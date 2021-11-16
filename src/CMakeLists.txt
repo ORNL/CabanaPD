@@ -1,0 +1,20 @@
+configure_file(CabanaPD_config.hpp.cmakein CabanaPD_config.hpp @ONLY)
+
+file(GLOB HEADERS GLOB *.hpp)
+
+file(GLOB SOURCES *.cpp)
+
+list(APPEND SOURCES ${FORCE_TYPES} ${SYSTEM_TYPES} ${SYSNNP_TYPES})
+
+install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/CabanaPD_config.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+add_library(CabanaPD ${SOURCES})
+
+target_include_directories(CabanaPD PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+                                    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+                                    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
+
+target_link_libraries(CabanaPD Cabana::cabanacore Cabana::Cajita)
+
+install(TARGETS CabanaPD DESTINATION lib)

@@ -1,0 +1,7 @@
+#ifndef CabanaPD_CONFIG_HPP
+#define CabanaPD_CONFIG_HPP
+
+#define CabanaPD_VERSION_STRING "@PROJECT_VERSION@"
+#define CabanaPD_GIT_COMMIT_HASH "@CabanaPD_GIT_COMMIT_HASH@"
+
+#endif
