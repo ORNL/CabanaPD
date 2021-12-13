@@ -59,10 +59,27 @@ void testForce( ModelTag )
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
     std::array<int, 3> num_cells = { 15, 15, 15 };
-
-    using ptype = CabanaPD::Particles<mem_space>;
-    ptype particles( exec_space(), box_min, box_max, num_cells );
     double s0 = 2.0;
+
+    // Create particles based on the mesh.
+    using ptype = CabanaPD::Particles<mem_space>;
+    ptype particles( exec_space{}, box_min, box_max, num_cells );
+    // This is probably not the best idea - the slice could be changed before
+    // this gets called. It certainly has to be called after the particle
+    // creation kernel is done.
+    auto x = particles.slice_x();
+    auto u = particles.slice_u();
+    auto v = particles.slice_v();
+
+    auto init_functor = KOKKOS_LAMBDA( const int pid )
+    {
+        for ( int d = 0; d < 3; d++ )
+        {
+            u( pid, d ) = s0 * x( pid, d );
+            v( pid, d ) = 0.0;
+        }
+    };
+    particles.update_particles( exec_space{}, init_functor );
 
     double K = 1.0;
     // This needs to exactly match the mesh spacing to compare with the single
@@ -76,7 +93,6 @@ void testForce( ModelTag )
     double mesh_max[3] = { particles.ghost_mesh_hi[0],
                            particles.ghost_mesh_hi[1],
                            particles.ghost_mesh_hi[2] };
-    auto x = particles.slice_x();
     using verlet_list =
         Cabana::VerletList<mem_space, Cabana::FullNeighborTag,
                            Cabana::VerletLayout2D, Cabana::TeamOpTag>;

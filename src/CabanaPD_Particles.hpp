@@ -174,6 +174,7 @@ class Particles
         int num_particles = particles_per_cell * owned_cells.size();
         _aosoa.resize( num_particles );
         auto x = slice_x();
+        auto v = slice_v();
         auto type = slice_type();
         auto rho = slice_rho();
         auto u = slice_u();
@@ -185,7 +186,7 @@ class Particles
         // Initialize particles.
         int local_num_create = 0;
         Kokkos::parallel_reduce(
-            "init_particles_uniform",
+            "CabanaPD::init_particles_uniform",
             Cajita::createExecutionPolicy( owned_cells, exec_space ),
             KOKKOS_LAMBDA( const int i, const int j, const int k,
                            int &create_count ) {
@@ -206,8 +207,7 @@ class Particles
                 for ( int d = 0; d < 3; d++ )
                 {
                     x( pid, d ) = cell_coord[d];
-                    // FIXME - needs to be done in the unit test
-                    u( pid, d ) = 2.0 * x( pid, d );
+                    v( pid, d ) = 0.0;
                 }
                 // FIXME: hardcoded
                 type( pid ) = 0;
@@ -231,6 +231,15 @@ class Particles
             local_num_create );
         n_local = local_num_create;
         // FIXME: global all reduce
+    }
+
+    template <class ExecSpace, class FunctorType>
+    void update_particles( const ExecSpace, const FunctorType init_functor )
+    {
+        Kokkos::RangePolicy<ExecSpace> policy( 0, n_local );
+        Kokkos::parallel_for(
+            "CabanaPD::update_particles", policy,
+            KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
     }
 
     // x, u, f, b, type, W, v, rho, id

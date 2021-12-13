@@ -100,18 +100,8 @@ class Solver : public SolverBase
         if ( print_rank() )
             exec_space::print_configuration( out );
 
-        // Create particles and simulation box
         // Create particles from mesh.
-        /*
-        auto init_functor = KOKKOS_LAMBDA( const int p )
-        {
-            for ( int d = 0; d < 3; d++ )
-            {
-                u( pid, d ) = random;
-                v( pid, d ) = 0;
-            }
-        };
-        */
+        // Does not set displacements, velocities, etc.
         Particles<memory_space> particles( exec_space(), inputs.low_corner,
                                            inputs.high_corner,
                                            inputs.num_cells );
