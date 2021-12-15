@@ -60,6 +60,10 @@ struct PMBModelTag
 {
 };
 
+struct LinearPMBModelTag
+{
+};
+
 template <class ExecutionSpace>
 class Force
 {
@@ -180,6 +184,53 @@ class Force
             neigh_op_tag, "CabanaPD::ForcePMB::compute_full" );
     }
 
+    template <class ForceType, class PosType, class VolType,
+              class NeighListType, class ParallelType>
+    void compute_force_full( const LinearPMBModelTag, ForceType &f,
+                             const PosType &x, const PosType &u,
+                             const VolType &vol,
+                             const NeighListType &neigh_list, const int n_local,
+                             ParallelType &neigh_op_tag )
+    {
+        auto c = _c;
+        // FIXME: will be bond-based
+        auto mu = _mu;
+
+        // Cabana::NeighborList<NeighListType> nlist;
+        auto force_full = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            double fx_i = 0.0;
+            double fy_i = 0.0;
+            double fz_i = 0.0;
+
+            // std::cout << nlist.numNeighbor( neigh_list, i ) << std::endl;
+
+            // Get the reference positions and displacements.
+            const double xi_x = x( i, 0 ) - x( j, 0 );
+            const double eta_u = u( i, 0 ) - u( j, 0 );
+            const double xi_y = x( i, 1 ) - x( j, 1 );
+            const double eta_v = u( i, 1 ) - u( j, 1 );
+            const double xi_z = x( i, 2 ) - x( j, 2 );
+            const double eta_w = u( i, 2 ) - u( j, 2 );
+            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+            const double linear_s =
+                ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
+            const double coeff = mu * c * linear_s * vol( i );
+            fx_i = coeff * xi_x / xi;
+            fy_i = coeff * xi_y / xi;
+            fz_i = coeff * xi_z / xi;
+
+            f( i, 0 ) += fx_i;
+            f( i, 1 ) += fy_i;
+            f( i, 2 ) += fz_i;
+        };
+
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Cabana::neighbor_parallel_for(
+            policy, force_full, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForceLinearPMB::compute_full" );
+    }
+
     template <class PosType, class VolType, class WType, class NeighListType,
               class ParallelType>
     double compute_energy_full( const PMBModelTag, WType &W, const PosType &x,
@@ -218,6 +269,46 @@ class Force
             policy, energy_full, neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, strain_energy,
             "CabanaPD::ForcePMB::compute_energy_full" );
+
+        return strain_energy;
+    }
+
+    template <class PosType, class VolType, class WType, class NeighListType,
+              class ParallelType>
+    double compute_energy_full( const LinearPMBModelTag, WType &W,
+                                const PosType &x, const PosType &u,
+                                const VolType &vol,
+                                const NeighListType &neigh_list,
+                                const int n_local, ParallelType &neigh_op_tag )
+    {
+        auto c = _c;
+        auto energy_full =
+            KOKKOS_LAMBDA( const int i, const int j, double &Phi )
+        {
+            // Get the reference positions and displacements.
+            const double xi_x = x( i, 0 ) - x( j, 0 );
+            const double eta_u = u( i, 0 ) - u( j, 0 );
+            const double xi_y = x( i, 1 ) - x( j, 1 );
+            const double eta_v = u( i, 1 ) - u( j, 1 );
+            const double xi_z = x( i, 2 ) - x( j, 2 );
+            const double eta_w = u( i, 2 ) - u( j, 2 );
+            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+            const double linear_s =
+                ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
+
+            // 1/2 from outside the integral; 1/2 from the integrand (pairwise
+            // potential).
+            double w = 0.25 * c * linear_s * linear_s * xi * vol( i );
+            W( i ) += w;
+            Phi += w * vol( i );
+        };
+
+        double strain_energy = 0.0;
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Cabana::neighbor_parallel_reduce(
+            policy, energy_full, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, strain_energy,
+            "CabanaPD::ForceLinearPMB::compute_energy_full" );
 
         return strain_energy;
     }

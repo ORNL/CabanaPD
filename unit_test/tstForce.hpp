@@ -158,5 +158,9 @@ void testForce( ModelTag )
 // TESTS
 //---------------------------------------------------------------------------//
 TEST( TEST_CATEGORY, test_force_pmb ) { testForce( CabanaPD::PMBModelTag{} ); }
+TEST( TEST_CATEGORY, test_force_linear_pmb )
+{
+    testForce( CabanaPD::LinearPMBModelTag{} );
+}
 
 } // end namespace Test
