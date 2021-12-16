@@ -93,7 +93,8 @@ class Integrator
             x( i, 2 ) += dtv * v( i, 2 );
         };
         Kokkos::RangePolicy<exec_space> policy( 0, v.size() );
-        Kokkos::parallel_for( "Integrator::Initial", policy, init_func );
+        Kokkos::parallel_for( "CabanaPD::Integrator::Initial", policy,
+                              init_func );
     }
 
     template <class ParticlesType>
@@ -113,7 +114,8 @@ class Integrator
             v( i, 2 ) += dtfm * f( i, 2 );
         };
         Kokkos::RangePolicy<exec_space> policy( 0, v.size() );
-        Kokkos::parallel_for( "Integrator::Final", policy, final_func );
+        Kokkos::parallel_for( "CabanaPD::Integrator::Final", policy,
+                              final_func );
     }
 };
 

@@ -186,7 +186,7 @@ class Particles
         // Initialize particles.
         int local_num_create = 0;
         Kokkos::parallel_reduce(
-            "CabanaPD::init_particles_uniform",
+            "CabanaPD::Particles::init_particles_uniform",
             Cajita::createExecutionPolicy( owned_cells, exec_space ),
             KOKKOS_LAMBDA( const int i, const int j, const int k,
                            int &create_count ) {
@@ -238,7 +238,7 @@ class Particles
     {
         Kokkos::RangePolicy<ExecSpace> policy( 0, n_local );
         Kokkos::parallel_for(
-            "CabanaPD::update_particles", policy,
+            "CabanaPD::Particles::update_particles", policy,
             KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
     }
 
