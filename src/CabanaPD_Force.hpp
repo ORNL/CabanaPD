@@ -175,9 +175,9 @@ class Force
         };
 
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-        Cabana::neighbor_parallel_for( policy, force_full, neigh_list,
-                                       Cabana::FirstNeighborsTag(),
-                                       neigh_op_tag, "ForcePMB::compute_full" );
+        Cabana::neighbor_parallel_for(
+            policy, force_full, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForcePMB::compute_full" );
     }
 
     template <class PosType, class VolType, class WType, class NeighListType,
@@ -216,7 +216,8 @@ class Force
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Cabana::neighbor_parallel_reduce(
             policy, energy_full, neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, strain_energy, "ForcePMB::compute_energy_full" );
+            neigh_op_tag, strain_energy,
+            "CabanaPD::ForcePMB::compute_energy_full" );
 
         return strain_energy;
     }
