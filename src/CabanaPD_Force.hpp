@@ -146,14 +146,11 @@ class Force
         // FIXME: will be bond-based
         auto mu = _mu;
 
-        // Cabana::NeighborList<NeighListType> nlist;
         auto force_full = KOKKOS_LAMBDA( const int i, const int j )
         {
             double fx_i = 0.0;
             double fy_i = 0.0;
             double fz_i = 0.0;
-
-            // std::cout << nlist.numNeighbor( neigh_list, i ) << std::endl;
 
             // Get the reference positions and displacements.
             const double xi_x = x( i, 0 ) - x( j, 0 );
@@ -196,14 +193,11 @@ class Force
         // FIXME: will be bond-based
         auto mu = _mu;
 
-        // Cabana::NeighborList<NeighListType> nlist;
         auto force_full = KOKKOS_LAMBDA( const int i, const int j )
         {
             double fx_i = 0.0;
             double fy_i = 0.0;
             double fz_i = 0.0;
-
-            // std::cout << nlist.numNeighbor( neigh_list, i ) << std::endl;
 
             // Get the reference positions and displacements.
             const double xi_x = x( i, 0 ) - x( j, 0 );
