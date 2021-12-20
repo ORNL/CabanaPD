@@ -153,12 +153,12 @@ class Force
             double fz_i = 0.0;
 
             // Get the reference positions and displacements.
-            const double xi_x = x( i, 0 ) - x( j, 0 );
-            const double eta_u = u( i, 0 ) - u( j, 0 );
-            const double xi_y = x( i, 1 ) - x( j, 1 );
-            const double eta_v = u( i, 1 ) - u( j, 1 );
-            const double xi_z = x( i, 2 ) - x( j, 2 );
-            const double eta_w = u( i, 2 ) - u( j, 2 );
+            const double xi_x = x( j, 0 ) - x( i, 0 );
+            const double eta_u = u( j, 0 ) - u( i, 0 );
+            const double xi_y = x( j, 1 ) - x( i, 1 );
+            const double eta_v = u( j, 1 ) - u( i, 1 );
+            const double xi_z = x( j, 2 ) - x( i, 2 );
+            const double eta_w = u( j, 2 ) - u( i, 2 );
             const double rx = xi_x + eta_u;
             const double ry = xi_y + eta_v;
             const double rz = xi_z + eta_w;
@@ -237,12 +237,12 @@ class Force
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
             // Get the reference positions and displacements.
-            const double xi_x = x( i, 0 ) - x( j, 0 );
-            const double eta_u = u( i, 0 ) - u( j, 0 );
-            const double xi_y = x( i, 1 ) - x( j, 1 );
-            const double eta_v = u( i, 1 ) - u( j, 1 );
-            const double xi_z = x( i, 2 ) - x( j, 2 );
-            const double eta_w = u( i, 2 ) - u( j, 2 );
+            const double xi_x = x( j, 0 ) - x( i, 0 );
+            const double eta_u = u( j, 0 ) - u( i, 0 );
+            const double xi_y = x( j, 1 ) - x( i, 1 );
+            const double eta_v = u( j, 1 ) - u( i, 1 );
+            const double xi_z = x( j, 2 ) - x( i, 2 );
+            const double eta_w = u( j, 2 ) - u( i, 2 );
             const double rx = xi_x + eta_u;
             const double ry = xi_y + eta_v;
             const double rz = xi_z + eta_w;

@@ -243,9 +243,9 @@ class Particles
     }
 
     // x, u, f, b, type, W, v, rho, id
-    auto slice_x() { return Cabana::slice<0>( _aosoa ); }
-    auto slice_u() { return Cabana::slice<1>( _aosoa ); }
-    auto slice_f() { return Cabana::slice<2>( _aosoa ); }
+    auto slice_x() { return Cabana::slice<0>( _aosoa, "positions" ); }
+    auto slice_u() { return Cabana::slice<1>( _aosoa, "displacements" ); }
+    auto slice_f() { return Cabana::slice<2>( _aosoa, "forces" ); }
     auto slice_f_a()
     {
         auto f = slice_f();
@@ -254,13 +254,13 @@ class Particles
         atomic_type f_a = f;
         return f_a;
     }
-    auto slice_b() { return Cabana::slice<3>( _aosoa ); }
-    auto slice_type() { return Cabana::slice<4>( _aosoa ); }
-    auto slice_W() { return Cabana::slice<5>( _aosoa ); }
-    auto slice_v() { return Cabana::slice<6>( _aosoa ); }
-    auto slice_rho() { return Cabana::slice<7>( _aosoa ); }
-    auto slice_id() { return Cabana::slice<8>( _aosoa ); }
-    auto slice_vol() { return Cabana::slice<9>( _aosoa ); }
+    auto slice_b() { return Cabana::slice<3>( _aosoa, "body_force" ); }
+    auto slice_type() { return Cabana::slice<4>( _aosoa, "type" ); }
+    auto slice_W() { return Cabana::slice<5>( _aosoa, "strain_energy" ); }
+    auto slice_v() { return Cabana::slice<6>( _aosoa, "velocities" ); }
+    auto slice_rho() { return Cabana::slice<7>( _aosoa, "density" ); }
+    auto slice_id() { return Cabana::slice<8>( _aosoa, "ID" ); }
+    auto slice_vol() { return Cabana::slice<9>( _aosoa, "volume" ); }
 
     void resize( int n_new )
     {

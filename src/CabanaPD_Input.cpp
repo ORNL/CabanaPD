@@ -57,20 +57,20 @@ namespace CabanaPD
 {
 
 // FIXME: hardcoded
-Inputs::Inputs()
+Inputs::Inputs( const int nc, const double lc, const double hc, const double _K,
+                const double d, const double t_f, const double dt )
+    : num_cells( { nc, nc, nc } )
+    , low_corner( { lc, lc, lc } )
+    , high_corner( { hc, hc, hc } )
+    , final_time( t_f )
+    , timestep( dt )
+    , K( _K )
+    , delta( d )
 {
-    // System
-    num_cells = { 5, 5, 5 };
-    low_corner = { 0, 0, 0 };
-    high_corner = { 1, 1, 1 };
-
-    // Simulation
-    n_steps = 10;
+    num_steps = final_time / timestep;
 
     // Force
     force_type = "PMB";
-    K = 72E9;
-    delta = 0.2;
 }
 
 Inputs::~Inputs() {}
