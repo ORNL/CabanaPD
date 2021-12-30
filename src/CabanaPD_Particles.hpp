@@ -116,7 +116,7 @@ class Particles
 
     // Constructor which initializes particles on regular grid.
     template <class ExecSpace>
-    Particles( const ExecSpace &exec_space, std::array<double, 3> low_corner,
+    Particles( const ExecSpace& exec_space, std::array<double, 3> low_corner,
                std::array<double, 3> high_corner,
                const std::array<int, 3> num_cells )
     {
@@ -163,7 +163,7 @@ class Particles
     }
 
     template <class ExecSpace>
-    void create_particles( const ExecSpace &exec_space )
+    void create_particles( const ExecSpace& exec_space )
     {
         // Create a local mesh and owned space.
         auto local_mesh = Cajita::createLocalMesh<device_type>( *local_grid );
@@ -179,7 +179,7 @@ class Particles
         auto rho = slice_rho();
         auto u = slice_u();
         auto vol = slice_vol();
-        auto created = Kokkos::View<bool *, device_type>(
+        auto created = Kokkos::View<bool*, device_type>(
             Kokkos::ViewAllocateWithoutInitializing( "particle_created" ),
             num_particles );
 
@@ -189,7 +189,7 @@ class Particles
             "CabanaPD::Particles::init_particles_uniform",
             Cajita::createExecutionPolicy( owned_cells, exec_space ),
             KOKKOS_LAMBDA( const int i, const int j, const int k,
-                           int &create_count ) {
+                           int& create_count ) {
                 // Compute the owned local cell id.
                 int i_own = i - owned_cells.min( Cajita::Dim::I );
                 int j_own = j - owned_cells.min( Cajita::Dim::J );

@@ -26,7 +26,7 @@ class Inputs
 
     Inputs();
     ~Inputs();
-    void read_args( int argc, char *argv[] );
+    void read_args( int argc, char* argv[] );
 };
 
 } // namespace CabanaPD

@@ -73,7 +73,7 @@ class Integrator
     ~Integrator() {}
 
     template <class ParticlesType>
-    void initial_integrate( ParticlesType &p )
+    void initial_integrate( ParticlesType& p )
     {
         auto u = p.slice_u();
         auto v = p.slice_v();
@@ -98,7 +98,7 @@ class Integrator
     }
 
     template <class ParticlesType>
-    void final_integrate( ParticlesType &p )
+    void final_integrate( ParticlesType& p )
     {
         auto v = p.slice_v();
         auto f = p.slice_f();
