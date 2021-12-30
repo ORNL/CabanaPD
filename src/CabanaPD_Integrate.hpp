@@ -61,13 +61,13 @@ class Integrator
 {
     using exec_space = ExecutionSpace;
 
-    double dtv, dtf;
+    double _dt, _half_dt;
 
   public:
     Integrator( double dt, double mvv2e )
+        : _dt( dt )
     {
-        dtf = 0.5 * dt / mvv2e;
-        dtv = dt;
+        _half_dt = 0.5 * dt / mvv2e;
     }
 
     ~Integrator() {}
@@ -82,15 +82,17 @@ class Integrator
         auto density = p.slice_rho();
         auto volume = p.slice_vol();
 
+        auto dt = _dt;
+        auto half_dt = _half_dt;
         auto init_func = KOKKOS_LAMBDA( const int i )
         {
-            const double dtfm = dtf / density( i ) / volume( i );
-            v( i, 0 ) += dtfm * f( i, 0 );
-            v( i, 1 ) += dtfm * f( i, 1 );
-            v( i, 2 ) += dtfm * f( i, 2 );
-            u( i, 0 ) += dtv * v( i, 0 );
-            u( i, 1 ) += dtv * v( i, 1 );
-            u( i, 2 ) += dtv * v( i, 2 );
+            const double half_dt_m = half_dt / density( i ) / volume( i );
+            v( i, 0 ) += half_dt_m * f( i, 0 );
+            v( i, 1 ) += half_dt_m * f( i, 1 );
+            v( i, 2 ) += half_dt_m * f( i, 2 );
+            u( i, 0 ) += dt * v( i, 0 );
+            u( i, 1 ) += dt * v( i, 1 );
+            u( i, 2 ) += dt * v( i, 2 );
         };
         Kokkos::RangePolicy<exec_space> policy( 0, v.size() );
         Kokkos::parallel_for( "CabanaPD::Integrator::Initial", policy,
@@ -106,12 +108,13 @@ class Integrator
         auto density = p.slice_rho();
         auto volume = p.slice_vol();
 
+        auto half_dt = _half_dt;
         auto final_func = KOKKOS_LAMBDA( const int i )
         {
-            const double dtfm = dtf / density( i ) / volume( i );
-            v( i, 0 ) += dtfm * f( i, 0 );
-            v( i, 1 ) += dtfm * f( i, 1 );
-            v( i, 2 ) += dtfm * f( i, 2 );
+            const double half_dt_m = half_dt / density( i ) / volume( i );
+            v( i, 0 ) += half_dt_m * f( i, 0 );
+            v( i, 1 ) += half_dt_m * f( i, 1 );
+            v( i, 2 ) += half_dt_m * f( i, 2 );
         };
         Kokkos::RangePolicy<exec_space> policy( 0, v.size() );
         Kokkos::parallel_for( "CabanaPD::Integrator::Final", policy,
