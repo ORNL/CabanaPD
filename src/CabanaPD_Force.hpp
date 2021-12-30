@@ -84,9 +84,9 @@ class Force
 
     template <class ModelTag, class ParticleType, class NeighListType,
               class ParallelType>
-    void compute( const ModelTag model_tag, ParticleType &particles,
-                  const NeighListType &neigh_list,
-                  const ParallelType &neigh_op_tag )
+    void compute( const ModelTag model_tag, ParticleType& particles,
+                  const NeighListType& neigh_list,
+                  const ParallelType& neigh_op_tag )
     {
         auto n_local = particles.n_local;
         auto x = particles.slice_x();
@@ -112,9 +112,9 @@ class Force
 
     template <class ModelTag, class ParticleType, class NeighListType,
               class ParallelType>
-    double compute_energy( const ModelTag model_tag, ParticleType &particles,
-                           const NeighListType &neigh_list,
-                           const ParallelType &neigh_op_tag )
+    double compute_energy( const ModelTag model_tag, ParticleType& particles,
+                           const NeighListType& neigh_list,
+                           const ParallelType& neigh_op_tag )
     {
         auto n_local = particles.n_local;
         auto x = particles.slice_x();
@@ -137,10 +137,10 @@ class Force
 
     template <class ForceType, class PosType, class VolType,
               class NeighListType, class ParallelType>
-    void compute_force_full( const PMBModelTag, ForceType &f, const PosType &x,
-                             const PosType &u, const VolType &vol,
-                             const NeighListType &neigh_list, const int n_local,
-                             ParallelType &neigh_op_tag )
+    void compute_force_full( const PMBModelTag, ForceType& f, const PosType& x,
+                             const PosType& u, const VolType& vol,
+                             const NeighListType& neigh_list, const int n_local,
+                             ParallelType& neigh_op_tag )
     {
         auto c = _c;
         // FIXME: will be bond-based
@@ -183,11 +183,11 @@ class Force
 
     template <class ForceType, class PosType, class VolType,
               class NeighListType, class ParallelType>
-    void compute_force_full( const LinearPMBModelTag, ForceType &f,
-                             const PosType &x, const PosType &u,
-                             const VolType &vol,
-                             const NeighListType &neigh_list, const int n_local,
-                             ParallelType &neigh_op_tag )
+    void compute_force_full( const LinearPMBModelTag, ForceType& f,
+                             const PosType& x, const PosType& u,
+                             const VolType& vol,
+                             const NeighListType& neigh_list, const int n_local,
+                             ParallelType& neigh_op_tag )
     {
         auto c = _c;
         // FIXME: will be bond-based
@@ -227,14 +227,14 @@ class Force
 
     template <class PosType, class VolType, class WType, class NeighListType,
               class ParallelType>
-    double compute_energy_full( const PMBModelTag, WType &W, const PosType &x,
-                                const PosType &u, const VolType &vol,
-                                const NeighListType &neigh_list,
-                                const int n_local, ParallelType &neigh_op_tag )
+    double compute_energy_full( const PMBModelTag, WType& W, const PosType& x,
+                                const PosType& u, const VolType& vol,
+                                const NeighListType& neigh_list,
+                                const int n_local, ParallelType& neigh_op_tag )
     {
         auto c = _c;
         auto energy_full =
-            KOKKOS_LAMBDA( const int i, const int j, double &Phi )
+            KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
             // Get the reference positions and displacements.
             const double xi_x = x( i, 0 ) - x( j, 0 );
@@ -269,15 +269,15 @@ class Force
 
     template <class PosType, class VolType, class WType, class NeighListType,
               class ParallelType>
-    double compute_energy_full( const LinearPMBModelTag, WType &W,
-                                const PosType &x, const PosType &u,
-                                const VolType &vol,
-                                const NeighListType &neigh_list,
-                                const int n_local, ParallelType &neigh_op_tag )
+    double compute_energy_full( const LinearPMBModelTag, WType& W,
+                                const PosType& x, const PosType& u,
+                                const VolType& vol,
+                                const NeighListType& neigh_list,
+                                const int n_local, ParallelType& neigh_op_tag )
     {
         auto c = _c;
         auto energy_full =
-            KOKKOS_LAMBDA( const int i, const int j, double &Phi )
+            KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
             // Get the reference positions and displacements.
             const double xi_x = x( i, 0 ) - x( j, 0 );

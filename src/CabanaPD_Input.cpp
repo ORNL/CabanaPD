@@ -75,7 +75,7 @@ Inputs::Inputs()
 
 Inputs::~Inputs() {}
 
-void Inputs::read_args( int argc, char *argv[] )
+void Inputs::read_args( int argc, char* argv[] )
 {
     for ( int i = 1; i < argc; i++ )
     {
