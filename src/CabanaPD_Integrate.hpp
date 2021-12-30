@@ -75,7 +75,7 @@ class Integrator
     template <class ParticlesType>
     void initial_integrate( ParticlesType &p )
     {
-        auto x = p.slice_x();
+        auto u = p.slice_u();
         auto v = p.slice_v();
         auto f = p.slice_f();
         auto type = p.slice_type();
@@ -88,9 +88,9 @@ class Integrator
             v( i, 0 ) += dtfm * f( i, 0 );
             v( i, 1 ) += dtfm * f( i, 1 );
             v( i, 2 ) += dtfm * f( i, 2 );
-            x( i, 0 ) += dtv * v( i, 0 );
-            x( i, 1 ) += dtv * v( i, 1 );
-            x( i, 2 ) += dtv * v( i, 2 );
+            u( i, 0 ) += dtv * v( i, 0 );
+            u( i, 1 ) += dtv * v( i, 1 );
+            u( i, 2 ) += dtv * v( i, 2 );
         };
         Kokkos::RangePolicy<exec_space> policy( 0, v.size() );
         Kokkos::parallel_for( "CabanaPD::Integrator::Initial", policy,
