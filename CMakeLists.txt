@@ -25,6 +25,9 @@ if( NOT Cabana_ENABLE_CAJITA )
   message( FATAL_ERROR "Cabana must be compiled with Cajita" )
 endif()
 
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CabanaPD_Config.cmakein
+  ${CMAKE_CURRENT_BINARY_DIR}/CabanaPD_Config.cmake @ONLY)
+
 ##---------------------------------------------------------------------------##
 ## Print the Git revision number to stdout
 ##---------------------------------------------------------------------------##
