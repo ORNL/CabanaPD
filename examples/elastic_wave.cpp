@@ -27,6 +27,8 @@ int main( int argc, char* argv[] )
         double dt = 0.01;
         double K = 1.0;
         double delta = 0.05;
+        // FIXME: set halo width based on delta
+        int halo_width = 2;
 
         CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, K, delta,
                                  t_final, dt );
@@ -34,15 +36,15 @@ int main( int argc, char* argv[] )
 
         // Create particles from mesh.
         // Does not set displacements, velocities, etc.
-        CabanaPD::Particles<memory_space> particles(
+        auto particles = std::make_shared<CabanaPD::Particles<memory_space>>(
             exec_space(), inputs.low_corner, inputs.high_corner,
-            inputs.num_cells );
+            inputs.num_cells, halo_width );
 
         // Define particle initialization.
-        auto x = particles.slice_x();
-        auto u = particles.slice_u();
-        auto v = particles.slice_v();
-        auto rho = particles.slice_rho();
+        auto x = particles->slice_x();
+        auto u = particles->slice_u();
+        auto v = particles->slice_v();
+        auto rho = particles->slice_rho();
 
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {
@@ -64,7 +66,7 @@ int main( int argc, char* argv[] )
             }
             rho( pid ) = 100;
         };
-        particles.update_particles( exec_space{}, init_functor );
+        particles->update_particles( exec_space{}, init_functor );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = std::make_shared<
@@ -72,33 +74,40 @@ int main( int argc, char* argv[] )
             inputs, particles );
         cabana_pd->run();
 
+        x = particles->slice_x();
+        u = particles->slice_u();
         auto profile = Kokkos::View<double* [2], memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "displacement_profile" ),
             num_cell );
-        auto measure_functor = KOKKOS_LAMBDA( const int pid )
+        double length = ( high_corner - low_corner );
+        int mpi_rank;
+        MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
+        int count = 0;
+        auto measure_profile = KOKKOS_LAMBDA( const int pid, int& c )
         {
-            double length = ( high_corner - low_corner );
             double dx = length / num_cell;
-            int index = Kokkos::Experimental::floor(
-                ( x( pid, 0 ) - low_corner ) / dx );
             if ( x( pid, 1 ) < dx / 2.0 && x( pid, 1 ) > -dx / 2.0 &&
                  x( pid, 2 ) < dx / 2.0 && x( pid, 2 ) > -dx / 2.0 )
             {
-                profile( index, 0 ) = x( pid, 0 );
-                profile( index, 1 ) = u( pid, 0 );
+                profile( c, 0 ) = x( pid, 0 );
+                profile( c, 1 ) = u( pid, 0 );
+                c++;
             }
         };
         Kokkos::RangePolicy<exec_space> policy( 0, x.size() );
-        Kokkos::parallel_for( "displacement_profile", policy, measure_functor );
+        Kokkos::parallel_reduce( "displacement_profile", policy,
+                                 measure_profile, count );
 
         auto profile_host =
             Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, profile );
         std::fstream fout;
         std::string file_name = "displacement_profile.txt";
-        fout.open( file_name, std::ios::out );
-        for ( std::size_t p = 0; p < profile_host.extent( 0 ); p++ )
-            fout << profile_host( p, 0 ) << " " << profile_host( p, 1 )
-                 << std::endl;
+        fout.open( file_name, std::ios::app );
+        for ( int p = 0; p < count; p++ )
+        {
+            fout << mpi_rank << " " << profile_host( p, 0 ) << " "
+                 << profile_host( p, 1 ) << std::endl;
+        }
     }
 
     MPI_Finalize();

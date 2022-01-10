@@ -51,6 +51,8 @@
 
 #include <memory>
 
+#include "mpi.h"
+
 #include <Kokkos_Core.hpp>
 
 #include <Cabana_Core.hpp>
@@ -68,10 +70,11 @@ class Particles
     static constexpr int dim = Dimension;
 
     // Per particle
-    int n_alloc;
-    int n_global;
-    int n_local;
-    int n_ghost;
+    int n_global = 0;
+    int n_local = 0;
+    int n_ghost = 0;
+    int size = 0;
+
     // x, u, f, b, type, W, v, rho, id, volume
     using member_types =
         Cabana::MemberTypes<double[dim], double[dim], double[dim], double[dim],
@@ -81,7 +84,7 @@ class Particles
     using aosoa_type = Cabana::AoSoA<member_types, memory_space>;
 
     // Per type
-    int n_types;
+    int n_types = 1;
 
     // Simulation total domain
     std::array<double, 3> global_mesh_ext;
@@ -95,15 +98,11 @@ class Particles
     std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double>>> local_grid;
 
     std::vector<int> halo_neighbors;
+    int halo_width;
 
     // Default constructor.
     Particles()
     {
-        n_global = 0;
-        n_local = 0;
-        n_ghost = 0;
-        n_types = 1;
-
         global_mesh_ext = { 0.0, 0.0, 0.0 };
         local_mesh_lo = { 0.0, 0.0, 0.0 };
         local_mesh_hi = { 0.0, 0.0, 0.0 };
@@ -118,7 +117,8 @@ class Particles
     template <class ExecSpace>
     Particles( const ExecSpace& exec_space, std::array<double, 3> low_corner,
                std::array<double, 3> high_corner,
-               const std::array<int, 3> num_cells )
+               const std::array<int, 3> num_cells, const int max_halo_width )
+        : halo_width( max_halo_width )
     {
         create_domain( low_corner, high_corner, num_cells );
         create_particles( exec_space );
@@ -146,7 +146,6 @@ class Particles
             MPI_COMM_WORLD, global_mesh, is_periodic, partitioner );
 
         // Create a local mesh
-        int halo_width = 1;
         local_grid = Cajita::createLocalGrid( global_grid, halo_width );
         auto local_mesh = Cajita::createLocalMesh<device_type>( *local_grid );
 
@@ -159,6 +158,7 @@ class Particles
             local_mesh_ext[d] = local_mesh.extent( Cajita::Own(), d );
         }
 
+        // FIXME: remove Impl
         halo_neighbors = Cajita::Impl::getTopology( *local_grid );
     }
 
@@ -179,11 +179,14 @@ class Particles
         auto rho = slice_rho();
         auto u = slice_u();
         auto vol = slice_vol();
+        auto id = slice_id();
         auto created = Kokkos::View<bool*, device_type>(
             Kokkos::ViewAllocateWithoutInitializing( "particle_created" ),
             num_particles );
 
         // Initialize particles.
+        int mpi_rank = -1;
+        MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
         int local_num_create = 0;
         Kokkos::parallel_reduce(
             "CabanaPD::Particles::init_particles_uniform",
@@ -213,6 +216,8 @@ class Particles
                 type( pid ) = 0;
                 rho( pid ) = 1.0;
 
+                id( pid ) = mpi_rank;
+
                 // Get the volume of the cell.
                 int empty[3];
                 vol( pid ) = local_mesh.measure( Cajita::Cell(), empty );
@@ -230,7 +235,11 @@ class Particles
             },
             local_num_create );
         n_local = local_num_create;
-        // FIXME: global all reduce
+        size = _aosoa.size();
+
+        // Not using Allreduce because global count is only used for printing.
+        MPI_Reduce( &n_local, &n_global, 1, MPI_INT, MPI_SUM, 0,
+                    MPI_COMM_WORLD );
     }
 
     template <class ExecSpace, class FunctorType>
@@ -262,13 +271,12 @@ class Particles
     auto slice_id() { return Cabana::slice<8>( _aosoa, "ID" ); }
     auto slice_vol() { return Cabana::slice<9>( _aosoa, "volume" ); }
 
-    void resize( int n_new )
+    void resize( int new_local, int new_ghost )
     {
-        if ( n_new > n_alloc )
-        {
-            n_alloc = n_new;
-        }
-        _aosoa.resize( n_new );
+        n_local = new_local;
+        n_ghost = new_ghost;
+        _aosoa.resize( new_local + new_ghost );
+        size = _aosoa.size();
     };
 
     void gather( Cabana::Halo<device_type> halo )
