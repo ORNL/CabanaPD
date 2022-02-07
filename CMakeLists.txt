@@ -18,12 +18,17 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 ##---------------------------------------------------------------------------##
 find_package(Cabana REQUIRED)
 
-if( NOT Cabana_ENABLE_MPI )
-  message( FATAL_ERROR "Cabana must be compiled with MPI" )
-endif()
-if( NOT Cabana_ENABLE_CAJITA )
-  message( FATAL_ERROR "Cabana must be compiled with Cajita" )
-endif()
+macro(CabanaPD_check_enabled)
+  cmake_parse_arguments(CABANA "" "OPTION" "" ${ARGN})
+
+  if( NOT Cabana_ENABLE_${CABANA_OPTION} )
+    message( FATAL_ERROR "Cabana must be compiled with ${CABANA_OPTION}" )
+  endif()
+endmacro()
+
+CabanaPD_check_enabled( OPTION MPI )
+CabanaPD_check_enabled( OPTION CAJITA )
+CabanaPD_check_enabled( OPTION SILO )
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CabanaPD_Config.cmakein
   ${CMAKE_CURRENT_BINARY_DIR}/CabanaPD_Config.cmake @ONLY)

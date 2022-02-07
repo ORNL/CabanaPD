@@ -58,6 +58,7 @@
 #include <Cabana_Core.hpp>
 #include <Kokkos_Core.hpp>
 
+#include <CabanaPD_Comm.hpp>
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Integrate.hpp>
@@ -81,103 +82,225 @@ class Solver : public SolverBase
     using exec_space = typename DeviceType::execution_space;
     using memory_space = typename DeviceType::memory_space;
 
-    int n_steps;
-    int write_freq;
+    using particle_type = Particles<memory_space>;
+    using integrator_type = Integrator<exec_space>;
+    using comm_type = Comm;
+    using force_type = Force<exec_space>;
+    using neighbor_type =
+        Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
+                           Cabana::VerletLayout2D, Cabana::TeamOpTag>;
 
-    Solver( Inputs inputs )
+    using model_tag = CabanaPD::PMBModelTag;
+    using neigh_iter_tag = Cabana::SerialOpTag;
+
+    int num_steps;
+    int output_frequency;
+    double init_time;
+
+    Solver( Inputs _inputs, particle_type _particles )
+        : particles( std::make_shared<particle_type>( _particles ) )
+        , inputs( std::make_shared<Inputs>( _inputs ) )
     {
-        // double init_time = 0;
         Kokkos::Timer init_timer;
         init_timer.reset();
+        init_time = 0;
 
-        std::ofstream out( inputs.output_file, std::ofstream::app );
-        std::ofstream err( inputs.error_file, std::ofstream::app );
+        std::ofstream out( inputs->output_file, std::ofstream::app );
+        std::ofstream err( inputs->error_file, std::ofstream::app );
 
-        // Create the inputs.
-        n_steps = inputs.n_steps;
-        log( out, "Read inputs." );
+        num_steps = inputs->num_steps;
+        output_frequency = inputs->output_frequency;
 
         if ( print_rank() )
             exec_space::print_configuration( out );
 
-        // Create particles from mesh.
-        // Does not set displacements, velocities, etc.
-        Particles<memory_space> particles( exec_space(), inputs.low_corner,
-                                           inputs.high_corner,
-                                           inputs.num_cells );
-
-        auto x = particles.slice_x();
-        for ( std::size_t p = 0; p < x.size(); p++ )
-            std::cout << x( p, 0 ) << " " << x( p, 1 ) << " " << x( p, 2 )
-                      << std::endl;
-
         // Create integrator.
         // FIXME: hardcoded
-        Integrator<exec_space> integrator( 0.001, 1.0 );
+        integrator = std::make_shared<integrator_type>( inputs->timestep, 1.0 );
 
         // Add ghosts from other MPI ranks
+        comm = std::make_shared<comm_type>();
         // FIXME: add Halo or use with PGhalo
         // Cabana::Halo<device_type> halo();
-        // particles.gather( halo );
+        // particles->gather( halo );
 
         // Create the neighbor list.
-        double mesh_min[3] = { particles.ghost_mesh_lo[0],
-                               particles.ghost_mesh_lo[1],
-                               particles.ghost_mesh_lo[2] };
-        double mesh_max[3] = { particles.ghost_mesh_hi[0],
-                               particles.ghost_mesh_hi[1],
-                               particles.ghost_mesh_hi[2] };
-        std::cout << particles.n_local << std::endl;
-        using verlet_list =
-            Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
-                               Cabana::VerletLayout2D, Cabana::TeamOpTag>;
-        verlet_list neighbors( x, 0, particles.n_local, inputs.delta, 1.0,
-                               mesh_min, mesh_max );
-        Cabana::NeighborList<verlet_list> nlist;
-        std::cout << nlist.maxNeighbor( neighbors ) << std::endl;
+        double mesh_min[3] = { particles->ghost_mesh_lo[0],
+                               particles->ghost_mesh_lo[1],
+                               particles->ghost_mesh_lo[2] };
+        double mesh_max[3] = { particles->ghost_mesh_hi[0],
+                               particles->ghost_mesh_hi[1],
+                               particles->ghost_mesh_hi[2] };
+        auto x = particles->slice_x();
+        neighbors = std::make_shared<neighbor_type>(
+            x, 0, particles->n_local, inputs->delta, 1.0, mesh_min, mesh_max );
 
-        Force<exec_space> force( inputs.half_neigh, inputs.K, inputs.delta );
+        force = std::make_shared<force_type>( inputs->half_neigh, inputs->K,
+                                              inputs->delta );
 
         // Compute initial forces
-        auto f = particles.slice_f();
+        auto f = particles->slice_f();
         Cabana::deep_copy( f, 0.0 );
-        if ( inputs.force_type == "PMB" )
-            force.compute( CabanaPD::PMBModelTag{}, particles, neighbors,
-                           Cabana::SerialOpTag{} );
+        if ( inputs->force_type == "PMB" )
+            force->compute( model_tag{}, *particles, *neighbors,
+                            neigh_iter_tag{} );
+
+        init_time += init_timer.seconds();
+
+        Cajita::Experimental::SiloParticleOutput::writeTimeStep(
+            particles->local_grid->globalGrid(), 0, 0, x, particles->slice_W(),
+            particles->slice_f(), particles->slice_u() );
+        /*
+        for ( std::size_t pid = 0; pid < x.size(); pid++ )
+            std::cout << x( pid, 0 ) << " " << x( pid, 1 ) << " " << x( pid, 2 )
+                      << " " << u( pid, 0 ) << " " << u( pid, 1 ) << " "
+                      << u( pid, 2 ) << " " << f( pid, 0 ) << " " << f( pid, 1 )
+                      << " " << f( pid, 2 ) << std::endl;
+        */
     }
 
-    void run() {}
+    void run()
+    {
+        std::ofstream out( inputs->output_file, std::ofstream::app );
+        double force_time = 0;
+        double integrate_time = 0;
+        double comm_time = 0;
+        double other_time = 0;
+        double last_time = 0;
+        Kokkos::Timer total_timer, force_timer, comm_timer, integrate_timer,
+            other_timer;
+        total_timer.reset();
+
+        // Main timestep loop
+        for ( int step = 1; step <= num_steps; step++ )
+        {
+            std::cout << step << std::endl;
+
+            // Integrate - velocity Verlet first half
+            integrate_timer.reset();
+            integrator->initial_integrate( *particles );
+            integrate_time += integrate_timer.seconds();
+
+            // Update ghost particles.
+            /*
+            comm_timer.reset();
+            comm->update_halo();
+            comm_time += comm_timer.seconds();
+            */
+            // Reset forces
+            force_timer.reset();
+            particles->slice_f();
+            auto f = particles->slice_f();
+            Cabana::deep_copy( f, 0.0 );
+
+            // Compute short range force
+            force->compute( model_tag{}, *particles, *neighbors,
+                            neigh_iter_tag{} );
+            force_time += force_timer.seconds();
+
+            // Integrate - velocity Verlet second half
+            integrate_timer.reset();
+            integrator->final_integrate( *particles );
+            integrate_time += integrate_timer.seconds();
+
+            // Print output
+            other_timer.reset();
+            if ( step % output_frequency == 0 )
+            {
+                auto W = force->compute_energy( model_tag{}, *particles,
+                                                *neighbors, neigh_iter_tag() );
+
+                double time = total_timer.seconds();
+                double rate = 1.0 * particles->n_global * output_frequency /
+                              ( time - last_time );
+                log( out, std::fixed, std::setprecision( 6 ), step, " ", W, " ",
+                     std::setprecision( 2 ), time, " ", std::scientific, rate );
+                last_time = time;
+
+                auto x = particles->slice_x();
+                Cajita::Experimental::SiloParticleOutput::writeTimeStep(
+                    particles->local_grid->globalGrid(),
+                    step / output_frequency, step * inputs->timestep, x,
+                    particles->slice_W(), particles->slice_f(),
+                    particles->slice_u() );
+
+                /*
+                auto u = particles->slice_u();
+                auto f = particles->slice_f();
+                for ( std::size_t pid = 0; pid < x.size(); pid++ )
+                    std::cout << x( pid, 0 ) << " " << x( pid, 1 ) << " "
+                              << x( pid, 2 ) << " " << u( pid, 0 ) << " "
+                              << u( pid, 1 ) << " " << u( pid, 2 ) << " "
+                              << f( pid, 0 ) << " " << f( pid, 1 ) << " "
+                              << f( pid, 2 ) << std::endl;
+                */
+            }
+            other_time += other_timer.seconds();
+        }
+
+        double time = total_timer.seconds();
+
+        // Final output and timings
+        double steps_per_sec = 1.0 * num_steps / time;
+        double p_steps_per_sec = particles->n_global * steps_per_sec;
+        log( out, std::fixed, std::setprecision( 2 ),
+             "\n#Procs Particles | Time T_Force T_Int T_Other T_Init |\n",
+             comm->mpi_size, " ", particles->n_global, " | ", time, " ",
+             force_time, " ", comm_time, " ", integrate_time, " ", other_time,
+             " ", init_time, " | PERFORMANCE\n", std::fixed, comm->mpi_size,
+             " ", particles->n_global, " | ", 1.0, " ", force_time / time, " ",
+             comm_time / time, " ", integrate_time / time, " ",
+             other_time / time, " ", init_time / time, " | FRACTION\n\n",
+             "#Steps/s Particle-steps/s Particle-steps/proc/s\n", std::scientific,
+             steps_per_sec, " ", p_steps_per_sec, " ",
+             p_steps_per_sec / comm->mpi_size );
+        out.close();
+    }
+
+  private:
+    std::shared_ptr<particle_type> particles;
+    std::shared_ptr<Inputs> inputs;
+    std::shared_ptr<comm_type> comm;
+    std::shared_ptr<integrator_type> integrator;
+    std::shared_ptr<force_type> force;
+    std::shared_ptr<neighbor_type> neighbors;
 };
 
-std::shared_ptr<SolverBase> createSolver( Inputs inp )
+template <class MemorySpace>
+std::shared_ptr<SolverBase> createSolver( Inputs inputs,
+                                          Particles<MemorySpace> particles )
 {
-    std::string device_type = inp.device_type;
+    std::string device_type = inputs.device_type;
     if ( device_type.compare( "SERIAL" ) == 0 )
     {
 #ifdef KOKKOS_ENABLE_SERIAL
         return std::make_shared<
-            Solver<Kokkos::Device<Kokkos::Serial, Kokkos::HostSpace>>>( inp );
+            Solver<Kokkos::Device<Kokkos::Serial, Kokkos::HostSpace>>>(
+            inputs, particles );
 #endif
     }
     else if ( device_type.compare( "OPENMP" ) == 0 )
     {
 #ifdef KOKKOS_ENABLE_OPENMP
         return std::make_shared<
-            Solver<Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace>>>( inp );
+            Solver<Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace>>>(
+            inputs, particles );
 #endif
     }
     else if ( device_type.compare( "CUDA" ) == 0 )
     {
 #ifdef KOKKOS_ENABLE_CUDA
         return std::make_shared<
-            Solver<Kokkos::Device<Kokkos::Cuda, Kokkos::CudaSpace>>>( inp );
+            Solver<Kokkos::Device<Kokkos::Cuda, Kokkos::CudaSpace>>>(
+            inputs, particles );
 #endif
     }
     else if ( device_type.compare( "HIP" ) == 0 )
     {
 #ifdef KOKKOS_ENABLE_HIP
         return std::make_shared<Solver<Kokkos::Device<
-            Kokkos::Experimental::HIP, Kokkos::Experimental::HIPSpace>>>( inp );
+            Kokkos::Experimental::HIP, Kokkos::Experimental::HIPSpace>>>(
+            inputs, particles );
 #endif
     }
 
