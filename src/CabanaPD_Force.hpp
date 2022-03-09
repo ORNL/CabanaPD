@@ -79,7 +79,6 @@ class Force
         : _half_neigh( half_neigh )
     {
         _c = 18.0 * K / ( 3.141592653589793 * delta * delta * delta * delta );
-        _mu = 1.0;
     }
 
     template <class ModelTag, class ParticleType, class NeighListType,
@@ -143,8 +142,6 @@ class Force
                              ParallelType& neigh_op_tag )
     {
         auto c = _c;
-        // FIXME: will be bond-based
-        auto mu = _mu;
 
         auto force_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -165,7 +162,7 @@ class Force
             const double r = sqrt( rx * rx + ry * ry + rz * rz );
             const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
             const double s = ( r - xi ) / xi;
-            const double coeff = mu * c * s * vol( i );
+            const double coeff = c * s * vol( i );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -190,8 +187,6 @@ class Force
                              ParallelType& neigh_op_tag )
     {
         auto c = _c;
-        // FIXME: will be bond-based
-        auto mu = _mu;
 
         auto force_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -209,7 +204,7 @@ class Force
             const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
             const double linear_s =
                 ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
-            const double coeff = mu * c * linear_s * vol( i );
+            const double coeff = c * linear_s * vol( i );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
             fz_i = coeff * xi_z / xi;
