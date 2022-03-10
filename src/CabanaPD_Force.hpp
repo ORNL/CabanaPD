@@ -56,92 +56,51 @@
 namespace CabanaPD
 {
 
-struct PMBModelTag
+struct PMBModel
 {
+    double c;
+
+    PMBModel(){};
+    PMBModel( const double K, const double delta ) { set_param( K, delta ); }
+
+    void set_param( const double K, const double delta )
+    {
+        c = 18.0 * K / ( 3.141592653589793 * delta * delta * delta * delta );
+    }
 };
 
-struct LinearPMBModelTag
+struct LinearPMBModel : public PMBModel
 {
+    using PMBModel::c;
 };
+
+template <class ExecutionSpace, class ForceType>
+class Force;
 
 template <class ExecutionSpace>
-class Force
+class Force<ExecutionSpace, PMBModel>
 {
   protected:
     bool _half_neigh;
-    double _c;
-    double _mu;
+    PMBModel _model;
 
   public:
     using exec_space = ExecutionSpace;
 
-    Force( const bool half_neigh, const double K, const double delta )
+    Force( const bool half_neigh, const PMBModel model )
         : _half_neigh( half_neigh )
+        , _model( model )
     {
-        _c = 18.0 * K / ( 3.141592653589793 * delta * delta * delta * delta );
-    }
-
-    template <class ModelTag, class ParticleType, class NeighListType,
-              class ParallelType>
-    void compute( const ModelTag model_tag, ParticleType& particles,
-                  const NeighListType& neigh_list,
-                  const ParallelType& neigh_op_tag )
-    {
-        auto n_local = particles.n_local;
-        auto x = particles.slice_x();
-        auto u = particles.slice_u();
-        auto f = particles.slice_f();
-        auto f_a = particles.slice_f_a();
-        auto vol = particles.slice_vol();
-
-        // if ( half_neigh )
-        // Forces must be atomic for half list
-        // compute_force_half( f_a, x, u, neigh_list, n_local,
-        //                    neigh_op_tag );
-
-        // Forces only atomic if using team threading
-        if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
-            compute_force_full( model_tag, f_a, x, u, vol, neigh_list, n_local,
-                                neigh_op_tag );
-        else
-            compute_force_full( model_tag, f, x, u, vol, neigh_list, n_local,
-                                neigh_op_tag );
-        Kokkos::fence();
-    }
-
-    template <class ModelTag, class ParticleType, class NeighListType,
-              class ParallelType>
-    double compute_energy( const ModelTag model_tag, ParticleType& particles,
-                           const NeighListType& neigh_list,
-                           const ParallelType& neigh_op_tag )
-    {
-        auto n_local = particles.n_local;
-        auto x = particles.slice_x();
-        auto u = particles.slice_u();
-        auto f = particles.slice_f();
-        auto W = particles.slice_W();
-        auto vol = particles.slice_vol();
-
-        double energy;
-        // if ( _half_neigh )
-        //    energy = compute_energy_half( model_tag, x, u, neigh_list,
-        //                                  n_local, neigh_op_tag );
-        // else
-        energy = compute_energy_full( model_tag, W, x, u, vol, neigh_list,
-                                      n_local, neigh_op_tag );
-        Kokkos::fence();
-
-        return energy;
     }
 
     template <class ForceType, class PosType, class VolType,
               class NeighListType, class ParallelType>
-    void compute_force_full( const PMBModelTag, ForceType& f, const PosType& x,
-                             const PosType& u, const VolType& vol,
+    void compute_force_full( ForceType& f, const PosType& x, const PosType& u,
+                             const VolType& vol,
                              const NeighListType& neigh_list, const int n_local,
-                             ParallelType& neigh_op_tag )
+                             ParallelType& neigh_op_tag ) const
     {
-        auto c = _c;
+        auto c = _model.c;
 
         auto force_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -178,15 +137,74 @@ class Force
             neigh_op_tag, "CabanaPD::ForcePMB::compute_full" );
     }
 
+    template <class PosType, class VolType, class WType, class NeighListType,
+              class ParallelType>
+    double
+    compute_energy_full( WType& W, const PosType& x, const PosType& u,
+                         const VolType& vol, const NeighListType& neigh_list,
+                         const int n_local, ParallelType& neigh_op_tag ) const
+    {
+        auto c = _model.c;
+
+        auto energy_full =
+            KOKKOS_LAMBDA( const int i, const int j, double& Phi )
+        {
+            // Get the reference positions and displacements.
+            const double xi_x = x( j, 0 ) - x( i, 0 );
+            const double eta_u = u( j, 0 ) - u( i, 0 );
+            const double xi_y = x( j, 1 ) - x( i, 1 );
+            const double eta_v = u( j, 1 ) - u( i, 1 );
+            const double xi_z = x( j, 2 ) - x( i, 2 );
+            const double eta_w = u( j, 2 ) - u( i, 2 );
+            const double rx = xi_x + eta_u;
+            const double ry = xi_y + eta_v;
+            const double rz = xi_z + eta_w;
+            const double r = sqrt( rx * rx + ry * ry + rz * rz );
+            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+            const double s = ( r - xi ) / xi;
+
+            // 1/2 from outside the integral; 1/2 from the integrand (pairwise
+            // potential).
+            double w = 0.25 * c * s * s * xi * vol( i );
+            W( i ) += w;
+            Phi += w * vol( i );
+        };
+
+        double strain_energy = 0.0;
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Cabana::neighbor_parallel_reduce(
+            policy, energy_full, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, strain_energy,
+            "CabanaPD::ForcePMB::compute_energy_full" );
+
+        return strain_energy;
+    }
+};
+
+template <class ExecutionSpace>
+class Force<ExecutionSpace, LinearPMBModel>
+{
+  protected:
+    bool _half_neigh;
+    LinearPMBModel _model;
+
+  public:
+    using exec_space = ExecutionSpace;
+
+    Force( const bool half_neigh, const LinearPMBModel model )
+        : _half_neigh( half_neigh )
+        , _model( model )
+    {
+    }
+
     template <class ForceType, class PosType, class VolType,
               class NeighListType, class ParallelType>
-    void compute_force_full( const LinearPMBModelTag, ForceType& f,
-                             const PosType& x, const PosType& u,
+    void compute_force_full( ForceType& f, const PosType& x, const PosType& u,
                              const VolType& vol,
                              const NeighListType& neigh_list, const int n_local,
-                             ParallelType& neigh_op_tag )
+                             ParallelType& neigh_op_tag ) const
     {
-        auto c = _c;
+        auto c = _model.c;
 
         auto force_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -222,55 +240,13 @@ class Force
 
     template <class PosType, class VolType, class WType, class NeighListType,
               class ParallelType>
-    double compute_energy_full( const PMBModelTag, WType& W, const PosType& x,
-                                const PosType& u, const VolType& vol,
-                                const NeighListType& neigh_list,
-                                const int n_local, ParallelType& neigh_op_tag )
+    double
+    compute_energy_full( WType& W, const PosType& x, const PosType& u,
+                         const VolType& vol, const NeighListType& neigh_list,
+                         const int n_local, ParallelType& neigh_op_tag ) const
     {
-        auto c = _c;
-        auto energy_full =
-            KOKKOS_LAMBDA( const int i, const int j, double& Phi )
-        {
-            // Get the reference positions and displacements.
-            const double xi_x = x( j, 0 ) - x( i, 0 );
-            const double eta_u = u( j, 0 ) - u( i, 0 );
-            const double xi_y = x( j, 1 ) - x( i, 1 );
-            const double eta_v = u( j, 1 ) - u( i, 1 );
-            const double xi_z = x( j, 2 ) - x( i, 2 );
-            const double eta_w = u( j, 2 ) - u( i, 2 );
-            const double rx = xi_x + eta_u;
-            const double ry = xi_y + eta_v;
-            const double rz = xi_z + eta_w;
-            const double r = sqrt( rx * rx + ry * ry + rz * rz );
-            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
-            const double s = ( r - xi ) / xi;
+        auto c = _model.c;
 
-            // 1/2 from outside the integral; 1/2 from the integrand (pairwise
-            // potential).
-            double w = 0.25 * c * s * s * xi * vol( i );
-            W( i ) += w;
-            Phi += w * vol( i );
-        };
-
-        double strain_energy = 0.0;
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-        Cabana::neighbor_parallel_reduce(
-            policy, energy_full, neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, strain_energy,
-            "CabanaPD::ForcePMB::compute_energy_full" );
-
-        return strain_energy;
-    }
-
-    template <class PosType, class VolType, class WType, class NeighListType,
-              class ParallelType>
-    double compute_energy_full( const LinearPMBModelTag, WType& W,
-                                const PosType& x, const PosType& u,
-                                const VolType& vol,
-                                const NeighListType& neigh_list,
-                                const int n_local, ParallelType& neigh_op_tag )
-    {
-        auto c = _c;
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
@@ -302,6 +278,59 @@ class Force
         return strain_energy;
     }
 };
+
+template <class ForceType, class ParticleType, class NeighListType,
+          class ParallelType>
+void compute_force( const ForceType& force, ParticleType& particles,
+                    const NeighListType& neigh_list,
+                    const ParallelType& neigh_op_tag )
+{
+    auto n_local = particles.n_local;
+    auto x = particles.slice_x();
+    auto u = particles.slice_u();
+    auto f = particles.slice_f();
+    auto f_a = particles.slice_f_a();
+    auto vol = particles.slice_vol();
+
+    // if ( half_neigh )
+    // Forces must be atomic for half list
+    // compute_force_half( f_a, x, u, neigh_list, n_local,
+    //                    neigh_op_tag );
+
+    // Forces only atomic if using team threading
+    if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
+        force.compute_force_full( f_a, x, u, vol, neigh_list, n_local,
+                                  neigh_op_tag );
+    else
+        force.compute_force_full( f, x, u, vol, neigh_list, n_local,
+                                  neigh_op_tag );
+    Kokkos::fence();
+}
+
+template <class ForceType, class ParticleType, class NeighListType,
+          class ParallelType>
+double compute_energy( const ForceType force, ParticleType& particles,
+                       const NeighListType& neigh_list,
+                       const ParallelType& neigh_op_tag )
+{
+    auto n_local = particles.n_local;
+    auto x = particles.slice_x();
+    auto u = particles.slice_u();
+    auto f = particles.slice_f();
+    auto W = particles.slice_W();
+    auto vol = particles.slice_vol();
+
+    double energy;
+    // if ( _half_neigh )
+    //    energy = compute_energy_half( force, x, u, neigh_list,
+    //                                  n_local, neigh_op_tag );
+    // else
+    energy = force.compute_energy_full( W, x, u, vol, neigh_list, n_local,
+                                        neigh_op_tag );
+    Kokkos::fence();
+
+    return energy;
+}
 
 } // namespace CabanaPD
 

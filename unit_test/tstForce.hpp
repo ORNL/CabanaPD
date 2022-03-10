@@ -51,8 +51,8 @@ double computeReferenceStrainEnergyDensity( const int m, const double delta,
     return W;
 }
 //---------------------------------------------------------------------------//
-template <class ModelTag>
-void testForce( ModelTag )
+template <class ModelType>
+void testForce( ModelType model )
 {
     using exec_space = TEST_EXECSPACE;
     using mem_space = TEST_MEMSPACE;
@@ -81,11 +81,12 @@ void testForce( ModelTag )
     };
     particles.update_particles( exec_space{}, init_functor );
 
-    double K = 1.0;
     // This needs to exactly match the mesh spacing to compare with the single
     // particle calculation.
     double delta = ( box_max[0] - box_min[0] ) / num_cells[0];
-    CabanaPD::Force<exec_space> force( true, K, delta );
+    double K = 1.0;
+    model.set_param( K, delta );
+    CabanaPD::Force<exec_space, ModelType> force( true, model );
 
     double mesh_min[3] = { particles.ghost_mesh_lo[0],
                            particles.ghost_mesh_lo[1],
@@ -104,10 +105,10 @@ void testForce( ModelTag )
     auto W = particles.slice_W();
     auto vol = particles.slice_vol();
     Cabana::deep_copy( f, 0.0 );
-    force.compute( ModelTag{}, particles, neigh_list, Cabana::SerialOpTag() );
+    compute_force( force, particles, neigh_list, Cabana::SerialOpTag() );
 
-    auto Phi = force.compute_energy( ModelTag{}, particles, neigh_list,
-                                     Cabana::SerialOpTag() );
+    auto Phi =
+        compute_energy( force, particles, neigh_list, Cabana::SerialOpTag() );
 
     // Make a copy of final results on the host
     std::size_t num_particle = x.size();
@@ -157,10 +158,10 @@ void testForce( ModelTag )
 //---------------------------------------------------------------------------//
 // TESTS
 //---------------------------------------------------------------------------//
-TEST( TEST_CATEGORY, test_force_pmb ) { testForce( CabanaPD::PMBModelTag{} ); }
+TEST( TEST_CATEGORY, test_force_pmb ) { testForce( CabanaPD::PMBModel() ); }
 TEST( TEST_CATEGORY, test_force_linear_pmb )
 {
-    testForce( CabanaPD::LinearPMBModelTag{} );
+    testForce( CabanaPD::LinearPMBModel() );
 }
 
 } // end namespace Test
