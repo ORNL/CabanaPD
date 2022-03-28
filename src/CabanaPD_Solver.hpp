@@ -49,6 +49,8 @@
 #ifndef SOLVER_H
 #define SOLVER_H
 
+#include <chrono>
+#include <ctime>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -84,7 +86,7 @@ class Solver : public SolverBase
 
     using particle_type = Particles<memory_space>;
     using integrator_type = Integrator<exec_space>;
-    using comm_type = Comm;
+    using comm_type = Comm<DeviceType>;
     using force_type = Force<exec_space>;
     using neighbor_type =
         Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
@@ -97,8 +99,8 @@ class Solver : public SolverBase
     int output_frequency;
     double init_time;
 
-    Solver( Inputs _inputs, particle_type _particles )
-        : particles( std::make_shared<particle_type>( _particles ) )
+    Solver( Inputs _inputs, std::shared_ptr<particle_type> _particles )
+        : particles( _particles )
         , inputs( std::make_shared<Inputs>( _inputs ) )
     {
         Kokkos::Timer init_timer;
@@ -111,6 +113,9 @@ class Solver : public SolverBase
         num_steps = inputs->num_steps;
         output_frequency = inputs->output_frequency;
 
+        auto time = std::chrono::system_clock::to_time_t(
+            std::chrono::system_clock::now() );
+        log( out, "CabanaPD (", std::ctime( &time ), ")\n" );
         if ( print_rank() )
             exec_space::print_configuration( out );
 
@@ -119,10 +124,7 @@ class Solver : public SolverBase
         integrator = std::make_shared<integrator_type>( inputs->timestep, 1.0 );
 
         // Add ghosts from other MPI ranks
-        comm = std::make_shared<comm_type>();
-        // FIXME: add Halo or use with PGhalo
-        // Cabana::Halo<device_type> halo();
-        // particles->gather( halo );
+        comm = std::make_shared<comm_type>( *particles );
 
         // Create the neighbor list.
         double mesh_min[3] = { particles->ghost_mesh_lo[0],
@@ -145,11 +147,10 @@ class Solver : public SolverBase
             force->compute( model_tag{}, *particles, *neighbors,
                             neigh_iter_tag{} );
 
-        init_time += init_timer.seconds();
 
         Cajita::Experimental::SiloParticleOutput::writeTimeStep(
             particles->local_grid->globalGrid(), 0, 0, x, particles->slice_W(),
-            particles->slice_f(), particles->slice_u() );
+            particles->slice_f(), particles->slice_u(), particles->slice_id() );
         /*
         for ( std::size_t pid = 0; pid < x.size(); pid++ )
             std::cout << x( pid, 0 ) << " " << x( pid, 1 ) << " " << x( pid, 2 )
@@ -157,6 +158,9 @@ class Solver : public SolverBase
                       << u( pid, 2 ) << " " << f( pid, 0 ) << " " << f( pid, 1 )
                       << " " << f( pid, 2 ) << std::endl;
         */
+        log( out, "Nlocal Nghost Nglobal\n", particles->n_local, " ",
+             particles->n_ghost, " ", particles->n_global );
+        init_time += init_timer.seconds();
     }
 
     void run()
@@ -174,7 +178,8 @@ class Solver : public SolverBase
         // Main timestep loop
         for ( int step = 1; step <= num_steps; step++ )
         {
-            std::cout << step << std::endl;
+            if ( print_rank() )
+                std::cout << step << std::endl;
 
             // Integrate - velocity Verlet first half
             integrate_timer.reset();
@@ -182,11 +187,10 @@ class Solver : public SolverBase
             integrate_time += integrate_timer.seconds();
 
             // Update ghost particles.
-            /*
             comm_timer.reset();
-            comm->update_halo();
+            comm->gather( *particles );
             comm_time += comm_timer.seconds();
-            */
+
             // Reset forces
             force_timer.reset();
             particles->slice_f();
@@ -222,7 +226,7 @@ class Solver : public SolverBase
                     particles->local_grid->globalGrid(),
                     step / output_frequency, step * inputs->timestep, x,
                     particles->slice_W(), particles->slice_f(),
-                    particles->slice_u() );
+                    particles->slice_u(), particles->slice_id() );
 
                 /*
                 auto u = particles->slice_u();
@@ -251,8 +255,8 @@ class Solver : public SolverBase
              " ", particles->n_global, " | ", 1.0, " ", force_time / time, " ",
              comm_time / time, " ", integrate_time / time, " ",
              other_time / time, " ", init_time / time, " | FRACTION\n\n",
-             "#Steps/s Particle-steps/s Particle-steps/proc/s\n", std::scientific,
-             steps_per_sec, " ", p_steps_per_sec, " ",
+             "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
+             std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
              p_steps_per_sec / comm->mpi_size );
         out.close();
     }

@@ -63,7 +63,7 @@ void testForce( ModelTag )
 
     // Create particles based on the mesh.
     using ptype = CabanaPD::Particles<mem_space>;
-    ptype particles( exec_space{}, box_min, box_max, num_cells );
+    ptype particles( exec_space{}, box_min, box_max, num_cells, 0 );
     // This is probably not the best idea - the slice could be changed before
     // this gets called. It certainly has to be called after the particle
     // creation kernel is done.

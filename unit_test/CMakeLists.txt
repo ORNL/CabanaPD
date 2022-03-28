@@ -27,7 +27,7 @@ macro(CabanaPD_add_tests)
   set(CABANAPD_UNIT_TEST_MPIEXEC_NUMPROCS 1)
   if(CABANAPD_UNIT_TEST_MPI)
     list(APPEND CABANAPD_UNIT_TEST_MPIEXEC_NUMPROCS 2)
-    if(MPIEXEC_MAX_NUMPROCS GREATER 1)
+    if(MPIEXEC_MAX_NUMPROCS GREATER 2)
       list(APPEND CABANAPD_UNIT_TEST_MPIEXEC_NUMPROCS ${MPIEXEC_MAX_NUMPROCS})
     endif()
   endif()
@@ -54,12 +54,12 @@ macro(CabanaPD_add_tests)
         foreach(_np ${CABANAPD_UNIT_TEST_MPIEXEC_NUMPROCS})
           if(_device STREQUAL PTHREAD OR _device STREQUAL OPENMP)
             foreach(_thread ${CABANAPD_UNIT_TEST_NUMTHREADS})
-              add_test(NAME ${_target}_${_np}_${_thread} COMMAND
+              add_test(NAME ${_target}_NP_${_np}_NT_${_thread} COMMAND
                 ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${_np} ${MPIEXEC_PREFLAGS}
                 ${_target} ${MPIEXEC_POSTFLAGS} ${gtest_args} --kokkos-threads=${_thread})
             endforeach()
           else()
-            add_test(NAME ${_target}_${_np} COMMAND
+            add_test(NAME ${_target}_NP_${_np} COMMAND
               ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${_np} ${MPIEXEC_PREFLAGS}
               ${_target} ${MPIEXEC_POSTFLAGsS} ${gtest_args})
           endif()
@@ -70,3 +70,5 @@ macro(CabanaPD_add_tests)
 endmacro()
 
 CabanaPD_add_tests(NAMES Force Integrator)
+
+CabanaPD_add_tests(MPI NAMES Comm)
