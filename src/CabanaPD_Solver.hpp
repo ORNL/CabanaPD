@@ -60,12 +60,14 @@
 #include <Cabana_Core.hpp>
 #include <Kokkos_Core.hpp>
 
+#include <CabanaPD_Boundary.hpp>
 #include <CabanaPD_Comm.hpp>
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Integrate.hpp>
 #include <CabanaPD_Output.hpp>
 #include <CabanaPD_Particles.hpp>
+#include <CabanaPD_Prenotch.hpp>
 
 namespace CabanaPD
 {
@@ -99,7 +101,7 @@ class Solver : public SolverBase
     double init_time;
 
     Solver( Inputs _inputs, std::shared_ptr<particle_type> _particles,
-            force_model_type force_model )
+            force_model_type force_model, Prenotch prenotch )
         : particles( _particles )
         , inputs( std::make_shared<Inputs>( _inputs ) )
     {
@@ -136,17 +138,33 @@ class Solver : public SolverBase
         auto x = particles->slice_x();
         neighbors = std::make_shared<neighbor_type>(
             x, 0, particles->n_local, inputs->delta, 1.0, mesh_min, mesh_max );
+        init_bond_breaking( true );
+
+        create_prenotch( true, prenotch );
+        auto type = particles->slice_type();
+        Cabana::deep_copy( type, 0.0 );
+        Kokkos::RangePolicy<exec_space> policy( 0, particles->n_local );
+        Kokkos::parallel_for(
+            "", policy, KOKKOS_LAMBDA( const int pid ) {
+                for ( std::size_t n = 0; n < mu.extent( 1 ); n++ )
+                    type( pid ) += mu( pid, n );
+            } );
 
         force = std::make_shared<force_type>( inputs->half_neigh, force_model );
 
         // Compute initial forces
         auto f = particles->slice_f();
         Cabana::deep_copy( f, 0.0 );
-        compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
+        compute_force( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
+        compute_energy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
+
+        // Add boundary condition - resetting boundary forces to zero.
+        CabanaPD::BoundaryCondition::apply( exec_space(), *particles );
 
         Cajita::Experimental::SiloParticleOutput::writeTimeStep(
             "particles", particles->local_grid->globalGrid(), 0, 0, x,
-            particles->slice_W(), particles->slice_f(), particles->slice_u() );
+            particles->slice_W(), particles->slice_f(), particles->slice_u(),
+            particles->slice_v(), particles->slice_phi() );
         /*
         for ( std::size_t pid = 0; pid < x.size(); pid++ )
             std::cout << x( pid, 0 ) << " " << x( pid, 1 ) << " " << x( pid, 2 )
@@ -157,6 +175,30 @@ class Solver : public SolverBase
         log( out, "Nlocal Nghost Nglobal\n", particles->n_local, " ",
              particles->n_ghost, " ", particles->n_global );
         init_time += init_timer.seconds();
+    }
+
+    void init_bond_breaking( bool break_bonds )
+    {
+        if ( break_bonds )
+        {
+            int max_neighbors =
+                Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
+            mu = NeighborView(
+                Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
+                particles->n_local, max_neighbors );
+            Kokkos::deep_copy( mu, 1 );
+            std::cout << mu.extent( 0 ) << " " << mu.extent( 1 ) << std::endl;
+        }
+        else
+        {
+            mu = NeighborView( "unused_bonds", 0, 0 );
+        }
+    }
+
+    void create_prenotch( bool add_prenotch, Prenotch prenotch )
+    {
+        if ( add_prenotch )
+            prenotch.create( exec_space{}, mu, *particles, *neighbors );
     }
 
     void run()
@@ -174,9 +216,6 @@ class Solver : public SolverBase
         // Main timestep loop
         for ( int step = 1; step <= num_steps; step++ )
         {
-            if ( print_rank() )
-                std::cout << step << std::endl;
-
             // Integrate - velocity Verlet first half
             integrate_timer.reset();
             integrator->initial_integrate( *particles );
@@ -194,8 +233,21 @@ class Solver : public SolverBase
             Cabana::deep_copy( f, 0.0 );
 
             // Compute short range force
-            compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
+            compute_force( *force, *particles, *neighbors, mu,
+                           neigh_iter_tag{} );
             force_time += force_timer.seconds();
+
+            auto type = particles->slice_type();
+            Cabana::deep_copy( type, 0.0 );
+            Kokkos::RangePolicy<exec_space> policy( 0, particles->n_local );
+            Kokkos::parallel_for(
+                "", policy, KOKKOS_LAMBDA( const int pid ) {
+                    for ( std::size_t n = 0; n < mu.extent( 1 ); n++ )
+                        type( pid ) += mu( pid, n );
+                } );
+
+            // Add boundary condition - resetting boundary forces to zero.
+            CabanaPD::BoundaryCondition::apply( exec_space(), *particles );
 
             // Integrate - velocity Verlet second half
             integrate_timer.reset();
@@ -206,7 +258,11 @@ class Solver : public SolverBase
             other_timer.reset();
             if ( step % output_frequency == 0 )
             {
-                auto W = compute_energy( *force, *particles, *neighbors,
+                if ( print_rank() )
+                    std::cout << step << " " << step * inputs->timestep
+                              << std::endl;
+
+                auto W = compute_energy( *force, *particles, *neighbors, mu,
                                          neigh_iter_tag() );
 
                 double time = total_timer.seconds();
@@ -221,7 +277,8 @@ class Solver : public SolverBase
                     "particles", particles->local_grid->globalGrid(),
                     step / output_frequency, step * inputs->timestep, x,
                     particles->slice_W(), particles->slice_f(),
-                    particles->slice_u() );
+                    particles->slice_u(), particles->slice_v(),
+                    particles->slice_phi() );
 
                 /*
                 auto u = particles->slice_u();
@@ -263,8 +320,12 @@ class Solver : public SolverBase
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
     std::shared_ptr<neighbor_type> neighbors;
+
+    using NeighborView = typename Kokkos::View<int**, memory_space>;
+    NeighborView mu;
 };
 
+/*
 template <class MemorySpace, class ForceModel>
 std::shared_ptr<SolverBase> createSolver( Inputs inputs,
                                           Particles<MemorySpace> particles )
@@ -307,7 +368,7 @@ std::shared_ptr<SolverBase> createSolver( Inputs inputs,
     log_err( std::cout, "Unknown backend: ", device_type );
     return nullptr;
 }
-
+*/
 } // namespace CabanaPD
 
 #endif

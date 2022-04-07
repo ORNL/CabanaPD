@@ -77,9 +77,9 @@ class Particles
 
     // x, u, f (needed for all particles, including ghosts)
     using ghost_type = Cabana::MemberTypes<double[dim]>;
-    // type, W, v, rho, volume
+    // type, W, v, rho, volume, damage
     using other_types =
-        Cabana::MemberTypes<int, double, double[dim], double, double>;
+        Cabana::MemberTypes<int, double, double[dim], double, double, double>;
     // Potentially needed later: body force (b), ID
 
     // FIXME: add vector length
@@ -102,6 +102,9 @@ class Particles
     std::array<double, 3> ghost_mesh_lo;
     std::array<double, 3> ghost_mesh_hi;
     std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double>>> local_grid;
+    double dx;
+    double dy;
+    double dz;
 
     std::vector<int> halo_neighbors;
     int halo_width;
@@ -140,7 +143,7 @@ class Particles
                         const std::array<int, 3> num_cells )
     {
         // Create the MPI partitions.
-        Cajita::UniformDimPartitioner partitioner;
+        Cajita::DimBlockPartitioner<3> partitioner;
 
         // Create global mesh of MPI partitions.
         auto global_mesh = Cajita::createUniformGlobalMesh(
@@ -166,6 +169,12 @@ class Particles
             ghost_mesh_hi[d] = local_mesh.highCorner( Cajita::Ghost(), d );
             local_mesh_ext[d] = local_mesh.extent( Cajita::Own(), d );
         }
+
+        // Uniform mesh spacing.
+        int zero[3] = { 0, 0, 0 };
+        dx = local_mesh.measure( Cajita::Edge<Cajita::Dim::I>(), zero );
+        dy = local_mesh.measure( Cajita::Edge<Cajita::Dim::J>(), zero );
+        dz = local_mesh.measure( Cajita::Edge<Cajita::Dim::K>(), zero );
 
         // FIXME: remove Impl
         halo_neighbors = Cajita::Impl::getTopology( *local_grid );
@@ -221,6 +230,7 @@ class Particles
                 for ( int d = 0; d < 3; d++ )
                 {
                     x( pid, d ) = cell_coord[d];
+                    u( pid, d ) = 0.0;
                     v( pid, d ) = 0.0;
                 }
                 // FIXME: hardcoded
@@ -276,6 +286,7 @@ class Particles
     auto slice_v() { return Cabana::slice<2>( _aosoa_other, "velocities" ); }
     auto slice_rho() { return Cabana::slice<3>( _aosoa_other, "density" ); }
     auto slice_vol() { return Cabana::slice<4>( _aosoa_other, "volume" ); }
+    auto slice_phi() { return Cabana::slice<5>( _aosoa_other, "damage" ); }
 
     void resize( int new_local, int new_ghost )
     {

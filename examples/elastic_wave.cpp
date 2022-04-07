@@ -20,9 +20,9 @@ int main( int argc, char* argv[] )
         using memory_space = Kokkos::HostSpace;
         using exec_space = Kokkos::Serial;
 
-        int num_cell = 41;
-        double low_corner = -0.5;
-        double high_corner = 0.5;
+        std::array<int, 3> num_cell = { 41, 41, 41 };
+        std::array<double, 3> low_corner = { -0.5, -0.5, -0.5 };
+        std::array<double, 3> high_corner = { 0.5, 0.5, 0.5 };
         double t_final = 0.6;
         double dt = 0.01;
         double K = 1.0;
@@ -79,16 +79,17 @@ int main( int argc, char* argv[] )
 
         x = particles->slice_x();
         u = particles->slice_u();
+        double num_cell_x = inputs.num_cells[0];
         auto profile = Kokkos::View<double* [2], memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "displacement_profile" ),
-            num_cell );
-        double length = ( high_corner - low_corner );
+            num_cell_x );
+        double length = ( high_corner[0] - low_corner[0] );
         int mpi_rank;
         MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
         int count = 0;
         auto measure_profile = KOKKOS_LAMBDA( const int pid, int& c )
         {
-            double dx = length / num_cell;
+            double dx = length / num_cell_x;
             if ( x( pid, 1 ) < dx / 2.0 && x( pid, 1 ) > -dx / 2.0 &&
                  x( pid, 2 ) < dx / 2.0 && x( pid, 2 ) > -dx / 2.0 )
             {
