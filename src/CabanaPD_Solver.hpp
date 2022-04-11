@@ -147,10 +147,10 @@ class Solver : public SolverBase
             force->compute( model_tag{}, *particles, *neighbors,
                             neigh_iter_tag{} );
 
-
         Cajita::Experimental::SiloParticleOutput::writeTimeStep(
-            particles->local_grid->globalGrid(), 0, 0, x, particles->slice_W(),
-            particles->slice_f(), particles->slice_u(), particles->slice_id() );
+            "particles", particles->local_grid->globalGrid(), 0, 0, x,
+            particles->slice_W(), particles->slice_f(), particles->slice_u(),
+            particles->slice_id() );
         /*
         for ( std::size_t pid = 0; pid < x.size(); pid++ )
             std::cout << x( pid, 0 ) << " " << x( pid, 1 ) << " " << x( pid, 2 )
@@ -223,7 +223,7 @@ class Solver : public SolverBase
 
                 auto x = particles->slice_x();
                 Cajita::Experimental::SiloParticleOutput::writeTimeStep(
-                    particles->local_grid->globalGrid(),
+                    "particles", particles->local_grid->globalGrid(),
                     step / output_frequency, step * inputs->timestep, x,
                     particles->slice_W(), particles->slice_f(),
                     particles->slice_u(), particles->slice_id() );
