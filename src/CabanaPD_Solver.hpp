@@ -77,7 +77,7 @@ class SolverBase
     virtual void run() = 0;
 };
 
-template <class DeviceType>
+template <class DeviceType, class ForceModel>
 class Solver : public SolverBase
 {
   public:
@@ -87,19 +87,19 @@ class Solver : public SolverBase
     using particle_type = Particles<memory_space>;
     using integrator_type = Integrator<exec_space>;
     using comm_type = Comm<DeviceType>;
-    using force_type = Force<exec_space>;
+    using force_model_type = ForceModel;
+    using force_type = Force<exec_space, force_model_type>;
     using neighbor_type =
         Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
                            Cabana::VerletLayout2D, Cabana::TeamOpTag>;
-
-    using model_tag = CabanaPD::PMBModelTag;
     using neigh_iter_tag = Cabana::SerialOpTag;
 
     int num_steps;
     int output_frequency;
     double init_time;
 
-    Solver( Inputs _inputs, std::shared_ptr<particle_type> _particles )
+    Solver( Inputs _inputs, std::shared_ptr<particle_type> _particles,
+            force_model_type force_model )
         : particles( _particles )
         , inputs( std::make_shared<Inputs>( _inputs ) )
     {
@@ -137,15 +137,12 @@ class Solver : public SolverBase
         neighbors = std::make_shared<neighbor_type>(
             x, 0, particles->n_local, inputs->delta, 1.0, mesh_min, mesh_max );
 
-        force = std::make_shared<force_type>( inputs->half_neigh, inputs->K,
-                                              inputs->delta );
+        force = std::make_shared<force_type>( inputs->half_neigh, force_model );
 
         // Compute initial forces
         auto f = particles->slice_f();
         Cabana::deep_copy( f, 0.0 );
-        if ( inputs->force_type == "PMB" )
-            force->compute( model_tag{}, *particles, *neighbors,
-                            neigh_iter_tag{} );
+        compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
 
         Cajita::Experimental::SiloParticleOutput::writeTimeStep(
             "particles", particles->local_grid->globalGrid(), 0, 0, x,
@@ -198,8 +195,7 @@ class Solver : public SolverBase
             Cabana::deep_copy( f, 0.0 );
 
             // Compute short range force
-            force->compute( model_tag{}, *particles, *neighbors,
-                            neigh_iter_tag{} );
+            compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
             force_time += force_timer.seconds();
 
             // Integrate - velocity Verlet second half
@@ -211,8 +207,8 @@ class Solver : public SolverBase
             other_timer.reset();
             if ( step % output_frequency == 0 )
             {
-                auto W = force->compute_energy( model_tag{}, *particles,
-                                                *neighbors, neigh_iter_tag() );
+                auto W = compute_energy( *force, *particles, *neighbors,
+                                         neigh_iter_tag() );
 
                 double time = total_timer.seconds();
                 double rate = 1.0 * particles->n_global * output_frequency /
@@ -270,7 +266,7 @@ class Solver : public SolverBase
     std::shared_ptr<neighbor_type> neighbors;
 };
 
-template <class MemorySpace>
+template <class MemorySpace, class ForceModel>
 std::shared_ptr<SolverBase> createSolver( Inputs inputs,
                                           Particles<MemorySpace> particles )
 {
@@ -278,33 +274,34 @@ std::shared_ptr<SolverBase> createSolver( Inputs inputs,
     if ( device_type.compare( "SERIAL" ) == 0 )
     {
 #ifdef KOKKOS_ENABLE_SERIAL
-        return std::make_shared<
-            Solver<Kokkos::Device<Kokkos::Serial, Kokkos::HostSpace>>>(
+        return std::make_shared<Solver<
+            Kokkos::Device<Kokkos::Serial, Kokkos::HostSpace>, ForceModel>>(
             inputs, particles );
 #endif
     }
     else if ( device_type.compare( "OPENMP" ) == 0 )
     {
 #ifdef KOKKOS_ENABLE_OPENMP
-        return std::make_shared<
-            Solver<Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace>>>(
+        return std::make_shared<Solver<
+            Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace>, ForceModel>>(
             inputs, particles );
 #endif
     }
     else if ( device_type.compare( "CUDA" ) == 0 )
     {
 #ifdef KOKKOS_ENABLE_CUDA
-        return std::make_shared<
-            Solver<Kokkos::Device<Kokkos::Cuda, Kokkos::CudaSpace>>>(
+        return std::make_shared<Solver<
+            Kokkos::Device<Kokkos::Cuda, Kokkos::CudaSpace>, ForceModel>>(
             inputs, particles );
 #endif
     }
     else if ( device_type.compare( "HIP" ) == 0 )
     {
 #ifdef KOKKOS_ENABLE_HIP
-        return std::make_shared<Solver<Kokkos::Device<
-            Kokkos::Experimental::HIP, Kokkos::Experimental::HIPSpace>>>(
-            inputs, particles );
+        return std::make_shared<
+            Solver<Kokkos::Device<Kokkos::Experimental::HIP,
+                                  Kokkos::Experimental::HIPSpace>,
+                   ForceModel>>( inputs, particles );
 #endif
     }
 
