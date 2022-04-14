@@ -75,13 +75,19 @@ class Particles
     int n_ghost = 0;
     int size = 0;
 
-    // x, u, f, b, type, W, v, rho, id, volume
-    using member_types =
-        Cabana::MemberTypes<double[dim], double[dim], double[dim], double[dim],
-                            int, double, double[dim], double, int, double>;
+    // x, u, f (needed for all particles, including ghosts)
+    using ghost_type = Cabana::MemberTypes<double[dim]>;
+    // type, W, v, rho, volume
+    using other_types =
+        Cabana::MemberTypes<int, double, double[dim], double, double>;
+    // Potentially needed later: body force (b), ID
+
     // FIXME: add vector length
-    // FIXME: enable separate aosoa
-    using aosoa_type = Cabana::AoSoA<member_types, memory_space>;
+    // FIXME: enable variable aosoa
+    using aosoa_x_type = Cabana::AoSoA<ghost_type, memory_space, 1>;
+    using aosoa_u_type = Cabana::AoSoA<ghost_type, memory_space, 1>;
+    using aosoa_f_type = Cabana::AoSoA<ghost_type, memory_space, 1>;
+    using aosoa_other_type = Cabana::AoSoA<other_types, memory_space>;
 
     // Per type
     int n_types = 1;
@@ -110,7 +116,10 @@ class Particles
         ghost_mesh_hi = { 0.0, 0.0, 0.0 };
         local_mesh_ext = { 0.0, 0.0, 0.0 };
 
-        aosoa_type _aosoa( "Particles", n_local );
+        aosoa_x_type _aosoa_x( "Particles", n_local );
+        aosoa_u_type _aosoa_u( "Particles", n_local );
+        aosoa_f_type _aosoa_f( "Particles", n_local );
+        aosoa_other_type _aosoa_other( "Particles", n_local );
     }
 
     // Constructor which initializes particles on regular grid.
@@ -172,14 +181,16 @@ class Particles
 
         int particles_per_cell = 1;
         int num_particles = particles_per_cell * owned_cells.size();
-        _aosoa.resize( num_particles );
+        _aosoa_x.resize( num_particles );
+        _aosoa_u.resize( num_particles );
+        _aosoa_f.resize( num_particles );
+        _aosoa_other.resize( num_particles );
         auto x = slice_x();
         auto v = slice_v();
         auto type = slice_type();
         auto rho = slice_rho();
         auto u = slice_u();
         auto vol = slice_vol();
-        auto id = slice_id();
         auto created = Kokkos::View<bool*, device_type>(
             Kokkos::ViewAllocateWithoutInitializing( "particle_created" ),
             num_particles );
@@ -216,8 +227,6 @@ class Particles
                 type( pid ) = 0;
                 rho( pid ) = 1.0;
 
-                id( pid ) = mpi_rank;
-
                 // Get the volume of the cell.
                 int empty[3];
                 vol( pid ) = local_mesh.measure( Cajita::Cell(), empty );
@@ -235,7 +244,7 @@ class Particles
             },
             local_num_create );
         n_local = local_num_create;
-        size = _aosoa.size();
+        size = _aosoa_x.size();
 
         // Not using Allreduce because global count is only used for printing.
         MPI_Reduce( &n_local, &n_global, 1, MPI_INT, MPI_SUM, 0,
@@ -251,10 +260,9 @@ class Particles
             KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
     }
 
-    // x, u, f, b, type, W, v, rho, id
-    auto slice_x() { return Cabana::slice<0>( _aosoa, "positions" ); }
-    auto slice_u() { return Cabana::slice<1>( _aosoa, "displacements" ); }
-    auto slice_f() { return Cabana::slice<2>( _aosoa, "forces" ); }
+    auto slice_x() { return Cabana::slice<0>( _aosoa_x, "positions" ); }
+    auto slice_u() { return Cabana::slice<0>( _aosoa_u, "displacements" ); }
+    auto slice_f() { return Cabana::slice<0>( _aosoa_f, "forces" ); }
     auto slice_f_a()
     {
         auto f = slice_f();
@@ -263,29 +271,35 @@ class Particles
         atomic_type f_a = f;
         return f_a;
     }
-    auto slice_b() { return Cabana::slice<3>( _aosoa, "body_force" ); }
-    auto slice_type() { return Cabana::slice<4>( _aosoa, "type" ); }
-    auto slice_W() { return Cabana::slice<5>( _aosoa, "strain_energy" ); }
-    auto slice_v() { return Cabana::slice<6>( _aosoa, "velocities" ); }
-    auto slice_rho() { return Cabana::slice<7>( _aosoa, "density" ); }
-    auto slice_id() { return Cabana::slice<8>( _aosoa, "ID" ); }
-    auto slice_vol() { return Cabana::slice<9>( _aosoa, "volume" ); }
+    auto slice_type() { return Cabana::slice<0>( _aosoa_other, "type" ); }
+    auto slice_W() { return Cabana::slice<1>( _aosoa_other, "strain_energy" ); }
+    auto slice_v() { return Cabana::slice<2>( _aosoa_other, "velocities" ); }
+    auto slice_rho() { return Cabana::slice<3>( _aosoa_other, "density" ); }
+    auto slice_vol() { return Cabana::slice<4>( _aosoa_other, "volume" ); }
 
     void resize( int new_local, int new_ghost )
     {
         n_local = new_local;
         n_ghost = new_ghost;
-        _aosoa.resize( new_local + new_ghost );
-        size = _aosoa.size();
+
+        _aosoa_x.resize( new_local + new_ghost );
+        _aosoa_u.resize( new_local + new_ghost );
+        _aosoa_f.resize( new_local );
+        _aosoa_other.resize( new_local );
+        size = _aosoa_x.size();
     };
 
     void gather( Cabana::Halo<device_type> halo )
     {
-        Cabana::gather( halo, _aosoa );
+        Cabana::gather( halo, _aosoa_x );
+        Cabana::gather( halo, _aosoa_u );
     };
 
   protected:
-    aosoa_type _aosoa;
+    aosoa_x_type _aosoa_x;
+    aosoa_u_type _aosoa_u;
+    aosoa_f_type _aosoa_f;
+    aosoa_other_type _aosoa_other;
 };
 
 } // namespace CabanaPD
