@@ -200,7 +200,7 @@ class Particles
         auto rho = slice_rho();
         auto u = slice_u();
         auto vol = slice_vol();
-        auto created = Kokkos::View<bool*, device_type>(
+        auto created = Kokkos::View<bool*, memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "particle_created" ),
             num_particles );
 
@@ -300,7 +300,8 @@ class Particles
         size = _aosoa_x.size();
     };
 
-    void gather( Cabana::Halo<device_type> halo )
+    template <class HaloType>
+    void gather( HaloType halo )
     {
         Cabana::gather( halo, _aosoa_x );
         Cabana::gather( halo, _aosoa_u );
