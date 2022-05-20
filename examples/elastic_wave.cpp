@@ -72,9 +72,10 @@ int main( int argc, char* argv[] )
         CabanaPD::PMBModel force_model( inputs.K, inputs.delta );
 
         // FIXME: use createSolver to switch backend at runtime.
-        auto cabana_pd = std::make_shared<CabanaPD::Solver<
+        auto cabana_pd = std::make_shared<CabanaPD::SolverElastic<
             Kokkos::Device<exec_space, memory_space>, CabanaPD::PMBModel>>(
             inputs, particles, force_model );
+        cabana_pd->init_force();
         cabana_pd->run();
 
         x = particles->slice_x();

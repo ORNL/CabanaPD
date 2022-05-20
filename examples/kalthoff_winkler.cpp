@@ -27,7 +27,7 @@ int main( int argc, char* argv[] )
         double thickness = 0.009; // [m] (  9 mm)
 
         // Domain
-        std::array<int, 3> num_cell = { 81, 161, 8 };
+        std::array<int, 3> num_cell = { 41, 81, 4 };
         std::array<double, 3> low_corner = { -0.5 * height, -0.5 * width,
                                              -0.5 * thickness };
         std::array<double, 3> high_corner = { 0.5 * height, 0.5 * width,
@@ -76,15 +76,20 @@ int main( int argc, char* argv[] )
         auto rho = particles->slice_rho();
 
         double dx = particles->dx;
-        /*
-        auto bc_functor = KOKKOS_LAMBDA( const int pid )
-        {
-            if ( x( pid, 1 ) > y_prenotch1 && x( pid, 1 ) < y_prenotch2 &&
-                 x( pid, 0 ) < -0.5 * height + dx )
-                for ( int d = 0; d < 3; d++ )
-                    f( pid, d ) = 0.0;
-        };
-        */
+
+        double x_bc = -0.5 * height;
+        CabanaPD::RegionBoundary plane(
+            x_bc - dx, x_bc + dx * 1.25, y_prenotch1 - dx * 0.25,
+            y_prenotch2 + dx * 0.25, -thickness, thickness );
+        using bc_index_type =
+            CabanaPD::BoundaryIndexSpace<memory_space,
+                                         CabanaPD::RegionBoundary>;
+        bc_index_type bc_indices;
+        bc_indices.create( exec_space{}, *particles, plane );
+        using bc_type =
+            CabanaPD::BoundaryCondition<bc_index_type, CabanaPD::ForceBCTag>;
+        bc_type bc( bc_indices );
+
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {
             rho( pid ) = rho0;
@@ -95,17 +100,16 @@ int main( int argc, char* argv[] )
         };
         particles->update_particles( exec_space{}, init_functor );
 
-        // CabanaPD::BoundaryCondition bc( bc_functor );
-
         // Choose force model type.
         CabanaPD::PMBDamageModel force_model( inputs.K, inputs.delta,
                                               inputs.G0 );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = std::make_shared<
-            CabanaPD::Solver<Kokkos::Device<exec_space, memory_space>,
-                             CabanaPD::PMBDamageModel>>(
-            inputs, particles, force_model, prenotch );
+            CabanaPD::SolverFracture<Kokkos::Device<exec_space, memory_space>,
+                                     CabanaPD::PMBDamageModel, bc_type>>(
+            inputs, particles, force_model, bc, prenotch );
+        cabana_pd->init_force();
         cabana_pd->run();
     }
 

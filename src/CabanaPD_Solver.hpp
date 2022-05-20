@@ -80,7 +80,7 @@ class SolverBase
 };
 
 template <class DeviceType, class ForceModel>
-class Solver : public SolverBase
+class SolverElastic
 {
   public:
     using exec_space = typename DeviceType::execution_space;
@@ -96,18 +96,19 @@ class Solver : public SolverBase
                            Cabana::VerletLayout2D, Cabana::TeamOpTag>;
     using neigh_iter_tag = Cabana::SerialOpTag;
 
-    int num_steps;
-    int output_frequency;
-    double init_time;
-
-    Solver( Inputs _inputs, std::shared_ptr<particle_type> _particles,
-            force_model_type force_model, Prenotch prenotch )
+    SolverElastic( Inputs _inputs, std::shared_ptr<particle_type> _particles,
+                   force_model_type force_model )
         : particles( _particles )
         , inputs( std::make_shared<Inputs>( _inputs ) )
     {
-        Kokkos::Timer init_timer;
-        init_timer.reset();
+        force_time = 0;
+        integrate_time = 0;
+        comm_time = 0;
+        other_time = 0;
+        last_time = 0;
         init_time = 0;
+        total_timer.reset();
+        init_timer.reset();
 
         std::ofstream out( inputs->output_file, std::ofstream::app );
         std::ofstream err( inputs->error_file, std::ofstream::app );
@@ -138,20 +139,218 @@ class Solver : public SolverBase
         auto x = particles->slice_x();
         neighbors = std::make_shared<neighbor_type>(
             x, 0, particles->n_local, inputs->delta, 1.0, mesh_min, mesh_max );
-        init_bond_breaking( true );
-
-        create_prenotch( true, prenotch );
-        auto type = particles->slice_type();
-        Cabana::deep_copy( type, 0.0 );
-        Kokkos::RangePolicy<exec_space> policy( 0, particles->n_local );
-        Kokkos::parallel_for(
-            "", policy, KOKKOS_LAMBDA( const int pid ) {
-                for ( std::size_t n = 0; n < mu.extent( 1 ); n++ )
-                    type( pid ) += mu( pid, n );
-            } );
 
         force = std::make_shared<force_type>( inputs->half_neigh, force_model );
 
+        Cajita::Experimental::SiloParticleOutput::writeTimeStep(
+            "particles", particles->local_grid->globalGrid(), 0, 0, x,
+            particles->slice_W(), particles->slice_f(), particles->slice_u(),
+            particles->slice_v() );
+
+        log( out, "Nlocal Nghost Nglobal\n", particles->n_local, " ",
+             particles->n_ghost, " ", particles->n_global );
+        init_time += init_timer.seconds();
+        out.close();
+    }
+
+    void init_force()
+    {
+        // Compute initial forces
+        auto f = particles->slice_f();
+        Cabana::deep_copy( f, 0.0 );
+        compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
+        compute_energy( *force, *particles, *neighbors, neigh_iter_tag() );
+    }
+
+    void run()
+    {
+        // Main timestep loop
+        for ( int step = 1; step <= num_steps; step++ )
+        {
+            // Integrate - velocity Verlet first half
+            integrate_timer.reset();
+            integrator->initial_integrate( *particles );
+            integrate_time += integrate_timer.seconds();
+
+            // Update ghost particles.
+            comm_timer.reset();
+            comm->gather( *particles );
+            comm_time += comm_timer.seconds();
+
+            // Reset forces
+            force_timer.reset();
+            particles->slice_f();
+            auto f = particles->slice_f();
+            Cabana::deep_copy( f, 0.0 );
+
+            // Compute short range force
+            compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
+            force_time += force_timer.seconds();
+
+            // Integrate - velocity Verlet second half
+            integrate_timer.reset();
+            integrator->final_integrate( *particles );
+            integrate_time += integrate_timer.seconds();
+
+            // Print output
+            other_timer.reset();
+            if ( step % output_frequency == 0 )
+            {
+                auto W = compute_energy( *force, *particles, *neighbors,
+                                         neigh_iter_tag() );
+
+                step_output( step, W );
+
+                auto x = particles->slice_x();
+                Cajita::Experimental::SiloParticleOutput::writeTimeStep(
+                    "particles", particles->local_grid->globalGrid(),
+                    step / output_frequency, step * inputs->timestep, x,
+                    particles->slice_W(), particles->slice_f(),
+                    particles->slice_u(), particles->slice_v() );
+
+                /*
+                auto u = particles->slice_u();
+                auto f = particles->slice_f();
+                for ( std::size_t pid = 0; pid < x.size(); pid++ )
+                    std::cout << x( pid, 0 ) << " " << x( pid, 1 ) << " "
+                              << x( pid, 2 ) << " " << u( pid, 0 ) << " "
+                              << u( pid, 1 ) << " " << u( pid, 2 ) << " "
+                              << f( pid, 0 ) << " " << f( pid, 1 ) << " "
+                              << f( pid, 2 ) << std::endl;
+                */
+            }
+            other_time += other_timer.seconds();
+        }
+
+        // Final output and timings
+        final_output();
+    }
+
+    void step_output( const int step, const double W )
+    {
+        std::ofstream out( inputs->output_file, std::ofstream::app );
+        log( std::cout, step, " ", step * inputs->timestep );
+
+        total_time = total_timer.seconds();
+        double rate = 1.0 * particles->n_global * output_frequency /
+                      ( total_time - last_time );
+        log( out, std::fixed, std::setprecision( 6 ), step, " ", W, " ",
+             std::setprecision( 2 ), total_time, " ", std::scientific, rate );
+        last_time = total_time;
+        out.close();
+    }
+
+    void final_output()
+    {
+        std::ofstream out( inputs->output_file, std::ofstream::app );
+        total_time = total_timer.seconds();
+        double steps_per_sec = 1.0 * num_steps / total_time;
+        double p_steps_per_sec = particles->n_global * steps_per_sec;
+        log( out, std::fixed, std::setprecision( 2 ),
+             "\n#Procs Particles | Time T_Force T_Int T_Other T_Init |\n",
+             comm->mpi_size, " ", particles->n_global, " | ", total_time, " ",
+             force_time, " ", comm_time, " ", integrate_time, " ", other_time,
+             " ", init_time, " | PERFORMANCE\n", std::fixed, comm->mpi_size,
+             " ", particles->n_global, " | ", 1.0, " ", force_time / total_time,
+             " ", comm_time / total_time, " ", integrate_time / total_time, " ",
+             other_time / total_time, " ", init_time / total_time,
+             " | FRACTION\n\n",
+             "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
+             std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
+             p_steps_per_sec / comm->mpi_size );
+        out.close();
+    }
+
+    int num_steps;
+    int output_frequency;
+
+  protected:
+    std::shared_ptr<particle_type> particles;
+    std::shared_ptr<Inputs> inputs;
+    std::shared_ptr<comm_type> comm;
+    std::shared_ptr<integrator_type> integrator;
+    std::shared_ptr<force_type> force;
+    std::shared_ptr<neighbor_type> neighbors;
+
+    double total_time;
+    double force_time;
+    double integrate_time;
+    double comm_time;
+    double other_time;
+    double init_time;
+    double last_time;
+    Kokkos::Timer total_timer;
+    Kokkos::Timer init_timer;
+    Kokkos::Timer force_timer;
+    Kokkos::Timer comm_timer;
+    Kokkos::Timer integrate_timer;
+    Kokkos::Timer other_timer;
+};
+
+template <class DeviceType, class ForceModel, class BoundaryCondition>
+class SolverFracture
+    : public SolverElastic<DeviceType, typename ForceModel::elastic_model>
+{
+  public:
+    using base_type =
+        SolverElastic<DeviceType, typename ForceModel::elastic_model>;
+    using exec_space = typename base_type::exec_space;
+    using memory_space = typename base_type::memory_space;
+
+    using particle_type = typename base_type::particle_type;
+    using integrator_type = typename base_type::integrator_type;
+    using comm_type = typename base_type::comm_type;
+    using neighbor_type = typename base_type::neighbor_type;
+    using force_model_type = ForceModel;
+    using force_type = Force<exec_space, force_model_type>;
+    using neigh_iter_tag = Cabana::SerialOpTag;
+    using bc_type = BoundaryCondition;
+
+    SolverFracture( Inputs _inputs, std::shared_ptr<particle_type> _particles,
+                    force_model_type force_model, bc_type bc,
+                    Prenotch prenotch )
+        : base_type( _inputs, _particles,
+                     typename force_model_type::elastic_model{} )
+        , boundary_condition( bc )
+    {
+        std::ofstream out( inputs->output_file, std::ofstream::app );
+        std::ofstream err( inputs->error_file, std::ofstream::app );
+
+        auto time = std::chrono::system_clock::to_time_t(
+            std::chrono::system_clock::now() );
+        log( out, "CabanaPD (", std::ctime( &time ), ")\n" );
+        if ( print_rank() )
+            exec_space::print_configuration( out );
+
+        // Create View to track broken bonds.
+        int max_neighbors =
+            Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
+        mu = NeighborView(
+            Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
+            particles->n_local, max_neighbors );
+        Kokkos::deep_copy( mu, 1 );
+        std::cout << mu.extent( 0 ) << " " << mu.extent( 1 ) << std::endl;
+
+        // Create prenotch.
+        prenotch.create( exec_space{}, mu, *particles, *neighbors );
+
+        // Create force.
+        force = std::make_shared<force_type>( inputs->half_neigh, force_model );
+
+        Cajita::Experimental::SiloParticleOutput::writeTimeStep(
+            "particles", particles->local_grid->globalGrid(), 0, 0,
+            particles->slice_x(), particles->slice_W(), particles->slice_f(),
+            particles->slice_u(), particles->slice_v(),
+            particles->slice_phi() );
+
+        log( out, "Nlocal Nghost Nglobal\n", particles->n_local, " ",
+             particles->n_ghost, " ", particles->n_global );
+        init_time += init_timer.seconds();
+        out.close();
+    }
+
+    void init_force()
+    {
         // Compute initial forces
         auto f = particles->slice_f();
         Cabana::deep_copy( f, 0.0 );
@@ -159,60 +358,11 @@ class Solver : public SolverBase
         compute_energy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
 
         // Add boundary condition - resetting boundary forces to zero.
-        CabanaPD::BoundaryCondition::apply( exec_space(), *particles );
-
-        Cajita::Experimental::SiloParticleOutput::writeTimeStep(
-            "particles", particles->local_grid->globalGrid(), 0, 0, x,
-            particles->slice_W(), particles->slice_f(), particles->slice_u(),
-            particles->slice_v(), particles->slice_phi() );
-        /*
-        for ( std::size_t pid = 0; pid < x.size(); pid++ )
-            std::cout << x( pid, 0 ) << " " << x( pid, 1 ) << " " << x( pid, 2 )
-                      << " " << u( pid, 0 ) << " " << u( pid, 1 ) << " "
-                      << u( pid, 2 ) << " " << f( pid, 0 ) << " " << f( pid, 1 )
-                      << " " << f( pid, 2 ) << std::endl;
-        */
-        log( out, "Nlocal Nghost Nglobal\n", particles->n_local, " ",
-             particles->n_ghost, " ", particles->n_global );
-        init_time += init_timer.seconds();
-    }
-
-    void init_bond_breaking( bool break_bonds )
-    {
-        if ( break_bonds )
-        {
-            int max_neighbors =
-                Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
-            mu = NeighborView(
-                Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
-                particles->n_local, max_neighbors );
-            Kokkos::deep_copy( mu, 1 );
-            std::cout << mu.extent( 0 ) << " " << mu.extent( 1 ) << std::endl;
-        }
-        else
-        {
-            mu = NeighborView( "unused_bonds", 0, 0 );
-        }
-    }
-
-    void create_prenotch( bool add_prenotch, Prenotch prenotch )
-    {
-        if ( add_prenotch )
-            prenotch.create( exec_space{}, mu, *particles, *neighbors );
+        boundary_condition.apply( exec_space(), *particles );
     }
 
     void run()
     {
-        std::ofstream out( inputs->output_file, std::ofstream::app );
-        double force_time = 0;
-        double integrate_time = 0;
-        double comm_time = 0;
-        double other_time = 0;
-        double last_time = 0;
-        Kokkos::Timer total_timer, force_timer, comm_timer, integrate_timer,
-            other_timer;
-        total_timer.reset();
-
         // Main timestep loop
         for ( int step = 1; step <= num_steps; step++ )
         {
@@ -237,17 +387,8 @@ class Solver : public SolverBase
                            neigh_iter_tag{} );
             force_time += force_timer.seconds();
 
-            auto type = particles->slice_type();
-            Cabana::deep_copy( type, 0.0 );
-            Kokkos::RangePolicy<exec_space> policy( 0, particles->n_local );
-            Kokkos::parallel_for(
-                "", policy, KOKKOS_LAMBDA( const int pid ) {
-                    for ( std::size_t n = 0; n < mu.extent( 1 ); n++ )
-                        type( pid ) += mu( pid, n );
-                } );
-
             // Add boundary condition - resetting boundary forces to zero.
-            CabanaPD::BoundaryCondition::apply( exec_space(), *particles );
+            boundary_condition.apply( exec_space{}, *particles );
 
             // Integrate - velocity Verlet second half
             integrate_timer.reset();
@@ -258,19 +399,10 @@ class Solver : public SolverBase
             other_timer.reset();
             if ( step % output_frequency == 0 )
             {
-                if ( print_rank() )
-                    std::cout << step << " " << step * inputs->timestep
-                              << std::endl;
-
                 auto W = compute_energy( *force, *particles, *neighbors, mu,
                                          neigh_iter_tag() );
 
-                double time = total_timer.seconds();
-                double rate = 1.0 * particles->n_global * output_frequency /
-                              ( time - last_time );
-                log( out, std::fixed, std::setprecision( 6 ), step, " ", W, " ",
-                     std::setprecision( 2 ), time, " ", std::scientific, rate );
-                last_time = time;
+                this->step_output( step, W );
 
                 auto x = particles->slice_x();
                 Cajita::Experimental::SiloParticleOutput::writeTimeStep(
@@ -279,52 +411,44 @@ class Solver : public SolverBase
                     particles->slice_W(), particles->slice_f(),
                     particles->slice_u(), particles->slice_v(),
                     particles->slice_phi() );
-
-                /*
-                auto u = particles->slice_u();
-                auto f = particles->slice_f();
-                for ( std::size_t pid = 0; pid < x.size(); pid++ )
-                    std::cout << x( pid, 0 ) << " " << x( pid, 1 ) << " "
-                              << x( pid, 2 ) << " " << u( pid, 0 ) << " "
-                              << u( pid, 1 ) << " " << u( pid, 2 ) << " "
-                              << f( pid, 0 ) << " " << f( pid, 1 ) << " "
-                              << f( pid, 2 ) << std::endl;
-                */
             }
             other_time += other_timer.seconds();
         }
 
-        double time = total_timer.seconds();
-
         // Final output and timings
-        double steps_per_sec = 1.0 * num_steps / time;
-        double p_steps_per_sec = particles->n_global * steps_per_sec;
-        log( out, std::fixed, std::setprecision( 2 ),
-             "\n#Procs Particles | Time T_Force T_Int T_Other T_Init |\n",
-             comm->mpi_size, " ", particles->n_global, " | ", time, " ",
-             force_time, " ", comm_time, " ", integrate_time, " ", other_time,
-             " ", init_time, " | PERFORMANCE\n", std::fixed, comm->mpi_size,
-             " ", particles->n_global, " | ", 1.0, " ", force_time / time, " ",
-             comm_time / time, " ", integrate_time / time, " ",
-             other_time / time, " ", init_time / time, " | FRACTION\n\n",
-             "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
-             std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
-             p_steps_per_sec / comm->mpi_size );
-        out.close();
+        this->final_output();
     }
 
-  private:
-    std::shared_ptr<particle_type> particles;
-    std::shared_ptr<Inputs> inputs;
-    std::shared_ptr<comm_type> comm;
-    std::shared_ptr<integrator_type> integrator;
+    using base_type::num_steps;
+    using base_type::output_frequency;
+
+  protected:
+    using base_type::comm;
+    using base_type::inputs;
+    using base_type::integrator;
+    using base_type::neighbors;
+    using base_type::particles;
     std::shared_ptr<force_type> force;
-    std::shared_ptr<neighbor_type> neighbors;
+    bc_type boundary_condition;
 
     using NeighborView = typename Kokkos::View<int**, memory_space>;
     NeighborView mu;
-};
 
+    using base_type::comm_time;
+    using base_type::force_time;
+    using base_type::init_time;
+    using base_type::integrate_time;
+    using base_type::last_time;
+    using base_type::other_time;
+    using base_type::total_time;
+
+    using base_type::comm_timer;
+    using base_type::force_timer;
+    using base_type::init_timer;
+    using base_type::integrate_timer;
+    using base_type::other_timer;
+    using base_type::total_timer;
+};
 /*
 template <class MemorySpace, class ForceModel>
 std::shared_ptr<SolverBase> createSolver( Inputs inputs,

@@ -78,9 +78,10 @@ struct PMBModel
 
 struct PMBDamageModel : public PMBModel
 {
-    using PMBModel::c;
-    using PMBModel::delta;
-    using PMBModel::K;
+    using elastic_model = PMBModel;
+    using elastic_model::c;
+    using elastic_model::delta;
+    using elastic_model::K;
     double s0;
     double bond_break_coeff;
 
@@ -448,6 +449,60 @@ class Force<ExecutionSpace, LinearPMBModel>
 };
 
 template <class ForceType, class ParticleType, class NeighListType,
+          class ParallelType>
+void compute_force( const ForceType& force, ParticleType& particles,
+                    const NeighListType& neigh_list,
+                    const ParallelType& neigh_op_tag )
+{
+    auto n_local = particles.n_local;
+    auto x = particles.slice_x();
+    auto u = particles.slice_u();
+    auto f = particles.slice_f();
+    auto f_a = particles.slice_f_a();
+    auto vol = particles.slice_vol();
+
+    // if ( half_neigh )
+    // Forces must be atomic for half list
+    // compute_force_half( f_a, x, u, neigh_list, n_local,
+    //                    neigh_op_tag );
+
+    // Forces only atomic if using team threading
+    if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
+        force.compute_force_full( f_a, x, u, vol, neigh_list, n_local,
+                                  neigh_op_tag );
+    else
+        force.compute_force_full( f, x, u, vol, neigh_list, n_local,
+                                  neigh_op_tag );
+    Kokkos::fence();
+}
+
+template <class ForceType, class ParticleType, class NeighListType,
+          class ParallelType>
+double compute_energy( const ForceType force, ParticleType& particles,
+                       const NeighListType& neigh_list,
+                       const ParallelType& neigh_op_tag )
+{
+    auto n_local = particles.n_local;
+    auto x = particles.slice_x();
+    auto u = particles.slice_u();
+    auto f = particles.slice_f();
+    auto W = particles.slice_W();
+    auto vol = particles.slice_vol();
+
+    double energy;
+    // if ( _half_neigh )
+    //    energy = compute_energy_half( force, x, u, neigh_list,
+    //                                  n_local, neigh_op_tag );
+    // else
+    energy = force.compute_energy_full( W, x, u, vol, neigh_list, n_local,
+                                        neigh_op_tag );
+    Kokkos::fence();
+
+    return energy;
+}
+
+// Forces with bond breaking.
+template <class ForceType, class ParticleType, class NeighListType,
           class NeighborView, class ParallelType>
 void compute_force( const ForceType& force, ParticleType& particles,
                     const NeighListType& neigh_list, NeighborView& mu,
@@ -475,6 +530,7 @@ void compute_force( const ForceType& force, ParticleType& particles,
     Kokkos::fence();
 }
 
+// Energy and damage.
 template <class ForceType, class ParticleType, class NeighListType,
           class NeighborView, class ParallelType>
 double compute_energy( const ForceType force, ParticleType& particles,
