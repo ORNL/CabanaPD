@@ -42,32 +42,38 @@ void testHalo()
     CabanaPD::Particles<mem_space> particles( exec_space(), box_min, box_max,
                                               num_cells, halo_width );
     // Set ID equal to MPI rank.
-    int rank = -1;
-    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
+    int current_rank = -1;
+    MPI_Comm_rank( MPI_COMM_WORLD, &current_rank );
 
+    // Only positions and displacements are communicated in CabanaPD. We use the
+    // displacement field for MPI rank here for convenience.
+    auto rank = particles.slice_u();
     auto x = particles.slice_x();
-    auto id = particles.slice_id();
-    auto init_functor = KOKKOS_LAMBDA( const int pid ) { id( pid ) = rank; };
+    auto init_functor = KOKKOS_LAMBDA( const int pid )
+    {
+        rank( pid, 0 ) = static_cast<double>( current_rank );
+    };
     particles.update_particles( exec_space{}, init_functor );
 
     int init_num_particles = particles.n_local;
-    using HostAoSoA =
-        Cabana::AoSoA<Cabana::MemberTypes<double[3], int>, Kokkos::HostSpace>;
+    using HostAoSoA = Cabana::AoSoA<Cabana::MemberTypes<double[3], double[3]>,
+                                    Kokkos::HostSpace>;
     HostAoSoA aosoa_init_host( "host_aosoa", init_num_particles );
     auto x_init_host = Cabana::slice<0>( aosoa_init_host );
-    auto id_init_host = Cabana::slice<1>( aosoa_init_host );
+    auto rank_init_host = Cabana::slice<1>( aosoa_init_host );
     Cabana::deep_copy( x_init_host, x );
-    Cabana::deep_copy( id_init_host, id );
+    Cabana::deep_copy( rank_init_host, rank );
 
+    // A gather is performed on construction.
     CabanaPD::Comm<device_type> comm( particles );
 
     HostAoSoA aosoa_host( "host_aosoa", particles.size );
     x = particles.slice_x();
-    id = particles.slice_id();
+    rank = particles.slice_u();
     auto x_host = Cabana::slice<0>( aosoa_host );
-    auto id_host = Cabana::slice<1>( aosoa_host );
+    auto rank_host = Cabana::slice<1>( aosoa_host );
     Cabana::deep_copy( x_host, x );
-    Cabana::deep_copy( id_host, id );
+    Cabana::deep_copy( rank_host, rank );
 
     EXPECT_EQ( particles.n_local, init_num_particles );
 
@@ -78,7 +84,7 @@ void testHalo()
         {
             EXPECT_EQ( x_host( p, d ), x_init_host( p, d ) );
         }
-        EXPECT_EQ( id_host( p ), id_init_host( p ) );
+        EXPECT_EQ( rank_host( p, 0 ), rank_init_host( p, 0 ) );
     }
 
     // Check all ghost particles in the halo region.
@@ -89,7 +95,7 @@ void testHalo()
             EXPECT_GE( x_host( p, d ), particles.ghost_mesh_lo[d] );
             EXPECT_LE( x_host( p, d ), particles.ghost_mesh_hi[d] );
         }
-        EXPECT_NE( id_host( p ), rank );
+        EXPECT_NE( rank_host( p, 0 ), current_rank );
     }
 
     double mesh_min[3] = { particles.ghost_mesh_lo[0],
