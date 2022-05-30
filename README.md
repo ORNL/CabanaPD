@@ -40,7 +40,7 @@ git clone https://code.ornl.gov/5t2/CabanaPD.git
 ## CPU Build
 After building Kokkos and Cabana for CPU:
 ```
-# Change directory as needed
+#Change directory as needed
 export CABANA_DIR=$HOME/Cabana
 
 cd ./CabanaPD
@@ -73,16 +73,51 @@ compiled with the HIP backend.
 
 ## Build, Test, and Install
 
-Once configured, build and install CabanaMD with:
+Once configured, build and install CabanaPD with:
 ```
-make -j $BUILD_NUM_THREADS
 make install
 ```
-Ensure installation by checking the installed libraries an headers in CBNMD_INSTALL_DIR. If tests are enable you can run the CabanaMD unit test suite with:
+
+If tests are enabled you can run the CabanaPD unit test suite with:
 ```
-cd build
+cd CabanaPD/build
 ctest
 ```
+
+## Examples
+
+Once built and installed, CabanaPD examples can be run. Timing and energy
+information is output to file and particle output (if enabled in Cabana) is
+written to files that can be visualized with Paraview and similar applications.
+The first is an elastic wave propagating through a cube from an initial
+Gaussian displacement profile from [1]. Assuming the build paths above:
+
+```
+./CabanaPD/build/examples/ElasticWave
+```
+
+The second is the Kalthoff Winkler experiment [2], where an impactor causes
+crack propagation at an angle from two pronotches.
+
+```
+./CabanaPD/build/examples/KalthoffWinkler
+```
+
+New examples can be created by using the existing `KalthoffWinkler` as a
+template to simulate other fracture problems. All inputs are currently
+specified in `examples/kalthoff_winkler.cpp`
+
+## References
+
+[1] P. Seleson and D. J. Littlewood, Numerical tools for improved convergence
+of meshfree peri-dynamic discretizations, in Handbook of Nonlocal Continuum
+Mechanics for Materials andStructures, George Voyiadjis, ed., Springer, Cham,
+2018.
+
+[2] J.F. Kalthoff, S. Winkler, Failure mode transition at high rates of shear
+loading, ImpactLoading and Dynamic Behavior of Materials, C.Y. Chiem, H.-D.
+Kunze, and L.W. Meyer, eds.,Vol 1, DGM Informationsgesellschaft Verlag (1988)
+185-195.
 
 ## License
 
