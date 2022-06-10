@@ -142,10 +142,10 @@ class SolverElastic
 
         force = std::make_shared<force_type>( inputs->half_neigh, force_model );
 
-        Cajita::Experimental::SiloParticleOutput::writeTimeStep(
-            "particles", particles->local_grid->globalGrid(), 0, 0, x,
-            particles->slice_W(), particles->slice_f(), particles->slice_u(),
-            particles->slice_v() );
+        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
+            "particles", particles->local_grid->globalGrid(), 0, 0, 0,
+            particles->n_local, x, particles->slice_W(), particles->slice_f(),
+            particles->slice_u(), particles->slice_v() );
 
         log( out, "Nlocal Nghost Nglobal\n", particles->n_local, " ",
              particles->n_ghost, " ", particles->n_global );
@@ -202,11 +202,13 @@ class SolverElastic
                 step_output( step, W );
 
                 auto x = particles->slice_x();
-                Cajita::Experimental::SiloParticleOutput::writeTimeStep(
-                    "particles", particles->local_grid->globalGrid(),
-                    step / output_frequency, step * inputs->timestep, x,
-                    particles->slice_W(), particles->slice_f(),
-                    particles->slice_u(), particles->slice_v() );
+                Cajita::Experimental::SiloParticleOutput::
+                    writePartialRangeTimeStep(
+                        "particles", particles->local_grid->globalGrid(),
+                        step / output_frequency, step * inputs->timestep, 0,
+                        particles->n_local, x, particles->slice_W(),
+                        particles->slice_f(), particles->slice_u(),
+                        particles->slice_v() );
 
                 /*
                 auto u = particles->slice_u();
@@ -337,10 +339,10 @@ class SolverFracture
         // Create force.
         force = std::make_shared<force_type>( inputs->half_neigh, force_model );
 
-        Cajita::Experimental::SiloParticleOutput::writeTimeStep(
-            "particles", particles->local_grid->globalGrid(), 0, 0,
-            particles->slice_x(), particles->slice_W(), particles->slice_f(),
-            particles->slice_u(), particles->slice_v(),
+        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
+            "particles", particles->local_grid->globalGrid(), 0, 0, 0,
+            particles->n_local, particles->slice_x(), particles->slice_W(),
+            particles->slice_f(), particles->slice_u(), particles->slice_v(),
             particles->slice_phi() );
 
         log( out, "Nlocal Nghost Nglobal\n", particles->n_local, " ",
@@ -405,12 +407,13 @@ class SolverFracture
                 this->step_output( step, W );
 
                 auto x = particles->slice_x();
-                Cajita::Experimental::SiloParticleOutput::writeTimeStep(
-                    "particles", particles->local_grid->globalGrid(),
-                    step / output_frequency, step * inputs->timestep, x,
-                    particles->slice_W(), particles->slice_f(),
-                    particles->slice_u(), particles->slice_v(),
-                    particles->slice_phi() );
+                Cajita::Experimental::SiloParticleOutput::
+                    writePartialRangeTimeStep(
+                        "particles", particles->local_grid->globalGrid(),
+                        step / output_frequency, step * inputs->timestep, 0,
+                        particles->n_local, x, particles->slice_W(),
+                        particles->slice_f(), particles->slice_u(),
+                        particles->slice_v(), particles->slice_phi() );
             }
             other_time += other_timer.seconds();
         }
