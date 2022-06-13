@@ -289,7 +289,8 @@ class SolverElastic
     Kokkos::Timer other_timer;
 };
 
-template <class DeviceType, class ForceModel, class BoundaryCondition>
+template <class DeviceType, class ForceModel, class BoundaryCondition,
+          class PrenotchType>
 class SolverFracture
     : public SolverElastic<DeviceType, typename ForceModel::elastic_model>
 {
@@ -307,10 +308,11 @@ class SolverFracture
     using force_type = Force<exec_space, force_model_type>;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using bc_type = BoundaryCondition;
+    using prenotch_type = PrenotchType;
 
     SolverFracture( Inputs _inputs, std::shared_ptr<particle_type> _particles,
                     force_model_type force_model, bc_type bc,
-                    Prenotch prenotch )
+                    prenotch_type prenotch )
         : base_type( _inputs, _particles,
                      typename force_model_type::elastic_model{} )
         , boundary_condition( bc )

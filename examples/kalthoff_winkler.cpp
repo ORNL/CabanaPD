@@ -52,8 +52,9 @@ int main( int argc, char* argv[] )
                                          low_corner[2] };
         Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
         Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-        std::vector<Kokkos::Array<double, 3>> notch_positions = { p01, p02 };
-        CabanaPD::Prenotch prenotch( v1, v2, notch_positions );
+        Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { p01,
+                                                                       p02 };
+        CabanaPD::Prenotch<2> prenotch( v1, v2, notch_positions );
 
         // FIXME: set halo width based on delta
         double delta = 0.0038;
@@ -100,10 +101,10 @@ int main( int argc, char* argv[] )
                                               inputs.G0 );
 
         // FIXME: use createSolver to switch backend at runtime.
-        auto cabana_pd = std::make_shared<
-            CabanaPD::SolverFracture<Kokkos::Device<exec_space, memory_space>,
-                                     CabanaPD::PMBDamageModel, decltype( bc )>>(
-            inputs, particles, force_model, bc, prenotch );
+        auto cabana_pd = std::make_shared<CabanaPD::SolverFracture<
+            Kokkos::Device<exec_space, memory_space>, CabanaPD::PMBDamageModel,
+            decltype( bc ), decltype( prenotch )>>( inputs, particles,
+                                                    force_model, bc, prenotch );
         cabana_pd->init_force();
         cabana_pd->run();
     }

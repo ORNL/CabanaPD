@@ -63,19 +63,21 @@ Kokkos::Array<double, 3> sum( Kokkos::Array<double, 3> a,
     return c;
 }
 
+template <std::size_t NumNotch>
 struct Prenotch
 {
+    static constexpr std::size_t num_notch = NumNotch;
     Kokkos::Array<double, 3> _v1;
     Kokkos::Array<double, 3> _v2;
-    std::vector<Kokkos::Array<double, 3>> _p0_vector;
+    Kokkos::Array<Kokkos::Array<double, 3>, num_notch> _p0_list;
 
     Prenotch() {}
 
     Prenotch( Kokkos::Array<double, 3> v1, Kokkos::Array<double, 3> v2,
-              std::vector<Kokkos::Array<double, 3>> p0_vector )
+              Kokkos::Array<Kokkos::Array<double, 3>, num_notch> p0_list )
         : _v1( v1 )
         , _v2( v2 )
-        , _p0_vector( p0_vector )
+        , _p0_list( p0_list )
     {
     }
 
@@ -89,9 +91,9 @@ struct Prenotch
 
         auto v1 = _v1;
         auto v2 = _v2;
-        for ( std::size_t p = 0; p < 3; p++ )
+        for ( std::size_t p = 0; p < _p0_list.size(); p++ )
         {
-            auto p0 = _p0_vector[p];
+            auto p0 = _p0_list[p];
             auto notch_functor = KOKKOS_LAMBDA( const int i )
             {
                 std::size_t num_neighbors =
