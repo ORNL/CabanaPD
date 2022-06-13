@@ -232,6 +232,7 @@ class Force<ExecutionSpace, PMBDamageModel>
                              const int n_local, ParallelType& ) const
     {
         auto c = _model.c;
+        auto break_coeff = _model.bond_break_coeff;
 
         auto force_full = KOKKOS_LAMBDA( const int i )
         {
@@ -262,7 +263,8 @@ class Force<ExecutionSpace, PMBDamageModel>
                     const double r2 = rx * rx + ry * ry + rz * rz;
                     const double xi2 = xi_x * xi_x + xi_y * xi_y + xi_z * xi_z;
 
-                    break_bond( mu( i, n ), r2, xi2 );
+                    if ( r2 >= break_coeff * xi2 )
+                        mu( i, n ) = 0;
                     if ( mu( i, n ) > 0 )
                     {
                         const double r = sqrt( r2 );
@@ -285,13 +287,6 @@ class Force<ExecutionSpace, PMBDamageModel>
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Kokkos::parallel_for( policy, force_full,
                               "CabanaPD::ForcePMBDamage::compute_full" );
-    }
-
-    KOKKOS_INLINE_FUNCTION void break_bond( int& mu, const double r2,
-                                            const double xi2 ) const
-    {
-        if ( r2 >= _model.bond_break_coeff * xi2 )
-            mu = 0;
     }
 
     template <class PosType, class VolType, class WType, class DamageType,
