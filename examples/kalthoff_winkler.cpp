@@ -81,14 +81,9 @@ int main( int argc, char* argv[] )
         CabanaPD::RegionBoundary plane(
             x_bc - dx, x_bc + dx * 1.25, y_prenotch1 - dx * 0.25,
             y_prenotch2 + dx * 0.25, -thickness, thickness );
-        using bc_index_type =
-            CabanaPD::BoundaryIndexSpace<memory_space,
-                                         CabanaPD::RegionBoundary>;
-        bc_index_type bc_indices;
-        bc_indices.create( exec_space{}, *particles, plane );
-        using bc_type =
-            CabanaPD::BoundaryCondition<bc_index_type, CabanaPD::ForceBCTag>;
-        bc_type bc( bc_indices );
+
+        auto bc = createBoundaryCondition( exec_space{}, *particles, plane,
+                                           CabanaPD::ForceBCTag{} );
 
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {
@@ -107,7 +102,7 @@ int main( int argc, char* argv[] )
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = std::make_shared<
             CabanaPD::SolverFracture<Kokkos::Device<exec_space, memory_space>,
-                                     CabanaPD::PMBDamageModel, bc_type>>(
+                                     CabanaPD::PMBDamageModel, decltype( bc )>>(
             inputs, particles, force_model, bc, prenotch );
         cabana_pd->init_force();
         cabana_pd->run();

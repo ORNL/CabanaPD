@@ -40,14 +40,13 @@ template <class MemorySpace>
 struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
 {
     using index_view_type = Kokkos::View<int*, MemorySpace>;
-    index_view_type index_space;
+    index_view_type _index_space;
 
     template <class ExecSpace, class Particles>
-    index_view_type create( ExecSpace, Particles particles,
-                            RegionBoundary plane )
+    BoundaryIndexSpace( ExecSpace, Particles particles, RegionBoundary plane )
     {
         // Guess 10% boundary particles.
-        index_space =
+        auto index_space =
             index_view_type( "boundary_indices", particles.n_local * 0.1 );
         auto x = particles.slice_x();
         Kokkos::RangePolicy<ExecSpace> policy( 0, particles.n_local );
@@ -81,9 +80,18 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
         }
 
         Kokkos::resize( index_space, sum );
-        return index_space;
+        _index_space = index_space;
     }
 };
+
+template <class ExecSpace, class Particles, class BoundaryType>
+auto createBoundaryIndexSpace( ExecSpace exec_space, Particles particles,
+                               BoundaryType plane )
+{
+    using memory_space = typename Particles::memory_space;
+    return BoundaryIndexSpace<memory_space, BoundaryType>( exec_space,
+                                                           particles, plane );
+}
 
 class ForceBCTag
 {
@@ -96,10 +104,10 @@ template <class BCIndexSpace>
 struct BoundaryCondition<BCIndexSpace, ForceBCTag>
 {
     using view_type = typename BCIndexSpace::index_view_type;
-    view_type index_space;
+    view_type _index_space;
 
     BoundaryCondition( BCIndexSpace bc_index_space )
-        : index_space( bc_index_space.index_space )
+        : _index_space( bc_index_space._index_space )
     {
     }
 
@@ -107,6 +115,7 @@ struct BoundaryCondition<BCIndexSpace, ForceBCTag>
     void apply( ExecSpace, ParticleType& particles )
     {
         auto f = particles.slice_f();
+        auto index_space = _index_space;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
@@ -116,6 +125,17 @@ struct BoundaryCondition<BCIndexSpace, ForceBCTag>
             } );
     }
 };
+
+template <class ExecSpace, class Particles, class BoundaryType, class BCTag>
+auto createBoundaryCondition( ExecSpace exec_space, Particles particles,
+                              BoundaryType plane, BCTag )
+{
+    using memory_space = typename Particles::memory_space;
+    using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;
+    bc_index_type bc_indices =
+        createBoundaryIndexSpace( exec_space, particles, plane );
+    return BoundaryCondition<bc_index_type, BCTag>( bc_indices );
+}
 
 } // namespace CabanaPD
 
