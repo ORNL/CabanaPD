@@ -43,7 +43,14 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
     index_view_type _index_space;
 
     template <class ExecSpace, class Particles>
-    BoundaryIndexSpace( ExecSpace, Particles particles, RegionBoundary plane )
+    BoundaryIndexSpace( ExecSpace exec_space, Particles particles,
+                        RegionBoundary plane )
+    {
+        create( exec_space, particles, plane );
+    }
+
+    template <class ExecSpace, class Particles>
+    void create( ExecSpace, Particles particles, RegionBoundary plane )
     {
         // Guess 10% boundary particles.
         auto index_space =
