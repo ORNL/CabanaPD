@@ -89,8 +89,9 @@ struct Prenotch
 
         auto v1 = _v1;
         auto v2 = _v2;
-        for ( auto p0 : _p0_vector )
+        for ( std::size_t p = 0; p < 3; p++ )
         {
+            auto p0 = _p0_vector[p];
             auto notch_functor = KOKKOS_LAMBDA( const int i )
             {
                 std::size_t num_neighbors =
@@ -136,6 +137,7 @@ struct Prenotch
         return 3;
     }
 
+    KOKKOS_INLINE_FUNCTION
     int bond_prenotch_intersection( Kokkos::Array<double, 3> v1,
                                     Kokkos::Array<double, 3> v2,
                                     Kokkos::Array<double, 3> p0,
