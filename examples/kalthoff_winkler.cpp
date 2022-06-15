@@ -18,8 +18,8 @@ int main( int argc, char* argv[] )
         Kokkos::ScopeGuard scope_guard( argc, argv );
 
         // FIXME: change backend at compile time for now.
-        using memory_space = Kokkos::HostSpace;
-        using exec_space = Kokkos::Serial;
+        using exec_space = Kokkos::DefaultExecutionSpace;
+        using memory_space = typename exec_space::memory_space;
 
         // Plate dimension)
         double height = 0.1;      // [m] (100 mm)

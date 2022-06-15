@@ -17,8 +17,8 @@ int main( int argc, char* argv[] )
         Kokkos::ScopeGuard scope_guard( argc, argv );
 
         // FIXME: change backend at compile time for now.
-        using memory_space = Kokkos::HostSpace;
-        using exec_space = Kokkos::Serial;
+        using exec_space = Kokkos::DefaultExecutionSpace;
+        using memory_space = typename exec_space::memory_space;
 
         std::array<int, 3> num_cell = { 41, 41, 41 };
         std::array<double, 3> low_corner = { -0.5, -0.5, -0.5 };
