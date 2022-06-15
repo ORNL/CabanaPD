@@ -39,7 +39,7 @@ struct BoundaryIndexSpace;
 template <class MemorySpace>
 struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
 {
-    using index_view_type = Kokkos::View<int*, MemorySpace>;
+    using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
     index_view_type _index_space;
 
     template <class ExecSpace, class Particles>
@@ -55,38 +55,37 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
         // Guess 10% boundary particles.
         auto index_space =
             index_view_type( "boundary_indices", particles.n_local * 0.1 );
+        auto count = index_view_type( "count", 1 );
         auto x = particles.slice_x();
         Kokkos::RangePolicy<ExecSpace> policy( 0, particles.n_local );
-        auto index_functor =
-            KOKKOS_LAMBDA( const std::size_t pid, std::size_t& c )
+        auto index_functor = KOKKOS_LAMBDA( const std::size_t pid )
         {
             if ( x( pid, 0 ) >= plane.low_x && x( pid, 0 ) <= plane.high_x &&
                  x( pid, 1 ) >= plane.low_y && x( pid, 1 ) <= plane.high_y &&
                  x( pid, 2 ) >= plane.low_z && x( pid, 2 ) <= plane.high_z )
             {
                 // Resize after count if needed.
+                auto c = Kokkos::atomic_fetch_add( &count( 0 ), 1 );
                 if ( c < index_space.size() )
                 {
                     index_space( c ) = pid;
                 }
-                c += 1;
             }
         };
 
-        std::size_t sum = 0;
-        Kokkos::parallel_reduce( "CabanaPD::BC::create", policy, index_functor,
-                                 Kokkos::Sum<std::size_t>( sum ) );
-
-        if ( sum > index_space.size() )
+        Kokkos::parallel_for( "CabanaPD::BC::create", policy, index_functor );
+        auto count_host =
+            Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, count );
+        if ( count_host( 0 ) != index_space.size() )
         {
-            Kokkos::realloc( index_space, sum );
-            sum = 0;
-            Kokkos::parallel_reduce( "CabanaPD::BC::create", policy,
-                                     index_functor,
-                                     Kokkos::Sum<std::size_t>( sum ) );
+            Kokkos::resize( index_space, count_host( 0 ) );
         }
-
-        Kokkos::resize( index_space, sum );
+        if ( count_host( 0 ) > index_space.size() )
+        {
+            Kokkos::deep_copy( count, 0 );
+            Kokkos::parallel_for( "CabanaPD::BC::create", policy,
+                                  index_functor );
+        }
         _index_space = index_space;
     }
 };
