@@ -27,10 +27,23 @@ class Inputs
     double K;
     double delta;
 
-    Inputs( const int nc, const double lc, const double hc, const double K,
-            const double d, const double t_f, const double dt );
+    Inputs( const std::array<int, 3> nc, std::array<double, 3> lc,
+            std::array<double, 3> hc, const double K, const double d,
+            const double t_f, const double dt );
     ~Inputs();
     void read_args( int argc, char* argv[] );
+};
+
+class InputsFracture : public Inputs
+{
+  public:
+    using Inputs::Inputs;
+    double G0;
+
+    InputsFracture( const std::array<int, 3> nc, std::array<double, 3> lc,
+                    std::array<double, 3> hc, const double K, const double d,
+                    const double t_f, const double dt, const double G0 );
+    ~InputsFracture();
 };
 
 } // namespace CabanaPD

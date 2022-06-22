@@ -78,7 +78,6 @@ class Integrator
         auto u = p.slice_u();
         auto v = p.slice_v();
         auto f = p.slice_f();
-        auto type = p.slice_type();
         auto density = p.slice_rho();
 
         auto dt = _dt;
@@ -103,7 +102,6 @@ class Integrator
     {
         auto v = p.slice_v();
         auto f = p.slice_f();
-        auto type = p.slice_type();
         auto density = p.slice_rho();
 
         auto half_dt = _half_dt;
