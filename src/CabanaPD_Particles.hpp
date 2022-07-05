@@ -90,9 +90,9 @@ class Particles
     using vector_type = Cabana::MemberTypes<double[dim]>;
     // volume
     using scalar_type = Cabana::MemberTypes<double>;
-    // type, W, v, rho, damage
-    using other_types =
-        Cabana::MemberTypes<int, double, double[dim], double, double>;
+    // type, W, v, rho, damage, dilatation, weighted_volume
+    using other_types = Cabana::MemberTypes<int, double, double[dim], double,
+                                            double, double, double>;
     // Potentially needed later: body force (b), ID
 
     // FIXME: add vector length
@@ -298,11 +298,28 @@ class Particles
         return f_a;
     }
     auto slice_vol() { return Cabana::slice<0>( _aosoa_vol, "volume" ); }
+    auto slice_vol() const { return Cabana::slice<0>( _aosoa_vol, "volume" ); }
     auto slice_type() { return Cabana::slice<0>( _aosoa_other, "type" ); }
     auto slice_W() { return Cabana::slice<1>( _aosoa_other, "strain_energy" ); }
     auto slice_v() { return Cabana::slice<2>( _aosoa_other, "velocities" ); }
     auto slice_rho() { return Cabana::slice<3>( _aosoa_other, "density" ); }
     auto slice_phi() { return Cabana::slice<4>( _aosoa_other, "damage" ); }
+    auto slice_theta()
+    {
+        return Cabana::slice<5>( _aosoa_other, "dilatation" );
+    }
+    auto slice_theta() const
+    {
+        return Cabana::slice<5>( _aosoa_other, "dilatation" );
+    }
+    auto slice_m()
+    {
+        return Cabana::slice<6>( _aosoa_other, "weighted_volume" );
+    }
+    auto slice_m() const
+    {
+        return Cabana::slice<6>( _aosoa_other, "weighted_volume" );
+    }
 
     void resize( int new_local, int new_ghost )
     {
