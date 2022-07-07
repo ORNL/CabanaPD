@@ -166,6 +166,9 @@ class SolverElastic
 
     void init_force()
     {
+        // Only needed for LPS.
+        force->initialize( *particles, *neighbors, neigh_iter_tag{} );
+
         // Compute initial forces
         compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
         compute_energy( *force, *particles, *neighbors, neigh_iter_tag() );
@@ -362,6 +365,9 @@ class SolverFracture
 
     void init_force()
     {
+        // Only needed for LPS.
+        force->initialize( *particles, *neighbors, neigh_iter_tag{} );
+
         // Compute initial forces
         compute_force( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
         compute_energy( *force, *particles, *neighbors, mu, neigh_iter_tag() );

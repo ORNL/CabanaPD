@@ -108,7 +108,7 @@ struct LPSModel
         G = _G;
         delta = _delta;
 
-        theta_coeff = 3 * K + 5 * G;
+        theta_coeff = 3 * K - 5 * G;
         s_coeff = 15 * G;
     }
 };
@@ -200,68 +200,30 @@ class Force<ExecutionSpace, LPSModel>
 
     template <class ParticleType, class NeighListType, class ParallelType>
     void initialize( ParticleType& particles, const NeighListType& neigh_list,
-                     ParallelType& neigh_op_tag )
+                     const ParallelType neigh_op_tag )
     {
         compute_weighted_volume( particles, neigh_list, neigh_op_tag );
-        compute_dilatation( particles, neigh_list, neigh_op_tag );
-    }
-
-    template <class ParticleType, class NeighListType, class ParallelType>
-    void compute_dilatation( ParticleType& particles,
-                             const NeighListType& neigh_list,
-                             ParallelType& neigh_op_tag ) const
-    {
-        auto n_local = particles.n_local;
-        auto x = particles.slice_x();
-        auto u = particles.slice_u();
-        auto theta = particles.slice_theta();
-        auto m = particles.slice_m();
-
-        auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
-        {
-            // Get the reference positions and displacements.
-            const double xi_x = x( j, 0 ) - x( i, 0 );
-            const double eta_u = u( j, 0 ) - u( i, 0 );
-            const double xi_y = x( j, 1 ) - x( i, 1 );
-            const double eta_v = u( j, 1 ) - u( i, 1 );
-            const double xi_z = x( j, 2 ) - x( i, 2 );
-            const double eta_w = u( j, 2 ) - u( i, 2 );
-            const double rx = xi_x + eta_u;
-            const double ry = xi_y + eta_v;
-            const double rz = xi_z + eta_w;
-            const double r = sqrt( rx * rx + ry * ry + rz * rz );
-            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
-            double theta_i = influence_function( xi ) * xi * ( r - xi );
-
-            theta( i ) += 3 * theta_i / m( i );
-        };
-
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-        Cabana::neighbor_parallel_for(
-            policy, dilatation, neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::compute_full" );
     }
 
     template <class ParticleType, class NeighListType, class ParallelType>
     void compute_weighted_volume( ParticleType& particles,
                                   const NeighListType& neigh_list,
-                                  ParallelType& neigh_op_tag ) const
+                                  const ParallelType neigh_op_tag )
     {
         auto n_local = particles.n_local;
         auto x = particles.slice_x();
+        const auto vol = particles.slice_vol();
         auto m = particles.slice_m();
 
         auto weighted_volume = KOKKOS_LAMBDA( const int i, const int j )
         {
-            double m_i = 0.0;
-
             // Get the reference positions and displacements.
             const double xi_x = x( j, 0 ) - x( i, 0 );
             const double xi_y = x( j, 1 ) - x( i, 1 );
             const double xi_z = x( j, 2 ) - x( i, 2 );
             const double xi2 = xi_x * xi_x + xi_y * xi_y + xi_z * xi_z;
             const double xi = sqrt( xi2 );
-            m_i = influence_function( xi ) * xi2;
+            double m_i = influence_function( xi ) * xi2 * vol( j );
 
             m( i ) += m_i;
         };
@@ -279,12 +241,29 @@ class Force<ExecutionSpace, LPSModel>
                              const NeighListType& neigh_list, const int n_local,
                              ParallelType& neigh_op_tag ) const
     {
-        auto K = _model.K;
-        auto G = _model.G;
+        auto theta_coeff = _model.theta_coeff;
+        auto s_coeff = _model.s_coeff;
 
         const auto vol = particles.slice_vol();
         auto theta = particles.slice_theta();
         auto m = particles.slice_m();
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+
+        auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            // Get the reference positions and displacements.
+            double r, rx, ry, rz;
+            double xi;
+            getDistance( x, u, i, j, xi, r, rx, ry, rz );
+            double theta_i =
+                influence_function( xi ) * xi * ( r - xi ) * vol( j );
+
+            theta( i ) += 3 * theta_i / m( i );
+        };
+
+        Cabana::neighbor_parallel_for(
+            policy, dilatation, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForceLPS::compute_dilatation" );
 
         auto force_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -305,10 +284,10 @@ class Force<ExecutionSpace, LPSModel>
             const double r = sqrt( rx * rx + ry * ry + rz * rz );
             const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
             const double s = ( r - xi ) / xi;
-            const double coeff = ( ( 3 * K - 5 * G ) * ( theta( i ) / m( i ) +
-                                                         theta( j ) / m( j ) ) +
-                                   15 * G * s * ( 1 / m( i ) + 1 / m( j ) ) ) *
-                                 influence_function( xi ) * xi * vol( i );
+            const double coeff =
+                ( theta_coeff * ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
+                  s_coeff * s * ( 1 / m( i ) + 1 / m( j ) ) ) *
+                influence_function( xi ) * xi * vol( j );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -318,7 +297,6 @@ class Force<ExecutionSpace, LPSModel>
             f( i, 2 ) += fz_i;
         };
 
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Cabana::neighbor_parallel_for(
             policy, force_full, neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPS::compute_full" );
@@ -363,7 +341,7 @@ class Force<ExecutionSpace, LPSModel>
             double w = ( 1 / num_neighbors ) * 0.5 * theta_coeff / 3 *
                            ( theta( i ) * theta( i ) ) +
                        0.5 * ( s_coeff / m( i ) ) * influence_function( xi ) *
-                           s * s * xi * xi * vol( i );
+                           s * s * xi * xi * vol( j );
             W( i ) += w;
             Phi += w * vol( i );
         };
@@ -396,6 +374,11 @@ class Force<ExecutionSpace, PMBModel>
     Force( const bool half_neigh, const PMBModel model )
         : _half_neigh( half_neigh )
         , _model( model )
+    {
+    }
+
+    template <class ParticleType, class NeighListType, class ParallelType>
+    void initialize( ParticleType&, NeighListType&, ParallelType )
     {
     }
 
@@ -503,6 +486,11 @@ class Force<ExecutionSpace, PMBDamageModel>
     Force( const bool half_neigh, const PMBDamageModel model )
         : _half_neigh( half_neigh )
         , _model( model )
+    {
+    }
+
+    template <class ParticleType, class NeighListType, class ParallelType>
+    void initialize( ParticleType&, NeighListType&, ParallelType )
     {
     }
 
@@ -644,6 +632,11 @@ class Force<ExecutionSpace, LinearPMBModel>
     Force( const bool half_neigh, const LinearPMBModel model )
         : _half_neigh( half_neigh )
         , _model( model )
+    {
+    }
+
+    template <class ParticleType, class NeighListType, class ParallelType>
+    void initialize( ParticleType&, NeighListType&, ParallelType )
     {
     }
 

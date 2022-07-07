@@ -79,7 +79,8 @@ int main( int argc, char* argv[] )
         particles->update_particles( exec_space{}, init_functor );
 
         // Choose force model type.
-        CabanaPD::PMBModel force_model( inputs.K, inputs.delta );
+        double G = 3 / 5. * K;
+        CabanaPD::LPSModel force_model( inputs.K, G, inputs.delta );
 
         // FIXME: use createSolver to switch backend at runtime.
         using device_type = Kokkos::Device<exec_space, memory_space>;
