@@ -328,11 +328,11 @@ class Force<ExecutionSpace, PMBDamageModel>
                 // (pairwise potential).
                 double w = mu( i, n ) * 0.25 * c * s * s * xi * vol( j );
                 W( i ) += w;
-                Phi += w * vol( i );
 
                 phi_i += mu( i, n );
             }
             phi( i ) = 1 - phi_i / num_neighbors;
+            Phi += W( i ) * vol( i );
         };
 
         double strain_energy = 0.0;
