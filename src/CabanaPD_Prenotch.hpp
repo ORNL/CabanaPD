@@ -209,7 +209,7 @@ struct Prenotch
                         mu( i, n ) = 0;
                 }
             };
-            Kokkos::parallel_for( policy, notch_functor, "CabanaPD::Prenotch" );
+            Kokkos::parallel_for( "CabanaPD::Prenotch", policy, notch_functor );
         }
     }
 };

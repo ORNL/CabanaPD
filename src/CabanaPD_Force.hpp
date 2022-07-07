@@ -285,8 +285,8 @@ class Force<ExecutionSpace, PMBDamageModel>
         };
 
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-        Kokkos::parallel_for( policy, force_full,
-                              "CabanaPD::ForcePMBDamage::compute_full" );
+        Kokkos::parallel_for( "CabanaPD::ForcePMBDamage::compute_full", policy,
+                              force_full );
     }
 
     template <class PosType, class VolType, class WType, class DamageType,
