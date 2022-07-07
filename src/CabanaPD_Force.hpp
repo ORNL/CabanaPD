@@ -148,7 +148,7 @@ class Force<ExecutionSpace, PMBModel>
             const double r = sqrt( rx * rx + ry * ry + rz * rz );
             const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
             const double s = ( r - xi ) / xi;
-            const double coeff = c * s * vol( i );
+            const double coeff = c * s * vol( j );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -192,7 +192,7 @@ class Force<ExecutionSpace, PMBModel>
 
             // 1/2 from outside the integral; 1/2 from the integrand (pairwise
             // potential).
-            double w = 0.25 * c * s * s * xi * vol( i );
+            double w = 0.25 * c * s * s * xi * vol( j );
             W( i ) += w;
             Phi += w * vol( i );
         };
@@ -270,7 +270,7 @@ class Force<ExecutionSpace, PMBDamageModel>
                         const double r = sqrt( r2 );
                         const double xi = sqrt( xi2 );
                         const double s = ( r - xi ) / xi;
-                        const double coeff = c * s * vol( i );
+                        const double coeff = c * s * vol( j );
                         double muij = mu( i, n );
                         fx_i = muij * coeff * rx / r;
                         fy_i = muij * coeff * ry / r;
@@ -326,7 +326,7 @@ class Force<ExecutionSpace, PMBDamageModel>
 
                 // 1/2 from outside the integral; 1/2 from the integrand
                 // (pairwise potential).
-                double w = mu( i, n ) * 0.25 * c * s * s * xi * vol( i );
+                double w = mu( i, n ) * 0.25 * c * s * s * xi * vol( j );
                 W( i ) += w;
                 Phi += w * vol( i );
 
@@ -386,7 +386,7 @@ class Force<ExecutionSpace, LinearPMBModel>
             const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
             const double linear_s =
                 ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
-            const double coeff = c * linear_s * vol( i );
+            const double coeff = c * linear_s * vol( j );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
             fz_i = coeff * xi_z / xi;
@@ -427,7 +427,7 @@ class Force<ExecutionSpace, LinearPMBModel>
 
             // 1/2 from outside the integral; 1/2 from the integrand (pairwise
             // potential).
-            double w = 0.25 * c * linear_s * linear_s * xi * vol( i );
+            double w = 0.25 * c * linear_s * linear_s * xi * vol( j );
             W( i ) += w;
             Phi += w * vol( i );
         };
