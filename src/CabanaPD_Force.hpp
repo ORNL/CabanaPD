@@ -304,6 +304,7 @@ class Force<ExecutionSpace, PMBDamageModel>
                 Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
                                                                   i );
             double phi_i = 0.0;
+            double vol_H_i = 0.0;
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
                 std::size_t j =
@@ -329,10 +330,11 @@ class Force<ExecutionSpace, PMBDamageModel>
                 double w = mu( i, n ) * 0.25 * c * s * s * xi * vol( j );
                 W( i ) += w;
 
-                phi_i += mu( i, n );
+                phi_i += mu( i, n ) * vol( j );
+                vol_H_i += vol( j );
             }
-            phi( i ) = 1 - phi_i / num_neighbors;
             Phi += W( i ) * vol( i );
+            phi( i ) = 1 - phi_i / vol_H_i;
         };
 
         double strain_energy = 0.0;
