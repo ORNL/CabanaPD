@@ -176,6 +176,24 @@ struct LinearPMBModel : public PMBModel
     using PMBModel::K;
 };
 
+template <class PosType>
+void getDistance( const PosType& x, const PosType& u, const int i, const int j,
+                  double& xi, double& r, double& rx, double& ry, double& rz )
+{
+    // Get the reference positions and displacements.
+    const double xi_x = x( j, 0 ) - x( i, 0 );
+    const double eta_u = u( j, 0 ) - u( i, 0 );
+    const double xi_y = x( j, 1 ) - x( i, 1 );
+    const double eta_v = u( j, 1 ) - u( i, 1 );
+    const double xi_z = x( j, 2 ) - x( i, 2 );
+    const double eta_w = u( j, 2 ) - u( i, 2 );
+    rx = xi_x + eta_u;
+    ry = xi_y + eta_v;
+    rz = xi_z + eta_w;
+    r = sqrt( rx * rx + ry * ry + rz * rz );
+    xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+}
+
 /******************************************************************************
   Force computation LPS
 ******************************************************************************/
@@ -271,18 +289,9 @@ class Force<ExecutionSpace, LPSModel>
             double fy_i = 0.0;
             double fz_i = 0.0;
 
-            // Get the reference positions and displacements.
-            const double xi_x = x( j, 0 ) - x( i, 0 );
-            const double eta_u = u( j, 0 ) - u( i, 0 );
-            const double xi_y = x( j, 1 ) - x( i, 1 );
-            const double eta_v = u( j, 1 ) - u( i, 1 );
-            const double xi_z = x( j, 2 ) - x( i, 2 );
-            const double eta_w = u( j, 2 ) - u( i, 2 );
-            const double rx = xi_x + eta_u;
-            const double ry = xi_y + eta_v;
-            const double rz = xi_z + eta_w;
-            const double r = sqrt( rx * rx + ry * ry + rz * rz );
-            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+            double r, rx, ry, rz;
+            double xi;
+            getDistance( x, u, i, j, xi, r, rx, ry, rz );
             const double s = ( r - xi ) / xi;
             const double coeff =
                 ( theta_coeff * ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
@@ -320,18 +329,9 @@ class Force<ExecutionSpace, LPSModel>
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
-            // Get the reference positions and displacements.
-            const double xi_x = x( j, 0 ) - x( i, 0 );
-            const double eta_u = u( j, 0 ) - u( i, 0 );
-            const double xi_y = x( j, 1 ) - x( i, 1 );
-            const double eta_v = u( j, 1 ) - u( i, 1 );
-            const double xi_z = x( j, 2 ) - x( i, 2 );
-            const double eta_w = u( j, 2 ) - u( i, 2 );
-            const double rx = xi_x + eta_u;
-            const double ry = xi_y + eta_v;
-            const double rz = xi_z + eta_w;
-            const double r = sqrt( rx * rx + ry * ry + rz * rz );
-            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+            double r, rx, ry, rz;
+            double xi;
+            getDistance( x, u, i, j, xi, r, rx, ry, rz );
             const double s = ( r - xi ) / xi;
 
             std::size_t num_neighbors =
@@ -398,18 +398,9 @@ class Force<ExecutionSpace, PMBModel>
             double fy_i = 0.0;
             double fz_i = 0.0;
 
-            // Get the reference positions and displacements.
-            const double xi_x = x( j, 0 ) - x( i, 0 );
-            const double eta_u = u( j, 0 ) - u( i, 0 );
-            const double xi_y = x( j, 1 ) - x( i, 1 );
-            const double eta_v = u( j, 1 ) - u( i, 1 );
-            const double xi_z = x( j, 2 ) - x( i, 2 );
-            const double eta_w = u( j, 2 ) - u( i, 2 );
-            const double rx = xi_x + eta_u;
-            const double ry = xi_y + eta_v;
-            const double rz = xi_z + eta_w;
-            const double r = sqrt( rx * rx + ry * ry + rz * rz );
-            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+            double r, rx, ry, rz;
+            double xi;
+            getDistance( x, u, i, j, xi, r, rx, ry, rz );
             const double s = ( r - xi ) / xi;
             const double coeff = c * s * vol( j );
             fx_i = coeff * rx / r;
@@ -442,17 +433,9 @@ class Force<ExecutionSpace, PMBModel>
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
             // Get the reference positions and displacements.
-            const double xi_x = x( j, 0 ) - x( i, 0 );
-            const double eta_u = u( j, 0 ) - u( i, 0 );
-            const double xi_y = x( j, 1 ) - x( i, 1 );
-            const double eta_v = u( j, 1 ) - u( i, 1 );
-            const double xi_z = x( j, 2 ) - x( i, 2 );
-            const double eta_w = u( j, 2 ) - u( i, 2 );
-            const double rx = xi_x + eta_u;
-            const double ry = xi_y + eta_v;
-            const double rz = xi_z + eta_w;
-            const double r = sqrt( rx * rx + ry * ry + rz * rz );
-            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+            double r, rx, ry, rz;
+            double xi;
+            getDistance( x, u, i, j, xi, r, rx, ry, rz );
             const double s = ( r - xi ) / xi;
 
             // 1/2 from outside the integral; 1/2 from the integrand (pairwise
@@ -583,18 +566,9 @@ class Force<ExecutionSpace, PMBDamageModel>
                     Cabana::NeighborList<NeighListType>::getNeighbor(
                         neigh_list, i, n );
                 // Get the reference positions and displacements.
-                const double xi_x = x( j, 0 ) - x( i, 0 );
-                const double eta_u = u( j, 0 ) - u( i, 0 );
-                const double xi_y = x( j, 1 ) - x( i, 1 );
-                const double eta_v = u( j, 1 ) - u( i, 1 );
-                const double xi_z = x( j, 2 ) - x( i, 2 );
-                const double eta_w = u( j, 2 ) - u( i, 2 );
-                const double rx = xi_x + eta_u;
-                const double ry = xi_y + eta_v;
-                const double rz = xi_z + eta_w;
-                const double r = sqrt( rx * rx + ry * ry + rz * rz );
-                const double xi =
-                    sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+                double r, rx, ry, rz;
+                double xi;
+                getDistance( x, u, i, j, xi, r, rx, ry, rz );
                 const double s = ( r - xi ) / xi;
 
                 // 1/2 from outside the integral; 1/2 from the integrand
