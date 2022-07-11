@@ -5,9 +5,7 @@
 
 #include <Kokkos_Core.hpp>
 
-#include <CabanaPD_Boundary.hpp>
-#include <CabanaPD_Output.hpp>
-#include <CabanaPD_Solver.hpp>
+#include <CabanaPD.hpp>
 
 int main( int argc, char* argv[] )
 {
