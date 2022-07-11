@@ -101,10 +101,9 @@ int main( int argc, char* argv[] )
                                               inputs.G0 );
 
         // FIXME: use createSolver to switch backend at runtime.
-        auto cabana_pd = std::make_shared<CabanaPD::SolverFracture<
-            Kokkos::Device<exec_space, memory_space>, CabanaPD::PMBDamageModel,
-            decltype( bc ), decltype( prenotch )>>( inputs, particles,
-                                                    force_model, bc, prenotch );
+        using device_type = Kokkos::Device<exec_space, memory_space>;
+        auto cabana_pd = CabanaPD::createSolverFracture<device_type>(
+            inputs, particles, force_model, bc, prenotch );
         cabana_pd->init_force();
         cabana_pd->run();
     }
