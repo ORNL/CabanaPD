@@ -75,18 +75,21 @@ class Particles
     int n_ghost = 0;
     int size = 0;
 
-    // x, u, f (needed for all particles, including ghosts)
-    using ghost_type = Cabana::MemberTypes<double[dim]>;
-    // type, W, v, rho, volume, damage
+    // x, u, f (vector matching system dimension)
+    using vector_type = Cabana::MemberTypes<double[dim]>;
+    // volume
+    using scalar_type = Cabana::MemberTypes<double>;
+    // type, W, v, rho, damage
     using other_types =
-        Cabana::MemberTypes<int, double, double[dim], double, double, double>;
+        Cabana::MemberTypes<int, double, double[dim], double, double>;
     // Potentially needed later: body force (b), ID
 
     // FIXME: add vector length
     // FIXME: enable variable aosoa
-    using aosoa_x_type = Cabana::AoSoA<ghost_type, memory_space, 1>;
-    using aosoa_u_type = Cabana::AoSoA<ghost_type, memory_space, 1>;
-    using aosoa_f_type = Cabana::AoSoA<ghost_type, memory_space, 1>;
+    using aosoa_x_type = Cabana::AoSoA<vector_type, memory_space, 1>;
+    using aosoa_u_type = Cabana::AoSoA<vector_type, memory_space, 1>;
+    using aosoa_f_type = Cabana::AoSoA<vector_type, memory_space, 1>;
+    using aosoa_vol_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
     using aosoa_other_type = Cabana::AoSoA<other_types, memory_space>;
 
     // Per type
@@ -122,6 +125,7 @@ class Particles
         aosoa_x_type _aosoa_x( "Particles", n_local );
         aosoa_u_type _aosoa_u( "Particles", n_local );
         aosoa_f_type _aosoa_f( "Particles", n_local );
+        aosoa_vol_type _aosoa_vol( "Particles", n_local );
         aosoa_other_type _aosoa_other( "Particles", n_local );
     }
 
@@ -193,6 +197,7 @@ class Particles
         _aosoa_x.resize( num_particles );
         _aosoa_u.resize( num_particles );
         _aosoa_f.resize( num_particles );
+        _aosoa_vol.resize( num_particles );
         _aosoa_other.resize( num_particles );
         auto x = slice_x();
         auto v = slice_v();
@@ -281,12 +286,12 @@ class Particles
         atomic_type f_a = f;
         return f_a;
     }
+    auto slice_vol() { return Cabana::slice<0>( _aosoa_vol, "volume" ); }
     auto slice_type() { return Cabana::slice<0>( _aosoa_other, "type" ); }
     auto slice_W() { return Cabana::slice<1>( _aosoa_other, "strain_energy" ); }
     auto slice_v() { return Cabana::slice<2>( _aosoa_other, "velocities" ); }
     auto slice_rho() { return Cabana::slice<3>( _aosoa_other, "density" ); }
-    auto slice_vol() { return Cabana::slice<4>( _aosoa_other, "volume" ); }
-    auto slice_phi() { return Cabana::slice<5>( _aosoa_other, "damage" ); }
+    auto slice_phi() { return Cabana::slice<4>( _aosoa_other, "damage" ); }
 
     void resize( int new_local, int new_ghost )
     {
@@ -295,6 +300,7 @@ class Particles
 
         _aosoa_x.resize( new_local + new_ghost );
         _aosoa_u.resize( new_local + new_ghost );
+        _aosoa_vol.resize( new_local + new_ghost );
         _aosoa_f.resize( new_local );
         _aosoa_other.resize( new_local );
         size = _aosoa_x.size();
@@ -305,12 +311,14 @@ class Particles
     {
         Cabana::gather( halo, _aosoa_x );
         Cabana::gather( halo, _aosoa_u );
+        Cabana::gather( halo, _aosoa_vol );
     };
 
   protected:
     aosoa_x_type _aosoa_x;
     aosoa_u_type _aosoa_u;
     aosoa_f_type _aosoa_f;
+    aosoa_vol_type _aosoa_vol;
     aosoa_other_type _aosoa_other;
 };
 
