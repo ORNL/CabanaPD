@@ -82,12 +82,22 @@ struct PMBDamageModel : public PMBModel
     using elastic_model::c;
     using elastic_model::delta;
     using elastic_model::K;
+    double G0;
     double s0;
     double bond_break_coeff;
 
     PMBDamageModel( const double K, const double delta, const double G0 )
         : PMBModel( K, delta )
     {
+        set_param( K, delta, G0 );
+    }
+
+    using elastic_model::set_param;
+
+    void set_param( const double _K, const double _delta, const double _G0 )
+    {
+        set_param( _K, _delta );
+        G0 = _G0;
         s0 = sqrt( 5.0 * G0 / 9.0 / K / delta );
         bond_break_coeff = ( 1 + s0 ) * ( 1 + s0 );
     }
@@ -95,7 +105,11 @@ struct PMBDamageModel : public PMBModel
 
 struct LinearPMBModel : public PMBModel
 {
+    using PMBModel::PMBModel;
+
     using PMBModel::c;
+    using PMBModel::delta;
+    using PMBModel::K;
 };
 
 /******************************************************************************
