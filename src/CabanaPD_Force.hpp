@@ -115,6 +115,8 @@ struct LPSModel
 
 struct LinearLPSModel : public LPSModel
 {
+    using LPSModel::LPSModel;
+
     using LPSModel::G;
     using LPSModel::K;
     using LPSModel::s_coeff;
@@ -273,8 +275,8 @@ class Force<ExecutionSpace, LPSModel>
             double r, rx, ry, rz;
             double xi;
             getDistance( x, u, i, j, xi, r, rx, ry, rz );
-            double theta_i =
-                influence_function( xi ) * xi * ( r - xi ) * vol( j );
+            const double s = ( r - xi ) / xi;
+            double theta_i = influence_function( xi ) * s * xi * xi * vol( j );
 
             theta( i ) += 3 * theta_i / m( i );
         };
@@ -342,6 +344,187 @@ class Force<ExecutionSpace, LPSModel>
                            ( theta( i ) * theta( i ) ) +
                        0.5 * ( s_coeff / m( i ) ) * influence_function( xi ) *
                            s * s * xi * xi * vol( j );
+            W( i ) += w;
+            Phi += w * vol( i );
+        };
+
+        double strain_energy = 0.0;
+
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Cabana::neighbor_parallel_reduce(
+            policy, energy_full, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, strain_energy,
+            "CabanaPD::ForceLPS::compute_energy_full" );
+
+        return strain_energy;
+    }
+};
+
+template <class ExecutionSpace>
+class Force<ExecutionSpace, LinearLPSModel>
+{
+  protected:
+    bool _half_neigh;
+    LinearLPSModel _model;
+
+  public:
+    using exec_space = ExecutionSpace;
+
+    Force( const bool half_neigh, const LinearLPSModel model )
+        : _half_neigh( half_neigh )
+        , _model( model )
+    {
+    }
+
+    template <class ParticleType, class NeighListType, class ParallelType>
+    void initialize( ParticleType& particles, const NeighListType& neigh_list,
+                     const ParallelType neigh_op_tag )
+    {
+        compute_weighted_volume( particles, neigh_list, neigh_op_tag );
+    }
+
+    template <class ParticleType, class NeighListType, class ParallelType>
+    void compute_weighted_volume( ParticleType& particles,
+                                  const NeighListType& neigh_list,
+                                  const ParallelType neigh_op_tag )
+    {
+        auto n_local = particles.n_local;
+        auto x = particles.slice_x();
+        const auto vol = particles.slice_vol();
+        auto m = particles.slice_m();
+
+        auto weighted_volume = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            // Get the reference positions and displacements.
+            const double xi_x = x( j, 0 ) - x( i, 0 );
+            const double xi_y = x( j, 1 ) - x( i, 1 );
+            const double xi_z = x( j, 2 ) - x( i, 2 );
+            const double xi2 = xi_x * xi_x + xi_y * xi_y + xi_z * xi_z;
+            const double xi = sqrt( xi2 );
+            double m_i = influence_function( xi ) * xi2 * vol( j );
+
+            m( i ) += m_i;
+        };
+
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Cabana::neighbor_parallel_for(
+            policy, weighted_volume, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForceLPS::compute_full" );
+    }
+
+    template <class ForceType, class PosType, class ParticleType,
+              class NeighListType, class ParallelType>
+    void compute_force_full( ForceType& f, const PosType& x, const PosType& u,
+                             const ParticleType& particles,
+                             const NeighListType& neigh_list, const int n_local,
+                             ParallelType& neigh_op_tag ) const
+    {
+        auto theta_coeff = _model.theta_coeff;
+        auto s_coeff = _model.s_coeff;
+
+        const auto vol = particles.slice_vol();
+        auto linear_theta = particles.slice_theta();
+        auto m = particles.slice_m();
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+
+        auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            // Get the reference positions and displacements.
+            const double xi_x = x( i, 0 ) - x( j, 0 );
+            const double eta_u = u( i, 0 ) - u( j, 0 );
+            const double xi_y = x( i, 1 ) - x( j, 1 );
+            const double eta_v = u( i, 1 ) - u( j, 1 );
+            const double xi_z = x( i, 2 ) - x( j, 2 );
+            const double eta_w = u( i, 2 ) - u( j, 2 );
+            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+            const double linear_s =
+                ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
+
+            double linear_theta_i =
+                influence_function( xi ) * linear_s * xi * xi * vol( j );
+
+            linear_theta( i ) += 3 * linear_theta_i / m( i );
+        };
+
+        Cabana::neighbor_parallel_for(
+            policy, dilatation, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForceLPS::compute_dilatation" );
+
+        auto force_full = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            double fx_i = 0.0;
+            double fy_i = 0.0;
+            double fz_i = 0.0;
+
+            // Get the reference positions and displacements.
+            const double xi_x = x( i, 0 ) - x( j, 0 );
+            const double eta_u = u( i, 0 ) - u( j, 0 );
+            const double xi_y = x( i, 1 ) - x( j, 1 );
+            const double eta_v = u( i, 1 ) - u( j, 1 );
+            const double xi_z = x( i, 2 ) - x( j, 2 );
+            const double eta_w = u( i, 2 ) - u( j, 2 );
+            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+            const double linear_s =
+                ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
+
+            const double coeff =
+                ( theta_coeff * ( linear_theta( i ) / m( i ) +
+                                  linear_theta( j ) / m( j ) ) +
+                  s_coeff * linear_s * ( 1 / m( i ) + 1 / m( j ) ) ) *
+                influence_function( xi ) * xi * vol( j );
+            fx_i = coeff * xi_x / xi;
+            fy_i = coeff * xi_y / xi;
+            fz_i = coeff * xi_z / xi;
+
+            f( i, 0 ) += fx_i;
+            f( i, 1 ) += fy_i;
+            f( i, 2 ) += fz_i;
+        };
+
+        Cabana::neighbor_parallel_for(
+            policy, force_full, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForceLPS::compute_full" );
+    }
+
+    template <class PosType, class WType, class ParticleType,
+              class NeighListType, class ParallelType>
+    double compute_energy_full( WType& W, const PosType& x, const PosType& u,
+                                const ParticleType& particles,
+                                const NeighListType& neigh_list,
+                                const int n_local,
+                                ParallelType& neigh_op_tag ) const
+    {
+        auto theta_coeff = _model.theta_coeff;
+        auto s_coeff = _model.s_coeff;
+
+        const auto vol = particles.slice_vol();
+        const auto linear_theta = particles.slice_theta();
+        auto m = particles.slice_m();
+
+        auto energy_full =
+            KOKKOS_LAMBDA( const int i, const int j, double& Phi )
+        {
+
+            // Do we need to recompute linear_theta_i?
+
+            const double xi_x = x( i, 0 ) - x( j, 0 );
+            const double eta_u = u( i, 0 ) - u( j, 0 );
+            const double xi_y = x( i, 1 ) - x( j, 1 );
+            const double eta_v = u( i, 1 ) - u( j, 1 );
+            const double xi_z = x( i, 2 ) - x( j, 2 );
+            const double eta_w = u( i, 2 ) - u( j, 2 );
+            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+            const double linear_s =
+                ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
+
+            std::size_t num_neighbors =
+                Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
+                                                                  i );
+
+            double w = ( 1 / num_neighbors ) * 0.5 * theta_coeff / 3 *
+                           ( linear_theta( i ) * linear_theta( i ) ) +
+                       0.5 * ( s_coeff / m( i ) ) * influence_function( xi ) *
+                           linear_s * linear_s * xi * xi * vol( j );
             W( i ) += w;
             Phi += w * vol( i );
         };
