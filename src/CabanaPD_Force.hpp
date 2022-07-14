@@ -179,8 +179,9 @@ struct LinearPMBModel : public PMBModel
 };
 
 template <class PosType>
-void getDistance( const PosType& x, const PosType& u, const int i, const int j,
-                  double& xi, double& r, double& rx, double& ry, double& rz )
+void getDistanceComponents( const PosType& x, const PosType& u, const int i,
+                            const int j, double& xi, double& r, double& s,
+                            double& rx, double& ry, double& rz )
 {
     // Get the reference positions and displacements.
     const double xi_x = x( j, 0 ) - x( i, 0 );
@@ -194,6 +195,40 @@ void getDistance( const PosType& x, const PosType& u, const int i, const int j,
     rz = xi_z + eta_w;
     r = sqrt( rx * rx + ry * ry + rz * rz );
     xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+    s = ( r - xi ) / xi;
+}
+
+template <class PosType>
+void getDistance( const PosType& x, const PosType& u, const int i, const int j,
+                  double& xi, double& r, double& s )
+{
+    double rx, ry, rz;
+    getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+}
+
+template <class PosType>
+void getLinearizedDistanceComponents( const PosType& x, const PosType& u,
+                                      const int i, const int j, double& xi,
+                                      double& s, double& xi_x, double& xi_y,
+                                      double& xi_z )
+{
+    // Get the reference positions and displacements.
+    xi_x = x( j, 0 ) - x( i, 0 );
+    const double eta_u = u( j, 0 ) - u( i, 0 );
+    xi_y = x( j, 1 ) - x( i, 1 );
+    const double eta_v = u( j, 1 ) - u( i, 1 );
+    xi_z = x( j, 2 ) - x( i, 2 );
+    const double eta_w = u( j, 2 ) - u( i, 2 );
+    xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+    s = ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
+}
+
+template <class PosType>
+void getLinearizedDistance( const PosType& x, const PosType& u, const int i,
+                            const int j, double& xi, double& s )
+{
+    double xi_x, xi_y, xi_z;
+    getLinearizedDistanceComponents( x, u, i, j, xi, s, xi_x, xi_y, xi_z );
 }
 
 /******************************************************************************
@@ -271,11 +306,10 @@ class Force<ExecutionSpace, LPSModel>
 
         auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
         {
-            // Get the reference positions and displacements.
-            double r, rx, ry, rz;
-            double xi;
-            getDistance( x, u, i, j, xi, r, rx, ry, rz );
-            const double s = ( r - xi ) / xi;
+            // Get the bond distance, displacement, and stretch
+            double xi, r, s;
+            double rx, ry, rz;
+            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
             double theta_i = influence_function( xi ) * s * xi * xi * vol( j );
 
             theta( i ) += 3 * theta_i / m( i );
@@ -291,10 +325,9 @@ class Force<ExecutionSpace, LPSModel>
             double fy_i = 0.0;
             double fz_i = 0.0;
 
-            double r, rx, ry, rz;
-            double xi;
-            getDistance( x, u, i, j, xi, r, rx, ry, rz );
-            const double s = ( r - xi ) / xi;
+            double xi, r, s;
+            double rx, ry, rz;
+            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
             const double coeff =
                 ( theta_coeff * ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
                   s_coeff * s * ( 1 / m( i ) + 1 / m( j ) ) ) *
@@ -331,10 +364,8 @@ class Force<ExecutionSpace, LPSModel>
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
-            double r, rx, ry, rz;
-            double xi;
-            getDistance( x, u, i, j, xi, r, rx, ry, rz );
-            const double s = ( r - xi ) / xi;
+            double xi, r, s;
+            getDistance( x, u, i, j, xi, r, s );
 
             std::size_t num_neighbors =
                 Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
@@ -429,16 +460,9 @@ class Force<ExecutionSpace, LinearLPSModel>
 
         auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
         {
-            // Get the reference positions and displacements.
-            const double xi_x = x( i, 0 ) - x( j, 0 );
-            const double eta_u = u( i, 0 ) - u( j, 0 );
-            const double xi_y = x( i, 1 ) - x( j, 1 );
-            const double eta_v = u( i, 1 ) - u( j, 1 );
-            const double xi_z = x( i, 2 ) - x( j, 2 );
-            const double eta_w = u( i, 2 ) - u( j, 2 );
-            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
-            const double linear_s =
-                ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
+            // Get the bond distance and stretch
+            double xi, linear_s;
+            getLinearizedDistance( x, u, i, j, xi, linear_s );
 
             double linear_theta_i =
                 influence_function( xi ) * linear_s * xi * xi * vol( j );
@@ -456,16 +480,11 @@ class Force<ExecutionSpace, LinearLPSModel>
             double fy_i = 0.0;
             double fz_i = 0.0;
 
-            // Get the reference positions and displacements.
-            const double xi_x = x( i, 0 ) - x( j, 0 );
-            const double eta_u = u( i, 0 ) - u( j, 0 );
-            const double xi_y = x( i, 1 ) - x( j, 1 );
-            const double eta_v = u( i, 1 ) - u( j, 1 );
-            const double xi_z = x( i, 2 ) - x( j, 2 );
-            const double eta_w = u( i, 2 ) - u( j, 2 );
-            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
-            const double linear_s =
-                ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
+            // Get the bond distance and stretch
+            double xi, linear_s;
+            double xi_x, xi_y, xi_z;
+            getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
+                                             xi_y, xi_z );
 
             const double coeff =
                 ( theta_coeff * ( linear_theta( i ) / m( i ) +
@@ -507,15 +526,8 @@ class Force<ExecutionSpace, LinearLPSModel>
 
             // Do we need to recompute linear_theta_i?
 
-            const double xi_x = x( i, 0 ) - x( j, 0 );
-            const double eta_u = u( i, 0 ) - u( j, 0 );
-            const double xi_y = x( i, 1 ) - x( j, 1 );
-            const double eta_v = u( i, 1 ) - u( j, 1 );
-            const double xi_z = x( i, 2 ) - x( j, 2 );
-            const double eta_w = u( i, 2 ) - u( j, 2 );
-            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
-            const double linear_s =
-                ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
+            double xi, linear_s;
+            getLinearizedDistance( x, u, i, j, xi, linear_s );
 
             std::size_t num_neighbors =
                 Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
@@ -581,10 +593,9 @@ class Force<ExecutionSpace, PMBModel>
             double fy_i = 0.0;
             double fz_i = 0.0;
 
-            double r, rx, ry, rz;
-            double xi;
-            getDistance( x, u, i, j, xi, r, rx, ry, rz );
-            const double s = ( r - xi ) / xi;
+            double xi, r, s;
+            double rx, ry, rz;
+            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
             const double coeff = c * s * vol( j );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
@@ -615,11 +626,9 @@ class Force<ExecutionSpace, PMBModel>
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
-            // Get the reference positions and displacements.
-            double r, rx, ry, rz;
-            double xi;
-            getDistance( x, u, i, j, xi, r, rx, ry, rz );
-            const double s = ( r - xi ) / xi;
+            // Get the bond distance, displacement, and stretch
+            double xi, r, s;
+            getDistance( x, u, i, j, xi, r, s );
 
             // 1/2 from outside the integral; 1/2 from the integrand (pairwise
             // potential).
@@ -748,11 +757,9 @@ class Force<ExecutionSpace, PMBDamageModel>
                 std::size_t j =
                     Cabana::NeighborList<NeighListType>::getNeighbor(
                         neigh_list, i, n );
-                // Get the reference positions and displacements.
-                double r, rx, ry, rz;
-                double xi;
-                getDistance( x, u, i, j, xi, r, rx, ry, rz );
-                const double s = ( r - xi ) / xi;
+                // Get the bond distance, displacement, and stretch
+                double xi, r, s;
+                getDistance( x, u, i, j, xi, r, s );
 
                 // 1/2 from outside the integral; 1/2 from the integrand
                 // (pairwise potential).
@@ -813,16 +820,12 @@ class Force<ExecutionSpace, LinearPMBModel>
             double fy_i = 0.0;
             double fz_i = 0.0;
 
-            // Get the reference positions and displacements.
-            const double xi_x = x( i, 0 ) - x( j, 0 );
-            const double eta_u = u( i, 0 ) - u( j, 0 );
-            const double xi_y = x( i, 1 ) - x( j, 1 );
-            const double eta_v = u( i, 1 ) - u( j, 1 );
-            const double xi_z = x( i, 2 ) - x( j, 2 );
-            const double eta_w = u( i, 2 ) - u( j, 2 );
-            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
-            const double linear_s =
-                ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
+            // Get the bond distance, displacement, and stretch
+            double xi, linear_s;
+            double xi_x, xi_y, xi_z;
+            getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
+                                             xi_y, xi_z );
+
             const double coeff = c * linear_s * vol( j );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
@@ -853,16 +856,9 @@ class Force<ExecutionSpace, LinearPMBModel>
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
-            // Get the reference positions and displacements.
-            const double xi_x = x( i, 0 ) - x( j, 0 );
-            const double eta_u = u( i, 0 ) - u( j, 0 );
-            const double xi_y = x( i, 1 ) - x( j, 1 );
-            const double eta_v = u( i, 1 ) - u( j, 1 );
-            const double xi_z = x( i, 2 ) - x( j, 2 );
-            const double eta_w = u( i, 2 ) - u( j, 2 );
-            const double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
-            const double linear_s =
-                ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
+            // Get the bond distance, displacement, and stretch
+            double xi, linear_s;
+            getLinearizedDistance( x, u, i, j, xi, linear_s );
 
             // 1/2 from outside the integral; 1/2 from the integrand (pairwise
             // potential).
