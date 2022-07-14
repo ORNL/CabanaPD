@@ -454,6 +454,25 @@ class SolverFracture
     using base_type::other_timer;
     using base_type::total_timer;
 };
+
+template <class DeviceType, class ParticleType, class ForceModel>
+auto createSolverElastic( Inputs inputs, ParticleType particles,
+                          ForceModel model )
+{
+    return std::make_shared<SolverElastic<DeviceType, ForceModel>>(
+        inputs, particles, model );
+}
+
+template <class DeviceType, class ParticleType, class ForceModel, class BCType,
+          class PrenotchType>
+auto createSolverFracture( Inputs inputs, ParticleType particles,
+                           ForceModel model, BCType bc, PrenotchType prenotch )
+{
+    return std::make_shared<
+        SolverFracture<DeviceType, ForceModel, BCType, PrenotchType>>(
+        inputs, particles, model, bc, prenotch );
+}
+
 /*
 template <class MemorySpace, class ForceModel>
 std::shared_ptr<SolverBase> createSolver( Inputs inputs,
