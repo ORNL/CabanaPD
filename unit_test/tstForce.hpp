@@ -63,13 +63,16 @@ double computeReferenceStrainEnergyDensity( const int m, const double delta,
 }
 //---------------------------------------------------------------------------//
 template <class ModelType>
-void testForce( ModelType model )
+void testForce( ModelType model, const double boundary_width )
 {
     using exec_space = TEST_EXECSPACE;
     using mem_space = TEST_MEMSPACE;
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
-    std::array<int, 3> num_cells = { 15, 15, 15 };
+    double delta = model.delta;
+    int nc = static_cast<int>( ( box_max[0] - box_min[0] ) / delta );
+    std::cout << nc << std::endl;
+    std::array<int, 3> num_cells = { nc, nc, nc };
     double s0 = 2.0;
 
     // Create particles based on the mesh.
@@ -94,9 +97,6 @@ void testForce( ModelType model )
 
     // This needs to exactly match the mesh spacing to compare with the single
     // particle calculation.
-    double delta = ( box_max[0] - box_min[0] ) / num_cells[0];
-    double K = 1.0;
-    model.set_param( K, delta );
     CabanaPD::Force<exec_space, ModelType> force( true, model );
 
     double mesh_min[3] = { particles.ghost_mesh_lo[0],
@@ -115,6 +115,7 @@ void testForce( ModelType model )
     auto f = particles.slice_f();
     auto W = particles.slice_W();
     auto vol = particles.slice_vol();
+    force.initialize( particles, neigh_list, Cabana::SerialOpTag() );
     compute_force( force, particles, neigh_list, Cabana::SerialOpTag() );
 
     auto Phi =
@@ -135,18 +136,24 @@ void testForce( ModelType model )
     Cabana::deep_copy( W_host, W );
     Cabana::deep_copy( vol_host, vol );
 
-    double ref_W = computeReferenceStrainEnergyDensity( 1, delta, K, s0 );
+    double ref_W = computeReferenceStrainEnergyDensity( 1, delta, model.K, s0 );
 
     // Check the results: avoid the system boundary for per particle values.
-    double check_Phi = 0.0;
+    double ref_Phi = 0.0;
     for ( std::size_t p = 0; p < num_particle; ++p )
     {
-        if ( x_host( p, 0 ) > particles.local_mesh_lo[0] + delta * 1.1 &&
-             x_host( p, 0 ) < particles.local_mesh_hi[0] - delta * 1.1 &&
-             x_host( p, 1 ) > particles.local_mesh_lo[1] + delta * 1.1 &&
-             x_host( p, 1 ) < particles.local_mesh_hi[1] - delta * 1.1 &&
-             x_host( p, 2 ) > particles.local_mesh_lo[2] + delta * 1.1 &&
-             x_host( p, 2 ) < particles.local_mesh_hi[2] - delta * 1.1 )
+        if ( x_host( p, 0 ) >
+                 particles.local_mesh_lo[0] + delta * boundary_width &&
+             x_host( p, 0 ) <
+                 particles.local_mesh_hi[0] - delta * boundary_width &&
+             x_host( p, 1 ) >
+                 particles.local_mesh_lo[1] + delta * boundary_width &&
+             x_host( p, 1 ) <
+                 particles.local_mesh_hi[1] - delta * boundary_width &&
+             x_host( p, 2 ) >
+                 particles.local_mesh_lo[2] + delta * boundary_width &&
+             x_host( p, 2 ) <
+                 particles.local_mesh_hi[2] - delta * boundary_width )
         {
             // Check force: all should cancel to zero.
             for ( std::size_t d = 0; d < 3; ++d )
@@ -159,19 +166,44 @@ void testForce( ModelType model )
         }
 
         // Check total sum of strain energy matches per particle sum.
-        check_Phi += W_host( p ) * vol_host( p );
+        ref_Phi += W_host( p ) * vol_host( p );
     }
 
-    EXPECT_FLOAT_EQ( Phi, check_Phi );
+    EXPECT_FLOAT_EQ( Phi, ref_Phi );
 }
 
 //---------------------------------------------------------------------------//
 // TESTS
 //---------------------------------------------------------------------------//
-TEST( TEST_CATEGORY, test_force_pmb ) { testForce( CabanaPD::PMBModel() ); }
+TEST( TEST_CATEGORY, test_force_pmb )
+{
+    double delta = 2.0 / 15.0;
+    double K = 1.0;
+    CabanaPD::PMBModel model( K, delta );
+    testForce( model, 1.1 );
+}
 TEST( TEST_CATEGORY, test_force_linear_pmb )
 {
-    testForce( CabanaPD::LinearPMBModel() );
+    double delta = 2.0 / 15.0;
+    double K = 1.0;
+    CabanaPD::LinearPMBModel model( K, delta );
+    testForce( model, 1.1 );
+}
+TEST( TEST_CATEGORY, test_force_lps )
+{
+    double delta = 2.0 / 15.0;
+    double K = 1.0;
+    double G = 3 / 5. * K;
+    CabanaPD::LPSModel model( K, G, delta );
+    testForce( model, 2.1 );
+}
+TEST( TEST_CATEGORY, test_force_linear_lps )
+{
+    double delta = 2.0 / 15.0;
+    double K = 1.0;
+    double G = 3 / 5. * K;
+    CabanaPD::LinearLPSModel model( K, G, delta );
+    testForce( model, 2.1 );
 }
 
 } // end namespace Test
