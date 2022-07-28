@@ -236,8 +236,8 @@ class SolverElastic
         total_time = total_timer.seconds();
         double rate = 1.0 * particles->n_global * output_frequency /
                       ( total_time - last_time );
-        log( out, std::fixed, std::setprecision( 6 ), step, " ", W, " ",
-             std::setprecision( 2 ), total_time, " ", std::scientific, rate );
+        log( out, std::fixed, std::setprecision( 8 ), step, " ", W, " ",
+             std::setprecision( 4 ), total_time, " ", std::scientific, rate );
         last_time = total_time;
         out.close();
     }
@@ -248,18 +248,19 @@ class SolverElastic
         total_time = total_timer.seconds();
         double steps_per_sec = 1.0 * num_steps / total_time;
         double p_steps_per_sec = particles->n_global * steps_per_sec;
-        log( out, std::fixed, std::setprecision( 2 ),
-             "\n#Procs Particles | Time T_Force T_Int T_Other T_Init |\n",
-             comm->mpi_size, " ", particles->n_global, " | ", total_time, " ",
-             force_time, " ", comm_time, " ", integrate_time, " ", other_time,
-             " ", init_time, " | PERFORMANCE\n", std::fixed, comm->mpi_size,
-             " ", particles->n_global, " | ", 1.0, " ", force_time / total_time,
-             " ", comm_time / total_time, " ", integrate_time / total_time, " ",
-             other_time / total_time, " ", init_time / total_time,
-             " | FRACTION\n\n",
-             "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
-             std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
-             p_steps_per_sec / comm->mpi_size );
+        log(
+            out, std::fixed, std::setprecision( 2 ),
+            "\n#Procs Particles | Time T_Force T_Comm T_Int T_Other T_Init |\n",
+            comm->mpi_size, " ", particles->n_global, " | ", total_time, " ",
+            force_time, " ", comm_time, " ", integrate_time, " ", other_time,
+            " ", init_time, " | PERFORMANCE\n", std::fixed, comm->mpi_size, " ",
+            particles->n_global, " | ", 1.0, " ", force_time / total_time, " ",
+            comm_time / total_time, " ", integrate_time / total_time, " ",
+            other_time / total_time, " ", init_time / total_time,
+            " | FRACTION\n\n",
+            "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
+            std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
+            p_steps_per_sec / comm->mpi_size );
         out.close();
     }
 
