@@ -69,8 +69,10 @@ int main( int argc, char* argv[] )
         double delta = 0.0075;
         int halo_width = 2;
 
-        CabanaPD::InputsFracture inputs( num_cell, low_corner, high_corner, K,
-                                         delta, t_final, dt, G0 );
+        // Choose force model type.
+        CabanaPD::PMBDamageModel force_model( delta, K, G0 );
+        CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final,
+                                 dt );
         inputs.read_args( argc, argv );
 
         // Create particles from mesh.
@@ -104,10 +106,6 @@ int main( int argc, char* argv[] )
                 v( pid, 0 ) = v0;
         };
         particles->update_particles( exec_space{}, init_functor );
-
-        // Choose force model type.
-        CabanaPD::PMBDamageModel force_model( inputs.K, inputs.delta,
-                                              inputs.G0 );
 
         // FIXME: use createSolver to switch backend at runtime.
         using device_type = Kokkos::Device<exec_space, memory_space>;

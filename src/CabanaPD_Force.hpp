@@ -62,6 +62,7 @@
 
 #include <cmath>
 
+#include <CabanaPD_Input.hpp>
 #include <CabanaPD_Output.hpp>
 
 namespace CabanaPD
@@ -85,28 +86,38 @@ double influence_function( double xi )
 /******************************************************************************
   Force models
 ******************************************************************************/
+struct ForceModel
+{
+    double delta;
+
+    ForceModel(){};
+    ForceModel( const double _delta )
+        : delta( _delta ){};
+};
 
 /* LPS */
 
-struct LPSModel
+struct LPSModel : public ForceModel
 {
+    using ForceModel::delta;
+
     double K;
     double G;
-    double delta;
     double theta_coeff;
     double s_coeff;
 
     LPSModel(){};
-    LPSModel( const double K, const double G, const double delta )
+    LPSModel( const double delta, const double K, const double G )
+        : ForceModel( delta )
     {
-        set_param( K, G, delta );
+        set_param( delta, K, G );
     }
 
-    void set_param( const double _K, const double _G, const double _delta )
+    void set_param( const double _delta, const double _K, const double _G )
     {
+        delta = _delta;
         K = _K;
         G = _G;
-        delta = _delta;
 
         theta_coeff = 3 * K - 5 * G;
         s_coeff = 15 * G;
@@ -117,6 +128,7 @@ struct LinearLPSModel : public LPSModel
 {
     using LPSModel::LPSModel;
 
+    using LPSModel::delta;
     using LPSModel::G;
     using LPSModel::K;
     using LPSModel::s_coeff;
@@ -125,19 +137,24 @@ struct LinearLPSModel : public LPSModel
 
 /* PMB */
 
-struct PMBModel
+struct PMBModel : public ForceModel
 {
+    using ForceModel::delta;
+
     double c;
-    double delta;
     double K;
 
     PMBModel(){};
-    PMBModel( const double K, const double delta ) { set_param( K, delta ); }
-
-    void set_param( const double _K, const double _delta )
+    PMBModel( const double delta, const double K )
+        : ForceModel( delta )
     {
-        K = _K;
+        set_param( delta, K );
+    }
+
+    void set_param( const double _delta, const double _K )
+    {
         delta = _delta;
+        K = _K;
         c = 18.0 * K / ( 3.141592653589793 * delta * delta * delta * delta );
     }
 };
@@ -152,17 +169,16 @@ struct PMBDamageModel : public PMBModel
     double s0;
     double bond_break_coeff;
 
-    PMBDamageModel( const double K, const double delta, const double G0 )
-        : PMBModel( K, delta )
+    PMBDamageModel() {}
+    PMBDamageModel( const double delta, const double K, const double G0 )
+        : PMBModel( delta, K )
     {
-        set_param( K, delta, G0 );
+        set_param( delta, K, G0 );
     }
 
-    using elastic_model::set_param;
-
-    void set_param( const double _K, const double _delta, const double _G0 )
+    void set_param( const double _delta, const double _K, const double _G0 )
     {
-        set_param( _K, _delta );
+        elastic_model::set_param( _delta, _K );
         G0 = _G0;
         s0 = sqrt( 5.0 * G0 / 9.0 / K / delta );
         bond_break_coeff = ( 1 + s0 ) * ( 1 + s0 );
@@ -179,9 +195,10 @@ struct LinearPMBModel : public PMBModel
 };
 
 template <class PosType>
-void getDistanceComponents( const PosType& x, const PosType& u, const int i,
-                            const int j, double& xi, double& r, double& s,
-                            double& rx, double& ry, double& rz )
+KOKKOS_INLINE_FUNCTION void
+getDistanceComponents( const PosType& x, const PosType& u, const int i,
+                       const int j, double& xi, double& r, double& s,
+                       double& rx, double& ry, double& rz )
 {
     // Get the reference positions and displacements.
     const double xi_x = x( j, 0 ) - x( i, 0 );
@@ -199,18 +216,18 @@ void getDistanceComponents( const PosType& x, const PosType& u, const int i,
 }
 
 template <class PosType>
-void getDistance( const PosType& x, const PosType& u, const int i, const int j,
-                  double& xi, double& r, double& s )
+KOKKOS_INLINE_FUNCTION void getDistance( const PosType& x, const PosType& u,
+                                         const int i, const int j, double& xi,
+                                         double& r, double& s )
 {
     double rx, ry, rz;
     getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 }
 
 template <class PosType>
-void getLinearizedDistanceComponents( const PosType& x, const PosType& u,
-                                      const int i, const int j, double& xi,
-                                      double& s, double& xi_x, double& xi_y,
-                                      double& xi_z )
+KOKKOS_INLINE_FUNCTION void getLinearizedDistanceComponents(
+    const PosType& x, const PosType& u, const int i, const int j, double& xi,
+    double& s, double& xi_x, double& xi_y, double& xi_z )
 {
     // Get the reference positions and displacements.
     xi_x = x( j, 0 ) - x( i, 0 );
@@ -224,8 +241,9 @@ void getLinearizedDistanceComponents( const PosType& x, const PosType& u,
 }
 
 template <class PosType>
-void getLinearizedDistance( const PosType& x, const PosType& u, const int i,
-                            const int j, double& xi, double& s )
+KOKKOS_INLINE_FUNCTION void
+getLinearizedDistance( const PosType& x, const PosType& u, const int i,
+                       const int j, double& xi, double& s )
 {
     double xi_x, xi_y, xi_z;
     getLinearizedDistanceComponents( x, u, i, j, xi, s, xi_x, xi_y, xi_z );

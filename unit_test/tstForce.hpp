@@ -179,14 +179,14 @@ TEST( TEST_CATEGORY, test_force_pmb )
 {
     double delta = 2.0 / 15.0;
     double K = 1.0;
-    CabanaPD::PMBModel model( K, delta );
+    CabanaPD::PMBModel model( delta, K );
     testForce( model, 1.1 );
 }
 TEST( TEST_CATEGORY, test_force_linear_pmb )
 {
     double delta = 2.0 / 15.0;
     double K = 1.0;
-    CabanaPD::LinearPMBModel model( K, delta );
+    CabanaPD::LinearPMBModel model( delta, K );
     testForce( model, 1.1 );
 }
 TEST( TEST_CATEGORY, test_force_lps )
@@ -194,7 +194,7 @@ TEST( TEST_CATEGORY, test_force_lps )
     double delta = 2.0 / 15.0;
     double K = 1.0;
     double G = 3 / 5. * K;
-    CabanaPD::LPSModel model( K, G, delta );
+    CabanaPD::LPSModel model( delta, K, G );
     testForce( model, 2.1 );
 }
 TEST( TEST_CATEGORY, test_force_linear_lps )
@@ -202,7 +202,7 @@ TEST( TEST_CATEGORY, test_force_linear_lps )
     double delta = 2.0 / 15.0;
     double K = 1.0;
     double G = 3 / 5. * K;
-    CabanaPD::LinearLPSModel model( K, G, delta );
+    CabanaPD::LinearLPSModel model( delta, K, G );
     testForce( model, 2.1 );
 }
 

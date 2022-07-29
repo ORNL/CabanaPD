@@ -148,8 +148,9 @@ class SolverElastic
                                particles->ghost_mesh_hi[1],
                                particles->ghost_mesh_hi[2] };
         auto x = particles->slice_x();
-        neighbors = std::make_shared<neighbor_type>(
-            x, 0, particles->n_local, inputs->delta, 1.0, mesh_min, mesh_max );
+        neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
+                                                     force_model.delta, 1.0,
+                                                     mesh_min, mesh_max );
 
         force = std::make_shared<force_type>( inputs->half_neigh, force_model );
 
