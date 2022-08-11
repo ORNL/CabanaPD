@@ -285,20 +285,18 @@ class Force<ExecutionSpace, LPSModel>
     {
         auto n_local = particles.n_local;
         auto x = particles.slice_x();
+        auto u = particles.slice_u();
         const auto vol = particles.slice_vol();
         auto m = particles.slice_m();
+        Cabana::deep_copy( m, 0.0 );
 
         auto weighted_volume = KOKKOS_LAMBDA( const int i, const int j )
         {
             // Get the reference positions and displacements.
-            const double xi_x = x( j, 0 ) - x( i, 0 );
-            const double xi_y = x( j, 1 ) - x( i, 1 );
-            const double xi_z = x( j, 2 ) - x( i, 2 );
-            const double xi2 = xi_x * xi_x + xi_y * xi_y + xi_z * xi_z;
-            const double xi = sqrt( xi2 );
-            double m_i = influence_function( xi ) * xi2 * vol( j );
-
-            m( i ) += m_i;
+            double xi, r, s;
+            getDistance( x, u, i, j, xi, r, s );
+            double m_j = influence_function( xi ) * xi * xi * vol( j );
+            m( i ) += m_j;
         };
 
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
@@ -320,16 +318,16 @@ class Force<ExecutionSpace, LPSModel>
         const auto vol = particles.slice_vol();
         auto theta = particles.slice_theta();
         auto m = particles.slice_m();
+        Cabana::deep_copy( theta, 0.0 );
+
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
 
         auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
         {
             // Get the bond distance, displacement, and stretch
             double xi, r, s;
-            double rx, ry, rz;
-            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+            getDistance( x, u, i, j, xi, r, s );
             double theta_i = influence_function( xi ) * s * xi * xi * vol( j );
-
             theta( i ) += 3 * theta_i / m( i );
         };
 
@@ -439,20 +437,18 @@ class Force<ExecutionSpace, LinearLPSModel>
     {
         auto n_local = particles.n_local;
         auto x = particles.slice_x();
+        auto u = particles.slice_u();
         const auto vol = particles.slice_vol();
         auto m = particles.slice_m();
+        Cabana::deep_copy( m, 0.0 );
 
         auto weighted_volume = KOKKOS_LAMBDA( const int i, const int j )
         {
             // Get the reference positions and displacements.
-            const double xi_x = x( j, 0 ) - x( i, 0 );
-            const double xi_y = x( j, 1 ) - x( i, 1 );
-            const double xi_z = x( j, 2 ) - x( i, 2 );
-            const double xi2 = xi_x * xi_x + xi_y * xi_y + xi_z * xi_z;
-            const double xi = sqrt( xi2 );
-            double m_i = influence_function( xi ) * xi2 * vol( j );
-
-            m( i ) += m_i;
+            double xi, r, s;
+            getDistance( x, u, i, j, xi, r, s );
+            double m_j = influence_function( xi ) * xi * xi * vol( j );
+            m( i ) += m_j;
         };
 
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
@@ -474,6 +470,8 @@ class Force<ExecutionSpace, LinearLPSModel>
         const auto vol = particles.slice_vol();
         auto linear_theta = particles.slice_theta();
         auto m = particles.slice_m();
+        Cabana::deep_copy( linear_theta, 0.0 );
+
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
 
         auto dilatation = KOKKOS_LAMBDA( const int i, const int j )

@@ -61,6 +61,17 @@ double computeReferenceStrainEnergyDensity( const int m, const double delta,
 
     return W;
 }
+
+void checkTheta( CabanaPD::PMBModel, const double, const double theta )
+{
+    EXPECT_FLOAT_EQ( 0.0, theta );
+}
+
+void checkTheta( CabanaPD::LPSModel, const double s0, const double theta )
+{
+    EXPECT_FLOAT_EQ( 3 * s0, theta );
+}
+
 //---------------------------------------------------------------------------//
 template <class ModelType>
 void testForce( ModelType model, const double boundary_width )
@@ -71,7 +82,6 @@ void testForce( ModelType model, const double boundary_width )
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
     double delta = model.delta;
     int nc = static_cast<int>( ( box_max[0] - box_min[0] ) / delta );
-    std::cout << nc << std::endl;
     std::array<int, 3> num_cells = { nc, nc, nc };
     double s0 = 2.0;
 
@@ -115,6 +125,8 @@ void testForce( ModelType model, const double boundary_width )
     auto f = particles.slice_f();
     auto W = particles.slice_W();
     auto vol = particles.slice_vol();
+    auto theta = particles.slice_theta();
+    auto m = particles.slice_m();
     force.initialize( particles, neigh_list, Cabana::SerialOpTag() );
     compute_force( force, particles, neigh_list, Cabana::SerialOpTag() );
 
@@ -123,18 +135,20 @@ void testForce( ModelType model, const double boundary_width )
 
     // Make a copy of final results on the host
     std::size_t num_particle = x.size();
-    using HostAoSoA =
-        Cabana::AoSoA<Cabana::MemberTypes<double[3], double[3], double, double>,
-                      Kokkos::HostSpace>;
+    using HostAoSoA = Cabana::AoSoA<
+        Cabana::MemberTypes<double[3], double[3], double, double, double>,
+        Kokkos::HostSpace>;
     HostAoSoA aosoa_host( "host_aosoa", num_particle );
     auto f_host = Cabana::slice<0>( aosoa_host );
     auto x_host = Cabana::slice<1>( aosoa_host );
     auto W_host = Cabana::slice<2>( aosoa_host );
     auto vol_host = Cabana::slice<3>( aosoa_host );
+    auto theta_host = Cabana::slice<4>( aosoa_host );
     Cabana::deep_copy( f_host, f );
     Cabana::deep_copy( x_host, x );
     Cabana::deep_copy( W_host, W );
     Cabana::deep_copy( vol_host, vol );
+    Cabana::deep_copy( theta_host, theta );
 
     double ref_W = computeReferenceStrainEnergyDensity( 1, delta, model.K, s0 );
 
@@ -164,6 +178,7 @@ void testForce( ModelType model, const double boundary_width )
             // Check strain energy (all should be equal for fixed stretch).
             EXPECT_FLOAT_EQ( W_host( p ), ref_W );
         }
+        checkTheta( model, s0, theta_host( p ) );
 
         // Check total sum of strain energy matches per particle sum.
         ref_Phi += W_host( p ) * vol_host( p );

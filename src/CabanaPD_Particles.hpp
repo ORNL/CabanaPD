@@ -216,6 +216,12 @@ class Particles
         auto rho = slice_rho();
         auto u = slice_u();
         auto vol = slice_vol();
+
+        auto theta = slice_theta();
+        Cabana::deep_copy( theta, 0.0 );
+        auto m = slice_m();
+        Cabana::deep_copy( m, 0.0 );
+
         auto created = Kokkos::View<bool*, memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "particle_created" ),
             num_particles );
