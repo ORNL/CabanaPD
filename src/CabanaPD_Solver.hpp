@@ -148,6 +148,7 @@ class SolverElastic
                                particles->ghost_mesh_hi[1],
                                particles->ghost_mesh_hi[2] };
         auto x = particles->slice_x();
+        std::cout << x.size() << " " << particles->n_local << std::endl;
         neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
                                                      force_model.delta, 1.0,
                                                      mesh_min, mesh_max );
@@ -310,6 +311,161 @@ class SolverElastic
     Kokkos::Timer comm_timer;
     Kokkos::Timer integrate_timer;
     Kokkos::Timer other_timer;
+};
+
+template <class DeviceType, class ForceModel>
+class SolverFractureAlso
+    : public SolverElastic<DeviceType, typename ForceModel::elastic_model>
+{
+  public:
+    using base_type =
+        SolverElastic<DeviceType, typename ForceModel::elastic_model>;
+    using exec_space = typename base_type::exec_space;
+    using memory_space = typename base_type::memory_space;
+
+    using particle_type = typename base_type::particle_type;
+    using integrator_type = typename base_type::integrator_type;
+    using comm_type = typename base_type::comm_type;
+    using neighbor_type = typename base_type::neighbor_type;
+    using force_model_type = ForceModel;
+    using force_type = Force<exec_space, force_model_type>;
+    using neigh_iter_tag = Cabana::SerialOpTag;
+
+    SolverFractureAlso( Inputs _inputs,
+                        std::shared_ptr<particle_type> _particles,
+                        force_model_type force_model )
+        : base_type( _inputs, _particles,
+                     typename force_model_type::elastic_model{} )
+    {
+        std::ofstream out( inputs->output_file, std::ofstream::app );
+        std::ofstream err( inputs->error_file, std::ofstream::app );
+
+        auto time = std::chrono::system_clock::to_time_t(
+            std::chrono::system_clock::now() );
+        log( out, "CabanaPD (", std::ctime( &time ), ")\n" );
+        if ( print_rank() )
+            exec_space::print_configuration( out );
+
+        // Create View to track broken bonds.
+        int max_neighbors =
+            Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
+        mu = NeighborView(
+            Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
+            particles->n_local, max_neighbors );
+        Kokkos::deep_copy( mu, 1 );
+        std::cout << mu.extent( 0 ) << " " << mu.extent( 1 ) << std::endl;
+
+        // Create force.
+        force = std::make_shared<force_type>( inputs->half_neigh, force_model );
+
+        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
+            "particles", particles->local_grid->globalGrid(), 0, 0, 0,
+            particles->n_local, particles->slice_x(), particles->slice_W(),
+            particles->slice_f(), particles->slice_u(), particles->slice_v(),
+            particles->slice_phi() );
+
+        log( out, "Nlocal Nghost Nglobal\n", particles->n_local, " ",
+             particles->n_ghost, " ", particles->n_global );
+        init_time += init_timer.seconds();
+        out.close();
+    }
+
+    void init_force()
+    {
+        // Only needed for LPS.
+        force->initialize( *particles, *neighbors, neigh_iter_tag{} );
+
+        // Compute initial forces
+        auto f = particles->slice_f();
+        Cabana::deep_copy( f, 0.0 );
+        compute_force( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
+        compute_energy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
+    }
+
+    void run()
+    {
+        // Main timestep loop
+        for ( int step = 1; step <= num_steps; step++ )
+        {
+            // Integrate - velocity Verlet first half
+            integrate_timer.reset();
+            integrator->initial_integrate( *particles );
+            integrate_time += integrate_timer.seconds();
+
+            // Update ghost particles.
+            comm_timer.reset();
+            comm->gather( *particles );
+            comm_time += comm_timer.seconds();
+
+            // Reset forces
+            force_timer.reset();
+            particles->slice_f();
+            auto f = particles->slice_f();
+            Cabana::deep_copy( f, 0.0 );
+
+            // Compute short range force
+            compute_force( *force, *particles, *neighbors, mu,
+                           neigh_iter_tag{} );
+            force_time += force_timer.seconds();
+
+            // Integrate - velocity Verlet second half
+            integrate_timer.reset();
+            integrator->final_integrate( *particles );
+            integrate_time += integrate_timer.seconds();
+
+            // Print output
+            other_timer.reset();
+            if ( step % output_frequency == 0 )
+            {
+                auto W = compute_energy( *force, *particles, *neighbors, mu,
+                                         neigh_iter_tag() );
+
+                this->step_output( step, W );
+
+                auto x = particles->slice_x();
+                Cajita::Experimental::SiloParticleOutput::
+                    writePartialRangeTimeStep(
+                        "particles", particles->local_grid->globalGrid(),
+                        step / output_frequency, step * inputs->timestep, 0,
+                        particles->n_local, x, particles->slice_W(),
+                        particles->slice_f(), particles->slice_u(),
+                        particles->slice_v(), particles->slice_phi() );
+            }
+            other_time += other_timer.seconds();
+        }
+
+        // Final output and timings
+        this->final_output();
+    }
+
+    using base_type::num_steps;
+    using base_type::output_frequency;
+
+  protected:
+    using base_type::comm;
+    using base_type::inputs;
+    using base_type::integrator;
+    using base_type::neighbors;
+    using base_type::particles;
+    std::shared_ptr<force_type> force;
+
+    using NeighborView = typename Kokkos::View<int**, memory_space>;
+    NeighborView mu;
+
+    using base_type::comm_time;
+    using base_type::force_time;
+    using base_type::init_time;
+    using base_type::integrate_time;
+    using base_type::last_time;
+    using base_type::other_time;
+    using base_type::total_time;
+
+    using base_type::comm_timer;
+    using base_type::force_timer;
+    using base_type::init_timer;
+    using base_type::integrate_timer;
+    using base_type::other_timer;
+    using base_type::total_timer;
 };
 
 template <class DeviceType, class ForceModel, class BoundaryCondition,
@@ -475,6 +631,14 @@ auto createSolverElastic( Inputs inputs, ParticleType particles,
                           ForceModel model )
 {
     return std::make_shared<SolverElastic<DeviceType, ForceModel>>(
+        inputs, particles, model );
+}
+
+template <class DeviceType, class ParticleType, class ForceModel>
+auto createSolverFractureAlso( Inputs inputs, ParticleType particles,
+                               ForceModel model )
+{
+    return std::make_shared<SolverFractureAlso<DeviceType, ForceModel>>(
         inputs, particles, model );
 }
 

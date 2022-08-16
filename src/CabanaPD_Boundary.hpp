@@ -154,6 +154,53 @@ auto createBoundaryCondition( ExecSpace exec_space, Particles particles,
     return BoundaryCondition<bc_index_type, BCTag>( bc_indices );
 }
 
+struct ImpactBCTag
+{
+};
+struct AllTag
+{
+};
+
+template <class AllTag, class BCTag>
+struct BoundaryCondition;
+
+template <>
+struct BoundaryCondition<AllTag, ImpactBCTag>
+{
+    double _R;
+    double _v;
+    double _dt;
+    double _z;
+
+    BoundaryCondition( const double R, const double v, const double dt )
+        : _R( R )
+        , _v( v )
+        , _dt( dt )
+        , _z( 0.0 )
+    {
+    }
+
+    template <class ExecSpace, class ParticleType>
+    void apply( ExecSpace, ParticleType& particles )
+    {
+        _z += _dt * _v;
+        auto f = particles.slice_f();
+        auto x = particles.slice_x();
+        Kokkos::RangePolicy<ExecSpace> policy( 0, x.size() );
+        Kokkos::parallel_for(
+            "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int p ) {
+                double z = 0.0 - x( p, 2 );
+                double r = sqrt( x( p, 0 ) * x( p, 0 ) + x( p, 1 ) * x( p, 1 ) +
+                                 z * z );
+                // if ( r < _R )
+                std::cout << ( x( p, 2 ) >= _z ) << " " << _z << " "
+                          << x( p, 2 ) << std::endl;
+                // if ( x( p, 2 ) >= _z ) //&& x( p, 2 ) < _z + _R * 2.0 )
+                f( p, 2 ) += -1.0e17 * ( r - _R ) * ( r - _R );
+            } );
+    }
+};
+
 } // namespace CabanaPD
 
 #endif
