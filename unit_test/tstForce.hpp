@@ -42,14 +42,17 @@ struct QuadraticTag
 };
 
 //---------------------------------------------------------------------------//
-// Get the strain energy density (at one point). Should converge at high enough
-// values of m to 9.0 / 2.0 * K * s0 * s0;
-double computeReferenceStrainEnergyDensity( const int m, const double delta,
-                                            const double K, const double s0 )
+// Note: all of these reference calculations assume uniform volume and a full
+// particle neighborhood.
+//---------------------------------------------------------------------------//
+
+//---------------------------------------------------------------------------//
+// Get the PMB strain energy density (at the center point).
+double computeReferenceStrainEnergyDensity( CabanaPD::PMBModel model,
+                                            const int m, const double s0 )
 {
     double W = 0.0;
-    double c = 18.0 * K / ( 3.141592653589793 * delta * delta * delta * delta );
-    double dx = delta / m;
+    double dx = model.delta / m;
     double vol = dx * dx * dx;
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
@@ -58,14 +61,104 @@ double computeReferenceStrainEnergyDensity( const int m, const double delta,
                 double xi_x = dx * i;
                 double xi_y = dx * j;
                 double xi_z = dx * k;
-                double xi_sq = xi_x * xi_x + xi_y * xi_y + xi_z * xi_z;
+                double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
 
-                if ( xi_sq > 0.0 && xi_sq < delta * delta + 1e-14 )
+                if ( xi > 0.0 && xi < model.delta + 1e-14 )
                 {
-                    W += 0.25 * c * s0 * s0 * sqrt( xi_sq ) * vol;
+                    W += 0.25 * model.c * s0 * s0 * xi * vol;
+                    // std::cout << W << " W\n";
                 }
             }
+    return W;
+}
 
+// Get the PMB force (at one point).
+double computeReferenceForceX( CabanaPD::PMBModel model, const int m,
+                               const double s0 )
+{
+    double f = 0.0;
+    double dx = model.delta / m;
+    double vol = dx * dx * dx;
+    for ( int i = -m; i < m + 1; ++i )
+        for ( int j = -m; j < m + 1; ++j )
+            for ( int k = -m; k < m + 1; ++k )
+            {
+                double xi_x = dx * i;
+                double xi_y = dx * j;
+                double xi_z = dx * k;
+                double eta_u = s0 * xi_x * xi_x;
+                double rx = xi_x + eta_u;
+                double ry = xi_y;
+                double rz = xi_z;
+                // Assumes zero y/z components.
+                double r = sqrt( rx * rx + ry * ry + rz * rz );
+                double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+
+                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                    f += model.c * s0 * vol * rx / r;
+            }
+    return f;
+}
+
+// Get the LPS strain energy density (at one point).
+double computeReferenceStrainEnergyDensity( CabanaPD::LPSModel model,
+                                            const int m, const double s0 )
+{
+    double W = 0.0;
+    double dx = model.delta / m;
+    double vol = dx * dx * dx;
+
+    // Weighted volume.
+    double weighted_volume = 0.0;
+    for ( int i = -m; i < m + 1; ++i )
+        for ( int j = -m; j < m + 1; ++j )
+            for ( int k = -m; k < m + 1; ++k )
+            {
+                double xi_x = dx * i;
+                double xi_y = dx * j;
+                double xi_z = dx * k;
+                double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                    weighted_volume += 1.0 / xi * xi * xi * vol;
+            }
+    // Dilatation and count neighbors.
+    double theta = 0.0;
+    double num_neighbors = 0.0;
+    for ( int i = -m; i < m + 1; ++i )
+        for ( int j = -m; j < m + 1; ++j )
+            for ( int k = -m; k < m + 1; ++k )
+            {
+                double xi_x = dx * i;
+                double xi_y = dx * j;
+                double xi_z = dx * k;
+                double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+
+                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                {
+                    theta +=
+                        3.0 / weighted_volume * 1.0 / xi * s0 * xi * xi * vol;
+
+                    num_neighbors += 1.0;
+                }
+            }
+    // Strain energy.
+    for ( int i = -m; i < m + 1; ++i )
+        for ( int j = -m; j < m + 1; ++j )
+            for ( int k = -m; k < m + 1; ++k )
+            {
+                double xi_x = dx * i;
+                double xi_y = dx * j;
+                double xi_z = dx * k;
+                double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+
+                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                {
+                    W += ( 1.0 / num_neighbors ) * 0.5 * model.theta_coeff /
+                             3.0 * ( theta * theta ) +
+                         0.5 * ( model.s_coeff / weighted_volume ) * 1.0 / xi *
+                             s0 * s0 * xi * xi * vol;
+                }
+            }
     return W;
 }
 
@@ -97,13 +190,13 @@ auto createParticles( LinearTag, ModelType model, const double s0 )
     return particles;
 }
 
+// Currently unused.
 template <class ModelType>
 auto createParticles( QuadraticTag, ModelType model, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
-    double delta = model.delta;
-    int nc = static_cast<int>( ( box_max[0] - box_min[0] ) / delta );
+    int nc = static_cast<int>( ( box_max[0] - box_min[0] ) / model.delta );
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
@@ -132,14 +225,14 @@ void checkResults( HostParticleType aosoa_host, double local_min[3],
                    const double s0, const int boundary_width, const double Phi )
 {
     double delta = model.delta;
-    double ref_W = computeReferenceStrainEnergyDensity( 1, delta, model.K, s0 );
+    // double ref_f = computeReferenceForceX( model, 1, s0 );
+    double ref_W = computeReferenceStrainEnergyDensity( model, 1, s0 );
     double ref_Phi = 0.0;
     auto f_host = Cabana::slice<0>( aosoa_host );
     auto x_host = Cabana::slice<1>( aosoa_host );
     auto W_host = Cabana::slice<2>( aosoa_host );
     auto vol_host = Cabana::slice<3>( aosoa_host );
     auto theta_host = Cabana::slice<4>( aosoa_host );
-
     // Check the results: avoid the system boundary for per particle values.
     for ( std::size_t p = 0; p < aosoa_host.size(); ++p )
     {
@@ -150,8 +243,8 @@ void checkResults( HostParticleType aosoa_host, double local_min[3],
              x_host( p, 2 ) > local_min[2] + delta * boundary_width &&
              x_host( p, 2 ) < local_max[2] - delta * boundary_width )
         {
-            checkParticle( test_tag, model, f_host( p, 0 ), f_host( p, 1 ),
-                           f_host( p, 2 ), W_host( p ), ref_W );
+            checkParticle( test_tag, model, s0, f_host( p, 0 ), f_host( p, 1 ),
+                           f_host( p, 2 ), -1, W_host( p ), ref_W );
         }
         checkTheta( model, test_tag, s0, theta_host( p ) );
 
@@ -159,12 +252,13 @@ void checkResults( HostParticleType aosoa_host, double local_min[3],
         ref_Phi += W_host( p ) * vol_host( p );
     }
 
-    EXPECT_FLOAT_EQ( Phi, ref_Phi );
+    EXPECT_NEAR( Phi, ref_Phi, 1e-5 );
 }
 
 template <class ModelType>
-void checkParticle( LinearTag, ModelType, const double fx, const double fy,
-                    const double fz, const double W, const double ref_W )
+void checkParticle( LinearTag tag, ModelType model, const double s0,
+                    const double fx, const double fy, const double fz,
+                    const double, const double W, const double ref_W )
 {
     EXPECT_LE( fx, 1e-13 );
     EXPECT_LE( fy, 1e-13 );
@@ -172,30 +266,62 @@ void checkParticle( LinearTag, ModelType, const double fx, const double fy,
 
     // Check strain energy (all should be equal for fixed stretch).
     EXPECT_FLOAT_EQ( W, ref_W );
+
+    // Check energy with analytical value (not very close for small m).
+    checkAnalyticalStrainEnergy( tag, model, s0, W );
 }
 
-void checkParticle( QuadraticTag, CabanaPD::PMBModel model, const double fx,
-                    const double fy, const double fz, const double,
-                    const double )
+// Currently unused.
+template <class ModelType>
+void checkParticle( QuadraticTag tag, ModelType model, const double s0,
+                    const double fx, const double fy, const double fz,
+                    const double ref_f, const double, const double )
 {
-    // Check force in x.
-    EXPECT_FLOAT_EQ( fx, 18.0 / 5.0 * model.K );
+    // Check force in x with discretized result.
+    EXPECT_FLOAT_EQ( fx, ref_f );
+
+    // Check force in x with analytical value (not very close for small m).
+    checkAnalyticalForce( tag, model, s0, fx );
 
     // Check force: other components should be zero.
     EXPECT_LE( fy, 1e-13 );
     EXPECT_LE( fz, 1e-13 );
 }
 
-void checkParticle( QuadraticTag, CabanaPD::LPSModel model, const double fx,
-                    const double fy, const double fz, const double,
-                    const double )
+// Currently unused.
+void checkAnalyticalStrainEnergy( LinearTag, CabanaPD::PMBModel model,
+                                  const double s0, const double W )
 {
-    // Check force in x.
-    EXPECT_FLOAT_EQ( fx, 2.0 * ( model.K + 4.0 / 3.0 * model.G ) );
+    // Very large error for small m. This is basically a check for order of
+    // magnitude.
+    double threshold = W * 0.50;
+    double analytical_W = 9.0 / 2.0 * model.K * s0 * s0;
+    EXPECT_NEAR( W, analytical_W, threshold );
+}
 
-    // Check force: other components should be zero.
-    EXPECT_LE( fy, 1e-13 );
-    EXPECT_LE( fz, 1e-13 );
+// Currently unused.
+void checkAnalyticalStrainEnergy( LinearTag, CabanaPD::LPSModel, const double,
+                                  const double )
+{
+    // FIXME: add check for LPS
+}
+
+// Currently unused.
+void checkAnalyticalForce( QuadraticTag, CabanaPD::PMBModel model,
+                           const double s0, const double fx )
+{
+    double threshold = fx * 0.50;
+    double analytical_f = 18.0 / 5.0 * model.K * s0;
+    EXPECT_NEAR( fx, analytical_f, threshold );
+}
+
+// Currently unused.
+void checkAnalyticalForce( QuadraticTag, CabanaPD::LPSModel model,
+                           const double s0, const double fx )
+{
+    double threshold = fx * 0.50;
+    double analytical_f = 2.0 * ( model.K + 4.0 / 3.0 * model.G ) * s0;
+    EXPECT_NEAR( fx, analytical_f, threshold );
 }
 
 void checkTheta( CabanaPD::PMBModel, LinearTag, const double,
@@ -285,29 +411,31 @@ void testForce( ModelType model, const double boundary_width,
 //---------------------------------------------------------------------------//
 // TESTS
 //---------------------------------------------------------------------------//
+// FIXME: Improvements
+//  1. Increase m
+//  2. Add single point force check with quadratic or check all neighbor
+//     contributions to force
 TEST( TEST_CATEGORY, test_force_pmb )
 {
     double delta = 2.0 / 15.0;
     double K = 1.0;
     CabanaPD::PMBModel model( delta, K );
-    testForce( model, 1.1, LinearTag{}, 2.0 );
-    testForce( model, 2.1, QuadraticTag{}, 1.0 );
+    testForce( model, 1.1, LinearTag{}, 0.1 );
 }
 TEST( TEST_CATEGORY, test_force_linear_pmb )
 {
     double delta = 2.0 / 15.0;
     double K = 1.0;
     CabanaPD::LinearPMBModel model( delta, K );
-    testForce( model, 1.1, LinearTag{}, 2.0 );
+    testForce( model, 1.1, LinearTag{}, 0.1 );
 }
 TEST( TEST_CATEGORY, test_force_lps )
 {
     double delta = 2.0 / 15.0;
     double K = 1.0;
-    double G = 3 / 5. * K;
+    double G = 0.5;
     CabanaPD::LPSModel model( delta, K, G );
-    testForce( model, 2.1, LinearTag{}, 2.0 );
-    testForce( model, 2.1, QuadraticTag{}, 1.0 );
+    testForce( model, 2.1, LinearTag{}, 0.1 );
 }
 TEST( TEST_CATEGORY, test_force_linear_lps )
 {
@@ -315,7 +443,6 @@ TEST( TEST_CATEGORY, test_force_linear_lps )
     double K = 1.0;
     double G = 3 / 5. * K;
     CabanaPD::LinearLPSModel model( delta, K, G );
-    testForce( model, 2.1, LinearTag{}, 2.0 );
+    testForce( model, 2.1, LinearTag{}, 0.1 );
 }
-
 } // end namespace Test
