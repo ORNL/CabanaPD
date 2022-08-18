@@ -77,7 +77,7 @@ int main( int argc, char* argv[] )
                 u( pid, d ) = a * std::exp( -arg ) * comp;
                 v( pid, d ) = 0.0;
             }
-            rho( pid ) = 100;
+            rho( pid ) = 100.0;
         };
         particles->update_particles( exec_space{}, init_functor );
 

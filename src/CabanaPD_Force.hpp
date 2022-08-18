@@ -76,9 +76,8 @@ namespace CabanaPD
 KOKKOS_INLINE_FUNCTION
 double influence_function( double xi )
 {
-    double omega = 0;
-    // omega = 1;
-    omega = 1 / xi;
+    // double omega = 1;
+    double omega = 1.0 / xi;
 
     return omega;
 }
@@ -119,8 +118,8 @@ struct LPSModel : public ForceModel
         K = _K;
         G = _G;
 
-        theta_coeff = 3 * K - 5 * G;
-        s_coeff = 15 * G;
+        theta_coeff = 3.0 * K - 5.0 * G;
+        s_coeff = 15.0 * G;
     }
 };
 
@@ -181,7 +180,7 @@ struct PMBDamageModel : public PMBModel
         elastic_model::set_param( _delta, _K );
         G0 = _G0;
         s0 = sqrt( 5.0 * G0 / 9.0 / K / delta );
-        bond_break_coeff = ( 1 + s0 ) * ( 1 + s0 );
+        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 };
 
@@ -328,7 +327,7 @@ class Force<ExecutionSpace, LPSModel>
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
             double theta_i = influence_function( xi ) * s * xi * xi * vol( j );
-            theta( i ) += 3 * theta_i / m( i );
+            theta( i ) += 3.0 * theta_i / m( i );
         };
 
         Cabana::neighbor_parallel_for(
@@ -346,7 +345,7 @@ class Force<ExecutionSpace, LPSModel>
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
             const double coeff =
                 ( theta_coeff * ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
-                  s_coeff * s * ( 1 / m( i ) + 1 / m( j ) ) ) *
+                  s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
                 influence_function( xi ) * xi * vol( j );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
@@ -383,11 +382,11 @@ class Force<ExecutionSpace, LPSModel>
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
-            std::size_t num_neighbors =
+            double num_neighbors = static_cast<double>(
                 Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
-                                                                  i );
+                                                                  i ) );
 
-            double w = ( 1 / num_neighbors ) * 0.5 * theta_coeff / 3 *
+            double w = ( 1.0 / num_neighbors ) * 0.5 * theta_coeff / 3.0 *
                            ( theta( i ) * theta( i ) ) +
                        0.5 * ( s_coeff / m( i ) ) * influence_function( xi ) *
                            s * s * xi * xi * vol( j );
@@ -483,7 +482,7 @@ class Force<ExecutionSpace, LinearLPSModel>
             double linear_theta_i =
                 influence_function( xi ) * linear_s * xi * xi * vol( j );
 
-            linear_theta( i ) += 3 * linear_theta_i / m( i );
+            linear_theta( i ) += 3.0 * linear_theta_i / m( i );
         };
 
         Cabana::neighbor_parallel_for(
@@ -505,7 +504,7 @@ class Force<ExecutionSpace, LinearLPSModel>
             const double coeff =
                 ( theta_coeff * ( linear_theta( i ) / m( i ) +
                                   linear_theta( j ) / m( j ) ) +
-                  s_coeff * linear_s * ( 1 / m( i ) + 1 / m( j ) ) ) *
+                  s_coeff * linear_s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
                 influence_function( xi ) * xi * vol( j );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
@@ -545,11 +544,11 @@ class Force<ExecutionSpace, LinearLPSModel>
             double xi, linear_s;
             getLinearizedDistance( x, u, i, j, xi, linear_s );
 
-            std::size_t num_neighbors =
+            double num_neighbors = static_cast<double>(
                 Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
-                                                                  i );
+                                                                  i ) );
 
-            double w = ( 1 / num_neighbors ) * 0.5 * theta_coeff / 3 *
+            double w = ( 1.0 / num_neighbors ) * 0.5 * theta_coeff / 3.0 *
                            ( linear_theta( i ) * linear_theta( i ) ) +
                        0.5 * ( s_coeff / m( i ) ) * influence_function( xi ) *
                            linear_s * linear_s * xi * xi * vol( j );

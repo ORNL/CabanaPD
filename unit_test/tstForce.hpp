@@ -179,7 +179,7 @@ void checkParticle( QuadraticTag, CabanaPD::PMBModel model, const double fx,
                     const double )
 {
     // Check force in x.
-    EXPECT_FLOAT_EQ( fx, 18 / 5 * model.K );
+    EXPECT_FLOAT_EQ( fx, 18.0 / 5.0 * model.K );
 
     // Check force: other components should be zero.
     EXPECT_LE( fy, 1e-13 );
@@ -191,7 +191,7 @@ void checkParticle( QuadraticTag, CabanaPD::LPSModel model, const double fx,
                     const double )
 {
     // Check force in x.
-    EXPECT_FLOAT_EQ( fx, -2 * ( model.K + 4 / 3 * model.G ) );
+    EXPECT_FLOAT_EQ( fx, 2.0 * ( model.K + 4.0 / 3.0 * model.G ) );
 
     // Check force: other components should be zero.
     EXPECT_LE( fy, 1e-13 );
