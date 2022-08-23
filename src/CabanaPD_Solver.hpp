@@ -120,7 +120,7 @@ class SolverElastic
             std::chrono::system_clock::now() );
         log( out, "CabanaPD (", std::ctime( &time ), ")\n" );
         if ( print_rank() )
-            exec_space::print_configuration( out );
+            exec_space().print_configuration( out );
 
         // Create integrator.
         // FIXME: hardcoded
@@ -324,7 +324,7 @@ class SolverFracture
             std::chrono::system_clock::now() );
         log( out, "CabanaPD (", std::ctime( &time ), ")\n" );
         if ( print_rank() )
-            exec_space::print_configuration( out );
+            exec_space().print_configuration( out );
 
         // Create View to track broken bonds.
         int max_neighbors =
