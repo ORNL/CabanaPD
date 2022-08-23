@@ -101,9 +101,9 @@ class Particles<DeviceType, PMB, Dimension>
     using vector_type = Cabana::MemberTypes<double[dim]>;
     // volume, dilatation, weighted_volume
     using scalar_type = Cabana::MemberTypes<double>;
-    // type, W, v, rho, damage
+    // type, W, v, rho, damage, boundary
     using other_types =
-        Cabana::MemberTypes<int, double, double[dim], double, double>;
+        Cabana::MemberTypes<int, double, double[dim], double, double, int>;
     // Potentially needed later: body force (b), ID
 
     // FIXME: add vector length
@@ -219,6 +219,7 @@ class Particles<DeviceType, PMB, Dimension>
         auto rho = slice_rho();
         auto u = slice_u();
         auto vol = slice_vol();
+        auto boundary = slice_boundary();
 
         auto created = Kokkos::View<bool*, memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "particle_created" ),
@@ -256,6 +257,7 @@ class Particles<DeviceType, PMB, Dimension>
                 }
                 // FIXME: hardcoded
                 type( pid ) = 0;
+                boundary( pid ) = 0;
                 rho( pid ) = 1.0;
 
                 // Get the volume of the cell.
@@ -292,6 +294,19 @@ class Particles<DeviceType, PMB, Dimension>
             KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
     }
 
+    template <class ExecSpace, class BoundaryType>
+    void update_boundary( const ExecSpace, const BoundaryType bc )
+    {
+        auto boundary = slice_boundary();
+        auto index_space = bc._index_space._view;
+        Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
+        Kokkos::parallel_for(
+            "CabanaPD::Particles::update_boundary", policy,
+            KOKKOS_LAMBDA( const int b ) {
+                boundary( index_space( b ) ) = 1;
+            } );
+    }
+
     auto slice_x() { return Cabana::slice<0>( _aosoa_x, "positions" ); }
     auto slice_x() const { return Cabana::slice<0>( _aosoa_x, "positions" ); }
     auto slice_u() { return Cabana::slice<0>( _aosoa_u, "displacements" ); }
@@ -315,6 +330,14 @@ class Particles<DeviceType, PMB, Dimension>
     auto slice_v() { return Cabana::slice<2>( _aosoa_other, "velocities" ); }
     auto slice_rho() { return Cabana::slice<3>( _aosoa_other, "density" ); }
     auto slice_phi() { return Cabana::slice<4>( _aosoa_other, "damage" ); }
+    auto slice_boundary()
+    {
+        return Cabana::slice<5>( _aosoa_other, "on_boundary" );
+    }
+    auto slice_boundary() const
+    {
+        return Cabana::slice<5>( _aosoa_other, "on_boundary" );
+    }
 
     void resize( int new_local, int new_ghost )
     {

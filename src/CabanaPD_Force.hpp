@@ -654,6 +654,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
         const auto vol = particles.slice_vol();
         auto theta = particles.slice_theta();
         auto m = particles.slice_m();
+        const auto boundary = particles.slice_boundary();
         auto force_full = KOKKOS_LAMBDA( const int i )
         {
             std::size_t num_neighbors =
@@ -1008,6 +1009,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
         auto c = _model.c;
         auto break_coeff = _model.bond_break_coeff;
         const auto vol = particles.slice_vol();
+        const auto boundary = particles.slice_boundary();
 
         auto force_full = KOKKOS_LAMBDA( const int i )
         {
@@ -1032,7 +1034,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                     getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
                     if ( r * r >= break_coeff * xi * xi )
-                        mu( i, n ) = 0;
+                        if ( !boundary( i ) && !boundary( n ) )
+                            mu( i, n ) = 0;
                     if ( mu( i, n ) > 0 )
                     {
                         const double coeff = c * s * vol( j );
