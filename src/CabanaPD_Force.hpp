@@ -123,6 +123,36 @@ struct LPSModel : public ForceModel
     }
 };
 
+struct LPSDamageModel : public LPSModel
+{
+    using elastic_model = LPSModel;
+    using elastic_model::delta;
+    using elastic_model::G;
+    using elastic_model::K;
+    using elastic_model::s_coeff;
+    using elastic_model::theta_coeff;
+    double G0;
+    double s0;
+    double bond_break_coeff;
+
+    LPSDamageModel() {}
+    LPSDamageModel( const double delta, const double K, const double G,
+                    const double G0 )
+        : LPSModel( delta, K, G )
+    {
+        set_param( delta, K, G, G0 );
+    }
+
+    void set_param( const double _delta, const double _K, const double _G,
+                    const double _G0 )
+    {
+        elastic_model::set_param( _delta, _K, _G );
+        G0 = _G0;
+        s0 = sqrt( 5.0 * G0 / 9.0 / K / delta );
+        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+    }
+};
+
 struct LinearLPSModel : public LPSModel
 {
     using LPSModel::LPSModel;
