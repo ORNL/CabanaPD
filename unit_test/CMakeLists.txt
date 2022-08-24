@@ -1,24 +1,3 @@
-##---------------------------------------------------------------------------##
-# Download and unpack googletest
-##---------------------------------------------------------------------------##
-set(GTEST_URL "https://github.com/google/googletest/archive/release-1.10.0.tar.gz" CACHE STRING "URL for GTest tarball")
-mark_as_advanced(GTEST_URL)
-
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  URL ${GTEST_URL}
-  URL_MD5         ecd1fa65e7de707cd5c00bdac56022cd
-  )
-
-FetchContent_GetProperties(googletest)
-if(NOT googletest_POPULATED)
-  FetchContent_Populate(googletest)
-  add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
-endif()
-
-set(gtest_args --gtest_color=yes)
-
 ##--------------------------------------------------------------------------##
 ## On-node tests
 ##--------------------------------------------------------------------------##
@@ -49,7 +28,7 @@ macro(CabanaPD_add_tests)
         set(_target ${_test}_test_${_uppercase_device})
         add_executable(${_target} ${_file} ${CABANAPD_UNIT_TEST_MAIN})
         target_include_directories(${_target} PRIVATE ${_dir} ${CMAKE_CURRENT_SOURCE_DIR})
-        target_link_libraries(${_target} PRIVATE CabanaPD gtest CabanaPD)
+        target_link_libraries(${_target} PRIVATE CabanaPD ${gtest_target})
 
         foreach(_np ${CABANAPD_UNIT_TEST_MPIEXEC_NUMPROCS})
           if(_device STREQUAL PTHREAD OR _device STREQUAL OPENMP)
