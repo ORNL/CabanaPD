@@ -66,7 +66,6 @@ double computeReferenceStrainEnergyDensity( CabanaPD::PMBModel model,
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                 {
                     W += 0.25 * model.c * s0 * s0 * xi * vol;
-                    // std::cout << W << " W\n";
                 }
             }
     return W;
@@ -299,11 +298,11 @@ void checkAnalyticalStrainEnergy( LinearTag, CabanaPD::PMBModel model,
     EXPECT_NEAR( W, analytical_W, threshold );
 }
 
-// Currently unused.
-void checkAnalyticalStrainEnergy( LinearTag, CabanaPD::LPSModel, const double,
-                                  const double )
+void checkAnalyticalStrainEnergy( LinearTag, CabanaPD::LPSModel model,
+                                  const double s0, const double W )
 {
-    // FIXME: add check for LPS
+    double analytical_W = 9.0 / 2.0 * model.K * s0 * s0;
+    EXPECT_FLOAT_EQ( W, analytical_W );
 }
 
 // Currently unused.
