@@ -71,9 +71,21 @@ double computeReferenceStrainEnergyDensity( CabanaPD::PMBModel model,
     return W;
 }
 
+template <class ModelType>
+double computeReferenceForceX( LinearTag, ModelType, const int, const double )
+{
+    return 0.0;
+}
+
+double computeReferenceForceX( QuadraticTag, CabanaPD::LPSModel, const int,
+                               const double )
+{
+    // FIXME: Add for LPS.
+    return -1;
+}
 // Get the PMB force (at one point).
-double computeReferenceForceX( CabanaPD::PMBModel model, const int m,
-                               const double s0 )
+double computeReferenceForceX( QuadraticTag, CabanaPD::PMBModel model,
+                               const int m, const double s0 )
 {
     double f = 0.0;
     double dx = model.delta / m;
@@ -161,13 +173,11 @@ double computeReferenceStrainEnergyDensity( CabanaPD::LPSModel model,
     return W;
 }
 
-template <class ModelType>
-auto createParticles( LinearTag, ModelType model, const double s0 )
+auto createParticles( LinearTag, const double dx, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
-    double delta = model.delta;
-    int nc = static_cast<int>( ( box_max[0] - box_min[0] ) / delta );
+    int nc = ( box_max[0] - box_min[0] ) / dx;
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
@@ -190,12 +200,11 @@ auto createParticles( LinearTag, ModelType model, const double s0 )
 }
 
 // Currently unused.
-template <class ModelType>
-auto createParticles( QuadraticTag, ModelType model, const double s0 )
+auto createParticles( QuadraticTag, const double dx, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
-    int nc = static_cast<int>( ( box_max[0] - box_min[0] ) / model.delta );
+    int nc = ( box_max[0] - box_min[0] ) / dx;
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
@@ -221,11 +230,12 @@ auto createParticles( QuadraticTag, ModelType model, const double s0 )
 template <class HostParticleType, class TestTag, class ModelType>
 void checkResults( HostParticleType aosoa_host, double local_min[3],
                    double local_max[3], TestTag test_tag, ModelType model,
-                   const double s0, const int boundary_width, const double Phi )
+                   const int m, const double s0, const int boundary_width,
+                   const double Phi )
 {
     double delta = model.delta;
-    // double ref_f = computeReferenceForceX( model, 1, s0 );
-    double ref_W = computeReferenceStrainEnergyDensity( model, 1, s0 );
+    double ref_f = computeReferenceForceX( test_tag, model, m, s0 );
+    double ref_W = computeReferenceStrainEnergyDensity( model, m, s0 );
     double ref_Phi = 0.0;
     auto f_host = Cabana::slice<0>( aosoa_host );
     auto x_host = Cabana::slice<1>( aosoa_host );
@@ -243,7 +253,7 @@ void checkResults( HostParticleType aosoa_host, double local_min[3],
              x_host( p, 2 ) < local_max[2] - delta * boundary_width )
         {
             checkParticle( test_tag, model, s0, f_host( p, 0 ), f_host( p, 1 ),
-                           f_host( p, 2 ), -1, W_host( p ), ref_W );
+                           f_host( p, 2 ), ref_f, W_host( p ), ref_W );
         }
         checkTheta( model, test_tag, s0, theta_host( p ) );
 
@@ -266,7 +276,7 @@ void checkParticle( LinearTag tag, ModelType model, const double s0,
     // Check strain energy (all should be equal for fixed stretch).
     EXPECT_FLOAT_EQ( W, ref_W );
 
-    // Check energy with analytical value (not very close for small m).
+    // Check energy with analytical value.
     checkAnalyticalStrainEnergy( tag, model, s0, W );
 }
 
@@ -279,7 +289,7 @@ void checkParticle( QuadraticTag tag, ModelType model, const double s0,
     // Check force in x with discretized result.
     EXPECT_FLOAT_EQ( fx, ref_f );
 
-    // Check force in x with analytical value (not very close for small m).
+    // Check force in x with analytical value.
     checkAnalyticalForce( tag, model, s0, fx );
 
     // Check force: other components should be zero.
@@ -291,9 +301,8 @@ void checkParticle( QuadraticTag tag, ModelType model, const double s0,
 void checkAnalyticalStrainEnergy( LinearTag, CabanaPD::PMBModel model,
                                   const double s0, const double W )
 {
-    // Very large error for small m. This is basically a check for order of
-    // magnitude.
-    double threshold = W * 0.50;
+    // Relatively large error for small m.
+    double threshold = W * 0.15;
     double analytical_W = 9.0 / 2.0 * model.K * s0 * s0;
     EXPECT_NEAR( W, analytical_W, threshold );
 }
@@ -301,6 +310,7 @@ void checkAnalyticalStrainEnergy( LinearTag, CabanaPD::PMBModel model,
 void checkAnalyticalStrainEnergy( LinearTag, CabanaPD::LPSModel model,
                                   const double s0, const double W )
 {
+    // LPS is exact.
     double analytical_W = 9.0 / 2.0 * model.K * s0 * s0;
     EXPECT_FLOAT_EQ( W, analytical_W );
 }
@@ -345,10 +355,11 @@ void checkTheta( CabanaPD::LPSModel, QuadraticTag, const double, const double )
 
 //---------------------------------------------------------------------------//
 template <class ModelType, class TestTag>
-void testForce( ModelType model, const double boundary_width,
-                const TestTag test_tag, const double s0 )
+void testForce( ModelType model, const double dx, const double m,
+                const double boundary_width, const TestTag test_tag,
+                const double s0 )
 {
-    auto particles = createParticles( test_tag, model, s0 );
+    auto particles = createParticles( test_tag, dx, s0 );
 
     // This needs to exactly match the mesh spacing to compare with the single
     // particle calculation.
@@ -403,45 +414,51 @@ void testForce( ModelType model, const double boundary_width,
                             particles.local_mesh_hi[1],
                             particles.local_mesh_hi[2] };
 
-    checkResults( aosoa_host, local_min, local_max, test_tag, model, s0,
+    checkResults( aosoa_host, local_min, local_max, test_tag, model, m, s0,
                   boundary_width, Phi );
 }
 
 //---------------------------------------------------------------------------//
 // TESTS
 //---------------------------------------------------------------------------//
-// FIXME: Improvements
-//  1. Increase m
-//  2. Add single point force check with quadratic or check all neighbor
-//     contributions to force
+// FIXME: Run non-zero force check with quadratic
 TEST( TEST_CATEGORY, test_force_pmb )
 {
-    double delta = 2.0 / 15.0;
+    double m = 3;
+    double dx = 2.0 / 15.0;
+    double delta = dx * m;
     double K = 1.0;
     CabanaPD::PMBModel model( delta, K );
-    testForce( model, 1.1, LinearTag{}, 0.1 );
+    testForce( model, dx, m, 1.1, LinearTag{}, 0.1 );
+    // testForce( model, dx, m, 1.1, QuadraticTag{}, 0.1 );
 }
 TEST( TEST_CATEGORY, test_force_linear_pmb )
 {
-    double delta = 2.0 / 15.0;
+    double m = 3;
+    double dx = 2.0 / 15.0;
+    double delta = dx * m;
     double K = 1.0;
     CabanaPD::LinearPMBModel model( delta, K );
-    testForce( model, 1.1, LinearTag{}, 0.1 );
+    testForce( model, dx, m, 1.1, LinearTag{}, 0.1 );
 }
 TEST( TEST_CATEGORY, test_force_lps )
 {
-    double delta = 2.0 / 15.0;
+    double m = 3;
+    double dx = 2.0 / 15.0;
+    double delta = dx * m;
     double K = 1.0;
     double G = 0.5;
     CabanaPD::LPSModel model( delta, K, G );
-    testForce( model, 2.1, LinearTag{}, 0.1 );
+    testForce( model, dx, m, 2.1, LinearTag{}, 0.1 );
 }
 TEST( TEST_CATEGORY, test_force_linear_lps )
 {
-    double delta = 2.0 / 15.0;
+    double m = 3;
+    double dx = 2.0 / 15.0;
+    double delta = dx * m;
     double K = 1.0;
     double G = 3 / 5. * K;
     CabanaPD::LinearLPSModel model( delta, K, G );
-    testForce( model, 2.1, LinearTag{}, 0.1 );
+    testForce( model, dx, m, 2.1, LinearTag{}, 0.1 );
 }
 } // end namespace Test
