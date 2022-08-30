@@ -86,28 +86,28 @@ int main( int argc, char* argv[] )
         double length = ( high_corner[0] - low_corner[0] );
         int mpi_rank;
         MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
-        int count = 0;
-        auto measure_profile = KOKKOS_LAMBDA( const int pid, int& c )
+        Kokkos::View<int*, memory_space> count( "c", 1 );
+        auto measure_profile = KOKKOS_LAMBDA( const int pid )
         {
             double dx = length / num_cell_x;
             if ( x( pid, 1 ) < dx / 2.0 && x( pid, 1 ) > -dx / 2.0 &&
                  x( pid, 2 ) < dx / 2.0 && x( pid, 2 ) > -dx / 2.0 )
             {
+                auto c = Kokkos::atomic_fetch_add( &count( 0 ), 1 );
                 profile( c, 0 ) = x( pid, 0 );
                 profile( c, 1 ) = u( pid, 0 );
-                c++;
             }
         };
         Kokkos::RangePolicy<exec_space> policy( 0, x.size() );
-        Kokkos::parallel_reduce( "displacement_profile", policy,
-                                 measure_profile, count );
-
+        Kokkos::parallel_for( "displacement_profile", policy, measure_profile );
+        auto count_host =
+            Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, count );
         auto profile_host =
             Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, profile );
         std::fstream fout;
         std::string file_name = "displacement_profile.txt";
         fout.open( file_name, std::ios::app );
-        for ( int p = 0; p < count; p++ )
+        for ( int p = 0; p < count_host( 0 ); p++ )
         {
             fout << mpi_rank << " " << profile_host( p, 0 ) << " "
                  << profile_host( p, 1 ) << std::endl;
