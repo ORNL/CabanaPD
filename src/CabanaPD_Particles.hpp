@@ -293,7 +293,12 @@ class Particles
     }
 
     auto slice_x() { return Cabana::slice<0>( _aosoa_x, "positions" ); }
+    auto slice_x() const { return Cabana::slice<0>( _aosoa_x, "positions" ); }
     auto slice_u() { return Cabana::slice<0>( _aosoa_u, "displacements" ); }
+    auto slice_u() const
+    {
+        return Cabana::slice<0>( _aosoa_u, "displacements" );
+    }
     auto slice_f() { return Cabana::slice<0>( _aosoa_f, "forces" ); }
     auto slice_f_a()
     {

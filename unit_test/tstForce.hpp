@@ -734,9 +734,22 @@ TEST( TEST_CATEGORY, test_force_pmb_damage )
     double dx = 2.0 / 11.0;
     double delta = dx * m;
     double K = 1.0;
+    // Large value to make sure no bonds break.
     double G0 = 1000.0;
     CabanaPD::PMBDamageModel model( delta, K, G0 );
     testForce( model, DamageTag{}, dx, m, 1.1, LinearTag{}, 0.1 );
-    // testForce( model, dx, m, 1.1, QuadraticTag{}, 0.01 );
+    testForce( model, DamageTag{}, dx, m, 1.1, QuadraticTag{}, 0.01 );
+}
+TEST( TEST_CATEGORY, test_force_lps_damage )
+{
+    double m = 3;
+    double dx = 2.0 / 15.0;
+    double delta = dx * m;
+    double K = 1.0;
+    double G = 0.5;
+    double G0 = 1000.0;
+    CabanaPD::LPSDamageModel model( delta, K, G, G0 );
+    testForce( model, DamageTag{}, dx, m, 2.1, LinearTag{}, 0.1 );
+    testForce( model, DamageTag{}, dx, m, 2.1, QuadraticTag{}, 0.01 );
 }
 } // end namespace Test

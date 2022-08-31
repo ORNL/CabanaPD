@@ -362,6 +362,33 @@ class Force<ExecutionSpace, LPSModel>
             neigh_op_tag, "CabanaPD::ForceLPS::compute_full" );
     }
 
+    template <class ParticleType, class NeighListType, class ParallelType>
+    void compute_dilatation( ParticleType& particles,
+                             const NeighListType& neigh_list,
+                             const ParallelType neigh_op_tag ) const
+    {
+        auto n_local = particles.n_local;
+        const auto x = particles.slice_x();
+        auto u = particles.slice_u();
+        const auto vol = particles.slice_vol();
+        auto m = particles.slice_m();
+        auto theta = particles.slice_theta();
+
+        auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            // Get the bond distance, displacement, and stretch
+            double xi, r, s;
+            getDistance( x, u, i, j, xi, r, s );
+            double theta_i = influence_function( xi ) * s * xi * xi * vol( j );
+            theta( i ) += 3.0 * theta_i / m( i );
+        };
+
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Cabana::neighbor_parallel_for(
+            policy, dilatation, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForceLPS::compute_dilatation" );
+    }
+
     template <class ForceType, class PosType, class ParticleType,
               class NeighListType, class ParallelType>
     void compute_force_full( ForceType& f, const PosType& x, const PosType& u,
@@ -377,20 +404,7 @@ class Force<ExecutionSpace, LPSModel>
         auto m = particles.slice_m();
         Cabana::deep_copy( theta, 0.0 );
 
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-
-        auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
-        {
-            // Get the bond distance, displacement, and stretch
-            double xi, r, s;
-            getDistance( x, u, i, j, xi, r, s );
-            double theta_i = influence_function( xi ) * s * xi * xi * vol( j );
-            theta( i ) += 3.0 * theta_i / m( i );
-        };
-
-        Cabana::neighbor_parallel_for(
-            policy, dilatation, neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::compute_dilatation" );
+        compute_dilatation( particles, neigh_list, neigh_op_tag );
 
         auto force_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -414,6 +428,7 @@ class Force<ExecutionSpace, LPSModel>
             f( i, 2 ) += fz_i;
         };
 
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Cabana::neighbor_parallel_for(
             policy, force_full, neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPS::compute_full" );
@@ -465,6 +480,147 @@ class Force<ExecutionSpace, LPSModel>
 };
 
 template <class ExecutionSpace>
+class Force<ExecutionSpace, LPSDamageModel>
+    : public Force<ExecutionSpace, LPSModel>
+{
+  protected:
+    using base_type = Force<ExecutionSpace, LPSModel>;
+    using base_type::_half_neigh;
+    LPSDamageModel _model;
+
+  public:
+    using exec_space = ExecutionSpace;
+
+    Force( const bool half_neigh, const LPSDamageModel model )
+        : base_type( half_neigh, model )
+        , _model( model )
+    {
+    }
+
+    template <class ForceType, class PosType, class ParticleType,
+              class NeighListType, class MuView, class ParallelType>
+    void compute_force_full( ForceType& f, const PosType& x, const PosType& u,
+                             const ParticleType& particles,
+                             const NeighListType& neigh_list, MuView& mu,
+                             const int n_local,
+                             ParallelType& neigh_op_tag ) const
+    {
+        auto break_coeff = _model.bond_break_coeff;
+        auto theta_coeff = _model.theta_coeff;
+        auto s_coeff = _model.s_coeff;
+
+        const auto vol = particles.slice_vol();
+        auto theta = particles.slice_theta();
+        auto m = particles.slice_m();
+        Cabana::deep_copy( theta, 0.0 );
+
+        this->compute_dilatation( particles, neigh_list, neigh_op_tag );
+
+        auto force_full = KOKKOS_LAMBDA( const int i )
+        {
+            std::size_t num_neighbors =
+                Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
+                                                                  i );
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            {
+                if ( mu( i, n ) > 0 )
+                {
+                    double fx_i = 0.0;
+                    double fy_i = 0.0;
+                    double fz_i = 0.0;
+
+                    std::size_t j =
+                        Cabana::NeighborList<NeighListType>::getNeighbor(
+                            neigh_list, i, n );
+
+                    // Get the reference positions and displacements.
+                    double xi, r, s;
+                    double rx, ry, rz;
+                    getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+
+                    if ( r * r >= break_coeff * xi * xi )
+                        mu( i, n ) = 0;
+                    if ( mu( i, n ) > 0 )
+                    {
+                        const double s = ( r - xi ) / xi;
+                        const double coeff =
+                            ( theta_coeff * ( theta( i ) / m( i ) +
+                                              theta( j ) / m( j ) ) +
+                              s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
+                            influence_function( xi ) * xi * vol( j );
+                        double muij = mu( i, n );
+                        fx_i = muij * coeff * rx / r;
+                        fy_i = muij * coeff * ry / r;
+                        fz_i = muij * coeff * rz / r;
+
+                        f( i, 0 ) += fx_i;
+                        f( i, 1 ) += fy_i;
+                        f( i, 2 ) += fz_i;
+                    }
+                }
+            }
+        };
+
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::compute_full", policy,
+                              force_full );
+    }
+
+    template <class PosType, class WType, class DamageType, class ParticleType,
+              class NeighListType, class MuView, class ParallelType>
+    double compute_energy_full( WType& W, const PosType& x, const PosType& u,
+                                DamageType& phi, const ParticleType& particles,
+                                const NeighListType& neigh_list, MuView& mu,
+                                const int n_local, ParallelType& ) const
+    {
+        auto theta_coeff = _model.theta_coeff;
+        auto s_coeff = _model.s_coeff;
+
+        const auto vol = particles.slice_vol();
+        const auto theta = particles.slice_theta();
+        auto m = particles.slice_m();
+
+        auto energy_full = KOKKOS_LAMBDA( const int i, double& Phi )
+        {
+            std::size_t num_neighbors =
+                Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
+                                                                  i );
+            double phi_i = 0.0;
+            double vol_H_i = 0.0;
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            {
+                std::size_t j =
+                    Cabana::NeighborList<NeighListType>::getNeighbor(
+                        neigh_list, i, n );
+                // Get the bond distance, displacement, and stretch
+                double xi, r, s;
+                getDistance( x, u, i, j, xi, r, s );
+
+                double w = ( 1.0 / num_neighbors ) * 0.5 * theta_coeff / 3.0 *
+                               ( theta( i ) * theta( i ) ) +
+                           0.5 * ( s_coeff / m( i ) ) *
+                               influence_function( xi ) * s * s * xi * xi *
+                               vol( j );
+                W( i ) += w;
+
+                phi_i += mu( i, n ) * vol( j );
+                vol_H_i += vol( j );
+            }
+            Phi += W( i ) * vol( i );
+            phi( i ) = 1 - phi_i / vol_H_i;
+        };
+
+        double strain_energy = 0.0;
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Kokkos::parallel_reduce(
+            "CabanaPD::ForceLPSDamage::compute_energy_full", policy,
+            energy_full, strain_energy );
+
+        return strain_energy;
+    }
+};
+
+template <class ExecutionSpace>
 class Force<ExecutionSpace, LinearLPSModel>
     : public Force<ExecutionSpace, LPSModel>
 {
@@ -498,23 +654,7 @@ class Force<ExecutionSpace, LinearLPSModel>
         auto m = particles.slice_m();
         Cabana::deep_copy( linear_theta, 0.0 );
 
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-
-        auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
-        {
-            // Get the bond distance and stretch
-            double xi, linear_s;
-            getLinearizedDistance( x, u, i, j, xi, linear_s );
-
-            double linear_theta_i =
-                influence_function( xi ) * linear_s * xi * xi * vol( j );
-
-            linear_theta( i ) += 3.0 * linear_theta_i / m( i );
-        };
-
-        Cabana::neighbor_parallel_for(
-            policy, dilatation, neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::compute_dilatation" );
+        this->compute_dilatation( particles, neigh_list, neigh_op_tag );
 
         auto force_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -542,6 +682,7 @@ class Force<ExecutionSpace, LinearLPSModel>
             f( i, 2 ) += fz_i;
         };
 
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Cabana::neighbor_parallel_for(
             policy, force_full, neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPS::compute_full" );
