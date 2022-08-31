@@ -104,7 +104,6 @@ void testForce( ModelType model )
     auto f = particles.slice_f();
     auto W = particles.slice_W();
     auto vol = particles.slice_vol();
-    Cabana::deep_copy( f, 0.0 );
     compute_force( force, particles, neigh_list, Cabana::SerialOpTag() );
 
     auto Phi =

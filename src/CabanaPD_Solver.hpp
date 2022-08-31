@@ -156,8 +156,6 @@ class SolverElastic
     void init_force()
     {
         // Compute initial forces
-        auto f = particles->slice_f();
-        Cabana::deep_copy( f, 0.0 );
         compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
         compute_energy( *force, *particles, *neighbors, neigh_iter_tag() );
     }
@@ -179,9 +177,6 @@ class SolverElastic
 
             // Reset forces
             force_timer.reset();
-            particles->slice_f();
-            auto f = particles->slice_f();
-            Cabana::deep_copy( f, 0.0 );
 
             // Compute short range force
             compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
@@ -357,8 +352,6 @@ class SolverFracture
     void init_force()
     {
         // Compute initial forces
-        auto f = particles->slice_f();
-        Cabana::deep_copy( f, 0.0 );
         compute_force( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
         compute_energy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
 
@@ -383,9 +376,6 @@ class SolverFracture
 
             // Reset forces
             force_timer.reset();
-            particles->slice_f();
-            auto f = particles->slice_f();
-            Cabana::deep_copy( f, 0.0 );
 
             // Compute short range force
             compute_force( *force, *particles, *neighbors, mu,
