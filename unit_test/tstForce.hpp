@@ -452,7 +452,7 @@ void checkResults( HostParticleType aosoa_host, double local_min[3],
                            f_host( p, 2 ), ref_f, W_host( p ), ref_W, x );
             particles_checked++;
         }
-        checkTheta( model, test_tag, s0, theta_host( p ) );
+        checkAnalyticalDilatation( model, test_tag, s0, theta_host( p ) );
 
         // Check total sum of strain energy matches per particle sum.
         ref_Phi += W_host( p ) * vol_host( p );
@@ -563,23 +563,21 @@ void checkAnalyticalForce( QuadraticTag, CabanaPD::LPSModel model,
     EXPECT_NEAR( fx, analytical_f, threshold );
 }
 
-void checkTheta( CabanaPD::PMBModel, LinearTag, const double,
-                 const double theta )
+void checkAnalyticalDilatation( CabanaPD::PMBModel, LinearTag, const double,
+                                const double theta )
 {
     EXPECT_FLOAT_EQ( 0.0, theta );
 }
 
-void checkTheta( CabanaPD::LPSModel, LinearTag, const double s0,
-                 const double theta )
+void checkAnalyticalDilatation( CabanaPD::LPSModel, LinearTag, const double s0,
+                                const double theta )
 {
     EXPECT_FLOAT_EQ( 3 * s0, theta );
 }
 
-void checkTheta( CabanaPD::PMBModel, QuadraticTag, const double, const double )
-{
-}
-
-void checkTheta( CabanaPD::LPSModel, QuadraticTag, const double, const double )
+template <class ModelType>
+void checkAnalyticalDilatation( ModelType, QuadraticTag, const double,
+                                const double )
 {
 }
 
