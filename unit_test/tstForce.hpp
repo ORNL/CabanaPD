@@ -417,9 +417,9 @@ auto createParticles( QuadraticTag, const double dx, const double s0 )
 //---------------------------------------------------------------------------//
 // Check all particles.
 //---------------------------------------------------------------------------//
-template <class HostParticleType, class TestTag, class ModelType>
+template <class HostParticleType, class TestType, class ModelType>
 void checkResults( HostParticleType aosoa_host, double local_min[3],
-                   double local_max[3], TestTag test_tag, ModelType model,
+                   double local_max[3], TestType test_tag, ModelType model,
                    const int m, const double s0, const int boundary_width,
                    const double Phi )
 {
@@ -581,13 +581,46 @@ void checkAnalyticalDilatation( ModelType, QuadraticTag, const double,
 {
 }
 
+struct DamageTag
+{
+};
+struct NoDamageTag
+{
+};
+
+template <class ForceType, class ParticleType, class NeighborList>
+double computeEnergyAndForce( NoDamageTag, const ForceType force,
+                              ParticleType& particles,
+                              const NeighborList& neigh_list, const int )
+{
+    compute_force( force, particles, neigh_list, Cabana::SerialOpTag() );
+    double Phi =
+        compute_energy( force, particles, neigh_list, Cabana::SerialOpTag() );
+    return Phi;
+}
+template <class ForceType, class ParticleType, class NeighborList>
+double computeEnergyAndForce( DamageTag, const ForceType force,
+                              ParticleType& particles,
+                              const NeighborList& neigh_list,
+                              const int max_neighbors )
+{
+    Kokkos::View<int**, TEST_MEMSPACE> mu(
+        Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
+        particles.n_local, max_neighbors );
+    Kokkos::deep_copy( mu, 1 );
+    compute_force( force, particles, neigh_list, mu, Cabana::SerialOpTag() );
+    double Phi = compute_energy( force, particles, neigh_list, mu,
+                                 Cabana::SerialOpTag() );
+    return Phi;
+}
+
 //---------------------------------------------------------------------------//
 // Main test function.
 //---------------------------------------------------------------------------//
-template <class ModelType, class TestTag>
-void testForce( ModelType model, const double dx, const double m,
-                const double boundary_width, const TestTag test_tag,
-                const double s0 )
+template <class ModelType, class TestType, class DamageType>
+void testForce( ModelType model, const DamageType damage_tag, const double dx,
+                const double m, const double boundary_width,
+                const TestType test_tag, const double s0 )
 {
     auto particles = createParticles( test_tag, dx, s0 );
 
@@ -608,17 +641,17 @@ void testForce( ModelType model, const double dx, const double m,
     auto x = particles.slice_x();
     verlet_list neigh_list( x, 0, particles.n_local, model.delta + 1e-14, 1.0,
                             mesh_min, mesh_max );
+    int max_neighbors =
+        Cabana::NeighborList<verlet_list>::maxNeighbor( neigh_list );
 
     auto f = particles.slice_f();
     auto W = particles.slice_W();
     auto vol = particles.slice_vol();
     auto theta = particles.slice_theta();
-    auto m = particles.slice_m();
     force.initialize( particles, neigh_list, Cabana::SerialOpTag() );
-    compute_force( force, particles, neigh_list, Cabana::SerialOpTag() );
 
-    auto Phi =
-        compute_energy( force, particles, neigh_list, Cabana::SerialOpTag() );
+    double Phi = computeEnergyAndForce( damage_tag, force, particles,
+                                        neigh_list, max_neighbors );
 
     // Make a copy of final results on the host
     std::size_t num_particle = x.size();
@@ -659,8 +692,8 @@ TEST( TEST_CATEGORY, test_force_pmb )
     double delta = dx * m;
     double K = 1.0;
     CabanaPD::PMBModel model( delta, K );
-    testForce( model, dx, m, 1.1, LinearTag{}, 0.1 );
-    testForce( model, dx, m, 1.1, QuadraticTag{}, 0.01 );
+    testForce( model, NoDamageTag{}, dx, m, 1.1, LinearTag{}, 0.1 );
+    testForce( model, NoDamageTag{}, dx, m, 1.1, QuadraticTag{}, 0.01 );
 }
 TEST( TEST_CATEGORY, test_force_linear_pmb )
 {
@@ -669,7 +702,7 @@ TEST( TEST_CATEGORY, test_force_linear_pmb )
     double delta = dx * m;
     double K = 1.0;
     CabanaPD::LinearPMBModel model( delta, K );
-    testForce( model, dx, m, 1.1, LinearTag{}, 0.1 );
+    testForce( model, NoDamageTag{}, dx, m, 1.1, LinearTag{}, 0.1 );
 }
 TEST( TEST_CATEGORY, test_force_lps )
 {
@@ -680,8 +713,8 @@ TEST( TEST_CATEGORY, test_force_lps )
     double K = 1.0;
     double G = 0.5;
     CabanaPD::LPSModel model( delta, K, G );
-    testForce( model, dx, m, 2.1, LinearTag{}, 0.1 );
-    testForce( model, dx, m, 2.1, QuadraticTag{}, 0.01 );
+    testForce( model, NoDamageTag{}, dx, m, 2.1, LinearTag{}, 0.1 );
+    testForce( model, NoDamageTag{}, dx, m, 2.1, QuadraticTag{}, 0.01 );
 }
 TEST( TEST_CATEGORY, test_force_linear_lps )
 {
@@ -691,7 +724,19 @@ TEST( TEST_CATEGORY, test_force_linear_lps )
     double K = 1.0;
     double G = 0.5;
     CabanaPD::LinearLPSModel model( delta, K, G );
-    testForce( model, dx, m, 2.1, LinearTag{}, 0.1 );
+    testForce( model, NoDamageTag{}, dx, m, 2.1, LinearTag{}, 0.1 );
 }
 
+// Tests without damage, but using damage models.
+TEST( TEST_CATEGORY, test_force_pmb_damage )
+{
+    double m = 3;
+    double dx = 2.0 / 11.0;
+    double delta = dx * m;
+    double K = 1.0;
+    double G0 = 1000.0;
+    CabanaPD::PMBDamageModel model( delta, K, G0 );
+    testForce( model, DamageTag{}, dx, m, 1.1, LinearTag{}, 0.1 );
+    // testForce( model, dx, m, 1.1, QuadraticTag{}, 0.01 );
+}
 } // end namespace Test
