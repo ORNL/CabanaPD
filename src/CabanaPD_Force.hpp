@@ -164,6 +164,21 @@ struct LinearLPSModel : public LPSModel
     using LPSModel::theta_coeff;
 };
 
+struct LinearLPSDamageModel : public LPSDamageModel
+{
+    using LPSDamageModel::LPSDamageModel;
+
+    using LPSDamageModel::delta;
+    using LPSDamageModel::G;
+    using LPSDamageModel::K;
+    using LPSDamageModel::s_coeff;
+    using LPSDamageModel::theta_coeff;
+
+    using LPSDamageModel::bond_break_coeff;
+    using LPSDamageModel::G0;
+    using LPSDamageModel::s0;
+};
+
 /* PMB */
 
 struct PMBModel : public ForceModel
@@ -221,6 +236,19 @@ struct LinearPMBModel : public PMBModel
     using PMBModel::c;
     using PMBModel::delta;
     using PMBModel::K;
+};
+
+struct LinearPMBDamageModel : public PMBDamageModel
+{
+    using PMBDamageModel::PMBDamageModel;
+
+    using PMBDamageModel::c;
+    using PMBDamageModel::delta;
+    using PMBDamageModel::K;
+
+    using PMBDamageModel::bond_break_coeff;
+    using PMBDamageModel::G0;
+    using PMBDamageModel::s0;
 };
 
 template <class PosType>
