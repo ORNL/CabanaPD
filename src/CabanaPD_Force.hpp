@@ -466,52 +466,20 @@ class Force<ExecutionSpace, LPSModel>
 
 template <class ExecutionSpace>
 class Force<ExecutionSpace, LinearLPSModel>
+    : public Force<ExecutionSpace, LPSModel>
 {
   protected:
-    bool _half_neigh;
+    using base_type = Force<ExecutionSpace, LPSModel>;
+    using base_type::_half_neigh;
     LinearLPSModel _model;
 
   public:
     using exec_space = ExecutionSpace;
 
     Force( const bool half_neigh, const LinearLPSModel model )
-        : _half_neigh( half_neigh )
+        : base_type( half_neigh, model )
         , _model( model )
     {
-    }
-
-    template <class ParticleType, class NeighListType, class ParallelType>
-    void initialize( ParticleType& particles, const NeighListType& neigh_list,
-                     const ParallelType neigh_op_tag )
-    {
-        compute_weighted_volume( particles, neigh_list, neigh_op_tag );
-    }
-
-    template <class ParticleType, class NeighListType, class ParallelType>
-    void compute_weighted_volume( ParticleType& particles,
-                                  const NeighListType& neigh_list,
-                                  const ParallelType neigh_op_tag )
-    {
-        auto n_local = particles.n_local;
-        auto x = particles.slice_x();
-        auto u = particles.slice_u();
-        const auto vol = particles.slice_vol();
-        auto m = particles.slice_m();
-        Cabana::deep_copy( m, 0.0 );
-
-        auto weighted_volume = KOKKOS_LAMBDA( const int i, const int j )
-        {
-            // Get the reference positions and displacements.
-            double xi, r, s;
-            getDistance( x, u, i, j, xi, r, s );
-            double m_j = influence_function( xi ) * xi * xi * vol( j );
-            m( i ) += m_j;
-        };
-
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-        Cabana::neighbor_parallel_for(
-            policy, weighted_volume, neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::compute_full" );
     }
 
     template <class ForceType, class PosType, class ParticleType,
@@ -526,6 +494,7 @@ class Force<ExecutionSpace, LinearLPSModel>
 
         const auto vol = particles.slice_vol();
         auto linear_theta = particles.slice_theta();
+        // Using weighted volume from base LPS class.
         auto m = particles.slice_m();
         Cabana::deep_copy( linear_theta, 0.0 );
 
@@ -723,22 +692,19 @@ class Force<ExecutionSpace, PMBModel>
 
 template <class ExecutionSpace>
 class Force<ExecutionSpace, PMBDamageModel>
+    : public Force<ExecutionSpace, PMBModel>
 {
   protected:
-    bool _half_neigh;
+    using base_type = Force<ExecutionSpace, PMBModel>;
+    using base_type::_half_neigh;
     PMBDamageModel _model;
 
   public:
     using exec_space = ExecutionSpace;
 
     Force( const bool half_neigh, const PMBDamageModel model )
-        : _half_neigh( half_neigh )
+        : base_type( half_neigh, model )
         , _model( model )
-    {
-    }
-
-    template <class ParticleType, class NeighListType, class ParallelType>
-    void initialize( ParticleType&, NeighListType&, ParallelType )
     {
     }
 
@@ -858,22 +824,19 @@ class Force<ExecutionSpace, PMBDamageModel>
 
 template <class ExecutionSpace>
 class Force<ExecutionSpace, LinearPMBModel>
+    : public Force<ExecutionSpace, PMBModel>
 {
   protected:
-    bool _half_neigh;
+    using base_type = Force<ExecutionSpace, PMBModel>;
+    using base_type::_half_neigh;
     LinearPMBModel _model;
 
   public:
     using exec_space = ExecutionSpace;
 
     Force( const bool half_neigh, const LinearPMBModel model )
-        : _half_neigh( half_neigh )
+        : base_type( half_neigh, model )
         , _model( model )
-    {
-    }
-
-    template <class ParticleType, class NeighListType, class ParallelType>
-    void initialize( ParticleType&, NeighListType&, ParallelType )
     {
     }
 
