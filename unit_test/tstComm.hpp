@@ -121,10 +121,23 @@ void testHalo()
     NeighListType nlist( x, 0, particles.n_local, delta, 1.0, mesh_min,
                          mesh_max );
 
+    // Copy neighbors per particle to host.
+    Kokkos::View<int*, TEST_MEMSPACE> num_neigh( "num_neighbors",
+                                                 particles.n_local );
+    Kokkos::RangePolicy<exec_space> policy( 0, particles.n_local );
+    Kokkos::parallel_for(
+        "num_neighbors", policy, KOKKOS_LAMBDA( const int p ) {
+            auto n =
+                Cabana::NeighborList<NeighListType>::numNeighbor( nlist, p );
+            num_neigh( p ) = n;
+        } );
+
     // Check that all local particles (away from global boundaries) have a full
     // set of neighbors.
     // FIXME: Expected neighbors per particle could also be calculated at the
     // boundaries (less than internal particles).
+    auto num_neigh_host =
+        Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, num_neigh );
     for ( int p = 0; p < particles.n_local; ++p )
     {
         if ( x_host( p, 0 ) > box_min[0] + delta * 1.01 &&
@@ -134,9 +147,7 @@ void testHalo()
              x_host( p, 2 ) > box_min[2] + delta * 1.01 &&
              x_host( p, 2 ) < box_max[2] - delta * 1.01 )
         {
-            auto n =
-                Cabana::NeighborList<NeighListType>::numNeighbor( nlist, p );
-            EXPECT_EQ( n, expected_n );
+            EXPECT_EQ( num_neigh_host( p ), expected_n );
         }
     }
 }
