@@ -251,6 +251,9 @@ struct LinearPMBDamageModel : public PMBDamageModel
     using PMBDamageModel::s0;
 };
 
+/******************************************************************************
+  Force helper functions.
+******************************************************************************/
 template <class PosType>
 KOKKOS_INLINE_FUNCTION void
 getDistanceComponents( const PosType& x, const PosType& u, const int i,
@@ -873,29 +876,19 @@ class Force<ExecutionSpace, PMBDamageModel>
                     double fy_i = 0.0;
                     double fz_i = 0.0;
 
-                    // Get the reference positions and displacements.
                     std::size_t j =
                         Cabana::NeighborList<NeighListType>::getNeighbor(
                             neigh_list, i, n );
-                    const double xi_x = x( j, 0 ) - x( i, 0 );
-                    const double eta_u = u( j, 0 ) - u( i, 0 );
-                    const double xi_y = x( j, 1 ) - x( i, 1 );
-                    const double eta_v = u( j, 1 ) - u( i, 1 );
-                    const double xi_z = x( j, 2 ) - x( i, 2 );
-                    const double eta_w = u( j, 2 ) - u( i, 2 );
-                    const double rx = xi_x + eta_u;
-                    const double ry = xi_y + eta_v;
-                    const double rz = xi_z + eta_w;
-                    const double r2 = rx * rx + ry * ry + rz * rz;
-                    const double xi2 = xi_x * xi_x + xi_y * xi_y + xi_z * xi_z;
 
-                    if ( r2 >= break_coeff * xi2 )
+                    // Get the reference positions and displacements.
+                    double xi, r, s;
+                    double rx, ry, rz;
+                    getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+
+                    if ( r * r >= break_coeff * xi * xi )
                         mu( i, n ) = 0;
                     if ( mu( i, n ) > 0 )
                     {
-                        const double r = sqrt( r2 );
-                        const double xi = sqrt( xi2 );
-                        const double s = ( r - xi ) / xi;
                         const double coeff = c * s * vol( j );
                         double muij = mu( i, n );
                         fx_i = muij * coeff * rx / r;
