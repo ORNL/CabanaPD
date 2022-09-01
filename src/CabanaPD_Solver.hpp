@@ -324,8 +324,7 @@ class SolverFracture
     SolverFracture( Inputs _inputs, std::shared_ptr<particle_type> _particles,
                     force_model_type force_model, bc_type bc,
                     prenotch_type prenotch )
-        : base_type( _inputs, _particles,
-                     typename force_model_type::elastic_model{} )
+        : base_type( _inputs, _particles, force_model )
         , boundary_condition( bc )
     {
         std::ofstream out( inputs->output_file, std::ofstream::app );

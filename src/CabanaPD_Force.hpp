@@ -136,11 +136,11 @@ struct LPSDamageModel : public LPSModel
     double bond_break_coeff;
 
     LPSDamageModel() {}
-    LPSDamageModel( const double delta, const double K, const double G,
-                    const double G0 )
-        : LPSModel( delta, K, G )
+    LPSDamageModel( const double _delta, const double _K, const double _G,
+                    const double _G0 )
+        : elastic_model( _delta, _K, _G )
     {
-        set_param( delta, K, G, G0 );
+        set_param( _delta, _K, _G, _G0 );
     }
 
     void set_param( const double _delta, const double _K, const double _G,
