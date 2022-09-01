@@ -83,3 +83,7 @@ Ensure installation by checking the installed libraries an headers in CBNMD_INST
 cd build
 ctest
 ```
+
+## License
+
+CabanaPD is distributed under an [open source 3-clause BSD license](LICENSE).
