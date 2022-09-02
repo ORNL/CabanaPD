@@ -483,6 +483,9 @@ void compute_force( const ForceType& force, ParticleType& particles,
     auto f_a = particles.slice_f_a();
     auto vol = particles.slice_vol();
 
+    // Reset force.
+    Cabana::deep_copy( f, 0.0 );
+
     // if ( half_neigh )
     // Forces must be atomic for half list
     // compute_force_half( f_a, x, u, neigh_list, n_local,
@@ -511,6 +514,9 @@ double compute_energy( const ForceType force, ParticleType& particles,
     auto W = particles.slice_W();
     auto vol = particles.slice_vol();
 
+    // Reset energy.
+    Cabana::deep_copy( W, 0.0 );
+
     double energy;
     // if ( _half_neigh )
     //    energy = compute_energy_half( force, x, u, neigh_list,
@@ -536,6 +542,9 @@ void compute_force( const ForceType& force, ParticleType& particles,
     auto f = particles.slice_f();
     auto f_a = particles.slice_f_a();
     auto vol = particles.slice_vol();
+
+    // Reset force.
+    Cabana::deep_copy( f, 0.0 );
 
     // if ( half_neigh )
     // Forces must be atomic for half list
@@ -566,6 +575,9 @@ double compute_energy( const ForceType force, ParticleType& particles,
     auto W = particles.slice_W();
     auto vol = particles.slice_vol();
     auto phi = particles.slice_phi();
+
+    // Reset energy.
+    Cabana::deep_copy( W, 0.0 );
 
     double energy;
     // if ( _half_neigh )
