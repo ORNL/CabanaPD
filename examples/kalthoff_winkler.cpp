@@ -71,6 +71,7 @@ int main( int argc, char* argv[] )
 
         // Choose force model type.
         CabanaPD::PMBDamageModel force_model( delta, K, G0 );
+        // CabanaPD::LPSDamageModel force_model( delta, K, 0.5, G0 );
         CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final,
                                  dt );
         inputs.read_args( argc, argv );

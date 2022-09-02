@@ -41,6 +41,7 @@ int main( int argc, char* argv[] )
         int halo_width = 2;
 
         // Choose force model type.
+        // CabanaPD::PMBModel force_model( delta, K );
         CabanaPD::LPSModel force_model( delta, K, 3.0 / 5.0 * K );
 
         CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final,
