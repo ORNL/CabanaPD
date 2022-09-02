@@ -36,7 +36,7 @@ int main( int argc, char* argv[] )
         double t_final = 0.6;
         double dt = 0.01;
         double K = 1.0;
-        double delta = 0.05;
+        double delta = 0.075;
         // FIXME: set halo width based on delta
         int halo_width = 2;
 
