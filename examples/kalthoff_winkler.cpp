@@ -45,11 +45,12 @@ int main( int argc, char* argv[] )
         double dt = 0.2e-6;
 
         // Material constants
-        double E = 191e+9;                     // [Pa]
-        double nu = 1 / 3;                     // unitless
-        double K = E / ( 3 * ( 1 - 2 * nu ) ); // [Pa]
-        double rho0 = 8000;                    // [kg/m^3]
-        double G0 = 42408;                     // [J/m^2]
+        double E = 191e+9;                           // [Pa]
+        double nu = 1.0 / 3.0;                       // unitless
+        double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) ); // [Pa]
+        double rho0 = 8000;                          // [kg/m^3]
+        double G0 = 42408;                           // [J/m^2]
+        double G = E / ( 2.0 * ( 1.0 + nu ) );
 
         double v0 = 16;              // [m/sec] (Half impactor's velocity)
         double L_prenotch = 0.05;    // [m] (50 mm)
@@ -70,8 +71,8 @@ int main( int argc, char* argv[] )
         int halo_width = 2;
 
         // Choose force model type.
-        CabanaPD::PMBDamageModel force_model( delta, K, G0 );
-        // CabanaPD::LPSDamageModel force_model( delta, K, 0.5, G0 );
+        // CabanaPD::PMBDamageModel force_model( delta, K, G0 );
+        CabanaPD::LPSDamageModel force_model( delta, K, G, G0 );
         CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final,
                                  dt );
         inputs.read_args( argc, argv );
