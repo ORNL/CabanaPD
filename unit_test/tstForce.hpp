@@ -141,10 +141,11 @@ double computeReferenceForceX( QuadraticTag, CabanaPD::PMBModel model,
     return fx;
 }
 
-double computeReferenceWeightedVolume( const double delta, const int m,
+template <class ModelType>
+double computeReferenceWeightedVolume( ModelType model, const int m,
                                        const double vol )
 {
-    double dx = delta / m;
+    double dx = model.delta / m;
     double weighted_volume = 0.0;
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
@@ -154,18 +155,20 @@ double computeReferenceWeightedVolume( const double delta, const int m,
                 double xi_y = dx * j;
                 double xi_z = dx * k;
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
-                if ( xi > 0.0 && xi < delta + 1e-14 )
-                    weighted_volume += 1.0 / xi * xi * xi * vol;
+                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                    weighted_volume +=
+                        model.influence_function( xi ) * xi * xi * vol;
             }
     return weighted_volume;
 }
 
 // LinearTag
-double computeReferenceDilatation( const double delta, const int m,
+template <class ModelType>
+double computeReferenceDilatation( ModelType model, const int m,
                                    const double s0, const double vol,
                                    const double weighted_volume )
 {
-    double dx = delta / m;
+    double dx = model.delta / m;
     double theta = 0.0;
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
@@ -176,21 +179,23 @@ double computeReferenceDilatation( const double delta, const int m,
                 double xi_z = dx * k;
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
 
-                if ( xi > 0.0 && xi < delta + 1e-14 )
-                    theta +=
-                        3.0 / weighted_volume * 1.0 / xi * s0 * xi * xi * vol;
+                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                    theta += 3.0 / weighted_volume *
+                             model.influence_function( xi ) * s0 * xi * xi *
+                             vol;
             }
     return theta;
 }
 
 // QuadraticTag
 // Assumes zero y/z displacement components.
-double computeReferenceDilatation( const double delta, const int m,
+template <class ModelType>
+double computeReferenceDilatation( ModelType model, const int m,
                                    const double u11, const double vol,
                                    const double weighted_volume,
                                    const double x )
 {
-    double dx = delta / m;
+    double dx = model.delta / m;
     double theta = 0.0;
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
@@ -207,9 +212,9 @@ double computeReferenceDilatation( const double delta, const int m,
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
                 double s = ( r - xi ) / xi;
 
-                if ( xi > 0.0 && xi < delta + 1e-14 )
-                    theta +=
-                        3.0 / weighted_volume * 1.0 / xi * s * xi * xi * vol;
+                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                    theta += 3.0 / weighted_volume *
+                             model.influence_function( xi ) * s * xi * xi * vol;
             }
     return theta;
 }
@@ -242,10 +247,9 @@ double computeReferenceStrainEnergyDensity( LinearTag, CabanaPD::LPSModel model,
     double dx = model.delta / m;
     double vol = dx * dx * dx;
 
-    auto weighted_volume =
-        computeReferenceWeightedVolume( model.delta, m, vol );
+    auto weighted_volume = computeReferenceWeightedVolume( model, m, vol );
     auto theta =
-        computeReferenceDilatation( model.delta, m, s0, vol, weighted_volume );
+        computeReferenceDilatation( model, m, s0, vol, weighted_volume );
     auto num_neighbors = computeReferenceNeighbors( model.delta, m );
 
     // Strain energy.
@@ -262,8 +266,9 @@ double computeReferenceStrainEnergyDensity( LinearTag, CabanaPD::LPSModel model,
                 {
                     W += ( 1.0 / num_neighbors ) * 0.5 * model.theta_coeff /
                              3.0 * ( theta * theta ) +
-                         0.5 * ( model.s_coeff / weighted_volume ) * 1.0 / xi *
-                             s0 * s0 * xi * xi * vol;
+                         0.5 * ( model.s_coeff / weighted_volume ) *
+                             model.influence_function( xi ) * s0 * s0 * xi *
+                             xi * vol;
                 }
             }
     return W;
@@ -278,11 +283,10 @@ double computeReferenceStrainEnergyDensity( QuadraticTag,
     double dx = model.delta / m;
     double vol = dx * dx * dx;
 
-    auto weighted_volume =
-        computeReferenceWeightedVolume( model.delta, m, vol );
+    auto weighted_volume = computeReferenceWeightedVolume( model, m, vol );
     auto num_neighbors = computeReferenceNeighbors( model.delta, m );
-    auto theta_i = computeReferenceDilatation( model.delta, m, u11, vol,
-                                               weighted_volume, x );
+    auto theta_i =
+        computeReferenceDilatation( model, m, u11, vol, weighted_volume, x );
 
     // Strain energy.
     for ( int i = -m; i < m + 1; ++i )
@@ -302,13 +306,14 @@ double computeReferenceStrainEnergyDensity( QuadraticTag,
 
                 double x_j = x + xi_x;
                 auto theta_j = computeReferenceDilatation(
-                    model.delta, m, u11, vol, weighted_volume, x_j );
+                    model, m, u11, vol, weighted_volume, x_j );
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                 {
                     W += ( 1.0 / num_neighbors ) * 0.5 * model.theta_coeff /
                              3.0 * ( theta_i * theta_j ) +
-                         0.5 * ( model.s_coeff / weighted_volume ) * 1.0 / xi *
-                             s * s * xi * xi * vol;
+                         0.5 * ( model.s_coeff / weighted_volume ) *
+                             model.influence_function( xi ) * s * s * xi * xi *
+                             vol;
                 }
             }
     return W;
@@ -323,10 +328,9 @@ double computeReferenceForceX( QuadraticTag, CabanaPD::LPSModel model,
     double dx = model.delta / m;
     double vol = dx * dx * dx;
 
-    auto weighted_volume =
-        computeReferenceWeightedVolume( model.delta, m, vol );
-    auto theta_i = computeReferenceDilatation( model.delta, m, u11, vol,
-                                               weighted_volume, x );
+    auto weighted_volume = computeReferenceWeightedVolume( model, m, vol );
+    auto theta_i =
+        computeReferenceDilatation( model, m, u11, vol, weighted_volume, x );
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
             for ( int k = -m; k < m + 1; ++k )
@@ -344,7 +348,7 @@ double computeReferenceForceX( QuadraticTag, CabanaPD::LPSModel model,
 
                 double x_j = x + xi_x;
                 auto theta_j = computeReferenceDilatation(
-                    model.delta, m, u11, vol, weighted_volume, x_j );
+                    model, m, u11, vol, weighted_volume, x_j );
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                 {
                     fx += ( model.theta_coeff * ( theta_i / weighted_volume +
@@ -352,7 +356,7 @@ double computeReferenceForceX( QuadraticTag, CabanaPD::LPSModel model,
                             model.s_coeff * s *
                                 ( 1.0 / weighted_volume +
                                   1.0 / weighted_volume ) ) *
-                          1 / xi * xi * vol * rx / r;
+                          model.influence_function( xi ) * xi * vol * rx / r;
                 }
             }
     return fx;
