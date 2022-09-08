@@ -23,7 +23,7 @@ class Inputs
     std::string output_file = "cabanaPD.out";
     std::string error_file = "cabanaPD.err";
     std::string device_type = "SERIAL";
-    int output_frequency = 10;
+    int output_frequency = 5;
 
     std::array<int, 3> num_cells;
     std::array<double, 3> low_corner;

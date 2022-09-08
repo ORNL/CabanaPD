@@ -712,7 +712,7 @@ TEST( TEST_CATEGORY, test_force_lps )
     double delta = dx * m;
     double K = 1.0;
     double G = 0.5;
-    CabanaPD::LPSModel model( delta, K, G );
+    CabanaPD::LPSModel model( delta, K, G, 1 );
     testForce( model, NoDamageTag{}, dx, m, 2.1, LinearTag{}, 0.1 );
     testForce( model, NoDamageTag{}, dx, m, 2.1, QuadraticTag{}, 0.01 );
 }
@@ -723,7 +723,7 @@ TEST( TEST_CATEGORY, test_force_linear_lps )
     double delta = dx * m;
     double K = 1.0;
     double G = 0.5;
-    CabanaPD::LinearLPSModel model( delta, K, G );
+    CabanaPD::LinearLPSModel model( delta, K, G, 1 );
     testForce( model, NoDamageTag{}, dx, m, 2.1, LinearTag{}, 0.1 );
 }
 
@@ -748,7 +748,7 @@ TEST( TEST_CATEGORY, test_force_lps_damage )
     double K = 1.0;
     double G = 0.5;
     double G0 = 1000.0;
-    CabanaPD::LPSDamageModel model( delta, K, G, G0 );
+    CabanaPD::LPSDamageModel model( delta, K, G, G0, 1 );
     testForce( model, DamageTag{}, dx, m, 2.1, LinearTag{}, 0.1 );
     testForce( model, DamageTag{}, dx, m, 2.1, QuadraticTag{}, 0.01 );
 }

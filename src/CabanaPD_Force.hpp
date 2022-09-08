@@ -67,21 +67,6 @@
 
 namespace CabanaPD
 {
-
-/******************************************************************************
-    Influence function
-******************************************************************************/
-
-// FIXME: should enable multiple function options.
-KOKKOS_INLINE_FUNCTION
-double influence_function( double xi )
-{
-    // double omega = 1;
-    double omega = 1.0 / xi;
-
-    return omega;
-}
-
 /******************************************************************************
   Force models
 ******************************************************************************/
@@ -100,16 +85,20 @@ struct LPSModel : public ForceModel
 {
     using ForceModel::delta;
 
+    int influence_type;
+
     double K;
     double G;
     double theta_coeff;
     double s_coeff;
 
     LPSModel(){};
-    LPSModel( const double delta, const double K, const double G )
-        : ForceModel( delta )
+    LPSModel( const double _delta, const double _K, const double _G,
+              const int _influence = 0 )
+        : ForceModel( _delta )
+        , influence_type( _influence )
     {
-        set_param( delta, K, G );
+        set_param( _delta, _K, _G );
     }
 
     void set_param( const double _delta, const double _K, const double _G )
@@ -121,6 +110,14 @@ struct LPSModel : public ForceModel
         theta_coeff = 3.0 * K - 5.0 * G;
         s_coeff = 15.0 * G;
     }
+
+    KOKKOS_INLINE_FUNCTION double influence_function( double xi ) const
+    {
+        if ( influence_type == 1 )
+            return 1.0 / xi;
+        else
+            return 1.0;
+    }
 };
 
 struct LPSDamageModel : public LPSModel
@@ -128,6 +125,7 @@ struct LPSDamageModel : public LPSModel
     using elastic_model = LPSModel;
     using elastic_model::delta;
     using elastic_model::G;
+    using elastic_model::influence_type;
     using elastic_model::K;
     using elastic_model::s_coeff;
     using elastic_model::theta_coeff;
@@ -137,8 +135,8 @@ struct LPSDamageModel : public LPSModel
 
     LPSDamageModel() {}
     LPSDamageModel( const double _delta, const double _K, const double _G,
-                    const double _G0 )
-        : elastic_model( _delta, _K, _G )
+                    const double _G0, const int _influence = 0 )
+        : elastic_model( _delta, _K, _G, _influence )
     {
         set_param( _delta, _K, _G, _G0 );
     }
@@ -148,7 +146,8 @@ struct LPSDamageModel : public LPSModel
     {
         elastic_model::set_param( _delta, _K, _G );
         G0 = _G0;
-        s0 = sqrt( 5.0 * G0 / 9.0 / K / delta );
+        // s0 = sqrt( 5.0 * G0 / 9.0 / K / delta ); // 1/xi
+        s0 = sqrt( 8.0 * G0 / 15.0 / K / delta ); // 1
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 };
@@ -159,6 +158,7 @@ struct LinearLPSModel : public LPSModel
 
     using LPSModel::delta;
     using LPSModel::G;
+    using LPSModel::influence_type;
     using LPSModel::K;
     using LPSModel::s_coeff;
     using LPSModel::theta_coeff;
@@ -170,6 +170,7 @@ struct LinearLPSDamageModel : public LPSDamageModel
 
     using LPSDamageModel::delta;
     using LPSDamageModel::G;
+    using LPSDamageModel::influence_type;
     using LPSDamageModel::K;
     using LPSDamageModel::s_coeff;
     using LPSDamageModel::theta_coeff;
@@ -349,13 +350,14 @@ class Force<ExecutionSpace, LPSModel>
         const auto vol = particles.slice_vol();
         auto m = particles.slice_m();
         Cabana::deep_copy( m, 0.0 );
+        auto model = _model;
 
         auto weighted_volume = KOKKOS_LAMBDA( const int i, const int j )
         {
             // Get the reference positions and displacements.
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
-            double m_j = influence_function( xi ) * xi * xi * vol( j );
+            double m_j = model.influence_function( xi ) * xi * xi * vol( j );
             m( i ) += m_j;
         };
 
@@ -376,13 +378,15 @@ class Force<ExecutionSpace, LPSModel>
         const auto vol = particles.slice_vol();
         auto m = particles.slice_m();
         auto theta = particles.slice_theta();
+        auto model = _model;
 
         auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
         {
             // Get the bond distance, displacement, and stretch
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
-            double theta_i = influence_function( xi ) * s * xi * xi * vol( j );
+            double theta_i =
+                model.influence_function( xi ) * s * xi * xi * vol( j );
             theta( i ) += 3.0 * theta_i / m( i );
         };
 
@@ -401,6 +405,7 @@ class Force<ExecutionSpace, LPSModel>
     {
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
+        auto model = _model;
 
         const auto vol = particles.slice_vol();
         auto theta = particles.slice_theta();
@@ -421,7 +426,7 @@ class Force<ExecutionSpace, LPSModel>
             const double coeff =
                 ( theta_coeff * ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
                   s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                influence_function( xi ) * xi * vol( j );
+                model.influence_function( xi ) * xi * vol( j );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -447,6 +452,7 @@ class Force<ExecutionSpace, LPSModel>
     {
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
+        auto model = _model;
 
         const auto vol = particles.slice_vol();
         const auto theta = particles.slice_theta();
@@ -464,8 +470,9 @@ class Force<ExecutionSpace, LPSModel>
 
             double w = ( 1.0 / num_neighbors ) * 0.5 * theta_coeff / 3.0 *
                            ( theta( i ) * theta( i ) ) +
-                       0.5 * ( s_coeff / m( i ) ) * influence_function( xi ) *
-                           s * s * xi * xi * vol( j );
+                       0.5 * ( s_coeff / m( i ) ) *
+                           model.influence_function( xi ) * s * s * xi * xi *
+                           vol( j );
             W( i ) += w;
             Phi += w * vol( i );
         };
@@ -511,6 +518,7 @@ class Force<ExecutionSpace, LPSDamageModel>
         auto break_coeff = _model.bond_break_coeff;
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
+        auto model = _model;
 
         const auto vol = particles.slice_vol();
         auto theta = particles.slice_theta();
@@ -545,12 +553,11 @@ class Force<ExecutionSpace, LPSDamageModel>
                         mu( i, n ) = 0;
                     if ( mu( i, n ) > 0 )
                     {
-                        const double s = ( r - xi ) / xi;
                         const double coeff =
                             ( theta_coeff * ( theta( i ) / m( i ) +
                                               theta( j ) / m( j ) ) +
                               s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                            influence_function( xi ) * xi * vol( j );
+                            model.influence_function( xi ) * xi * vol( j );
                         double muij = mu( i, n );
                         fx_i = muij * coeff * rx / r;
                         fy_i = muij * coeff * ry / r;
@@ -578,6 +585,7 @@ class Force<ExecutionSpace, LPSDamageModel>
     {
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
+        auto model = _model;
 
         const auto vol = particles.slice_vol();
         const auto theta = particles.slice_theta();
@@ -602,8 +610,8 @@ class Force<ExecutionSpace, LPSDamageModel>
                 double w = ( 1.0 / num_neighbors ) * 0.5 * theta_coeff / 3.0 *
                                ( theta( i ) * theta( i ) ) +
                            0.5 * ( s_coeff / m( i ) ) *
-                               influence_function( xi ) * s * s * xi * xi *
-                               vol( j );
+                               model.influence_function( xi ) * s * s * xi *
+                               xi * vol( j );
                 W( i ) += w;
 
                 phi_i += mu( i, n ) * vol( j );
@@ -650,6 +658,7 @@ class Force<ExecutionSpace, LinearLPSModel>
     {
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
+        auto model = _model;
 
         const auto vol = particles.slice_vol();
         auto linear_theta = particles.slice_theta();
@@ -675,7 +684,7 @@ class Force<ExecutionSpace, LinearLPSModel>
                 ( theta_coeff * ( linear_theta( i ) / m( i ) +
                                   linear_theta( j ) / m( j ) ) +
                   s_coeff * linear_s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                influence_function( xi ) * xi * vol( j );
+                model.influence_function( xi ) * xi * vol( j );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
             fz_i = coeff * xi_z / xi;
@@ -701,6 +710,7 @@ class Force<ExecutionSpace, LinearLPSModel>
     {
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
+        auto model = _model;
 
         const auto vol = particles.slice_vol();
         const auto linear_theta = particles.slice_theta();
@@ -721,8 +731,9 @@ class Force<ExecutionSpace, LinearLPSModel>
 
             double w = ( 1.0 / num_neighbors ) * 0.5 * theta_coeff / 3.0 *
                            ( linear_theta( i ) * linear_theta( i ) ) +
-                       0.5 * ( s_coeff / m( i ) ) * influence_function( xi ) *
-                           linear_s * linear_s * xi * xi * vol( j );
+                       0.5 * ( s_coeff / m( i ) ) *
+                           model.influence_function( xi ) * linear_s *
+                           linear_s * xi * xi * vol( j );
             W( i ) += w;
             Phi += w * vol( i );
         };
