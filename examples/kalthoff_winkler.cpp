@@ -45,11 +45,12 @@ int main( int argc, char* argv[] )
         double dt = 0.2e-6;
 
         // Material constants
-        double E = 191e+9;                     // [Pa]
-        double nu = 1 / 3;                     // unitless
-        double K = E / ( 3 * ( 1 - 2 * nu ) ); // [Pa]
-        double rho0 = 8000;                    // [kg/m^3]
-        double G0 = 42408;                     // [J/m^2]
+        double E = 191e+9;                           // [Pa]
+        double nu = 1.0 / 3.0;                       // unitless
+        double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) ); // [Pa]
+        double rho0 = 8000;                          // [kg/m^3]
+        double G0 = 42408;                           // [J/m^2]
+        double G = E / ( 2.0 * ( 1.0 + nu ) );
 
         double v0 = 16;              // [m/sec] (Half impactor's velocity)
         double L_prenotch = 0.05;    // [m] (50 mm)
@@ -69,8 +70,11 @@ int main( int argc, char* argv[] )
         double delta = 0.0075;
         int halo_width = 2;
 
-        CabanaPD::InputsFracture inputs( num_cell, low_corner, high_corner, K,
-                                         delta, t_final, dt, G0 );
+        // Choose force model type.
+        // CabanaPD::PMBDamageModel force_model( delta, K, G0 );
+        CabanaPD::LPSDamageModel force_model( delta, K, G, G0 );
+        CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final,
+                                 dt );
         inputs.read_args( argc, argv );
 
         // Create particles from mesh.
@@ -104,10 +108,6 @@ int main( int argc, char* argv[] )
                 v( pid, 0 ) = v0;
         };
         particles->update_particles( exec_space{}, init_functor );
-
-        // Choose force model type.
-        CabanaPD::PMBDamageModel force_model( inputs.K, inputs.delta,
-                                              inputs.G0 );
 
         // FIXME: use createSolver to switch backend at runtime.
         using device_type = Kokkos::Device<exec_space, memory_space>;

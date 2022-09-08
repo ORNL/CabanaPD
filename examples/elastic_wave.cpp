@@ -40,8 +40,12 @@ int main( int argc, char* argv[] )
         // FIXME: set halo width based on delta
         int halo_width = 2;
 
-        CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, K, delta,
-                                 t_final, dt );
+        // Choose force model type.
+        // CabanaPD::PMBModel force_model( delta, K );
+        CabanaPD::LPSModel force_model( delta, K, 3.0 / 5.0 * K );
+
+        CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final,
+                                 dt );
         inputs.read_args( argc, argv );
 
         // Create particles from mesh.
@@ -74,12 +78,9 @@ int main( int argc, char* argv[] )
                 u( pid, d ) = a * std::exp( -arg ) * comp;
                 v( pid, d ) = 0.0;
             }
-            rho( pid ) = 100;
+            rho( pid ) = 100.0;
         };
         particles->update_particles( exec_space{}, init_functor );
-
-        // Choose force model type.
-        CabanaPD::PMBModel force_model( inputs.K, inputs.delta );
 
         // FIXME: use createSolver to switch backend at runtime.
         using device_type = Kokkos::Device<exec_space, memory_space>;

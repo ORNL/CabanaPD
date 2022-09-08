@@ -148,8 +148,9 @@ class SolverElastic
                                particles->ghost_mesh_hi[1],
                                particles->ghost_mesh_hi[2] };
         auto x = particles->slice_x();
-        neighbors = std::make_shared<neighbor_type>(
-            x, 0, particles->n_local, inputs->delta, 1.0, mesh_min, mesh_max );
+        neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
+                                                     force_model.delta, 1.0,
+                                                     mesh_min, mesh_max );
 
         force = std::make_shared<force_type>( inputs->half_neigh, force_model );
 
@@ -166,6 +167,9 @@ class SolverElastic
 
     void init_force()
     {
+        // Only needed for LPS.
+        force->initialize( *particles, *neighbors, neigh_iter_tag{} );
+
         // Compute initial forces
         compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
         compute_energy( *force, *particles, *neighbors, neigh_iter_tag() );
@@ -320,8 +324,7 @@ class SolverFracture
     SolverFracture( Inputs _inputs, std::shared_ptr<particle_type> _particles,
                     force_model_type force_model, bc_type bc,
                     prenotch_type prenotch )
-        : base_type( _inputs, _particles,
-                     typename force_model_type::elastic_model{} )
+        : base_type( _inputs, _particles, force_model )
         , boundary_condition( bc )
     {
         std::ofstream out( inputs->output_file, std::ofstream::app );
@@ -362,6 +365,9 @@ class SolverFracture
 
     void init_force()
     {
+        // Only needed for LPS.
+        force->initialize( *particles, *neighbors, neigh_iter_tag{} );
+
         // Compute initial forces
         compute_force( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
         compute_energy( *force, *particles, *neighbors, mu, neigh_iter_tag() );

@@ -69,20 +69,14 @@ namespace CabanaPD
 
 // FIXME: hardcoded
 Inputs::Inputs( const std::array<int, 3> nc, std::array<double, 3> lc,
-                std::array<double, 3> hc, const double _K, const double d,
-                const double t_f, const double dt )
+                std::array<double, 3> hc, const double t_f, const double dt )
     : num_cells( nc )
     , low_corner( lc )
     , high_corner( hc )
     , final_time( t_f )
     , timestep( dt )
-    , K( _K )
-    , delta( d )
 {
     num_steps = final_time / timestep;
-
-    // Force
-    force_type = "PMB";
 }
 
 Inputs::~Inputs() {}
@@ -135,21 +129,5 @@ void Inputs::read_args( int argc, char* argv[] )
         }
     }
 }
-
-InputsFracture::InputsFracture( const std::array<int, 3> nc,
-                                std::array<double, 3> lc,
-                                std::array<double, 3> hc, const double _K,
-                                const double d, const double t_f,
-                                const double dt, const double _G0 )
-    : Inputs( nc, lc, hc, _K, d, t_f, dt )
-    , G0( _G0 )
-{
-    num_steps = final_time / timestep;
-
-    // Force
-    force_type = "PMB";
-}
-
-InputsFracture::~InputsFracture(){};
 
 } // namespace CabanaPD
