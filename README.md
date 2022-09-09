@@ -10,9 +10,10 @@ CabanaPD has the following dependencies:
 |CMake      | 3.11+   | Yes      | Build system
 |MPI        | GPU-Aware if CUDA/HIP enabled | Yes | Message Passing Interface
 |Kokkos     | 3.2.0+  | Yes      | Performance portable on-node parallelism
-|Cabana     | 0.4.0+  | Yes      | Performance portable particle algorithms
+|Cabana     | master  | Yes      | Performance portable particle algorithms
 |CUDA       | 10+     | No       | Programming model for NVIDIA GPUs
 |HIP        | 4.2+    | No       | Programming model for AMD GPUs
+| GTest     | 1.10+   | No       | Unit test framework
 
 The underlying parallel programming models are available on most systems, as is
 CMake. Those must be installed first, if not available. Kokkos and Cabana are
@@ -20,7 +21,7 @@ available on some systems or can be installed with `spack` (see
 https://spack.readthedocs.io/en/latest/getting_started.html):
 
 ```
-spack install cabana+mpi
+spack install cabana+cajita
 ```
 
 Alternatively, Kokkos can be built locally, followed by Cabana:
@@ -34,14 +35,17 @@ compiled with Cajita and MPI.
 Clone the master branch:
 
 ```
-git clone https://code.ornl.gov/5t2/CabanaPD.git
+git clone https://github.com/ORNL/CabanaPD.git
 ```
 
-## CPU Build
-After building Kokkos and Cabana for CPU:
+## Build and install
+### CPU Build
+
+After building Kokkos and Cabana for CPU, the following script will build and install CabanaPD:
+
 ```
 #Change directory as needed
-export CABANA_DIR=$HOME/Cabana
+export CABANA_DIR=$HOME/Cabana/build/install
 
 cd ./CabanaPD
 mkdir build
@@ -54,37 +58,50 @@ cmake \
 make install
 ```
 
-## CUDA Build
+### CUDA Build
+
 After building Kokkos and Cabana for Cuda:
 https://github.com/ECP-copa/Cabana/wiki/CUDA-Build
 
 The CUDA build script is identical to that above, but again note that Kokkos
-must be compiled with the Cuda backend. Older versions of Kokkos require a
-compiler wrapper to be passed explicitly for Cuda:
+must be compiled with the CUDA backend. Older versions of Kokkos require a
+compiler wrapper to be passed explicitly for CUDA:
+
 ```
 -D CMAKE_CXX_COMPILER=/path/to/nvcc_wrapper
 ```
 
-## HIP Build
+Note that Kokkos and Cabana must be compiled with the same compiler as
+CabanaPD and the CUDA backend.
+
+### HIP Build
+
 After building Kokkos and Cabana for HIP:
 https://github.com/ECP-copa/Cabana/wiki/HIP-and-SYCL-Build#HIP
 
 The HIP build script is identical to that above, except that `hipcc` compiler
 must be used:
+
 ```
 -D CMAKE_CXX_COMPILER=hipcc
 ```
- Again note that Kokkos must be
-compiled with the HIP backend.
 
-## Build, Test, and Install
+Again note that Kokkos and Cabana must be compiled with the same compiler as
+CabanaPD and the HIP backend.
 
-Once CabanaPD is configured, build, and installed with:
+## Test
+
+Unit tests can be built by updating the CabanaPD CMake configuration in the
+script above with:
+
 ```
-make install
+-D CabanaPD_ENABLE_TESTING=ON
 ```
 
-If tests are enabled, you can run the CabanaPD unit test suite with:
+GTest is required for CabanaPD unit tests, with build instructions
+[here](https://github.com/google/googletest). If tests are enabled, you can run
+the CabanaPD unit test suite with:
+
 ```
 cd CabanaPD/build
 ctest
@@ -93,17 +110,20 @@ ctest
 ## Examples
 
 Once built and installed, CabanaPD examples can be run. Timing and energy
-information is output to file and particle output (if enabled in Cabana) is
+information is output to file and particle output (if SILO output is [enabled
+in Cabana](https://github.com/ECP-copa/Cabana/wiki/Optional-Build#silo)) is
 written to files that can be visualized with Paraview and similar applications.
 The first example is an elastic wave propagating through a cube from an initial
-Gaussian radial displacement profile from [1]. Assuming the build paths above, the example can be run with:
+Gaussian radial displacement profile from [1]. Assuming the build paths above,
+the example can be run with:
 
 ```
 ./CabanaPD/build/examples/ElasticWave
 ```
 
-The second example is the Kalthoff-Winkler experiment [2], where an impactor causes
-crack propagation at an angle from two pre-notches on a steel plate. The example can be run with:
+The second example is the Kalthoff-Winkler experiment [2], where an impactor
+causes crack propagation at an angle from two pre-notches on a steel plate. The
+example can be run with:
 
 ```
 ./CabanaPD/build/examples/KalthoffWinkler
