@@ -151,6 +151,10 @@ class SolverElastic
         neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
                                                      force_model.delta, 1.0,
                                                      mesh_min, mesh_max );
+        int max_neighbors =
+            Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
+        log( std::cout, "Local particles: ", particles->n_local,
+             ", Maximum local neighbors: ", max_neighbors );
 
         force = std::make_shared<force_type>( inputs->half_neigh, force_model );
 
@@ -225,17 +229,6 @@ class SolverElastic
                         particles->n_local, x, particles->slice_W(),
                         particles->slice_f(), particles->slice_u(),
                         particles->slice_v() );
-
-                /*
-                auto u = particles->slice_u();
-                auto f = particles->slice_f();
-                for ( std::size_t pid = 0; pid < x.size(); pid++ )
-                    std::cout << x( pid, 0 ) << " " << x( pid, 1 ) << " "
-                              << x( pid, 2 ) << " " << u( pid, 0 ) << " "
-                              << u( pid, 1 ) << " " << u( pid, 2 ) << " "
-                              << f( pid, 0 ) << " " << f( pid, 1 ) << " "
-                              << f( pid, 2 ) << std::endl;
-                */
             }
             other_time += other_timer.seconds();
         }
@@ -347,7 +340,6 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
             Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
             particles->n_local, max_neighbors );
         Kokkos::deep_copy( mu, 1 );
-        std::cout << mu.extent( 0 ) << " " << mu.extent( 1 ) << std::endl;
 
         // Create prenotch.
         prenotch.create( exec_space{}, mu, *particles, *neighbors );
