@@ -56,18 +56,18 @@ void testHalo()
     int current_rank = -1;
     MPI_Comm_rank( MPI_COMM_WORLD, &current_rank );
 
-    // Only positions and displacements are communicated in CabanaPD. We use the
-    // displacement field for MPI rank here for convenience.
-    auto rank = particles.slice_u();
+    // No ints are communicated in CabanaPD. We use the volume field for MPI
+    // rank here for convenience.
+    auto rank = particles.slice_vol();
     auto x = particles.slice_x();
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
-        rank( pid, 0 ) = static_cast<double>( current_rank );
+        rank( pid ) = static_cast<double>( current_rank );
     };
     particles.update_particles( exec_space{}, init_functor );
 
     int init_num_particles = particles.n_local;
-    using HostAoSoA = Cabana::AoSoA<Cabana::MemberTypes<double[3], double[3]>,
+    using HostAoSoA = Cabana::AoSoA<Cabana::MemberTypes<double[3], double>,
                                     Kokkos::HostSpace>;
     HostAoSoA aosoa_init_host( "host_aosoa", init_num_particles );
     auto x_init_host = Cabana::slice<0>( aosoa_init_host );
@@ -80,7 +80,7 @@ void testHalo()
 
     HostAoSoA aosoa_host( "host_aosoa", particles.size );
     x = particles.slice_x();
-    rank = particles.slice_u();
+    rank = particles.slice_vol();
     auto x_host = Cabana::slice<0>( aosoa_host );
     auto rank_host = Cabana::slice<1>( aosoa_host );
     Cabana::deep_copy( x_host, x );
@@ -95,7 +95,7 @@ void testHalo()
         {
             EXPECT_EQ( x_host( p, d ), x_init_host( p, d ) );
         }
-        EXPECT_EQ( rank_host( p, 0 ), rank_init_host( p, 0 ) );
+        EXPECT_EQ( rank_host( p ), rank_init_host( p ) );
     }
 
     // Check all ghost particles in the halo region.
@@ -106,7 +106,7 @@ void testHalo()
             EXPECT_GE( x_host( p, d ), particles.ghost_mesh_lo[d] );
             EXPECT_LE( x_host( p, d ), particles.ghost_mesh_hi[d] );
         }
-        EXPECT_NE( rank_host( p, 0 ), current_rank );
+        EXPECT_NE( rank_host( p ), current_rank );
     }
 
     double mesh_min[3] = { particles.ghost_mesh_lo[0],
