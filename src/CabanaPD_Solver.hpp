@@ -169,6 +169,7 @@ class SolverElastic
     {
         // Only needed for LPS.
         force->initialize( *particles, *neighbors, neigh_iter_tag{} );
+        comm->gather_m( *particles );
 
         // Compute initial forces
         compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
@@ -192,6 +193,11 @@ class SolverElastic
 
             // Reset forces
             force_timer.reset();
+            // Compute dilatation for LPS (does nothing for PMB).
+            force->prepare_force( *particles, *neighbors, neigh_iter_tag{} );
+            // Communicate dilatation for LPS (FIXME: should not be done for
+            // PMB).
+            comm->gather_theta( *particles );
 
             // Compute short range force
             compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
@@ -365,8 +371,9 @@ class SolverFracture
 
     void init_force()
     {
-        // Only needed for LPS.
+        // Only needed for LPS (does nothing for PMB).
         force->initialize( *particles, *neighbors, neigh_iter_tag{} );
+        comm->gather_m( *particles );
 
         // Compute initial forces
         compute_force( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
@@ -393,6 +400,11 @@ class SolverFracture
 
             // Reset forces
             force_timer.reset();
+            // Compute dilatation for LPS (does nothing for PMB).
+            force->prepare_force( *particles, *neighbors, neigh_iter_tag{} );
+            // Communicate dilatation for LPS (FIXME: should not be done for
+            // PMB).
+            comm->gather_theta( *particles );
 
             // Compute short range force
             compute_force( *force, *particles, *neighbors, mu,
@@ -423,7 +435,9 @@ class SolverFracture
                         step / output_frequency, step * inputs->timestep, 0,
                         particles->n_local, x, particles->slice_W(),
                         particles->slice_f(), particles->slice_u(),
-                        particles->slice_v(), particles->slice_phi() );
+                        particles->slice_v(), particles->slice_phi(),
+                        particles->slice_vol(), particles->slice_theta(),
+                        particles->slice_m() );
             }
             other_time += other_timer.seconds();
         }

@@ -88,11 +88,11 @@ class Particles
 
     // x, u, f (vector matching system dimension)
     using vector_type = Cabana::MemberTypes<double[dim]>;
-    // volume
+    // volume, dilatation, weighted_volume
     using scalar_type = Cabana::MemberTypes<double>;
-    // type, W, v, rho, damage, dilatation, weighted_volume
-    using other_types = Cabana::MemberTypes<int, double, double[dim], double,
-                                            double, double, double>;
+    // type, W, v, rho, damage
+    using other_types =
+        Cabana::MemberTypes<int, double, double[dim], double, double>;
     // Potentially needed later: body force (b), ID
 
     // FIXME: add vector length
@@ -101,6 +101,10 @@ class Particles
     using aosoa_u_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_f_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_vol_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
+    // These are split since weighted volume only needs to be communicated once
+    // and dilatation only needs to be communicated for LPS.
+    using aosoa_theta_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
+    using aosoa_m_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
     using aosoa_other_type = Cabana::AoSoA<other_types, memory_space>;
 
     // Per type
@@ -209,6 +213,8 @@ class Particles
         _aosoa_u.resize( num_particles );
         _aosoa_f.resize( num_particles );
         _aosoa_vol.resize( num_particles );
+        _aosoa_m.resize( num_particles );
+        _aosoa_theta.resize( num_particles );
         _aosoa_other.resize( num_particles );
         auto x = slice_x();
         auto v = slice_v();
@@ -217,6 +223,8 @@ class Particles
         auto u = slice_u();
         auto vol = slice_vol();
 
+        auto f = slice_f();
+        Cabana::deep_copy( f, 0.0 );
         auto theta = slice_theta();
         Cabana::deep_copy( theta, 0.0 );
         auto m = slice_m();
@@ -317,19 +325,16 @@ class Particles
     auto slice_phi() { return Cabana::slice<4>( _aosoa_other, "damage" ); }
     auto slice_theta()
     {
-        return Cabana::slice<5>( _aosoa_other, "dilatation" );
+        return Cabana::slice<0>( _aosoa_theta, "dilatation" );
     }
     auto slice_theta() const
     {
-        return Cabana::slice<5>( _aosoa_other, "dilatation" );
+        return Cabana::slice<0>( _aosoa_theta, "dilatation" );
     }
-    auto slice_m()
-    {
-        return Cabana::slice<6>( _aosoa_other, "weighted_volume" );
-    }
+    auto slice_m() { return Cabana::slice<0>( _aosoa_m, "weighted_volume" ); }
     auto slice_m() const
     {
-        return Cabana::slice<6>( _aosoa_other, "weighted_volume" );
+        return Cabana::slice<0>( _aosoa_m, "weighted_volume" );
     }
 
     void resize( int new_local, int new_ghost )
@@ -340,6 +345,8 @@ class Particles
         _aosoa_x.resize( new_local + new_ghost );
         _aosoa_u.resize( new_local + new_ghost );
         _aosoa_vol.resize( new_local + new_ghost );
+        _aosoa_theta.resize( new_local + new_ghost );
+        _aosoa_m.resize( new_local + new_ghost );
         _aosoa_f.resize( new_local );
         _aosoa_other.resize( new_local );
         size = _aosoa_x.size();
@@ -352,12 +359,24 @@ class Particles
         Cabana::gather( halo, _aosoa_u );
         Cabana::gather( halo, _aosoa_vol );
     };
+    template <class HaloType>
+    void gather_theta( HaloType halo )
+    {
+        Cabana::gather( halo, _aosoa_theta );
+    };
+    template <class HaloType>
+    void gather_m( HaloType halo )
+    {
+        Cabana::gather( halo, _aosoa_m );
+    };
 
   protected:
     aosoa_x_type _aosoa_x;
     aosoa_u_type _aosoa_u;
     aosoa_f_type _aosoa_f;
     aosoa_vol_type _aosoa_vol;
+    aosoa_theta_type _aosoa_theta;
+    aosoa_m_type _aosoa_m;
     aosoa_other_type _aosoa_other;
 };
 

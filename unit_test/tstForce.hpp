@@ -653,6 +653,9 @@ void testForce( ModelType model, const DamageType damage_tag, const double dx,
     auto vol = particles.slice_vol();
     auto theta = particles.slice_theta();
     force.initialize( particles, neigh_list, Cabana::SerialOpTag() );
+    // No communication needed (as in the main solver) since this test is only
+    // intended for one rank.
+    force.prepare_force( particles, neigh_list, Cabana::SerialOpTag() );
 
     double Phi = computeEnergyAndForce( damage_tag, force, particles,
                                         neigh_list, max_neighbors );

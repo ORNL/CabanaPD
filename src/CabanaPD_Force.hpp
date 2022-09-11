@@ -340,6 +340,14 @@ class Force<ExecutionSpace, LPSModel>
     }
 
     template <class ParticleType, class NeighListType, class ParallelType>
+    void prepare_force( ParticleType& particles,
+                        const NeighListType& neigh_list,
+                        const ParallelType neigh_op_tag )
+    {
+        compute_dilatation( particles, neigh_list, neigh_op_tag );
+    }
+
+    template <class ParticleType, class NeighListType, class ParallelType>
     void compute_weighted_volume( ParticleType& particles,
                                   const NeighListType& neigh_list,
                                   const ParallelType neigh_op_tag )
@@ -379,6 +387,7 @@ class Force<ExecutionSpace, LPSModel>
         auto m = particles.slice_m();
         auto theta = particles.slice_theta();
         auto model = _model;
+        Cabana::deep_copy( theta, 0.0 );
 
         auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -410,10 +419,6 @@ class Force<ExecutionSpace, LPSModel>
         const auto vol = particles.slice_vol();
         auto theta = particles.slice_theta();
         auto m = particles.slice_m();
-        Cabana::deep_copy( theta, 0.0 );
-
-        compute_dilatation( particles, neigh_list, neigh_op_tag );
-
         auto force_full = KOKKOS_LAMBDA( const int i, const int j )
         {
             double fx_i = 0.0;
@@ -512,8 +517,7 @@ class Force<ExecutionSpace, LPSDamageModel>
     void compute_force_full( ForceType& f, const PosType& x, const PosType& u,
                              const ParticleType& particles,
                              const NeighListType& neigh_list, MuView& mu,
-                             const int n_local,
-                             ParallelType& neigh_op_tag ) const
+                             const int n_local, ParallelType& ) const
     {
         auto break_coeff = _model.bond_break_coeff;
         auto theta_coeff = _model.theta_coeff;
@@ -523,10 +527,6 @@ class Force<ExecutionSpace, LPSDamageModel>
         const auto vol = particles.slice_vol();
         auto theta = particles.slice_theta();
         auto m = particles.slice_m();
-        Cabana::deep_copy( theta, 0.0 );
-
-        this->compute_dilatation( particles, neigh_list, neigh_op_tag );
-
         auto force_full = KOKKOS_LAMBDA( const int i )
         {
             std::size_t num_neighbors =
@@ -664,9 +664,6 @@ class Force<ExecutionSpace, LinearLPSModel>
         auto linear_theta = particles.slice_theta();
         // Using weighted volume from base LPS class.
         auto m = particles.slice_m();
-        Cabana::deep_copy( linear_theta, 0.0 );
-
-        this->compute_dilatation( particles, neigh_list, neigh_op_tag );
 
         auto force_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -769,8 +766,14 @@ class Force<ExecutionSpace, PMBModel>
     {
     }
 
+    // These functions are only needed for LPS.
     template <class ParticleType, class NeighListType, class ParallelType>
     void initialize( ParticleType&, NeighListType&, ParallelType )
+    {
+    }
+    template <class ParticleType, class NeighListType, class ParallelType>
+    void prepare_force( ParticleType&, const NeighListType&,
+                        const ParallelType )
     {
     }
 
