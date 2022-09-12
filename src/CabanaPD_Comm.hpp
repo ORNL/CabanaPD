@@ -224,12 +224,22 @@ class Comm
             local_grid, positions, min_halo_width, max_export );
     }
 
+    // We assume here that the particle count has not changed and no resize
+    // is necessary.
     template <class ParticleType>
     void gather( ParticleType& particles )
     {
-        // We assume here that the particle count has not changed and no resize
-        // is necessary.
         particles.gather( *halo );
+    }
+    template <class ParticleType>
+    void gather_theta( ParticleType& particles )
+    {
+        particles.gather_theta( *halo );
+    }
+    template <class ParticleType>
+    void gather_m( ParticleType& particles )
+    {
+        particles.gather_m( *halo );
     }
 };
 

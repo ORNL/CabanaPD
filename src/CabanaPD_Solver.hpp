@@ -169,6 +169,7 @@ class SolverElastic
     {
         // Only needed for LPS.
         force->initialize( *particles, *neighbors, neigh_iter_tag{} );
+        comm->gather_m( *particles );
 
         // Compute initial forces
         compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
@@ -192,6 +193,11 @@ class SolverElastic
 
             // Reset forces
             force_timer.reset();
+            // Compute dilatation for LPS (does nothing for PMB).
+            force->prepare_force( *particles, *neighbors, neigh_iter_tag{} );
+            // Communicate dilatation for LPS (FIXME: should not be done for
+            // PMB).
+            comm->gather_theta( *particles );
 
             // Compute short range force
             compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
@@ -302,12 +308,10 @@ class SolverElastic
 
 template <class DeviceType, class ForceModel, class BoundaryCondition,
           class PrenotchType>
-class SolverFracture
-    : public SolverElastic<DeviceType, typename ForceModel::elastic_model>
+class SolverFracture : public SolverElastic<DeviceType, ForceModel>
 {
   public:
-    using base_type =
-        SolverElastic<DeviceType, typename ForceModel::elastic_model>;
+    using base_type = SolverElastic<DeviceType, ForceModel>;
     using exec_space = typename base_type::exec_space;
     using memory_space = typename base_type::memory_space;
 
@@ -316,7 +320,7 @@ class SolverFracture
     using comm_type = typename base_type::comm_type;
     using neighbor_type = typename base_type::neighbor_type;
     using force_model_type = ForceModel;
-    using force_type = Force<exec_space, force_model_type>;
+    using force_type = typename base_type::force_type;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using bc_type = BoundaryCondition;
     using prenotch_type = PrenotchType;
@@ -347,26 +351,13 @@ class SolverFracture
 
         // Create prenotch.
         prenotch.create( exec_space{}, mu, *particles, *neighbors );
-
-        // Create force.
-        force = std::make_shared<force_type>( inputs->half_neigh, force_model );
-
-        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
-            "particles", particles->local_grid->globalGrid(), 0, 0, 0,
-            particles->n_local, particles->slice_x(), particles->slice_W(),
-            particles->slice_f(), particles->slice_u(), particles->slice_v(),
-            particles->slice_phi() );
-
-        log( out, "Nlocal Nghost Nglobal\n", particles->n_local, " ",
-             particles->n_ghost, " ", particles->n_global );
-        init_time += init_timer.seconds();
-        out.close();
     }
 
     void init_force()
     {
-        // Only needed for LPS.
+        // Only needed for LPS (does nothing for PMB).
         force->initialize( *particles, *neighbors, neigh_iter_tag{} );
+        comm->gather_m( *particles );
 
         // Compute initial forces
         compute_force( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
@@ -393,6 +384,11 @@ class SolverFracture
 
             // Reset forces
             force_timer.reset();
+            // Compute dilatation for LPS (does nothing for PMB).
+            force->prepare_force( *particles, *neighbors, neigh_iter_tag{} );
+            // Communicate dilatation for LPS (FIXME: should not be done for
+            // PMB).
+            comm->gather_theta( *particles );
 
             // Compute short range force
             compute_force( *force, *particles, *neighbors, mu,
@@ -423,7 +419,9 @@ class SolverFracture
                         step / output_frequency, step * inputs->timestep, 0,
                         particles->n_local, x, particles->slice_W(),
                         particles->slice_f(), particles->slice_u(),
-                        particles->slice_v(), particles->slice_phi() );
+                        particles->slice_v(), particles->slice_phi(),
+                        particles->slice_vol(), particles->slice_theta(),
+                        particles->slice_m() );
             }
             other_time += other_timer.seconds();
         }
@@ -437,11 +435,11 @@ class SolverFracture
 
   protected:
     using base_type::comm;
+    using base_type::force;
     using base_type::inputs;
     using base_type::integrator;
     using base_type::neighbors;
     using base_type::particles;
-    std::shared_ptr<force_type> force;
     bc_type boundary_condition;
 
     using NeighborView = typename Kokkos::View<int**, memory_space>;
