@@ -512,6 +512,55 @@ class Force<ExecutionSpace, LPSDamageModel>
     {
     }
 
+    template <class ParticleType, class NeighListType, class MuView>
+    void prepare_force( ParticleType& particles,
+                        const NeighListType& neigh_list, const MuView& mu )
+    {
+        compute_dilatation( particles, neigh_list, mu );
+    }
+
+    template <class ParticleType, class NeighListType, class MuView>
+    void compute_dilatation( ParticleType& particles,
+                             const NeighListType& neigh_list,
+                             const MuView& mu ) const
+    {
+        auto n_local = particles.n_local;
+        const auto x = particles.slice_x();
+        auto u = particles.slice_u();
+        const auto vol = particles.slice_vol();
+        auto m = particles.slice_m();
+        auto theta = particles.slice_theta();
+        auto model = _model;
+        Cabana::deep_copy( theta, 0.0 );
+
+        auto dilatation = KOKKOS_LAMBDA( const int i )
+        {
+            std::size_t num_neighbors =
+                Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
+                                                                  i );
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            {
+                if ( mu( i, n ) > 0 )
+                {
+                    std::size_t j =
+                        Cabana::NeighborList<NeighListType>::getNeighbor(
+                            neigh_list, i, n );
+
+                    // Get the bond distance, displacement, and stretch
+                    double xi, r, s;
+                    getDistance( x, u, i, j, xi, r, s );
+                    double theta_i =
+                        model.influence_function( xi ) * s * xi * xi * vol( j );
+                    theta( i ) += 3.0 * theta_i / m( i );
+                }
+            }
+        };
+
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::compute_dilatation",
+                              policy, dilatation );
+    }
+
     template <class ForceType, class PosType, class ParticleType,
               class NeighListType, class MuView, class ParallelType>
     void compute_force_full( ForceType& f, const PosType& x, const PosType& u,

@@ -618,6 +618,26 @@ double computeEnergyAndForce( DamageTag, const ForceType force,
     return Phi;
 }
 
+template <class ModelType, class ForceType, class ParticleType,
+          class NeighborList>
+void prepareForce( ModelType, ForceType& force, ParticleType& particles,
+                   const NeighborList& neigh_list )
+{
+    force.prepare_force( particles, neigh_list, Cabana::SerialOpTag() );
+}
+
+template <class ForceType, class ParticleType, class NeighborList>
+void prepareForce( CabanaPD::LPSDamageModel, ForceType& force,
+                   ParticleType& particles, const NeighborList& neigh_list )
+{
+    int max_neighbors =
+        Cabana::NeighborList<NeighborList>::maxNeighbor( neigh_list );
+    Kokkos::View<int**, TEST_MEMSPACE> mu( "broken_bonds", particles.n_local,
+                                           max_neighbors );
+    Kokkos::deep_copy( mu, 1 );
+    force.prepare_force( particles, neigh_list, mu );
+}
+
 //---------------------------------------------------------------------------//
 // Main test function.
 //---------------------------------------------------------------------------//
@@ -655,7 +675,7 @@ void testForce( ModelType model, const DamageType damage_tag, const double dx,
     force.initialize( particles, neigh_list, Cabana::SerialOpTag() );
     // No communication needed (as in the main solver) since this test is only
     // intended for one rank.
-    force.prepare_force( particles, neigh_list, Cabana::SerialOpTag() );
+    prepareForce( model, force, particles, neigh_list );
 
     double Phi = computeEnergyAndForce( damage_tag, force, particles,
                                         neigh_list, max_neighbors );

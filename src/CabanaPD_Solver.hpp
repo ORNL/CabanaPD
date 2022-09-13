@@ -385,7 +385,7 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
             // Reset forces
             force_timer.reset();
             // Compute dilatation for LPS (does nothing for PMB).
-            force->prepare_force( *particles, *neighbors, neigh_iter_tag{} );
+            force->prepare_force( *particles, *neighbors, mu );
             // Communicate dilatation for LPS (FIXME: should not be done for
             // PMB).
             comm->gather_theta( *particles );
