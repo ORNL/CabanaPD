@@ -158,11 +158,6 @@ class SolverElastic
 
         force = std::make_shared<force_type>( inputs->half_neigh, force_model );
 
-        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
-            "particles", particles->local_grid->globalGrid(), 0, 0, 0,
-            particles->n_local, x, particles->slice_W(), particles->slice_f(),
-            particles->slice_u(), particles->slice_v() );
-
         log( out, "Nlocal Nghost Nglobal\n", particles->n_local, " ",
              particles->n_ghost, " ", particles->n_global );
         init_time += init_timer.seconds();
@@ -178,6 +173,8 @@ class SolverElastic
         // Compute initial forces
         compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
         compute_energy( *force, *particles, *neighbors, neigh_iter_tag() );
+
+        particle_output( 0 );
     }
 
     void run()
@@ -220,15 +217,7 @@ class SolverElastic
                                          neigh_iter_tag() );
 
                 step_output( step, W );
-
-                auto x = particles->slice_x();
-                Cajita::Experimental::SiloParticleOutput::
-                    writePartialRangeTimeStep(
-                        "particles", particles->local_grid->globalGrid(),
-                        step / output_frequency, step * inputs->timestep, 0,
-                        particles->n_local, x, particles->slice_W(),
-                        particles->slice_f(), particles->slice_u(),
-                        particles->slice_v() );
+                particle_output( step );
             }
             other_time += other_timer.seconds();
         }
@@ -271,6 +260,15 @@ class SolverElastic
             std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
             p_steps_per_sec / comm->mpi_size );
         out.close();
+    }
+
+    void particle_output( const int step )
+    {
+        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
+            "particles", particles->local_grid->globalGrid(),
+            step / output_frequency, step * inputs->timestep, 0,
+            particles->n_local, particles->slice_x(), particles->slice_W(),
+            particles->slice_f(), particles->slice_u(), particles->slice_v() );
     }
 
     int num_steps;
@@ -357,6 +355,8 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
 
         // Add boundary condition - resetting boundary forces to zero.
         boundary_condition.apply( exec_space(), *particles );
+
+        particle_output( 0 );
     }
 
     void run()
@@ -403,23 +403,24 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
                                          neigh_iter_tag() );
 
                 this->step_output( step, W );
-
-                auto x = particles->slice_x();
-                Cajita::Experimental::SiloParticleOutput::
-                    writePartialRangeTimeStep(
-                        "particles", particles->local_grid->globalGrid(),
-                        step / output_frequency, step * inputs->timestep, 0,
-                        particles->n_local, x, particles->slice_W(),
-                        particles->slice_f(), particles->slice_u(),
-                        particles->slice_v(), particles->slice_phi(),
-                        particles->slice_vol(), particles->slice_theta(),
-                        particles->slice_m() );
+                particle_output( step );
             }
             other_time += other_timer.seconds();
         }
 
         // Final output and timings
         this->final_output();
+    }
+
+    void particle_output( const int step )
+    {
+        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
+            "particles", particles->local_grid->globalGrid(),
+            step / output_frequency, step * inputs->timestep, 0,
+            particles->n_local, particles->slice_x(), particles->slice_W(),
+            particles->slice_f(), particles->slice_u(), particles->slice_v(),
+            particles->slice_phi(), particles->slice_theta(),
+            particles->slice_m() );
     }
 
     using base_type::num_steps;
