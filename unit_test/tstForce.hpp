@@ -620,22 +620,25 @@ double computeEnergyAndForce( DamageTag, const ForceType force,
 
 template <class ModelType, class ForceType, class ParticleType,
           class NeighborList>
-void prepareForce( ModelType, ForceType& force, ParticleType& particles,
-                   const NeighborList& neigh_list )
+void initializeForce( ModelType, ForceType& force, ParticleType& particles,
+                      const NeighborList& neigh_list )
 {
-    force.prepare_force( particles, neigh_list, Cabana::SerialOpTag() );
+    force.compute_weighted_volume( particles, neigh_list,
+                                   Cabana::SerialOpTag() );
+    force.compute_dilatation( particles, neigh_list, Cabana::SerialOpTag() );
 }
 
 template <class ForceType, class ParticleType, class NeighborList>
-void prepareForce( CabanaPD::LPSDamageModel, ForceType& force,
-                   ParticleType& particles, const NeighborList& neigh_list )
+void initializeForce( CabanaPD::LPSDamageModel, ForceType& force,
+                      ParticleType& particles, const NeighborList& neigh_list )
 {
     int max_neighbors =
         Cabana::NeighborList<NeighborList>::maxNeighbor( neigh_list );
     Kokkos::View<int**, TEST_MEMSPACE> mu( "broken_bonds", particles.n_local,
                                            max_neighbors );
     Kokkos::deep_copy( mu, 1 );
-    force.prepare_force( particles, neigh_list, mu );
+    force.compute_weighted_volume( particles, neigh_list, mu );
+    force.compute_dilatation( particles, neigh_list, mu );
 }
 
 //---------------------------------------------------------------------------//
@@ -672,10 +675,9 @@ void testForce( ModelType model, const DamageType damage_tag, const double dx,
     auto W = particles.slice_W();
     auto vol = particles.slice_vol();
     auto theta = particles.slice_theta();
-    force.initialize( particles, neigh_list, Cabana::SerialOpTag() );
     // No communication needed (as in the main solver) since this test is only
     // intended for one rank.
-    prepareForce( model, force, particles, neigh_list );
+    initializeForce( model, force, particles, neigh_list );
 
     double Phi = computeEnergyAndForce( damage_tag, force, particles,
                                         neigh_list, max_neighbors );
