@@ -66,9 +66,10 @@ int main( int argc, char* argv[] )
                                                                        p02 };
         CabanaPD::Prenotch<2> prenotch( v1, v2, notch_positions );
 
-        // FIXME: set halo width based on delta
         double delta = 0.0075;
-        int halo_width = 2;
+        int m = std::floor(
+            delta / ( ( high_corner[0] - low_corner[0] ) / num_cell[0] ) );
+        int halo_width = m + 1; // Just to be safe.
 
         // Choose force model type.
         // CabanaPD::PMBDamageModel force_model( delta, K, G0 );
