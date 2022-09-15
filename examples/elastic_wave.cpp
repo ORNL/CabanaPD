@@ -37,8 +37,9 @@ int main( int argc, char* argv[] )
         double dt = 0.01;
         double K = 1.0;
         double delta = 0.075;
-        // FIXME: set halo width based on delta
-        int halo_width = 2;
+        int m = std::floor(
+            delta / ( ( high_corner[0] - low_corner[0] ) / num_cell[0] ) );
+        int halo_width = m + 1; // Just to be safe.
 
         // Choose force model type.
         // CabanaPD::PMBModel force_model( delta, K );
