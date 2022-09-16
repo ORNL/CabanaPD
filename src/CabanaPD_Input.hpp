@@ -23,7 +23,6 @@ class Inputs
     std::string output_file = "cabanaPD.out";
     std::string error_file = "cabanaPD.err";
     std::string device_type = "SERIAL";
-    int output_frequency = 5;
 
     std::array<int, 3> num_cells;
     std::array<double, 3> low_corner;
@@ -32,11 +31,13 @@ class Inputs
     std::size_t num_steps;
     double final_time;
     double timestep;
+    int output_frequency;
 
     bool half_neigh = false;
 
     Inputs( const std::array<int, 3> nc, std::array<double, 3> lc,
-            std::array<double, 3> hc, const double t_f, const double dt );
+            std::array<double, 3> hc, const double t_f, const double dt,
+            const int output_freq );
     ~Inputs();
     void read_args( int argc, char* argv[] );
 };

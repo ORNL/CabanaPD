@@ -35,6 +35,7 @@ int main( int argc, char* argv[] )
         std::array<double, 3> high_corner = { 0.5, 0.5, 0.5 };
         double t_final = 0.6;
         double dt = 0.01;
+        int output_frequency = 5;
         double K = 1.0;
         double G = 0.5;
         double delta = 0.075;
@@ -46,8 +47,8 @@ int main( int argc, char* argv[] )
         // CabanaPD::PMBModel force_model( delta, K );
         CabanaPD::LinearLPSModel force_model( delta, K, G );
 
-        CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final,
-                                 dt );
+        CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final, dt,
+                                 output_frequency );
         inputs.read_args( argc, argv );
 
         // Create particles from mesh.
