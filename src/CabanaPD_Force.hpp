@@ -665,6 +665,10 @@ class Force<ExecutionSpace, LPSDamageModel>
             std::size_t num_neighbors =
                 Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
                                                                   i );
+            double num_bonds = 0.0;
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+                num_bonds += static_cast<double>( mu( i, n ) );
+
             double phi_i = 0.0;
             double vol_H_i = 0.0;
             for ( std::size_t n = 0; n < num_neighbors; n++ )
@@ -676,7 +680,7 @@ class Force<ExecutionSpace, LPSDamageModel>
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
 
-                double w = ( 1.0 / num_neighbors ) * 0.5 * theta_coeff / 3.0 *
+                double w = ( 1.0 / num_bonds ) * 0.5 * theta_coeff / 3.0 *
                                ( theta( i ) * theta( i ) ) +
                            0.5 * ( s_coeff / m( i ) ) *
                                model.influence_function( xi ) * s * s * xi *
