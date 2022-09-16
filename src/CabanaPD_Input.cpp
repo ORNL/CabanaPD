@@ -69,12 +69,14 @@ namespace CabanaPD
 
 // FIXME: hardcoded
 Inputs::Inputs( const std::array<int, 3> nc, std::array<double, 3> lc,
-                std::array<double, 3> hc, const double t_f, const double dt )
+                std::array<double, 3> hc, const double t_f, const double dt,
+                const int of )
     : num_cells( nc )
     , low_corner( lc )
     , high_corner( hc )
     , final_time( t_f )
     , timestep( dt )
+    , output_frequency( of )
 {
     num_steps = final_time / timestep;
 }

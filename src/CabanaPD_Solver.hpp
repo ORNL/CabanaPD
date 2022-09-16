@@ -129,7 +129,7 @@ class SolverElastic
 
         auto time = std::chrono::system_clock::to_time_t(
             std::chrono::system_clock::now() );
-        log( out, "CabanaPD (", std::ctime( &time ), ")\n" );
+        log( out, "CabanaPD ", std::ctime( &time ), "\n" );
         if ( print_rank() )
             exec_space().print_configuration( out );
 
@@ -155,11 +155,16 @@ class SolverElastic
             Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
         log( std::cout, "Local particles: ", particles->n_local,
              ", Maximum local neighbors: ", max_neighbors );
+        log( std::cout, "#Timestep/Total-steps Simulation-time" );
 
         force = std::make_shared<force_type>( inputs->half_neigh, force_model );
 
-        log( out, "Nlocal Nghost Nglobal\n", particles->n_local, " ",
-             particles->n_ghost, " ", particles->n_global );
+        log( out, "Local particles, Ghosted particles, Global particles\n",
+             particles->n_local, ", ", particles->n_ghost, ", ",
+             particles->n_global );
+        log( out, "Maximum local neighbors: ", max_neighbors, "\n" );
+        log( out, "#Timestep/Total-steps Simulation-time Total-strain-energy "
+                  "Run-Time(s) Particle*steps/s" );
         init_time += init_timer.seconds();
         out.close();
     }
@@ -237,13 +242,15 @@ class SolverElastic
     void step_output( const int step, const double W )
     {
         std::ofstream out( inputs->output_file, std::ofstream::app );
-        log( std::cout, step, " ", step * inputs->timestep );
+        log( std::cout, step, "/", num_steps, " ", std::scientific,
+             std::setprecision( 2 ), step * inputs->timestep );
 
         total_time = total_timer.seconds();
         double rate = 1.0 * particles->n_global * output_frequency /
                       ( total_time - last_time );
-        log( out, std::fixed, std::setprecision( 8 ), step, " ", W, " ",
-             std::setprecision( 4 ), total_time, " ", std::scientific, rate );
+        log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps, " ",
+             std::scientific, std::setprecision( 2 ), step * inputs->timestep,
+             " ", W, " ", std::fixed, total_time, " ", std::scientific, rate );
         last_time = total_time;
         out.close();
     }
@@ -332,12 +339,6 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
     {
         std::ofstream out( inputs->output_file, std::ofstream::app );
         std::ofstream err( inputs->error_file, std::ofstream::app );
-
-        auto time = std::chrono::system_clock::to_time_t(
-            std::chrono::system_clock::now() );
-        log( out, "CabanaPD (", std::ctime( &time ), ")\n" );
-        if ( print_rank() )
-            exec_space().print_configuration( out );
 
         // Create View to track broken bonds.
         int max_neighbors =
