@@ -36,6 +36,7 @@ int main( int argc, char* argv[] )
         double t_final = 0.6;
         double dt = 0.01;
         double K = 1.0;
+        double G = 0.5;
         double delta = 0.075;
         int m = std::floor(
             delta / ( ( high_corner[0] - low_corner[0] ) / num_cell[0] ) );
@@ -43,7 +44,7 @@ int main( int argc, char* argv[] )
 
         // Choose force model type.
         // CabanaPD::PMBModel force_model( delta, K );
-        CabanaPD::LPSModel force_model( delta, K, 3.0 / 5.0 * K );
+        CabanaPD::LinearLPSModel force_model( delta, K, G );
 
         CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final,
                                  dt );
