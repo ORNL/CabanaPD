@@ -680,11 +680,12 @@ class Force<ExecutionSpace, LPSDamageModel>
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
 
-                double w = ( 1.0 / num_bonds ) * 0.5 * theta_coeff / 3.0 *
-                               ( theta( i ) * theta( i ) ) +
-                           0.5 * ( s_coeff / m( i ) ) *
-                               model.influence_function( xi ) * s * s * xi *
-                               xi * vol( j );
+                double w =
+                    mu( i, n ) * ( ( 1.0 / num_bonds ) * 0.5 * theta_coeff /
+                                       3.0 * ( theta( i ) * theta( i ) ) +
+                                   0.5 * ( s_coeff / m( i ) ) *
+                                       model.influence_function( xi ) * s * s *
+                                       xi * xi * vol( j ) );
                 W( i ) += w;
 
                 phi_i += mu( i, n ) * vol( j );
