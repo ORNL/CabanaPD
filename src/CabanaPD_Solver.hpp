@@ -202,8 +202,13 @@ class SolverElastic
             // Reset forces
             force_timer.reset();
             // Compute short range force
-            // Do not need to recompute LPS weighted volume or dilatation here
-            // without damage.
+            // Do not need to recompute LPS weighted volume here without damage.
+            // Compute dilatation for LPS (does nothing for PMB).
+            force->compute_dilatation( *particles, *neighbors,
+                                       neigh_iter_tag{} );
+            // Communicate dilatation for LPS (FIXME: should not be done for
+            // PMB).
+            comm->gather_theta( *particles );
             compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
             force_time += force_timer.seconds();
 
