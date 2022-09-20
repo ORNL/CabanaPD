@@ -209,7 +209,7 @@ class Comm
             halo_ids._destinations, topology );
 
         particles.resize( halo->numLocal(), halo->numGhost() );
-        particles.gather( *halo );
+        particles.gather_init( *halo );
     }
     ~Comm() {}
 
@@ -227,9 +227,9 @@ class Comm
     // We assume here that the particle count has not changed and no resize
     // is necessary.
     template <class ParticleType>
-    void gather( ParticleType& particles )
+    void gather_u( ParticleType& particles )
     {
-        particles.gather( *halo );
+        particles.gather_u( *halo );
     }
     template <class ParticleType>
     void gather_theta( ParticleType& particles )

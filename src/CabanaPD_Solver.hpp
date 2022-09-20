@@ -201,7 +201,7 @@ class SolverElastic
 
             // Update ghost particles.
             comm_timer.reset();
-            comm->gather( *particles );
+            comm->gather_u( *particles );
             comm_time += comm_timer.seconds();
 
             // Reset forces
@@ -384,7 +384,7 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
 
             // Update ghost particles.
             comm_timer.reset();
-            comm->gather( *particles );
+            comm->gather_u( *particles );
             comm_time += comm_timer.seconds();
 
             // Reset forces
