@@ -99,7 +99,7 @@ class SolverElastic
 
     using particle_type = Particles<memory_space>;
     using integrator_type = Integrator<exec_space>;
-    using comm_type = Comm<DeviceType>;
+    using comm_type = Comm<DeviceType, particle_type>;
     using force_model_type = ForceModel;
     using force_type = Force<exec_space, force_model_type>;
     using neighbor_type =
@@ -176,11 +176,11 @@ class SolverElastic
         // Compute weighted volume for LPS (does nothing for PMB).
         force->compute_weighted_volume( *particles, *neighbors,
                                         neigh_iter_tag{} );
-        comm->gather_m( *particles );
+        comm->gatherWeightedVolume();
         // Compute dilatation for LPS (does nothing for PMB).
         force->compute_dilatation( *particles, *neighbors, neigh_iter_tag{} );
         // Communicate dilatation for LPS (FIXME: should not be done for PMB).
-        comm->gather_theta( *particles );
+        comm->gatherDilatation();
 
         // Compute initial forces
         compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
@@ -201,7 +201,7 @@ class SolverElastic
 
             // Update ghost particles.
             comm_timer.reset();
-            comm->gather_u( *particles );
+            comm->gatherDisplacement();
             comm_time += comm_timer.seconds();
 
             // Reset forces
@@ -213,7 +213,7 @@ class SolverElastic
                                        neigh_iter_tag{} );
             // Communicate dilatation for LPS (FIXME: should not be done for
             // PMB).
-            comm->gather_theta( *particles );
+            comm->gatherDilatation();
             compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
             force_time += force_timer.seconds();
 
@@ -356,11 +356,11 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
     {
         // Compute weighted volume for LPS (does nothing for PMB).
         force->compute_weighted_volume( *particles, *neighbors, mu );
-        comm->gather_m( *particles );
+        comm->gatherWeightedVolume();
         // Compute dilatation for LPS (does nothing for PMB).
         force->compute_dilatation( *particles, *neighbors, mu );
         // Communicate dilatation for LPS (FIXME: should not be done for PMB).
-        comm->gather_theta( *particles );
+        comm->gatherDilatation();
 
         // Compute initial forces
         compute_force( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
@@ -384,19 +384,19 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
 
             // Update ghost particles.
             comm_timer.reset();
-            comm->gather_u( *particles );
+            comm->gatherDisplacement();
             comm_time += comm_timer.seconds();
 
             // Reset forces
             force_timer.reset();
             // Compute weighted volume for LPS (does nothing for PMB).
             force->compute_weighted_volume( *particles, *neighbors, mu );
-            comm->gather_m( *particles );
+            comm->gatherWeightedVolume();
             // Compute dilatation for LPS (does nothing for PMB).
             force->compute_dilatation( *particles, *neighbors, mu );
             // Communicate dilatation for LPS (FIXME: should not be done for
             // PMB).
-            comm->gather_theta( *particles );
+            comm->gatherDilatation();
 
             // Compute short range force
             compute_force( *force, *particles, *neighbors, mu,
