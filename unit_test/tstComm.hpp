@@ -89,7 +89,7 @@ void testHalo()
     EXPECT_EQ( particles.n_local, init_num_particles );
 
     // Check all local particles unchanged.
-    for ( int p = 0; p < particles.n_local; ++p )
+    for ( std::size_t p = 0; p < particles.n_local; ++p )
     {
         for ( int d = 0; d < 3; ++d )
         {
@@ -99,7 +99,7 @@ void testHalo()
     }
 
     // Check all ghost particles in the halo region.
-    for ( int p = particles.n_local; p < particles.size; ++p )
+    for ( std::size_t p = particles.n_local; p < particles.size; ++p )
     {
         for ( int d = 0; d < 3; ++d )
         {
@@ -138,7 +138,7 @@ void testHalo()
     // boundaries (less than internal particles).
     auto num_neigh_host =
         Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, num_neigh );
-    for ( int p = 0; p < particles.n_local; ++p )
+    for ( std::size_t p = 0; p < particles.n_local; ++p )
     {
         if ( x_host( p, 0 ) > box_min[0] + delta * 1.01 &&
              x_host( p, 0 ) < box_max[0] - delta * 1.01 &&
