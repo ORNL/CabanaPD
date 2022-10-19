@@ -1,0 +1,73 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  CI:
+    strategy:
+      matrix:
+        distro: ['ubuntu:latest']
+        cxx: ['g++', 'clang++']
+        backend: ['SERIAL', 'OPENMP']
+        cmake_build_type: ['Debug', 'Release']
+        kokkos_ver: ['3.6.01']
+    runs-on: ubuntu-20.04
+    container: ghcr.io/ecp-copa/ci-containers/${{ matrix.distro }}
+    steps:
+      - name: Checkout kokkos
+        uses: actions/checkout@v2.2.0
+        with:
+          repository: kokkos/kokkos
+          ref: ${{ matrix.kokkos_ver }}
+          path: kokkos
+      - name: Build kokkos
+        working-directory: kokkos
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DCMAKE_INSTALL_PREFIX=$HOME/kokkos \
+            -DKokkos_ENABLE_${{ matrix.backend }}=ON \
+            -DKokkos_ENABLE_HWLOC=ON
+          cmake --build build --parallel 2
+          cmake --install build
+      - name: Checkout Cabana
+        uses: actions/checkout@v2.2.0
+        with:
+          repository: ECP-CoPA/Cabana
+          # This version is post-release 0.5
+          ref: 468f0c3082c0dda5870bd001ba79741a0b23e975
+          path: cabana
+      - name: Build Cabana
+        working-directory: cabana
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DCMAKE_INSTALL_PREFIX=$HOME/Cabana \
+            -DCMAKE_PREFIX_PATH="$HOME/kokkos"
+          cmake --build build --parallel 2
+          cmake --install build
+      - name: Checkout CabanaPD
+        uses: actions/checkout@v2.2.0
+      - name: Build CabanaPD
+        run: |
+          cmake -B build \
+            -D CMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }} \
+            -D CMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Werror" \
+            -D CMAKE_INSTALL_PREFIX=$HOME/CabanaPD \
+            -D CMAKE_PREFIX_PATH="$HOME/Cabana" \
+            -D MPIEXEC_MAX_NUMPROCS=2 \
+            -D MPIEXEC_PREFLAGS="--oversubscribe" \
+            -D CabanaPD_ENABLE_TESTING=ON
+          cmake --build build --parallel 2
+          cmake --install build
+      - name: Test CabanaPD
+        run: |
+          CTEST_OUTPUT_ON_FAILURE=1 cmake --build build --target test

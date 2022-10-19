@@ -358,17 +358,17 @@ class Particles
         Cabana::gather( halo, _aosoa_x );
         Cabana::gather( halo, _aosoa_u );
         Cabana::gather( halo, _aosoa_vol );
-    };
+    }
     template <class HaloType>
     void gather_theta( HaloType halo )
     {
         Cabana::gather( halo, _aosoa_theta );
-    };
+    }
     template <class HaloType>
     void gather_m( HaloType halo )
     {
         Cabana::gather( halo, _aosoa_m );
-    };
+    }
 
   protected:
     aosoa_x_type _aosoa_x;
