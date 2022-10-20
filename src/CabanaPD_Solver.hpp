@@ -171,6 +171,7 @@ class SolverElastic
 
     void init_force()
     {
+        init_timer.reset();
         // These are split and called here to facilitate the alternating
         // compute/communicate for LPS.
         // Compute weighted volume for LPS (does nothing for PMB).
@@ -187,6 +188,7 @@ class SolverElastic
         compute_energy( *force, *particles, *neighbors, neigh_iter_tag() );
 
         particle_output( 0 );
+        init_time += init_timer.seconds();
     }
 
     void run()
@@ -204,16 +206,20 @@ class SolverElastic
             comm->gatherDisplacement();
             comm_time += comm_timer.seconds();
 
-            // Reset forces
-            force_timer.reset();
-            // Compute short range force
             // Do not need to recompute LPS weighted volume here without damage.
             // Compute dilatation for LPS (does nothing for PMB).
+            force_timer.reset();
             force->compute_dilatation( *particles, *neighbors,
                                        neigh_iter_tag{} );
+            force_time += force_timer.seconds();
             // Communicate dilatation for LPS (FIXME: should not be done for
             // PMB).
+            comm_timer.reset();
             comm->gatherDilatation();
+            comm_time += comm_timer.seconds();
+
+            // Compute short range force
+            force_timer.reset();
             compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
             force_time += force_timer.seconds();
 
@@ -337,6 +343,7 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
         : base_type( _inputs, _particles, force_model )
         , boundary_condition( bc )
     {
+        init_timer.reset();
         std::ofstream out( inputs->output_file, std::ofstream::app );
         std::ofstream err( inputs->error_file, std::ofstream::app );
 
@@ -350,10 +357,12 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
 
         // Create prenotch.
         prenotch.create( exec_space{}, mu, *particles, *neighbors );
+        init_time += init_timer.seconds();
     }
 
     void init_force()
     {
+        init_timer.reset();
         // Compute weighted volume for LPS (does nothing for PMB).
         force->compute_weighted_volume( *particles, *neighbors, mu );
         comm->gatherWeightedVolume();
@@ -370,6 +379,7 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
         boundary_condition.apply( exec_space(), *particles );
 
         particle_output( 0 );
+        init_time += init_timer.seconds();
     }
 
     void run()
@@ -387,18 +397,25 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
             comm->gatherDisplacement();
             comm_time += comm_timer.seconds();
 
-            // Reset forces
-            force_timer.reset();
             // Compute weighted volume for LPS (does nothing for PMB).
+            force_timer.reset();
             force->compute_weighted_volume( *particles, *neighbors, mu );
+            force_time += force_timer.seconds();
+            comm_timer.reset();
             comm->gatherWeightedVolume();
+            comm_time += comm_timer.seconds();
             // Compute dilatation for LPS (does nothing for PMB).
+            force_timer.reset();
             force->compute_dilatation( *particles, *neighbors, mu );
+            force_time += force_timer.seconds();
             // Communicate dilatation for LPS (FIXME: should not be done for
             // PMB).
+            comm_timer.reset();
             comm->gatherDilatation();
+            comm_time += comm_timer.seconds();
 
             // Compute short range force
+            force_timer.reset();
             compute_force( *force, *particles, *neighbors, mu,
                            neigh_iter_tag{} );
             force_time += force_timer.seconds();
