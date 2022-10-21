@@ -374,7 +374,7 @@ auto createParticles( LinearTag, const double dx, const double s0 )
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    using ptype = CabanaPD::Particles<TEST_MEMSPACE>;
+    using ptype = CabanaPD::Particles<TEST_DEVICE>;
     ptype particles( TEST_EXECSPACE{}, box_min, box_max, num_cells, 0 );
 
     auto x = particles.slice_x();

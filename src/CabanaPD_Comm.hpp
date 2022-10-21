@@ -170,7 +170,7 @@ struct HaloIds
     }
 };
 
-template <class DeviceType, class ParticleType>
+template <class ParticleType>
 class Comm
 {
   public:
@@ -178,7 +178,9 @@ class Comm
     int mpi_rank = -1;
     int max_export;
 
-    using device_type = DeviceType;
+    // FIXME: this should use MemorySpace directly, but Cabana::Halo currently
+    // uses DeviceType
+    using device_type = typename ParticleType::device_type;
     using halo_type = Cabana::Halo<device_type>;
     using gather_u_type =
         Cabana::Gather<halo_type, typename ParticleType::aosoa_u_type>;

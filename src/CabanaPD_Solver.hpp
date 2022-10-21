@@ -97,9 +97,9 @@ class SolverElastic
     using exec_space = typename DeviceType::execution_space;
     using memory_space = typename DeviceType::memory_space;
 
-    using particle_type = Particles<memory_space>;
+    using particle_type = Particles<DeviceType>;
     using integrator_type = Integrator<exec_space>;
-    using comm_type = Comm<DeviceType, particle_type>;
+    using comm_type = Comm<particle_type>;
     using force_model_type = ForceModel;
     using force_type = Force<exec_space, force_model_type>;
     using neighbor_type =
