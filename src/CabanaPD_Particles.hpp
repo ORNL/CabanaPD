@@ -81,10 +81,10 @@ class Particles
     static constexpr int dim = Dimension;
 
     // Per particle
-    int n_global = 0;
-    int n_local = 0;
-    int n_ghost = 0;
-    int size = 0;
+    unsigned long long int n_global = 0;
+    std::size_t n_local = 0;
+    std::size_t n_ghost = 0;
+    std::size_t size = 0;
 
     // x, u, f (vector matching system dimension)
     using vector_type = Cabana::MemberTypes<double[dim]>;
@@ -287,7 +287,7 @@ class Particles
         size = _aosoa_x.size();
 
         // Not using Allreduce because global count is only used for printing.
-        MPI_Reduce( &n_local, &n_global, 1, MPI_INT, MPI_SUM, 0,
+        MPI_Reduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0,
                     MPI_COMM_WORLD );
     }
 
