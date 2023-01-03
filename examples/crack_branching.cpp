@@ -40,7 +40,7 @@ int main( int argc, char* argv[] )
 
         // Material constants
         double E = 72e+9;                      // [Pa]
-        double nu = 1 / 3;                     // unitless
+        double nu = 0.25;                      // unitless
         double K = E / ( 3 * ( 1 - 2 * nu ) ); // [Pa]
         double rho0 = 2440;                    // [kg/m^3]
         double G0 = 3.8;                       // [J/m^2]
@@ -54,7 +54,7 @@ int main( int argc, char* argv[] )
         CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
 
         // FIXME: set halo width based on delta
-        double delta = 0.0038;
+        double delta = 0.003;
         int m = std::floor(
             delta / ( ( high_corner[0] - low_corner[0] ) / num_cell[0] ) );
         int halo_width = m + 1;
