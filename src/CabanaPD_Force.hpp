@@ -678,7 +678,9 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                     getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
                     if ( r * r >= break_coeff * xi * xi )
-                        mu( i, n ) = 0;
+
+                        if ( !boundary( i ) && !boundary( j ) )
+                            mu( i, n ) = 0;
                     if ( mu( i, n ) > 0 )
                     {
                         const double coeff =
@@ -1034,8 +1036,9 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                     getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
                     if ( r * r >= break_coeff * xi * xi )
-                        if ( !boundary( i ) && !boundary( n ) )
+                        if ( !boundary( i ) && !boundary( j ) )
                             mu( i, n ) = 0;
+
                     if ( mu( i, n ) > 0 )
                     {
                         const double coeff = c * s * vol( j );
