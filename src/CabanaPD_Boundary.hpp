@@ -98,15 +98,16 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
 
         Kokkos::parallel_for( "CabanaPD::BC::update", policy, index_functor );
         Kokkos::deep_copy( count_host, _count );
-        if ( count_host( 0 ) != index_space.size() )
-        {
-            Kokkos::resize( index_space, count_host( 0 ) );
-        }
         if ( count_host( 0 ) > index_space.size() )
         {
+            Kokkos::resize( index_space, count_host( 0 ) );
             Kokkos::deep_copy( count, init_count );
             Kokkos::parallel_for( "CabanaPD::BC::update", policy,
                                   index_functor );
+        }
+        if ( count_host( 0 ) < index_space.size() )
+        {
+            Kokkos::resize( index_space, count_host( 0 ) );
         }
     }
 };
