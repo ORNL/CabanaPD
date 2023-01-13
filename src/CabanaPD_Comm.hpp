@@ -187,13 +187,13 @@ class Comm
     Comm( ParticleType& particles, int max_export_guess = 100 )
         : max_export( max_export_guess )
     {
-        MPI_Comm_size( MPI_COMM_WORLD, &mpi_size );
-        MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
+        auto local_grid = particles.local_grid;
+        MPI_Comm_size( local_grid->globalGrid().comm(), &mpi_size );
+        MPI_Comm_rank( local_grid->globalGrid().comm(), &mpi_rank );
 
         auto positions = particles.slice_x();
         // Get all 26 neighbor ranks.
         // FIXME: remove Impl
-        auto local_grid = particles.local_grid;
         auto halo_width = local_grid->haloCellWidth();
         auto topology = Cajita::Impl::getTopology( *local_grid );
 
