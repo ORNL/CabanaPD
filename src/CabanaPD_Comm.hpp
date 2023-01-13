@@ -110,7 +110,8 @@ struct HaloIds
         // for each of the 26 neighbors cells. Do this one neighbor rank at a
         // time so that sends are contiguous.
         auto topology = Cajita::Impl::getTopology( local_grid );
-        auto unique_topology = Cabana::Impl::getUniqueTopology( topology );
+        auto unique_topology = Cabana::Impl::getUniqueTopology(
+            local_grid.globalGrid().comm(), topology );
         for ( std::size_t ar = 0; ar < unique_topology.size(); ar++ )
         {
             int nr = 0;
