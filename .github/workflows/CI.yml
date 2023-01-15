@@ -41,7 +41,7 @@ jobs:
         with:
           repository: ECP-CoPA/Cabana
           # This version is post-release 0.5
-          ref: 468f0c3082c0dda5870bd001ba79741a0b23e975
+          ref: 10cc6758fa19dce9922a5e695c173e0586eb5d70
           path: cabana
       - name: Build Cabana
         working-directory: cabana
