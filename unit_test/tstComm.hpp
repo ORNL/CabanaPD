@@ -39,7 +39,6 @@ namespace Test
 void testHalo()
 {
     using exec_space = TEST_EXECSPACE;
-    using mem_space = TEST_MEMSPACE;
     using device_type = TEST_DEVICE;
 
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
@@ -50,8 +49,9 @@ void testHalo()
     int halo_width = 2;
     // FIXME: This is for m = 1; should be calculated from m
     int expected_n = 6;
-    CabanaPD::Particles<mem_space> particles( exec_space(), box_min, box_max,
-                                              num_cells, halo_width );
+    using particles_type = CabanaPD::Particles<device_type>;
+    particles_type particles( exec_space(), box_min, box_max, num_cells,
+                              halo_width );
     // Set ID equal to MPI rank.
     int current_rank = -1;
     MPI_Comm_rank( MPI_COMM_WORLD, &current_rank );
@@ -76,7 +76,7 @@ void testHalo()
     Cabana::deep_copy( rank_init_host, rank );
 
     // A gather is performed on construction.
-    CabanaPD::Comm<device_type> comm( particles );
+    CabanaPD::Comm<particles_type> comm( particles );
 
     HostAoSoA aosoa_host( "host_aosoa", particles.size );
     x = particles.slice_x();

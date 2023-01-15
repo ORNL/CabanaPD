@@ -38,18 +38,17 @@ namespace Test
 void testIntegratorReversibility( int steps )
 {
     using exec_space = TEST_EXECSPACE;
-    using mem_space = TEST_MEMSPACE;
 
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
     std::array<int, 3> num_cells = { 10, 10, 10 };
 
-    CabanaPD::Particles<mem_space> particles( exec_space(), box_min, box_max,
-                                              num_cells, 0 );
+    CabanaPD::Particles<TEST_DEVICE> particles( exec_space(), box_min, box_max,
+                                                num_cells, 0 );
     auto x = particles.slice_x();
     std::size_t num_particle = x.size();
 
-    CabanaPD::Integrator<TEST_EXECSPACE> integrator( 0.001, 1.0 );
+    CabanaPD::Integrator<exec_space> integrator( 0.001, 1.0 );
 
     // Keep a copy of initial positions on the host
     using DataTypes = Cabana::MemberTypes<double[3]>;

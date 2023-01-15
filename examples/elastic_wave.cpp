@@ -53,7 +53,9 @@ int main( int argc, char* argv[] )
 
         // Create particles from mesh.
         // Does not set displacements, velocities, etc.
-        auto particles = std::make_shared<CabanaPD::Particles<memory_space>>(
+        // FIXME: use createSolver to switch backend at runtime.
+        using device_type = Kokkos::Device<exec_space, memory_space>;
+        auto particles = std::make_shared<CabanaPD::Particles<device_type>>(
             exec_space(), inputs.low_corner, inputs.high_corner,
             inputs.num_cells, halo_width );
 
@@ -85,8 +87,6 @@ int main( int argc, char* argv[] )
         };
         particles->update_particles( exec_space{}, init_functor );
 
-        // FIXME: use createSolver to switch backend at runtime.
-        using device_type = Kokkos::Device<exec_space, memory_space>;
         auto cabana_pd = CabanaPD::createSolverElastic<device_type>(
             inputs, particles, force_model );
         cabana_pd->init_force();

@@ -170,7 +170,7 @@ struct HaloIds
     }
 };
 
-template <class DeviceType>
+template <class ParticleType>
 class Comm
 {
   public:
@@ -178,11 +178,20 @@ class Comm
     int mpi_rank = -1;
     int max_export;
 
-    using device_type = DeviceType;
+    // FIXME: this should use MemorySpace directly, but Cabana::Halo currently
+    // uses DeviceType
+    using device_type = typename ParticleType::device_type;
     using halo_type = Cabana::Halo<device_type>;
-    std::shared_ptr<halo_type> halo;
+    using gather_u_type =
+        Cabana::Gather<halo_type, typename ParticleType::aosoa_u_type>;
+    using gather_m_type =
+        Cabana::Gather<halo_type, typename ParticleType::aosoa_m_type>;
+    using gather_theta_type =
+        Cabana::Gather<halo_type, typename ParticleType::aosoa_theta_type>;
+    std::shared_ptr<gather_u_type> gather_u;
+    std::shared_ptr<gather_m_type> gather_m;
+    std::shared_ptr<gather_theta_type> gather_theta;
 
-    template <class ParticleType>
     Comm( ParticleType& particles, int max_export_guess = 100 )
         : max_export( max_export_guess )
     {
@@ -204,12 +213,22 @@ class Comm
         halo_ids.rebuild( *local_grid );
 
         // Create the Cabana Halo.
-        halo = std::make_shared<Cabana::Halo<device_type>>(
-            local_grid->globalGrid().comm(), particles.n_local, halo_ids._ids,
-            halo_ids._destinations, topology );
+        auto halo =
+            halo_type( local_grid->globalGrid().comm(), particles.n_local,
+                       halo_ids._ids, halo_ids._destinations, topology );
 
-        particles.resize( halo->numLocal(), halo->numGhost() );
-        particles.gather( *halo );
+        particles.resize( halo.numLocal(), halo.numGhost() );
+
+        // Only use this interface because we don't need to recommunicate
+        // positions or volumes.
+        Cabana::gather( halo, particles._aosoa_x );
+        Cabana::gather( halo, particles._aosoa_vol );
+
+        gather_u = std::make_shared<gather_u_type>( halo, particles._aosoa_u );
+        gather_m = std::make_shared<gather_m_type>( halo, particles._aosoa_m );
+        gather_theta =
+            std::make_shared<gather_theta_type>( halo, particles._aosoa_theta );
+        gather_u->apply();
     }
     ~Comm() {}
 
@@ -226,21 +245,9 @@ class Comm
 
     // We assume here that the particle count has not changed and no resize
     // is necessary.
-    template <class ParticleType>
-    void gather( ParticleType& particles )
-    {
-        particles.gather( *halo );
-    }
-    template <class ParticleType>
-    void gather_theta( ParticleType& particles )
-    {
-        particles.gather_theta( *halo );
-    }
-    template <class ParticleType>
-    void gather_m( ParticleType& particles )
-    {
-        particles.gather_m( *halo );
-    }
+    void gatherDisplacement() { gather_u->apply(); }
+    void gatherDilatation() { gather_theta->apply(); }
+    void gatherWeightedVolume() { gather_m->apply(); }
 };
 
 } // namespace CabanaPD

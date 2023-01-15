@@ -69,15 +69,20 @@
 #include <Cabana_Core.hpp>
 #include <Cajita.hpp>
 
+#include <CabanaPD_Comm.hpp>
+
 namespace CabanaPD
 {
 
-template <class MemorySpace, int Dimension = 3>
+// FIXME: this should use MemorySpace directly, but DeviceType enables the
+// friend class with Comm (which only uses DeviceType because Cabana::Halo
+// currently does)
+template <class DeviceType, int Dimension = 3>
 class Particles
 {
   public:
-    using memory_space = MemorySpace;
-    using device_type = typename memory_space::device_type;
+    using device_type = DeviceType;
+    using memory_space = typename device_type::memory_space;
     static constexpr int dim = Dimension;
 
     // Per particle
@@ -352,23 +357,7 @@ class Particles
         size = _aosoa_x.size();
     };
 
-    template <class HaloType>
-    void gather( HaloType halo )
-    {
-        Cabana::gather( halo, _aosoa_x );
-        Cabana::gather( halo, _aosoa_u );
-        Cabana::gather( halo, _aosoa_vol );
-    }
-    template <class HaloType>
-    void gather_theta( HaloType halo )
-    {
-        Cabana::gather( halo, _aosoa_theta );
-    }
-    template <class HaloType>
-    void gather_m( HaloType halo )
-    {
-        Cabana::gather( halo, _aosoa_m );
-    }
+    friend class Comm<Particles<device_type>>;
 
   protected:
     aosoa_x_type _aosoa_x;
