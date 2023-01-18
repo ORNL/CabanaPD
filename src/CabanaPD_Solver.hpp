@@ -162,9 +162,7 @@ class SolverElastic
         log( out, "Local particles, Ghosted particles, Global particles\n",
              particles->n_local, ", ", particles->n_ghost, ", ",
              particles->n_global );
-        log( out, "Maximum local neighbors: ", max_neighbors, "\n" );
-        log( out, "#Timestep/Total-steps Simulation-time Total-strain-energy "
-                  "Run-Time(s) Particle*steps/s" );
+        log( out, "Maximum local neighbors: ", max_neighbors );
         init_time += init_timer.seconds();
         out.close();
     }
@@ -193,6 +191,8 @@ class SolverElastic
 
     void run()
     {
+        init_output();
+
         // Main timestep loop
         for ( int step = 1; step <= num_steps; step++ )
         {
@@ -245,6 +245,16 @@ class SolverElastic
         final_output();
     }
 
+    void init_output()
+    {
+        // Output after construction and initial forces.
+        std::ofstream out( inputs->output_file, std::ofstream::app );
+        log( out, "Init-Time(s): ", init_time, "\n" );
+        log( out, "#Timestep/Total-steps Simulation-time Total-strain-energy "
+                  "Run-Time(s) Force-Time(s) Comm-Time(s) Int-Time(s) "
+                  "Other-Time(s) Particle*steps/s" );
+    }
+
     void step_output( const int step, const double W )
     {
         std::ofstream out( inputs->output_file, std::ofstream::app );
@@ -256,7 +266,9 @@ class SolverElastic
                       ( total_time - last_time );
         log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps, " ",
              std::scientific, std::setprecision( 2 ), step * inputs->timestep,
-             " ", W, " ", std::fixed, total_time, " ", std::scientific, rate );
+             " ", W, " ", std::fixed, total_time, " ", force_time, " ",
+             comm_time, " ", integrate_time, " ", other_time, " ",
+             std::scientific, rate );
         last_time = total_time;
         out.close();
     }
@@ -384,6 +396,8 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
 
     void run()
     {
+        this->init_output();
+
         // Main timestep loop
         for ( int step = 1; step <= num_steps; step++ )
         {
