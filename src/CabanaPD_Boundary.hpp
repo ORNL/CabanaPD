@@ -170,13 +170,17 @@ struct BoundaryCondition<AllTag, ImpactBCTag>
     double _R;
     double _v;
     double _dt;
+    double _x;
+    double _y;
     double _z;
 
     BoundaryCondition( const double R, const double v, const double dt )
         : _R( R )
         , _v( v )
         , _dt( dt )
-        , _z( 0.0 )
+        , _x( 0.0 )
+        , _y( 0.0 )
+        , _z( R )
     {
     }
 
@@ -189,14 +193,16 @@ struct BoundaryCondition<AllTag, ImpactBCTag>
         Kokkos::RangePolicy<ExecSpace> policy( 0, x.size() );
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int p ) {
-                double z = 0.0 - x( p, 2 );
-                double r = sqrt( x( p, 0 ) * x( p, 0 ) + x( p, 1 ) * x( p, 1 ) +
-                                 z * z );
-                // if ( r < _R )
-                std::cout << ( x( p, 2 ) >= _z ) << " " << _z << " "
-                          << x( p, 2 ) << std::endl;
-                // if ( x( p, 2 ) >= _z ) //&& x( p, 2 ) < _z + _R * 2.0 )
-                f( p, 2 ) += -1.0e17 * ( r - _R ) * ( r - _R );
+                double r = sqrt( ( x( p, 0 ) - _x ) * ( x( p, 0 ) - _x ) +
+                                 ( x( p, 1 ) - _y ) * ( x( p, 1 ) - _y ) +
+                                 ( x( p, 2 ) - _z ) * ( x( p, 2 ) - _z ) );
+                if ( r < _R )
+                {
+                    double fmag = -1.0e17 * ( r - _R ) * ( r - _R );
+                    f( p, 0 ) += fmag * x( p, 0 ) / r;
+                    f( p, 1 ) += fmag * x( p, 1 ) / r;
+                    f( p, 2 ) += fmag * ( x( p, 2 ) - _z ) / r;
+                }
             } );
     }
 };

@@ -25,24 +25,24 @@ int main( int argc, char* argv[] )
         double thickness = 2.5e-3; // [m]
 
         // Domain
-        std::array<int, 3> num_cell = { 81, 81, 4 };
+        std::array<int, 3> num_cell = { 149, 149, 5 };
         std::array<double, 3> low_corner = { -radius, -radius, -thickness };
         std::array<double, 3> high_corner = { radius, radius, 0.0 };
         double t_final = 2.0e-4;
         double dt = 1.0e-7;
-        int output_frequency = 1;
+        int output_frequency = 50;
 
         // Material constants
         // double nu = 1.0 / 4.0; // unitless
         double K = 14.9e+9;   // [Pa]
         double rho0 = 2200.0; // [kg/m^3]
-        double G0 = 3.8;      // [J/m^2]
+        double G0 = 10.0575;  // [J/m^2]
         double impact_v = -100.0;
         // double ks = 1.0e17;
         double impact_r = 5e-3; // [m]
 
         // FIXME: set halo width based on delta
-        double delta = 0.0028;
+        double delta = 0.0015;
         int halo_width = 2;
 
         // Choose force model type.
