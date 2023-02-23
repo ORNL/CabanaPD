@@ -56,7 +56,7 @@ int main( int argc, char* argv[] )
         using device_type = Kokkos::Device<exec_space, memory_space>;
         auto particles = std::make_shared<CabanaPD::Particles<device_type>>(
             exec_space(), inputs.low_corner, inputs.high_corner,
-            inputs.num_cells, halo_width );
+            inputs.num_cells, halo_width, true );
 
         // Define particle initialization.
         auto x = particles->slice_x();
