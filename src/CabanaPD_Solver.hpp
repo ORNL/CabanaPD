@@ -108,9 +108,10 @@ class SolverElastic
     using neigh_iter_tag = Cabana::SerialOpTag;
 
     SolverElastic( Inputs _inputs, std::shared_ptr<particle_type> _particles,
-                   force_model_type force_model )
+                   force_model_type force_model, const bool _output_deformed )
         : particles( _particles )
         , inputs( std::make_shared<Inputs>( _inputs ) )
+        , output_deformed( _output_deformed )
     {
         force_time = 0;
         integrate_time = 0;
@@ -278,12 +279,35 @@ class SolverElastic
         out.close();
     }
 
+    auto get_positions()
+    {
+        // Output particles in the reference configuration.
+        if ( output_deformed )
+            return particles->slice_x();
+
+        // Output particles in the deformed configuration.
+        typename particle_type::aosoa_x_type xu( "updated_positions",
+                                                 particles->n_local );
+        auto slice_xu = Cabana::slice<0>( xu, "updated_positions" );
+        auto slice_x = particles->slice_x();
+        auto slice_u = particles->slice_u();
+        Kokkos::RangePolicy<exec_space> policy( 0, particles->n_local );
+        Kokkos::parallel_for(
+            "CabanaPD::Solver::particle_output", policy,
+            KOKKOS_LAMBDA( const int pid ) {
+                for ( int d = 0; d < 3; d++ )
+                    slice_xu( pid, d ) = slice_x( pid, d ) - slice_u( pid, d );
+            } );
+        return slice_xu;
+    }
+
     void particle_output( const int step )
     {
+        auto positions = get_positions();
         Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
             "particles", particles->local_grid->globalGrid(),
             step / output_frequency, step * inputs->timestep, 0,
-            particles->n_local, particles->slice_x(), particles->slice_W(),
+            particles->n_local, positions, particles->slice_W(),
             particles->slice_f(), particles->slice_u(), particles->slice_v() );
     }
 
@@ -311,6 +335,8 @@ class SolverElastic
     Kokkos::Timer comm_timer;
     Kokkos::Timer integrate_timer;
     Kokkos::Timer other_timer;
+
+    bool output_deformed;
 };
 
 template <class DeviceType, class ForceModel, class BoundaryCondition,
@@ -334,8 +360,8 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
 
     SolverFracture( Inputs _inputs, std::shared_ptr<particle_type> _particles,
                     force_model_type force_model, bc_type bc,
-                    prenotch_type prenotch )
-        : base_type( _inputs, _particles, force_model )
+                    prenotch_type prenotch, const bool _output_deformed )
+        : base_type( _inputs, _particles, force_model, _output_deformed )
         , boundary_condition( bc )
     {
         std::ofstream out( inputs->output_file, std::ofstream::app );
@@ -431,10 +457,11 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
 
     void particle_output( const int step )
     {
+        auto positions = this->get_positions();
         Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
             "particles", particles->local_grid->globalGrid(),
             step / output_frequency, step * inputs->timestep, 0,
-            particles->n_local, particles->slice_x(), particles->slice_W(),
+            particles->n_local, positions, particles->slice_W(),
             particles->slice_f(), particles->slice_u(), particles->slice_v(),
             particles->slice_phi(), particles->slice_theta(),
             particles->slice_m() );
@@ -469,24 +496,27 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
     using base_type::integrate_timer;
     using base_type::other_timer;
     using base_type::total_timer;
+
+    using base_type::output_deformed;
 };
 
 template <class DeviceType, class ParticleType, class ForceModel>
 auto createSolverElastic( Inputs inputs, ParticleType particles,
-                          ForceModel model )
+                          ForceModel model, const bool output_deformed = false )
 {
     return std::make_shared<SolverElastic<DeviceType, ForceModel>>(
-        inputs, particles, model );
+        inputs, particles, model, output_deformed );
 }
 
 template <class DeviceType, class ParticleType, class ForceModel, class BCType,
           class PrenotchType>
 auto createSolverFracture( Inputs inputs, ParticleType particles,
-                           ForceModel model, BCType bc, PrenotchType prenotch )
+                           ForceModel model, BCType bc, PrenotchType prenotch,
+                           const bool output_deformed = false )
 {
     return std::make_shared<
         SolverFracture<DeviceType, ForceModel, BCType, PrenotchType>>(
-        inputs, particles, model, bc, prenotch );
+        inputs, particles, model, bc, prenotch, output_deformed );
 }
 
 /*
