@@ -296,7 +296,7 @@ class SolverElastic
             "CabanaPD::Solver::particle_output", policy,
             KOKKOS_LAMBDA( const int pid ) {
                 for ( int d = 0; d < 3; d++ )
-                    slice_xu( pid, d ) = slice_x( pid, d ) - slice_u( pid, d );
+                    slice_xu( pid, d ) = slice_x( pid, d ) + slice_u( pid, d );
             } );
         return slice_xu;
     }

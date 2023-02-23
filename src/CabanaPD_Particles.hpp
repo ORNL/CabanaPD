@@ -244,16 +244,10 @@ class Particles
         // Initialize particles.
         int mpi_rank = -1;
         MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
-        int local_num_create = 0;
         Kokkos::parallel_for(
             "CabanaPD::Particles::init_particles_uniform",
             Cajita::createExecutionPolicy( owned_cells, exec_space ),
             KOKKOS_LAMBDA( const int i, const int j, const int k ) {
-                // Compute the owned local cell id.
-                int i_own = i - owned_cells.min( Cajita::Dim::I );
-                int j_own = j - owned_cells.min( Cajita::Dim::J );
-                int k_own = k - owned_cells.min( Cajita::Dim::K );
-
                 // Get the coordinates of the cell.
                 int node[3] = { i, j, k };
                 double cell_coord[3];
