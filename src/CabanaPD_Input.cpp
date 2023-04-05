@@ -91,18 +91,24 @@ void Inputs::read_args( int argc, char* argv[] )
         if ( ( strcmp( argv[i], "-h" ) == 0 ) ||
              ( strcmp( argv[i], "--help" ) == 0 ) )
         {
-            log( std::cout, "CabanaPD\n", "Options:" );
-            log( std::cout,
-                 "  -o [FILE] (OR)\n"
-                 "  --output-file [FILE]:    Provide output file name\n" );
-            log( std::cout,
-                 "  -e [FILE] (OR)\n"
-                 "  --error-file [FILE]:    Provide error file name\n" );
-            log( std::cout,
-                 "  --device-type [TYPE]:     Kokkos device type to run ",
-                 "with\n",
-                 "                                (SERIAL, PTHREAD, OPENMP, "
-                 "CUDA, HIP)" );
+            if ( print_rank() )
+            {
+                log( std::cout, "CabanaPD\n", "Options:" );
+                log( std::cout,
+                     "  -o [FILE] (OR)\n"
+                     "  --output-file [FILE]:    Provide output file name\n" );
+                log( std::cout,
+                     "  -e [FILE] (OR)\n"
+                     "  --error-file [FILE]:    Provide error file name\n" );
+                /* Not yet enabled.
+                log(
+                    std::cout,
+                    "  --device-type [TYPE]:     Kokkos device type to run ",
+                    "with\n",
+                    "                                (SERIAL, PTHREAD, OPENMP, "
+                    "CUDA, HIP)" );
+                */
+            }
         }
         // Output file names
         else if ( ( strcmp( argv[i], "-o" ) == 0 ) ||

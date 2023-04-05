@@ -121,17 +121,8 @@ class SolverElastic
         total_timer.reset();
         init_timer.reset();
 
-        std::ofstream out( inputs->output_file, std::ofstream::app );
-        std::ofstream err( inputs->error_file, std::ofstream::app );
-
         num_steps = inputs->num_steps;
         output_frequency = inputs->output_frequency;
-
-        auto time = std::chrono::system_clock::to_time_t(
-            std::chrono::system_clock::now() );
-        log( out, "CabanaPD ", std::ctime( &time ), "\n" );
-        if ( print_rank() )
-            exec_space().print_configuration( out );
 
         // Create integrator.
         // FIXME: hardcoded
@@ -153,18 +144,31 @@ class SolverElastic
                                                      mesh_min, mesh_max );
         int max_neighbors =
             Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
-        log( std::cout, "Local particles: ", particles->n_local,
-             ", Maximum local neighbors: ", max_neighbors );
-        log( std::cout, "#Timestep/Total-steps Simulation-time" );
 
         force = std::make_shared<force_type>( inputs->half_neigh, force_model );
 
-        log( out, "Local particles, Ghosted particles, Global particles\n",
-             particles->n_local, ", ", particles->n_ghost, ", ",
-             particles->n_global );
-        log( out, "Maximum local neighbors: ", max_neighbors );
+        print = print_rank();
+        if ( print )
+        {
+            log( std::cout, "Local particles: ", particles->n_local,
+                 ", Maximum local neighbors: ", max_neighbors );
+            log( std::cout, "#Timestep/Total-steps Simulation-time" );
+
+            std::ofstream out( inputs->output_file, std::ofstream::app );
+            std::ofstream err( inputs->error_file, std::ofstream::app );
+
+            auto time = std::chrono::system_clock::to_time_t(
+                std::chrono::system_clock::now() );
+            log( out, "CabanaPD ", std::ctime( &time ), "\n" );
+            exec_space().print_configuration( out );
+
+            log( out, "Local particles, Ghosted particles, Global particles\n",
+                 particles->n_local, ", ", particles->n_ghost, ", ",
+                 particles->n_global );
+            log( out, "Maximum local neighbors: ", max_neighbors, "\n" );
+            out.close();
+        }
         init_time += init_timer.seconds();
-        out.close();
     }
 
     void init_force()
@@ -257,42 +261,48 @@ class SolverElastic
 
     void step_output( const int step, const double W )
     {
-        std::ofstream out( inputs->output_file, std::ofstream::app );
-        log( std::cout, step, "/", num_steps, " ", std::scientific,
-             std::setprecision( 2 ), step * inputs->timestep );
+        if ( print )
+        {
+            std::ofstream out( inputs->output_file, std::ofstream::app );
+            log( std::cout, step, "/", num_steps, " ", std::scientific,
+                 std::setprecision( 2 ), step * inputs->timestep );
 
-        total_time = total_timer.seconds();
-        double rate = 1.0 * particles->n_global * output_frequency /
-                      ( total_time - last_time );
-        log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps, " ",
-             std::scientific, std::setprecision( 2 ), step * inputs->timestep,
-             " ", W, " ", std::fixed, total_time, " ", force_time, " ",
-             comm_time, " ", integrate_time, " ", other_time, " ",
-             std::scientific, rate );
-        last_time = total_time;
-        out.close();
+            total_time = total_timer.seconds();
+            double rate = 1.0 * particles->n_global * output_frequency /
+                          ( total_time - last_time );
+            log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
+                 " ", std::scientific, std::setprecision( 2 ),
+                 step * inputs->timestep, " ", W, " ", std::fixed, total_time,
+                 " ", force_time, " ", comm_time, " ", integrate_time, " ",
+                 other_time, " ", std::scientific, rate );
+            last_time = total_time;
+            out.close();
+        }
     }
 
     void final_output()
     {
-        std::ofstream out( inputs->output_file, std::ofstream::app );
-        total_time = total_timer.seconds();
-        double steps_per_sec = 1.0 * num_steps / total_time;
-        double p_steps_per_sec = particles->n_global * steps_per_sec;
-        log(
-            out, std::fixed, std::setprecision( 2 ),
-            "\n#Procs Particles | Time T_Force T_Comm T_Int T_Other T_Init |\n",
-            comm->mpi_size, " ", particles->n_global, " | ", total_time, " ",
-            force_time, " ", comm_time, " ", integrate_time, " ", other_time,
-            " ", init_time, " | PERFORMANCE\n", std::fixed, comm->mpi_size, " ",
-            particles->n_global, " | ", 1.0, " ", force_time / total_time, " ",
-            comm_time / total_time, " ", integrate_time / total_time, " ",
-            other_time / total_time, " ", init_time / total_time,
-            " | FRACTION\n\n",
-            "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
-            std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
-            p_steps_per_sec / comm->mpi_size );
-        out.close();
+        if ( print )
+        {
+            std::ofstream out( inputs->output_file, std::ofstream::app );
+            total_time = total_timer.seconds();
+            double steps_per_sec = 1.0 * num_steps / total_time;
+            double p_steps_per_sec = particles->n_global * steps_per_sec;
+            log( out, std::fixed, std::setprecision( 2 ),
+                 "\n#Procs Particles | Time T_Force T_Comm T_Int T_Other "
+                 "T_Init |\n",
+                 comm->mpi_size, " ", particles->n_global, " | ", total_time,
+                 " ", force_time, " ", comm_time, " ", integrate_time, " ",
+                 other_time, " ", init_time, " | PERFORMANCE\n", std::fixed,
+                 comm->mpi_size, " ", particles->n_global, " | ", 1.0, " ",
+                 force_time / total_time, " ", comm_time / total_time, " ",
+                 integrate_time / total_time, " ", other_time / total_time, " ",
+                 init_time / total_time, " | FRACTION\n\n",
+                 "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
+                 std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
+                 p_steps_per_sec / comm->mpi_size );
+            out.close();
+        }
     }
 
     void particle_output( const int step )
@@ -328,6 +338,7 @@ class SolverElastic
     Kokkos::Timer comm_timer;
     Kokkos::Timer integrate_timer;
     Kokkos::Timer other_timer;
+    bool print;
 };
 
 template <class DeviceType, class ForceModel, class BoundaryCondition,
@@ -356,8 +367,6 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
         , boundary_condition( bc )
     {
         init_timer.reset();
-        std::ofstream out( inputs->output_file, std::ofstream::app );
-        std::ofstream err( inputs->error_file, std::ofstream::app );
 
         // Create View to track broken bonds.
         int max_neighbors =
@@ -499,6 +508,8 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
     using base_type::integrate_timer;
     using base_type::other_timer;
     using base_type::total_timer;
+
+    using base_type::print;
 };
 
 template <class DeviceType, class ParticleType, class ForceModel>
