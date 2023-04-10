@@ -222,9 +222,10 @@ class Comm<ParticleType, PMB>
         particles.resize( halo->numLocal(), halo->numGhost() );
 
         // Only use this interface because we don't need to recommunicate
-        // positions or volumes.
+        // positions, volumes, or no-fail region.
         Cabana::gather( *halo, particles._aosoa_x );
         Cabana::gather( *halo, particles._aosoa_vol );
+        Cabana::gather( *halo, particles._aosoa_nofail );
 
         gather_u = std::make_shared<gather_u_type>( *halo, particles._aosoa_u );
         gather_u->apply();

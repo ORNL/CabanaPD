@@ -101,8 +101,9 @@ class Particles<DeviceType, PMB, Dimension>
     using vector_type = Cabana::MemberTypes<double[dim]>;
     // volume, dilatation, weighted_volume
     using scalar_type = Cabana::MemberTypes<double>;
+    // no-fail
+    using int_type = Cabana::MemberTypes<int>;
     // type, W, v, rho, damage
-    using scalar_type = Cabana::MemberTypes<double>;
     using other_types =
         Cabana::MemberTypes<int, double, double[dim], double, double>;
     // Potentially needed later: body force (b), ID
@@ -113,6 +114,7 @@ class Particles<DeviceType, PMB, Dimension>
     using aosoa_u_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_f_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_vol_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
+    using aosoa_nofail_type = Cabana::AoSoA<int_type, memory_space, 1>;
     using aosoa_other_type = Cabana::AoSoA<other_types, memory_space>;
 
     // Per type
@@ -320,11 +322,11 @@ class Particles<DeviceType, PMB, Dimension>
     auto slice_phi() { return Cabana::slice<4>( _aosoa_other, "damage" ); }
     auto slice_nofail()
     {
-        return Cabana::slice<5>( _aosoa_other, "no_fail_region" );
+        return Cabana::slice<0>( _aosoa_nofail, "no_fail_region" );
     }
     auto slice_nofail() const
     {
-        return Cabana::slice<5>( _aosoa_other, "no_fail_region" );
+        return Cabana::slice<0>( _aosoa_nofail, "no_fail_region" );
     }
 
     void resize( int new_local, int new_ghost )
@@ -337,6 +339,7 @@ class Particles<DeviceType, PMB, Dimension>
         _aosoa_vol.resize( new_local + new_ghost );
         _aosoa_f.resize( new_local );
         _aosoa_other.resize( new_local );
+        _aosoa_nofail.resize( new_local + new_ghost );
         size = _aosoa_x.size();
     };
 
@@ -367,6 +370,7 @@ class Particles<DeviceType, PMB, Dimension>
     aosoa_u_type _aosoa_u;
     aosoa_f_type _aosoa_f;
     aosoa_vol_type _aosoa_vol;
+    aosoa_nofail_type _aosoa_nofail;
     aosoa_other_type _aosoa_other;
 
 #ifdef Cabana_ENABLE_HDF5
@@ -423,7 +427,7 @@ class Particles<DeviceType, LPS, Dimension>
         : base_type()
     {
         _aosoa_m = aosoa_m_type( "Particle Weighted Volumes", 0 );
-        _aosoa_theta = aosoa_theta_type( "Particle Dilatationss", 0 );
+        _aosoa_theta = aosoa_theta_type( "Particle Dilatations", 0 );
     }
 
     // Constructor which initializes particles on regular grid.
@@ -435,7 +439,7 @@ class Particles<DeviceType, LPS, Dimension>
                      max_halo_width )
     {
         _aosoa_m = aosoa_m_type( "Particle Weighted Volumes", n_local );
-        _aosoa_theta = aosoa_theta_type( "Particle Dilatationss", n_local );
+        _aosoa_theta = aosoa_theta_type( "Particle Dilatations", n_local );
         init_lps();
     }
 

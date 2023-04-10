@@ -678,7 +678,8 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                     getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
                     // Break if beyond critical stretch unless in no-fail zone.
-                    if ( r * r >= break_coeff * xi * xi && !nofail( i ) )
+                    if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
+                         !nofail( i ) )
                         mu( i, n ) = 0;
 
                     if ( mu( i, n ) > 0 )
@@ -1036,7 +1037,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                     getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
                     // Break if beyond critical stretch unless in no-fail zone.
-                    if ( r * r >= break_coeff * xi * xi && !nofail( i ) )
+                    if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
+                         !nofail( j ) )
                         mu( i, n ) = 0;
 
                     if ( mu( i, n ) > 0 )
