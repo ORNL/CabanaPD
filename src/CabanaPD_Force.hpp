@@ -654,7 +654,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
         const auto vol = particles.slice_vol();
         auto theta = particles.slice_theta();
         auto m = particles.slice_m();
-        const auto boundary = particles.slice_boundary();
+        const auto nofail = particles.slice_nofail();
         auto force_full = KOKKOS_LAMBDA( const int i )
         {
             std::size_t num_neighbors =
@@ -677,10 +677,10 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                     double rx, ry, rz;
                     getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-                    if ( r * r >= break_coeff * xi * xi )
+                    // Break if beyond critical stretch unless in no-fail zone.
+                    if ( r * r >= break_coeff * xi * xi && !nofail( i ) )
+                        mu( i, n ) = 0;
 
-                        if ( !boundary( i ) && !boundary( j ) )
-                            mu( i, n ) = 0;
                     if ( mu( i, n ) > 0 )
                     {
                         const double coeff =
@@ -1011,7 +1011,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
         auto c = _model.c;
         auto break_coeff = _model.bond_break_coeff;
         const auto vol = particles.slice_vol();
-        const auto boundary = particles.slice_boundary();
+        const auto nofail = particles.slice_nofail();
 
         auto force_full = KOKKOS_LAMBDA( const int i )
         {
@@ -1035,9 +1035,9 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                     double rx, ry, rz;
                     getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-                    if ( r * r >= break_coeff * xi * xi )
-                        if ( !boundary( i ) && !boundary( j ) )
-                            mu( i, n ) = 0;
+                    // Break if beyond critical stretch unless in no-fail zone.
+                    if ( r * r >= break_coeff * xi * xi && !nofail( i ) )
+                        mu( i, n ) = 0;
 
                     if ( mu( i, n ) > 0 )
                     {

@@ -49,6 +49,7 @@ struct RegionBoundary
 template <class MemorySpace, class BoundaryType>
 struct BoundaryIndexSpace;
 
+// FIXME: fails for some cases if initial guess is not sufficient.
 template <class MemorySpace>
 struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
 {
@@ -64,10 +65,18 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
         _view = index_view_type( "boundary_indices",
                                  particles.n_local * initial_guess );
         _count = index_view_type( "count", 1 );
-        Kokkos::deep_copy( _count, 0 );
 
         for ( RegionBoundary plane : planes )
+        {
             update( exec_space, particles, plane );
+        }
+        // Resize after all planes searched.
+        auto count_host =
+            Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, _count );
+        if ( count_host( 0 ) < _view.size() )
+        {
+            Kokkos::resize( _view, count_host( 0 ) );
+        }
     }
 
     template <class ExecSpace, class Particles>
@@ -104,10 +113,6 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
             Kokkos::deep_copy( count, init_count );
             Kokkos::parallel_for( "CabanaPD::BC::update", policy,
                                   index_functor );
-        }
-        if ( count_host( 0 ) < index_space.size() )
-        {
-            Kokkos::resize( index_space, count_host( 0 ) );
         }
     }
 };
@@ -161,15 +166,12 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
-                auto sign = std::abs( x( pid, 0 ) ) / x( pid, 0 );
-                std::cout << pid << " " << f( pid, 0 ) << " " << _value << " "
-                          << sign << std::endl;
-                f( pid, 0 ) += _value * sign;
+                for ( int d = 0; d < 3; d++ )
+                    f( pid, d ) = _value;
             } );
     }
 };
 
-// Only difference for this tag is the +=...
 template <class BCIndexSpace>
 struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
 {
@@ -199,20 +201,19 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
-                // FIXME don't commit this..
-                auto sign = std::abs( x( pid, 0 ) ) / x( pid, 0 );
-                std::cout << pid << " " << f( pid, 0 ) << " " << _value << " "
-                          << sign << std::endl;
-                f( pid, 0 ) += _value * sign;
+                // FIXME: this is specifically for the crack branching.
+                auto sign = std::abs( x( pid, 1 ) ) / x( pid, 1 );
+                f( pid, 1 ) += _value * sign;
             } );
     }
 };
 
+// FIXME: relatively large initial guess for allocation.
 template <class BoundaryType, class BCTag, class ExecSpace, class Particles>
 auto createBoundaryCondition( BCTag, ExecSpace exec_space, Particles particles,
                               std::vector<BoundaryType> planes,
                               const double value,
-                              const double initial_guess = 0.1 )
+                              const double initial_guess = 0.5 )
 {
     using memory_space = typename Particles::memory_space;
     using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;

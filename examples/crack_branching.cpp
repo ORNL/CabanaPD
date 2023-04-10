@@ -25,7 +25,7 @@ int main( int argc, char* argv[] )
         double thickness = 0.002;
 
         // Domain
-        std::array<int, 3> num_cell = { 300, 120, 6 }; // 300 x 120 x 6
+        std::array<int, 3> num_cell = { 300, 121, 6 }; // 300 x 120 x 6
         double low_x = -0.5 * height;
         double low_y = -0.5 * width;
         double low_z = -0.5 * thickness;
@@ -38,7 +38,7 @@ int main( int argc, char* argv[] )
         // Time
         double t_final = 43e-6;
         double dt = 6.7e-8;
-        double output_frequency = 1;
+        double output_frequency = 5;
 
         // Material constants
         double E = 72e+9;                      // [Pa]
@@ -85,6 +85,7 @@ int main( int argc, char* argv[] )
         auto v = particles->slice_v();
         auto f = particles->slice_f();
         auto rho = particles->slice_rho();
+        auto nofail = particles->slice_nofail();
 
         // Relying on uniform grid here.
         double dy = particles->dy;
@@ -102,9 +103,12 @@ int main( int argc, char* argv[] )
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {
             rho( pid ) = rho0;
+            // Set the no-fail zone.
+            if ( x( pid, 1 ) <= plane1.low_y + delta + 1e-10 ||
+                 x( pid, 1 ) >= plane2.high_y - delta - 1e-10 )
+                nofail( pid ) = 1;
         };
         particles->update_particles( exec_space{}, init_functor );
-        particles->update_boundary( exec_space{}, bc );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<device_type>(
