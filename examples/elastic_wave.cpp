@@ -44,8 +44,12 @@ int main( int argc, char* argv[] )
         int halo_width = m + 1; // Just to be safe.
 
         // Choose force model type.
-        // CabanaPD::PMBModel force_model( delta, K );
-        CabanaPD::LinearLPSModel force_model( delta, K, G );
+        // using model_type =
+        //    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic>;
+        // model_type force_model( delta, K );
+        using model_type =
+            CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::Elastic>;
+        model_type force_model( delta, K, G );
 
         CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final, dt,
                                  output_frequency );
@@ -55,7 +59,8 @@ int main( int argc, char* argv[] )
         // Does not set displacements, velocities, etc.
         // FIXME: use createSolver to switch backend at runtime.
         using device_type = Kokkos::Device<exec_space, memory_space>;
-        auto particles = std::make_shared<CabanaPD::Particles<device_type>>(
+        auto particles = std::make_shared<
+            CabanaPD::Particles<device_type, typename model_type::base_model>>(
             exec_space(), inputs.low_corner, inputs.high_corner,
             inputs.num_cells, halo_width );
 
