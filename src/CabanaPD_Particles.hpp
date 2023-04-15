@@ -70,6 +70,7 @@
 #include <Cajita.hpp>
 
 #include <CabanaPD_Comm.hpp>
+#include <CabanaPD_Types.hpp>
 
 namespace CabanaPD
 {
