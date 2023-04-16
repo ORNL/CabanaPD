@@ -187,7 +187,7 @@ class SolverElastic
         compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
         compute_energy( *force, *particles, *neighbors, neigh_iter_tag() );
 
-        particle_output( 0 );
+        particles->output( 0, 0.0 );
         init_time += init_timer.seconds();
     }
 
@@ -236,7 +236,8 @@ class SolverElastic
                                          neigh_iter_tag() );
 
                 step_output( step, W );
-                particle_output( step );
+                particles->output( step / output_frequency,
+                                   step * inputs->timestep );
             }
             other_time += other_timer.seconds();
         }
@@ -299,15 +300,6 @@ class SolverElastic
                  p_steps_per_sec / comm->mpi_size );
             out.close();
         }
-    }
-
-    void particle_output( const int step )
-    {
-        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
-            "particles", particles->local_grid->globalGrid(),
-            step / output_frequency, step * inputs->timestep, 0,
-            particles->n_local, particles->slice_x(), particles->slice_W(),
-            particles->slice_f(), particles->slice_u(), particles->slice_v() );
     }
 
     int num_steps;
@@ -396,7 +388,7 @@ class SolverFracture
         // Add boundary condition - resetting boundary forces to zero.
         boundary_condition.apply( exec_space(), *particles );
 
-        particle_output( 0 );
+        particles->output( 0, 0.0 );
         init_time += init_timer.seconds();
     }
 
@@ -454,23 +446,14 @@ class SolverFracture
                                          neigh_iter_tag() );
 
                 this->step_output( step, W );
-                particle_output( step );
+                particles->output( step / output_frequency,
+                                   step * inputs->timestep );
             }
             other_time += other_timer.seconds();
         }
 
         // Final output and timings
         this->final_output();
-    }
-
-    void particle_output( const int step )
-    {
-        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
-            "particles", particles->local_grid->globalGrid(),
-            step / output_frequency, step * inputs->timestep, 0,
-            particles->n_local, particles->slice_x(), particles->slice_W(),
-            particles->slice_f(), particles->slice_u(), particles->slice_v(),
-            particles->slice_phi() );
     }
 
     using base_type::num_steps;

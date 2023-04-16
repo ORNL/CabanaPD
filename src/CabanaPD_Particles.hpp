@@ -328,6 +328,14 @@ class Particles<DeviceType, PMB, Dimension>
         size = _aosoa_x.size();
     };
 
+    void output( const int output_step, const double output_time )
+    {
+        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
+            "particles", local_grid->globalGrid(), output_step, output_time, 0,
+            n_local, slice_x(), slice_W(), slice_f(), slice_u(), slice_v(),
+            slice_phi() );
+    }
+
     friend class Comm<self_type, PMB>;
 
   protected:
@@ -430,6 +438,15 @@ class Particles<DeviceType, LPS, Dimension>
         base_type::resize( new_local, new_ghost );
         _aosoa_theta.resize( new_local + new_ghost );
         _aosoa_m.resize( new_local + new_ghost );
+    }
+
+    void output( const int output_step, const double output_time )
+    {
+        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
+            "particles", local_grid->globalGrid(), output_step, output_time, 0,
+            n_local, base_type::slice_x(), base_type::slice_W(),
+            base_type::slice_f(), base_type::slice_u(), base_type::slice_v(),
+            base_type::slice_phi(), slice_m(), slice_theta() );
     }
 
     friend class Comm<self_type, PMB>;
