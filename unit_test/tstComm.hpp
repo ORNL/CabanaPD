@@ -49,7 +49,7 @@ void testHalo()
     int halo_width = 2;
     // FIXME: This is for m = 1; should be calculated from m
     int expected_n = 6;
-    using particles_type = CabanaPD::Particles<device_type>;
+    using particles_type = CabanaPD::Particles<device_type, CabanaPD::PMB>;
     particles_type particles( exec_space(), box_min, box_max, num_cells,
                               halo_width );
     // Set ID equal to MPI rank.
@@ -76,7 +76,7 @@ void testHalo()
     Cabana::deep_copy( rank_init_host, rank );
 
     // A gather is performed on construction.
-    CabanaPD::Comm<particles_type> comm( particles );
+    CabanaPD::Comm<particles_type, CabanaPD::PMB> comm( particles );
 
     HostAoSoA aosoa_host( "host_aosoa", particles.size );
     x = particles.slice_x();

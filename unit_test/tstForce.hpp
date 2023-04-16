@@ -373,9 +373,9 @@ computeReferenceForceX( QuadraticTag,
 //---------------------------------------------------------------------------//
 // System creation.
 //---------------------------------------------------------------------------//
-
-CabanaPD::Particles<TEST_DEVICE> createParticles( LinearTag, const double dx,
-                                                  const double s0 )
+template <class ModelType>
+CabanaPD::Particles<TEST_DEVICE, typename ModelType::base_model>
+createParticles( ModelType, LinearTag, const double dx, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -383,7 +383,8 @@ CabanaPD::Particles<TEST_DEVICE> createParticles( LinearTag, const double dx,
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    using ptype = CabanaPD::Particles<TEST_DEVICE>;
+    using ptype =
+        CabanaPD::Particles<TEST_DEVICE, typename ModelType::base_model>;
     ptype particles( TEST_EXECSPACE{}, box_min, box_max, num_cells, 0 );
 
     auto x = particles.slice_x();
@@ -401,8 +402,9 @@ CabanaPD::Particles<TEST_DEVICE> createParticles( LinearTag, const double dx,
     return particles;
 }
 
-CabanaPD::Particles<TEST_DEVICE> createParticles( QuadraticTag, const double dx,
-                                                  const double s0 )
+template <class ModelType>
+CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model>
+createParticles( ModelType, QuadraticTag, const double dx, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -410,7 +412,8 @@ CabanaPD::Particles<TEST_DEVICE> createParticles( QuadraticTag, const double dx,
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    using ptype = CabanaPD::Particles<TEST_DEVICE>;
+    using ptype =
+        CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model>;
     ptype particles( TEST_EXECSPACE{}, box_min, box_max, num_cells, 0 );
     auto x = particles.slice_x();
     auto u = particles.slice_u();
@@ -662,6 +665,21 @@ void initializeForce( CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>,
     force.compute_dilatation( particles, neigh_list, mu );
 }
 
+template <class ParticleType, class AoSoAType>
+void copyTheta( CabanaPD::PMB, ParticleType, AoSoAType aosoa_host )
+{
+    auto theta_host = Cabana::slice<4>( aosoa_host );
+    Cabana::deep_copy( theta_host, 0.0 );
+}
+
+template <class ParticleType, class AoSoAType>
+void copyTheta( CabanaPD::LPS, ParticleType particles, AoSoAType aosoa_host )
+{
+    auto theta_host = Cabana::slice<4>( aosoa_host );
+    auto theta = particles.slice_theta();
+    Cabana::deep_copy( theta_host, theta );
+}
+
 //---------------------------------------------------------------------------//
 // Main test function.
 //---------------------------------------------------------------------------//
@@ -670,7 +688,7 @@ void testForce( ModelType model, const DamageType damage_tag, const double dx,
                 const double m, const double boundary_width,
                 const TestType test_tag, const double s0 )
 {
-    auto particles = createParticles( test_tag, dx, s0 );
+    auto particles = createParticles( model, test_tag, dx, s0 );
 
     // This needs to exactly match the mesh spacing to compare with the single
     // particle calculation.
@@ -695,9 +713,8 @@ void testForce( ModelType model, const DamageType damage_tag, const double dx,
     auto f = particles.slice_f();
     auto W = particles.slice_W();
     auto vol = particles.slice_vol();
-    auto theta = particles.slice_theta();
-    // No communication needed (as in the main solver) since this test is only
-    // intended for one rank.
+    //  No communication needed (as in the main solver) since this test is only
+    //  intended for one rank.
     initializeForce( model, force, particles, neigh_list );
 
     double Phi = computeEnergyAndForce( damage_tag, force, particles,
@@ -713,12 +730,11 @@ void testForce( ModelType model, const DamageType damage_tag, const double dx,
     auto x_host = Cabana::slice<1>( aosoa_host );
     auto W_host = Cabana::slice<2>( aosoa_host );
     auto vol_host = Cabana::slice<3>( aosoa_host );
-    auto theta_host = Cabana::slice<4>( aosoa_host );
     Cabana::deep_copy( f_host, f );
     Cabana::deep_copy( x_host, x );
     Cabana::deep_copy( W_host, W );
     Cabana::deep_copy( vol_host, vol );
-    Cabana::deep_copy( theta_host, theta );
+    copyTheta( typename ModelType::base_model{}, particles, aosoa_host );
 
     double local_min[3] = { particles.local_mesh_lo[0],
                             particles.local_mesh_lo[1],
