@@ -90,18 +90,19 @@ class SolverBase
     virtual void run() = 0;
 };
 
-template <class DeviceType, class ForceModel>
+template <class DeviceType, class ParticleType, class ForceModel>
 class SolverElastic
 {
   public:
     using exec_space = typename DeviceType::execution_space;
     using memory_space = typename DeviceType::memory_space;
 
-    using particle_type = Particles<DeviceType>;
+    using particle_type = ParticleType;
     using integrator_type = Integrator<exec_space>;
-    using comm_type = Comm<particle_type>;
     using force_model_type = ForceModel;
     using force_type = Force<exec_space, force_model_type>;
+    using comm_type =
+        Comm<particle_type, typename force_model_type::base_model>;
     using neighbor_type =
         Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
                            Cabana::VerletLayout2D, Cabana::TeamOpTag>;
@@ -174,15 +175,12 @@ class SolverElastic
     void init_force()
     {
         init_timer.reset();
-        // These are split and called here to facilitate the alternating
-        // compute/communicate for LPS.
-        // Compute weighted volume for LPS (does nothing for PMB).
+        // Compute/communicate LPS weighted volume (does nothing for PMB).
         force->compute_weighted_volume( *particles, *neighbors,
                                         neigh_iter_tag{} );
         comm->gatherWeightedVolume();
-        // Compute dilatation for LPS (does nothing for PMB).
+        // Compute/communicate LPS dilatation (does nothing for PMB).
         force->compute_dilatation( *particles, *neighbors, neigh_iter_tag{} );
-        // Communicate dilatation for LPS (FIXME: should not be done for PMB).
         comm->gatherDilatation();
 
         // Compute initial forces
@@ -211,13 +209,11 @@ class SolverElastic
             comm_time += comm_timer.seconds();
 
             // Do not need to recompute LPS weighted volume here without damage.
-            // Compute dilatation for LPS (does nothing for PMB).
+            // Compute/communicate LPS dilatation (does nothing for PMB).
             force_timer.reset();
             force->compute_dilatation( *particles, *neighbors,
                                        neigh_iter_tag{} );
             force_time += force_timer.seconds();
-            // Communicate dilatation for LPS (FIXME: should not be done for
-            // PMB).
             comm_timer.reset();
             comm->gatherDilatation();
             comm_time += comm_timer.seconds();
@@ -341,12 +337,13 @@ class SolverElastic
     bool print;
 };
 
-template <class DeviceType, class ForceModel, class BoundaryCondition,
-          class PrenotchType>
-class SolverFracture : public SolverElastic<DeviceType, ForceModel>
+template <class DeviceType, class ParticleType, class ForceModel,
+          class BoundaryCondition, class PrenotchType>
+class SolverFracture
+    : public SolverElastic<DeviceType, ParticleType, ForceModel>
 {
   public:
-    using base_type = SolverElastic<DeviceType, ForceModel>;
+    using base_type = SolverElastic<DeviceType, ParticleType, ForceModel>;
     using exec_space = typename base_type::exec_space;
     using memory_space = typename base_type::memory_space;
 
@@ -389,7 +386,7 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
         comm->gatherWeightedVolume();
         // Compute dilatation for LPS (does nothing for PMB).
         force->compute_dilatation( *particles, *neighbors, mu );
-        // Communicate dilatation for LPS (FIXME: should not be done for PMB).
+        // Communicate dilatation for LPS (does nothing for PMB).
         comm->gatherDilatation();
 
         // Compute initial forces
@@ -420,19 +417,17 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
             comm->gatherDisplacement();
             comm_time += comm_timer.seconds();
 
-            // Compute weighted volume for LPS (does nothing for PMB).
+            // Compute/communicate LPS weighted volume (does nothing for PMB).
             force_timer.reset();
             force->compute_weighted_volume( *particles, *neighbors, mu );
             force_time += force_timer.seconds();
             comm_timer.reset();
             comm->gatherWeightedVolume();
             comm_time += comm_timer.seconds();
-            // Compute dilatation for LPS (does nothing for PMB).
+            // Compute/communicate LPS dilatation (does nothing for PMB).
             force_timer.reset();
             force->compute_dilatation( *particles, *neighbors, mu );
             force_time += force_timer.seconds();
-            // Communicate dilatation for LPS (FIXME: should not be done for
-            // PMB).
             comm_timer.reset();
             comm->gatherDilatation();
             comm_time += comm_timer.seconds();
@@ -475,8 +470,7 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
             step / output_frequency, step * inputs->timestep, 0,
             particles->n_local, particles->slice_x(), particles->slice_W(),
             particles->slice_f(), particles->slice_u(), particles->slice_v(),
-            particles->slice_phi(), particles->slice_theta(),
-            particles->slice_m() );
+            particles->slice_phi() );
     }
 
     using base_type::num_steps;
@@ -513,20 +507,23 @@ class SolverFracture : public SolverElastic<DeviceType, ForceModel>
 };
 
 template <class DeviceType, class ParticleType, class ForceModel>
-auto createSolverElastic( Inputs inputs, ParticleType particles,
+auto createSolverElastic( Inputs inputs,
+                          std::shared_ptr<ParticleType> particles,
                           ForceModel model )
 {
-    return std::make_shared<SolverElastic<DeviceType, ForceModel>>(
-        inputs, particles, model );
+    return std::make_shared<
+        SolverElastic<DeviceType, ParticleType, ForceModel>>( inputs, particles,
+                                                              model );
 }
 
 template <class DeviceType, class ParticleType, class ForceModel, class BCType,
           class PrenotchType>
-auto createSolverFracture( Inputs inputs, ParticleType particles,
+auto createSolverFracture( Inputs inputs,
+                           std::shared_ptr<ParticleType> particles,
                            ForceModel model, BCType bc, PrenotchType prenotch )
 {
-    return std::make_shared<
-        SolverFracture<DeviceType, ForceModel, BCType, PrenotchType>>(
+    return std::make_shared<SolverFracture<DeviceType, ParticleType, ForceModel,
+                                           BCType, PrenotchType>>(
         inputs, particles, model, bc, prenotch );
 }
 
