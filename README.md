@@ -8,12 +8,16 @@ CabanaPD has the following dependencies:
 |Dependency | Version | Required | Details|
 |---------- | ------- |--------  |------- |
 |CMake      | 3.11+   | Yes      | Build system
-|MPI        | GPU-Aware if CUDA/HIP enabled | Yes | Message Passing Interface
-|Kokkos     | 3.2.0+  | Yes      | Performance portable on-node parallelism
 |Cabana     | master  | Yes      | Performance portable particle algorithms
-|CUDA       | 10+     | No       | Programming model for NVIDIA GPUs
-|HIP        | 4.2+    | No       | Programming model for AMD GPUs
-| GTest     | 1.10+   | No       | Unit test framework
+|GTest      | 1.10+   | No       | Unit test framework
+
+Cabana must be built with the following in order to work with CabanaPD:
+|Cabana Dependency | Version | Required | Details|
+|---------- | ------- |--------  |------- |
+|CMake      | 3.16+   | Yes      | Build system
+|MPI        | GPU-Aware if CUDA/HIP enabled | Yes | Message Passing Interface
+|Kokkos     | 3.6.0+  | Yes      | Performance portable on-node parallelism
+|SILO       | master  | Yes      | Particle output
 
 The underlying parallel programming models are available on most systems, as is
 CMake. Those must be installed first, if not available. Kokkos and Cabana are
@@ -21,7 +25,7 @@ available on some systems or can be installed with `spack` (see
 https://spack.readthedocs.io/en/latest/getting_started.html):
 
 ```
-spack install cabana+cajita
+spack install cabana+cajita+silo
 ```
 
 Alternatively, Kokkos can be built locally, followed by Cabana:
@@ -110,12 +114,11 @@ ctest
 ## Examples
 
 Once built and installed, CabanaPD examples can be run. Timing and energy
-information is output to file and particle output (if SILO output is [enabled
-in Cabana](https://github.com/ECP-copa/Cabana/wiki/Optional-Build#silo)) is
-written to files that can be visualized with Paraview and similar applications.
-The first example is an elastic wave propagating through a cube from an initial
-Gaussian radial displacement profile from [1]. Assuming the build paths above,
-the example can be run with:
+information is output to file and particle output is written to files that can
+be visualized with Paraview and similar applications. The first example is an
+elastic wave propagating through a cube from an initial Gaussian radial
+displacement profile from [1]. Assuming the build paths above, the example can
+be run with:
 
 ```
 ./CabanaPD/build/install/bin/ElasticWave
