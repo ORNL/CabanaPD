@@ -68,15 +68,9 @@ After building Kokkos and Cabana for Cuda:
 https://github.com/ECP-copa/Cabana/wiki/CUDA-Build
 
 The CUDA build script is identical to that above, but again note that Kokkos
-must be compiled with the CUDA backend. Older versions of Kokkos require a
-compiler wrapper to be passed explicitly for CUDA:
+must be compiled with the CUDA backend. 
 
-```
--D CMAKE_CXX_COMPILER=/path/to/nvcc_wrapper
-```
-
-Note that Kokkos and Cabana must be compiled with the same compiler as
-CabanaPD and the CUDA backend.
+Note that the same compiler should be used for Kokkos, Cabana, and CabanaPD.
 
 ### HIP Build
 
@@ -90,8 +84,7 @@ must be used:
 -D CMAKE_CXX_COMPILER=hipcc
 ```
 
-Again note that Kokkos and Cabana must be compiled with the same compiler as
-CabanaPD and the HIP backend.
+Note that `hipcc` should be used for Kokkos, Cabana, and CabanaPD.
 
 ## Test
 
