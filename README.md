@@ -118,7 +118,7 @@ Gaussian radial displacement profile from [1]. Assuming the build paths above,
 the example can be run with:
 
 ```
-./CabanaPD/build/examples/ElasticWave
+./CabanaPD/build/install/bin/ElasticWave
 ```
 
 The second example is the Kalthoff-Winkler experiment [2], where an impactor
@@ -126,7 +126,7 @@ causes crack propagation at an angle from two pre-notches on a steel plate. The
 example can be run with:
 
 ```
-./CabanaPD/build/examples/KalthoffWinkler
+./CabanaPD/build/install/bin/KalthoffWinkler
 ```
 
 New examples can be created by using the existing `KalthoffWinkler` as a
