@@ -15,4 +15,4 @@ target_include_directories(CabanaPD PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 
 target_link_libraries(CabanaPD Cabana::cabanacore Cabana::Cajita)
 
-install(TARGETS CabanaPD DESTINATION lib)
+install(TARGETS CabanaPD DESTINATION ${CMAKE_INSTALL_LIBDIR})
