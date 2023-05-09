@@ -9,19 +9,30 @@
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef CABANAPD_HPP
-#define CABANAPD_HPP
+#ifndef TYPES_H
+#define TYPES_H
 
-#include <CabanaPD_Boundary.hpp>
-#include <CabanaPD_Comm.hpp>
-#include <CabanaPD_Force.hpp>
-#include <CabanaPD_Input.hpp>
-#include <CabanaPD_Integrate.hpp>
-#include <CabanaPD_Output.hpp>
-#include <CabanaPD_Particles.hpp>
-#include <CabanaPD_Prenotch.hpp>
-#include <CabanaPD_Solver.hpp>
-#include <CabanaPD_Types.hpp>
-#include <CabanaPD_config.hpp>
+namespace CabanaPD
+{
+struct Elastic
+{
+};
+struct Fracture
+{
+};
 
+struct PMB
+{
+};
+struct LinearPMB
+{
+};
+struct LPS
+{
+};
+struct LinearLPS
+{
+};
+
+} // namespace CabanaPD
 #endif

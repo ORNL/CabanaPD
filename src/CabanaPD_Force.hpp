@@ -64,26 +64,37 @@
 
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Output.hpp>
+#include <CabanaPD_Particles.hpp>
+#include <CabanaPD_Types.hpp>
 
 namespace CabanaPD
 {
 /******************************************************************************
   Force models
 ******************************************************************************/
-struct ForceModel
+struct BaseForceModel
 {
     double delta;
 
-    ForceModel(){};
-    ForceModel( const double _delta )
+    BaseForceModel(){};
+    BaseForceModel( const double _delta )
         : delta( _delta ){};
+
+    BaseForceModel( const BaseForceModel& model ) { delta = model.delta; }
 };
 
-/* LPS */
+template <typename ModelType, typename DamageType>
+struct ForceModel;
 
-struct LPSModel : public ForceModel
+/* LPS */
+template <>
+struct ForceModel<LPS, Elastic> : public BaseForceModel
 {
-    using ForceModel::delta;
+    using base_type = BaseForceModel;
+    using base_model = LPS;
+    using fracture_type = Elastic;
+
+    using BaseForceModel::delta;
 
     int influence_type;
 
@@ -92,10 +103,10 @@ struct LPSModel : public ForceModel
     double theta_coeff;
     double s_coeff;
 
-    LPSModel(){};
-    LPSModel( const double _delta, const double _K, const double _G,
-              const int _influence = 0 )
-        : ForceModel( _delta )
+    ForceModel(){};
+    ForceModel( const double _delta, const double _K, const double _G,
+                const int _influence = 0 )
+        : base_type( _delta )
         , influence_type( _influence )
     {
         set_param( _delta, _K, _G );
@@ -120,23 +131,27 @@ struct LPSModel : public ForceModel
     }
 };
 
-struct LPSDamageModel : public LPSModel
+template <>
+struct ForceModel<LPS, Fracture> : public ForceModel<LPS, Elastic>
 {
-    using elastic_model = LPSModel;
-    using elastic_model::delta;
-    using elastic_model::G;
-    using elastic_model::influence_type;
-    using elastic_model::K;
-    using elastic_model::s_coeff;
-    using elastic_model::theta_coeff;
+    using base_type = ForceModel<LPS, Elastic>;
+    using base_model = LPS;
+    using fracture_type = Fracture;
+
+    using base_type::delta;
+    using base_type::G;
+    using base_type::influence_type;
+    using base_type::K;
+    using base_type::s_coeff;
+    using base_type::theta_coeff;
     double G0;
     double s0;
     double bond_break_coeff;
 
-    LPSDamageModel() {}
-    LPSDamageModel( const double _delta, const double _K, const double _G,
-                    const double _G0, const int _influence = 0 )
-        : elastic_model( _delta, _K, _G, _influence )
+    ForceModel() {}
+    ForceModel( const double _delta, const double _K, const double _G,
+                const double _G0, const int _influence = 0 )
+        : base_type( _delta, _K, _G, _influence )
     {
         set_param( _delta, _K, _G, _G0 );
     }
@@ -144,7 +159,7 @@ struct LPSDamageModel : public LPSModel
     void set_param( const double _delta, const double _K, const double _G,
                     const double _G0 )
     {
-        elastic_model::set_param( _delta, _K, _G );
+        base_type::set_param( _delta, _K, _G );
         G0 = _G0;
         // s0 = sqrt( 5.0 * G0 / 9.0 / K / delta ); // 1/xi
         s0 = sqrt( 8.0 * G0 / 15.0 / K / delta ); // 1
@@ -152,48 +167,69 @@ struct LPSDamageModel : public LPSModel
     }
 };
 
-struct LinearLPSModel : public LPSModel
+template <>
+struct ForceModel<LinearLPS, Elastic> : public ForceModel<LPS, Elastic>
 {
-    using LPSModel::LPSModel;
+    using base_type = ForceModel<LPS, Elastic>;
+    using base_model = LPS;
+    using fracture_type = Elastic;
 
-    using LPSModel::delta;
-    using LPSModel::G;
-    using LPSModel::influence_type;
-    using LPSModel::K;
-    using LPSModel::s_coeff;
-    using LPSModel::theta_coeff;
+    using base_type::base_type;
+
+    using base_type::delta;
+    using base_type::G;
+    using base_type::influence_type;
+    using base_type::K;
+    using base_type::s_coeff;
+    using base_type::theta_coeff;
 };
 
-struct LinearLPSDamageModel : public LPSDamageModel
+template <>
+struct ForceModel<LinearLPS, Fracture> : public ForceModel<LPS, Fracture>
 {
-    using LPSDamageModel::LPSDamageModel;
+    using base_type = ForceModel<LPS, Fracture>;
+    using base_model = LPS;
+    using fracture_type = Fracture;
 
-    using LPSDamageModel::delta;
-    using LPSDamageModel::G;
-    using LPSDamageModel::influence_type;
-    using LPSDamageModel::K;
-    using LPSDamageModel::s_coeff;
-    using LPSDamageModel::theta_coeff;
+    using base_type::base_type;
 
-    using LPSDamageModel::bond_break_coeff;
-    using LPSDamageModel::G0;
-    using LPSDamageModel::s0;
+    using base_type::delta;
+    using base_type::G;
+    using base_type::influence_type;
+    using base_type::K;
+    using base_type::s_coeff;
+    using base_type::theta_coeff;
+
+    using base_type::bond_break_coeff;
+    using base_type::G0;
+    using base_type::s0;
 };
 
 /* PMB */
-
-struct PMBModel : public ForceModel
+template <>
+struct ForceModel<PMB, Elastic> : public BaseForceModel
 {
-    using ForceModel::delta;
+    using base_type = BaseForceModel;
+    using base_model = PMB;
+    using fracture_type = Elastic;
+
+    using BaseForceModel::delta;
 
     double c;
     double K;
 
-    PMBModel(){};
-    PMBModel( const double delta, const double K )
-        : ForceModel( delta )
+    ForceModel(){};
+    ForceModel( const double delta, const double K )
+        : base_type( delta )
     {
         set_param( delta, K );
+    }
+
+    ForceModel( const ForceModel& model )
+        : base_type( model )
+    {
+        c = model.c;
+        K = model.K;
     }
 
     void set_param( const double _delta, const double _K )
@@ -204,52 +240,74 @@ struct PMBModel : public ForceModel
     }
 };
 
-struct PMBDamageModel : public PMBModel
+template <>
+struct ForceModel<PMB, Fracture> : public ForceModel<PMB, Elastic>
 {
-    using elastic_model = PMBModel;
-    using elastic_model::c;
-    using elastic_model::delta;
-    using elastic_model::K;
+    using base_type = ForceModel<PMB, Elastic>;
+    using base_model = PMB;
+    using fracture_type = Fracture;
+
+    using base_type::c;
+    using base_type::delta;
+    using base_type::K;
     double G0;
     double s0;
     double bond_break_coeff;
 
-    PMBDamageModel() {}
-    PMBDamageModel( const double delta, const double K, const double G0 )
-        : PMBModel( delta, K )
+    ForceModel() {}
+    ForceModel( const double delta, const double K, const double G0 )
+        : base_type( delta, K )
     {
         set_param( delta, K, G0 );
     }
 
+    ForceModel( const ForceModel& model )
+        : base_type( model )
+    {
+        G0 = model.G0;
+        s0 = model.s0;
+        bond_break_coeff = model.bond_break_coeff;
+    }
+
     void set_param( const double _delta, const double _K, const double _G0 )
     {
-        elastic_model::set_param( _delta, _K );
+        base_type::set_param( _delta, _K );
         G0 = _G0;
         s0 = sqrt( 5.0 * G0 / 9.0 / K / delta );
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 };
 
-struct LinearPMBModel : public PMBModel
+template <>
+struct ForceModel<LinearPMB, Elastic> : public ForceModel<PMB, Elastic>
 {
-    using PMBModel::PMBModel;
+    using base_type = ForceModel<PMB, Elastic>;
+    using base_model = PMB;
+    using fracture_type = Elastic;
 
-    using PMBModel::c;
-    using PMBModel::delta;
-    using PMBModel::K;
+    using base_type::base_type;
+
+    using base_type::c;
+    using base_type::delta;
+    using base_type::K;
 };
 
-struct LinearPMBDamageModel : public PMBDamageModel
+template <>
+struct ForceModel<LinearPMB, Fracture> : public ForceModel<PMB, Fracture>
 {
-    using PMBDamageModel::PMBDamageModel;
+    using base_type = ForceModel<PMB, Fracture>;
+    using base_model = PMB;
+    using fracture_type = Fracture;
 
-    using PMBDamageModel::c;
-    using PMBDamageModel::delta;
-    using PMBDamageModel::K;
+    using base_type::base_type;
 
-    using PMBDamageModel::bond_break_coeff;
-    using PMBDamageModel::G0;
-    using PMBDamageModel::s0;
+    using base_type::c;
+    using base_type::delta;
+    using base_type::K;
+
+    using base_type::bond_break_coeff;
+    using base_type::G0;
+    using base_type::s0;
 };
 
 /******************************************************************************
@@ -317,16 +375,16 @@ template <class ExecutionSpace, class ForceType>
 class Force;
 
 template <class ExecutionSpace>
-class Force<ExecutionSpace, LPSModel>
+class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
 {
   protected:
     bool _half_neigh;
-    LPSModel _model;
+    ForceModel<LPS, Elastic> _model;
 
   public:
     using exec_space = ExecutionSpace;
 
-    Force( const bool half_neigh, const LPSModel model )
+    Force( const bool half_neigh, const ForceModel<LPS, Elastic> model )
         : _half_neigh( half_neigh )
         , _model( model )
     {
@@ -480,18 +538,18 @@ class Force<ExecutionSpace, LPSModel>
 };
 
 template <class ExecutionSpace>
-class Force<ExecutionSpace, LPSDamageModel>
-    : public Force<ExecutionSpace, LPSModel>
+class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
+    : public Force<ExecutionSpace, ForceModel<LPS, Elastic>>
 {
   protected:
-    using base_type = Force<ExecutionSpace, LPSModel>;
+    using base_type = Force<ExecutionSpace, ForceModel<LPS, Elastic>>;
     using base_type::_half_neigh;
-    LPSDamageModel _model;
+    ForceModel<LPS, Fracture> _model;
 
   public:
     using exec_space = ExecutionSpace;
 
-    Force( const bool half_neigh, const LPSDamageModel model )
+    Force( const bool half_neigh, const ForceModel<LPS, Fracture> model )
         : base_type( half_neigh, model )
         , _model( model )
     {
@@ -706,18 +764,18 @@ class Force<ExecutionSpace, LPSDamageModel>
 };
 
 template <class ExecutionSpace>
-class Force<ExecutionSpace, LinearLPSModel>
-    : public Force<ExecutionSpace, LPSModel>
+class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
+    : public Force<ExecutionSpace, ForceModel<LPS, Elastic>>
 {
   protected:
-    using base_type = Force<ExecutionSpace, LPSModel>;
+    using base_type = Force<ExecutionSpace, ForceModel<LPS, Elastic>>;
     using base_type::_half_neigh;
-    LinearLPSModel _model;
+    ForceModel<LinearLPS, Elastic> _model;
 
   public:
     using exec_space = ExecutionSpace;
 
-    Force( const bool half_neigh, const LinearLPSModel model )
+    Force( const bool half_neigh, const ForceModel<LinearLPS, Elastic> model )
         : base_type( half_neigh, model )
         , _model( model )
     {
@@ -825,16 +883,16 @@ class Force<ExecutionSpace, LinearLPSModel>
   Force computation PMB
 ******************************************************************************/
 template <class ExecutionSpace>
-class Force<ExecutionSpace, PMBModel>
+class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
 {
   protected:
     bool _half_neigh;
-    PMBModel _model;
+    ForceModel<PMB, Elastic> _model;
 
   public:
     using exec_space = ExecutionSpace;
 
-    Force( const bool half_neigh, const PMBModel model )
+    Force( const bool half_neigh, const ForceModel<PMB, Elastic> model )
         : _half_neigh( half_neigh )
         , _model( model )
     {
@@ -923,18 +981,18 @@ class Force<ExecutionSpace, PMBModel>
 };
 
 template <class ExecutionSpace>
-class Force<ExecutionSpace, PMBDamageModel>
-    : public Force<ExecutionSpace, PMBModel>
+class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
+    : public Force<ExecutionSpace, ForceModel<PMB, Elastic>>
 {
   protected:
-    using base_type = Force<ExecutionSpace, PMBModel>;
+    using base_type = Force<ExecutionSpace, ForceModel<PMB, Elastic>>;
     using base_type::_half_neigh;
-    PMBDamageModel _model;
+    ForceModel<PMB, Fracture> _model;
 
   public:
     using exec_space = ExecutionSpace;
 
-    Force( const bool half_neigh, const PMBDamageModel model )
+    Force( const bool half_neigh, const ForceModel<PMB, Fracture> model )
         : base_type( half_neigh, model )
         , _model( model )
     {
@@ -1045,18 +1103,18 @@ class Force<ExecutionSpace, PMBDamageModel>
 };
 
 template <class ExecutionSpace>
-class Force<ExecutionSpace, LinearPMBModel>
-    : public Force<ExecutionSpace, PMBModel>
+class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
+    : public Force<ExecutionSpace, ForceModel<PMB, Elastic>>
 {
   protected:
-    using base_type = Force<ExecutionSpace, PMBModel>;
+    using base_type = Force<ExecutionSpace, ForceModel<PMB, Elastic>>;
     using base_type::_half_neigh;
-    LinearPMBModel _model;
+    ForceModel<LinearPMB, Elastic> _model;
 
   public:
     using exec_space = ExecutionSpace;
 
-    Force( const bool half_neigh, const LinearPMBModel model )
+    Force( const bool half_neigh, const ForceModel<LinearPMB, Elastic> model )
         : base_type( half_neigh, model )
         , _model( model )
     {
