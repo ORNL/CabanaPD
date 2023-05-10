@@ -286,7 +286,7 @@ class Particles<DeviceType, PMB, Dimension>
     void create_particles_from_csv(const ExecSpace& exec_space, std::string fileName )
     {
        
-       std::vector<double> x , y  , volume;
+       std::vector<double> xFile , yFile  , volumeFile;
 
         std::vector<std::string> row;
         std::string line, word;
@@ -305,9 +305,9 @@ class Particles<DeviceType, PMB, Dimension>
             {
                 row.push_back(word);
             }
-            x.push_back(std::stod(row[1]));
-            y.push_back(std::stod(row[2]));
-            volume.push_back(std::stod(row[3]));
+            xFile.push_back(std::stod(row[1]));
+            yFile.push_back(std::stod(row[2]));
+            volumeFile.push_back(std::stod(row[3]));
 
 		}
 	}
@@ -357,14 +357,14 @@ class Particles<DeviceType, PMB, Dimension>
                     v( index, d ) = 0.0;
                 }
 
-                 x( index, 0 ) = x[index];
-                  x( index, 1 ) = y[index];
-                   x( index, 2 ) = 0;
+                 x( index, 0 ) = xFile[index];
+                 x( index, 1 ) = yFile[index];
+                 x( index, 2 ) = 0;
                 // FIXME: hardcoded
                 type( index ) = 0;
                 rho( index ) = 1.0;
 
-                  vol( index ) = volume[index];
+                  vol( index ) = volumeFile[index];
 
 
 
