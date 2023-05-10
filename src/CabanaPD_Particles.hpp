@@ -70,6 +70,7 @@
 #include <Cajita.hpp>
 
 #include <CabanaPD_Comm.hpp>
+#include <CabanaPD_Types.hpp>
 
 namespace CabanaPD
 {
@@ -77,10 +78,14 @@ namespace CabanaPD
 // FIXME: this should use MemorySpace directly, but DeviceType enables the
 // friend class with Comm (which only uses DeviceType because Cabana::Halo
 // currently does)
-template <class DeviceType, int Dimension = 3>
-class Particles
+template <class DeviceType, class ModelType, int Dimension = 3>
+class Particles;
+
+template <class DeviceType, int Dimension>
+class Particles<DeviceType, PMB, Dimension>
 {
   public:
+    using self_type = Particles<DeviceType, PMB, Dimension>;
     using device_type = DeviceType;
     using memory_space = typename device_type::memory_space;
     static constexpr int dim = Dimension;
@@ -106,10 +111,6 @@ class Particles
     using aosoa_u_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_f_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_vol_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
-    // These are split since weighted volume only needs to be communicated once
-    // and dilatation only needs to be communicated for LPS.
-    using aosoa_theta_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
-    using aosoa_m_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
     using aosoa_other_type = Cabana::AoSoA<other_types, memory_space>;
 
     // Per type
@@ -142,11 +143,7 @@ class Particles
         ghost_mesh_hi = { 0.0, 0.0, 0.0 };
         local_mesh_ext = { 0.0, 0.0, 0.0 };
 
-        aosoa_x_type _aosoa_x( "Particles", n_local );
-        aosoa_u_type _aosoa_u( "Particles", n_local );
-        aosoa_f_type _aosoa_f( "Particles", n_local );
-        aosoa_vol_type _aosoa_vol( "Particles", n_local );
-        aosoa_other_type _aosoa_other( "Particles", n_local );
+        resize( 0, 0 );
     }
 
     // Constructor which initializes particles on regular grid.
@@ -159,8 +156,6 @@ class Particles
         create_domain( low_corner, high_corner, num_cells );
         create_particles( exec_space );
     }
-
-    ~Particles() {}
 
     void create_domain( std::array<double, 3> low_corner,
                         std::array<double, 3> high_corner,
@@ -214,26 +209,15 @@ class Particles
 
         int particles_per_cell = 1;
         int num_particles = particles_per_cell * owned_cells.size();
-        _aosoa_x.resize( num_particles );
-        _aosoa_u.resize( num_particles );
-        _aosoa_f.resize( num_particles );
-        _aosoa_vol.resize( num_particles );
-        _aosoa_m.resize( num_particles );
-        _aosoa_theta.resize( num_particles );
-        _aosoa_other.resize( num_particles );
+        resize( num_particles, 0 );
+
         auto x = slice_x();
         auto v = slice_v();
+        auto f = slice_f();
         auto type = slice_type();
         auto rho = slice_rho();
         auto u = slice_u();
         auto vol = slice_vol();
-
-        auto f = slice_f();
-        Cabana::deep_copy( f, 0.0 );
-        auto theta = slice_theta();
-        Cabana::deep_copy( theta, 0.0 );
-        auto m = slice_m();
-        Cabana::deep_copy( m, 0.0 );
 
         auto created = Kokkos::View<bool*, memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "particle_created" ),
@@ -267,6 +251,7 @@ class Particles
                     x( pid, d ) = cell_coord[d];
                     u( pid, d ) = 0.0;
                     v( pid, d ) = 0.0;
+                    f( pid, d ) = 0.0;
                 }
                 // FIXME: hardcoded
                 type( pid ) = 0;
@@ -289,6 +274,7 @@ class Particles
             },
             local_num_create );
         n_local = local_num_create;
+        resize( n_local, 0 );
         size = _aosoa_x.size();
 
         // Not using Allreduce because global count is only used for printing.
@@ -423,6 +409,111 @@ class Particles
     auto slice_v() { return Cabana::slice<2>( _aosoa_other, "velocities" ); }
     auto slice_rho() { return Cabana::slice<3>( _aosoa_other, "density" ); }
     auto slice_phi() { return Cabana::slice<4>( _aosoa_other, "damage" ); }
+
+    void resize( int new_local, int new_ghost )
+    {
+        n_local = new_local;
+        n_ghost = new_ghost;
+
+        _aosoa_x.resize( new_local + new_ghost );
+        _aosoa_u.resize( new_local + new_ghost );
+        _aosoa_vol.resize( new_local + new_ghost );
+        _aosoa_f.resize( new_local );
+        _aosoa_other.resize( new_local );
+        size = _aosoa_x.size();
+    };
+
+    void output( const int output_step, const double output_time )
+    {
+        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
+            "particles", local_grid->globalGrid(), output_step, output_time, 0,
+            n_local, slice_x(), slice_W(), slice_f(), slice_u(), slice_v(),
+            slice_phi() );
+    }
+
+    friend class Comm<self_type, PMB>;
+
+  protected:
+    aosoa_x_type _aosoa_x;
+    aosoa_u_type _aosoa_u;
+    aosoa_f_type _aosoa_f;
+    aosoa_vol_type _aosoa_vol;
+    aosoa_other_type _aosoa_other;
+};
+
+template <class DeviceType, int Dimension>
+class Particles<DeviceType, LPS, Dimension>
+    : public Particles<DeviceType, PMB, Dimension>
+{
+  public:
+    using self_type = Particles<DeviceType, LPS, Dimension>;
+    using base_type = Particles<DeviceType, PMB, Dimension>;
+    using device_type = typename base_type::device_type;
+    using memory_space = typename base_type::memory_space;
+    using base_type::dim;
+
+    // Per particle
+    using base_type::n_ghost;
+    using base_type::n_global;
+    using base_type::n_local;
+    using base_type::size;
+
+    // These are split since weighted volume only needs to be communicated once
+    // and dilatation only needs to be communicated for LPS.
+    using scalar_type = typename base_type::scalar_type;
+    using aosoa_theta_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
+    using aosoa_m_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
+
+    // Per type
+    using base_type::n_types;
+
+    // Simulation total domain
+    using base_type::global_mesh_ext;
+
+    // Simulation sub domain (single MPI rank)
+    using base_type::ghost_mesh_hi;
+    using base_type::ghost_mesh_lo;
+    using base_type::local_mesh_ext;
+    using base_type::local_mesh_hi;
+    using base_type::local_mesh_lo;
+
+    using base_type::dx;
+    using base_type::dy;
+    using base_type::dz;
+    using base_type::local_grid;
+
+    using base_type::halo_neighbors;
+    using base_type::halo_width;
+
+    // Default constructor.
+    Particles()
+        : base_type()
+    {
+        _aosoa_m = aosoa_m_type( "Particle Weighted Volumes", 0 );
+        _aosoa_theta = aosoa_theta_type( "Particle Dilatationss", 0 );
+    }
+
+    // Constructor which initializes particles on regular grid.
+    template <class ExecSpace>
+    Particles( const ExecSpace& exec_space, std::array<double, 3> low_corner,
+               std::array<double, 3> high_corner,
+               const std::array<int, 3> num_cells, const int max_halo_width )
+        : base_type( exec_space, low_corner, high_corner, num_cells,
+                     max_halo_width )
+    {
+        _aosoa_m = aosoa_m_type( "Particle Weighted Volumes", n_local );
+        _aosoa_theta = aosoa_theta_type( "Particle Dilatationss", n_local );
+        init_lps();
+    }
+
+    template <class ExecSpace>
+    void create_particles( const ExecSpace& exec_space )
+    {
+        base_type::create_particles( exec_space );
+        _aosoa_m.resize( 0 );
+        _aosoa_theta.resize( 0 );
+    }
+
     auto slice_theta()
     {
         return Cabana::slice<0>( _aosoa_theta, "dilatation" );
@@ -439,29 +530,34 @@ class Particles
 
     void resize( int new_local, int new_ghost )
     {
-        n_local = new_local;
-        n_ghost = new_ghost;
-
-        _aosoa_x.resize( new_local + new_ghost );
-        _aosoa_u.resize( new_local + new_ghost );
-        _aosoa_vol.resize( new_local + new_ghost );
+        base_type::resize( new_local, new_ghost );
         _aosoa_theta.resize( new_local + new_ghost );
         _aosoa_m.resize( new_local + new_ghost );
-        _aosoa_f.resize( new_local );
-        _aosoa_other.resize( new_local );
-        size = _aosoa_x.size();
-    };
+    }
 
-    friend class Comm<Particles<device_type>>;
+    void output( const int output_step, const double output_time )
+    {
+        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
+            "particles", local_grid->globalGrid(), output_step, output_time, 0,
+            n_local, base_type::slice_x(), base_type::slice_W(),
+            base_type::slice_f(), base_type::slice_u(), base_type::slice_v(),
+            base_type::slice_phi(), slice_m(), slice_theta() );
+    }
+
+    friend class Comm<self_type, PMB>;
+    friend class Comm<self_type, LPS>;
 
   protected:
-    aosoa_x_type _aosoa_x;
-    aosoa_u_type _aosoa_u;
-    aosoa_f_type _aosoa_f;
-    aosoa_vol_type _aosoa_vol;
+    void init_lps()
+    {
+        auto theta = slice_theta();
+        Cabana::deep_copy( theta, 0.0 );
+        auto m = slice_m();
+        Cabana::deep_copy( m, 0.0 );
+    }
+
     aosoa_theta_type _aosoa_theta;
     aosoa_m_type _aosoa_m;
-    aosoa_other_type _aosoa_other;
 };
 
 } // namespace CabanaPD
