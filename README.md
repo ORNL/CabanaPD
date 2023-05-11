@@ -5,11 +5,11 @@ Peridynamics with the Cabana library
 ## Dependencies
 CabanaPD has the following dependencies:
 
-|Dependency | Version | Required | Details|
-|---------- | ------- |--------  |------- |
-|CMake      | 3.11+   | Yes      | Build system
-|Cabana     | master  | Yes      | Performance portable particle algorithms
-|GTest      | 1.10+   | No       | Unit test framework
+|Dependency | Version  | Required | Details|
+|---------- | -------  |--------  |------- |
+|CMake      | 3.11+    | Yes      | Build system
+|Cabana     | 10cc6758 | Yes      | Performance portable particle algorithms
+|GTest      | 1.10+    | No       | Unit test framework
 
 Cabana must be built with the following in order to work with CabanaPD:
 |Cabana Dependency | Version | Required | Details|
@@ -25,7 +25,7 @@ available on some systems or can be installed with `spack` (see
 https://spack.readthedocs.io/en/latest/getting_started.html):
 
 ```
-spack install cabana+cajita+silo
+spack install cabana@master+cajita+silo
 ```
 
 Alternatively, Kokkos can be built locally, followed by Cabana:
