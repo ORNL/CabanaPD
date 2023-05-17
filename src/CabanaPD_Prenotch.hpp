@@ -18,10 +18,39 @@
 #include <Cajita.hpp>
 
 #include <cassert>
-#include <cmath>
 
 namespace CabanaPD
 {
+
+KOKKOS_INLINE_FUNCTION
+double abs( const double a )
+{
+#if KOKKOS_VERSION >= 30700
+    return Kokkos::abs( a );
+#else
+    return Kokkos::Experimental::abs( a );
+#endif
+}
+
+KOKKOS_INLINE_FUNCTION
+double fmin( const double a, const double b )
+{
+#if KOKKOS_VERSION >= 30700
+    return Kokkos::fmin( a, b );
+#else
+    return Kokkos::Experimental::fmin( a, b );
+#endif
+}
+
+KOKKOS_INLINE_FUNCTION
+double fmax( const double a, const double b )
+{
+#if KOKKOS_VERSION >= 30700
+    return Kokkos::fmax( a, b );
+#else
+    return Kokkos::Experimental::fmax( a, b );
+#endif
+}
 
 KOKKOS_INLINE_FUNCTION
 double dot( Kokkos::Array<double, 3> a, Kokkos::Array<double, 3> b )
