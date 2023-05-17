@@ -70,6 +70,7 @@
 #include <Cajita.hpp>
 
 #include <CabanaPD_Comm.hpp>
+#include <CabanaPD_Output.hpp>
 #include <CabanaPD_Types.hpp>
 
 namespace CabanaPD
@@ -330,10 +331,22 @@ class Particles<DeviceType, PMB, Dimension>
 
     void output( const int output_step, const double output_time )
     {
+#ifdef Cabana_ENABLE_HDF5
+        Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
+            h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
+            n_local, slice_x(), slice_W(), slice_f(), slice_u(), slice_v(),
+            slice_phi() );
+#else
+#ifdef Cabana_ENABLE_SILO
         Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
             "particles", local_grid->globalGrid(), output_step, output_time, 0,
             n_local, slice_x(), slice_W(), slice_f(), slice_u(), slice_v(),
             slice_phi() );
+#else
+        log( std::cout, "No particle output enabled for step ", output_step,
+             " (", output_time, ")" );
+#endif
+#endif
     }
 
     friend class Comm<self_type, PMB>;
@@ -344,6 +357,10 @@ class Particles<DeviceType, PMB, Dimension>
     aosoa_f_type _aosoa_f;
     aosoa_vol_type _aosoa_vol;
     aosoa_other_type _aosoa_other;
+
+#ifdef Cabana_ENABLE_HDF5
+    Cabana::Experimental::HDF5ParticleOutput::HDF5Config h5_config;
+#endif
 };
 
 template <class DeviceType, int Dimension>
@@ -442,11 +459,24 @@ class Particles<DeviceType, LPS, Dimension>
 
     void output( const int output_step, const double output_time )
     {
+#ifdef Cabana_ENABLE_HDF5
+        Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
+            h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
+            n_local, base_type::slice_x(), base_type::slice_W(),
+            base_type::slice_f(), base_type::slice_u(), base_type::slice_v(),
+            base_type::slice_phi(), slice_m(), slice_theta() );
+#else
+#ifdef Cabana_ENABLE_SILO
         Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
             "particles", local_grid->globalGrid(), output_step, output_time, 0,
             n_local, base_type::slice_x(), base_type::slice_W(),
             base_type::slice_f(), base_type::slice_u(), base_type::slice_v(),
             base_type::slice_phi(), slice_m(), slice_theta() );
+#else
+        log( std::cout, "No particle output enabled for ", output_step, "(",
+             output_time, ")" );
+#endif
+#endif
     }
 
     friend class Comm<self_type, PMB>;
@@ -463,6 +493,10 @@ class Particles<DeviceType, LPS, Dimension>
 
     aosoa_theta_type _aosoa_theta;
     aosoa_m_type _aosoa_m;
+
+#ifdef Cabana_ENABLE_HDF5
+    using base_type::h5_config;
+#endif
 };
 
 } // namespace CabanaPD

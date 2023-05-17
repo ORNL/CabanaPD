@@ -8,7 +8,7 @@ CabanaPD has the following dependencies:
 |Dependency | Version  | Required | Details|
 |---------- | -------  |--------  |------- |
 |CMake      | 3.11+    | Yes      | Build system
-|Cabana     | 10cc6758 | Yes      | Performance portable particle algorithms
+|Cabana     | 4fdb7eeb | Yes      | Performance portable particle algorithms
 |GTest      | 1.10+    | No       | Unit test framework
 
 Cabana must be built with the following in order to work with CabanaPD:
@@ -17,7 +17,8 @@ Cabana must be built with the following in order to work with CabanaPD:
 |CMake      | 3.16+   | Yes      | Build system
 |MPI        | GPU-Aware if CUDA/HIP enabled | Yes | Message Passing Interface
 |Kokkos     | 3.6.0+  | Yes      | Performance portable on-node parallelism
-|SILO       | master  | Yes      | Particle output
+|HDF5       | master  | No       | Particle output
+|SILO       | master  | No       | Particle output
 
 The underlying parallel programming models are available on most systems, as is
 CMake. Those must be installed first, if not available. Kokkos and Cabana are
@@ -107,11 +108,7 @@ ctest
 ## Examples
 
 Once built and installed, CabanaPD examples can be run. Timing and energy
-information is output to file and particle output is written to files that can
-be visualized with Paraview and similar applications. The first example is an
-elastic wave propagating through a cube from an initial Gaussian radial
-displacement profile from [1]. Assuming the build paths above, the example can
-be run with:
+information is output to file and particle output is written to files (if enabled within Cabana) that can be visualized with Paraview and similar applications. The first example is an elastic wave propagating through a cube from an initial Gaussian radial displacement profile from [1]. Assuming the build paths above, the example can be run with:
 
 ```
 ./CabanaPD/build/install/bin/ElasticWave
