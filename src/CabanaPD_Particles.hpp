@@ -281,6 +281,101 @@ class Particles<DeviceType, PMB, Dimension>
         MPI_Reduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0,
                     MPI_COMM_WORLD );
     }
+  
+    template <class ExecSpace>
+    void create_particles_from_csv(const ExecSpace& exec_space, std::string fileName )
+    {
+       
+       std::vector<double> xFile , yFile  , volumeFile;
+
+        std::vector<std::string> row;
+        std::string line, word;
+
+        std::fstream file (fileName, std::ios::in);
+	    if(file.is_open())
+	    {
+        std::getline(file, line);
+		while(std::getline(file, line))
+		{
+			row.clear();
+ 
+            std::stringstream str(line);
+ 
+			while(std::getline(str, word, ','))
+            {
+                row.push_back(word);
+            }
+            xFile.push_back(std::stod(row[1]));
+            yFile.push_back(std::stod(row[2]));
+            volumeFile.push_back(std::stod(row[3]));
+
+		}
+	}
+
+        int num_particles = x.size();
+
+        //int particles_per_cell = 1;
+        //int num_particles = particles_per_cell * owned_cells.size();
+        _aosoa_x.resize( num_particles );
+        _aosoa_u.resize( num_particles );
+        _aosoa_f.resize( num_particles );
+        _aosoa_vol.resize( num_particles );
+        _aosoa_m.resize( num_particles );
+        _aosoa_theta.resize( num_particles );
+        _aosoa_other.resize( num_particles );
+        auto x = slice_x();
+        auto v = slice_v();
+        auto type = slice_type();
+        auto rho = slice_rho();
+        auto u = slice_u();
+        auto vol = slice_vol();
+
+        auto f = slice_f();
+        Cabana::deep_copy( f, 0.0 );
+        auto theta = slice_theta();
+        Cabana::deep_copy( theta, 0.0 );
+        auto m = slice_m();
+        Cabana::deep_copy( m, 0.0 );
+
+        auto created = Kokkos::View<bool*, memory_space>(
+            Kokkos::ViewAllocateWithoutInitializing( "particle_created" ),
+            num_particles );
+
+        // Initialize particles.
+        int mpi_rank = -1;
+        MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
+        int local_num_create = 0;
+
+        for (size_t index = 0 ; index < x.size(); index++)
+
+        {
+ // Set the particle position.
+                for ( int d = 0; d < 3; d++ )
+                {
+                   
+                    u( index, d ) = 0.0;
+                    v( index, d ) = 0.0;
+                }
+
+                 x( index, 0 ) = xFile[index];
+                 x( index, 1 ) = yFile[index];
+                 x( index, 2 ) = 0;
+                // FIXME: hardcoded
+                type( index ) = 0;
+                rho( index ) = 1.0;
+
+                  vol( index ) = volumeFile[index];
+
+
+
+        }
+
+        size = _aosoa_x.size();
+
+        // Not using Allreduce because global count is only used for printing.
+        MPI_Reduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0,
+                    MPI_COMM_WORLD );
+    }
 
     template <class ExecSpace, class FunctorType>
     void update_particles( const ExecSpace, const FunctorType init_functor )
