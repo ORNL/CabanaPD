@@ -18,17 +18,25 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 ##---------------------------------------------------------------------------##
 find_package(Cabana REQUIRED)
 
-macro(CabanaPD_check_enabled)
+macro(CabanaPD_check_required)
   cmake_parse_arguments(CABANA "" "OPTION" "" ${ARGN})
-
   if( NOT Cabana_ENABLE_${CABANA_OPTION} )
     message( FATAL_ERROR "Cabana must be compiled with ${CABANA_OPTION}" )
   endif()
 endmacro()
 
-CabanaPD_check_enabled( OPTION MPI )
-CabanaPD_check_enabled( OPTION CAJITA )
-CabanaPD_check_enabled( OPTION SILO )
+CabanaPD_check_required( OPTION MPI )
+CabanaPD_check_required( OPTION CAJITA )
+
+macro(CabanaPD_check_optional)
+  cmake_parse_arguments(CABANA "" "OPTION" "" ${ARGN})
+  if( Cabana_ENABLE_${CABANA_OPTION} )
+    message( STATUS "Cabana includes ${CABANA_OPTION}" )
+  endif()
+endmacro()
+
+CabanaPD_check_optional( OPTION HDF5 )
+CabanaPD_check_optional( OPTION SILO )
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CabanaPD_Config.cmakein
   ${CMAKE_CURRENT_BINARY_DIR}/CabanaPD_Config.cmake @ONLY)

@@ -41,7 +41,9 @@ jobs:
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }} \
             -DCMAKE_INSTALL_PREFIX=$HOME/Cabana \
-            -DCMAKE_PREFIX_PATH="$HOME/kokkos"
+            -DCMAKE_PREFIX_PATH="$HOME/kokkos" \
+            -DCabana_REQUIRE_HDF5=ON \
+            -DCabana_REQUIRE_SILO=ON
           cmake --build build --parallel 2
           cmake --install build
       - name: Checkout CabanaPD
