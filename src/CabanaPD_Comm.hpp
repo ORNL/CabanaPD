@@ -251,7 +251,7 @@ class Comm<ParticleType, PMB>
         MPI_Comm_size( local_grid->globalGrid().comm(), &mpi_size );
         MPI_Comm_rank( local_grid->globalGrid().comm(), &mpi_rank );
 
-        auto positions = particles.sliceRefPosition();
+        auto positions = particles.sliceReferencePosition();
         // Get all 26 neighbor ranks.
         auto halo_width = local_grid->haloCellWidth();
         auto topology = Cajita::getTopology( *local_grid );

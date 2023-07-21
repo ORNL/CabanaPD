@@ -140,7 +140,7 @@ class SolverElastic
         double mesh_max[3] = { particles->ghost_mesh_hi[0],
                                particles->ghost_mesh_hi[1],
                                particles->ghost_mesh_hi[2] };
-        auto x = particles->sliceRefPosition();
+        auto x = particles->sliceReferencePosition();
         neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
                                                      force_model.delta, 1.0,
                                                      mesh_min, mesh_max );

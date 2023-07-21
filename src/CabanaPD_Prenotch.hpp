@@ -218,7 +218,7 @@ struct Prenotch
     void create( ExecSpace, NeighborView& mu, Particles& particles,
                  Neighbors& neighbors )
     {
-        auto x = particles.sliceRefPosition();
+        auto x = particles.sliceReferencePosition();
         Kokkos::RangePolicy<ExecSpace> policy( 0, particles.n_local );
 
         auto v1 = _v1;

@@ -111,6 +111,7 @@ class Particles<DeviceType, PMB, Dimension>
     // FIXME: enable variable aosoa.
     using aosoa_x_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_u_type = Cabana::AoSoA<vector_type, memory_space, 1>;
+    using aosoa_y_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_f_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_vol_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
     using aosoa_nofail_type = Cabana::AoSoA<int_type, memory_space, 1>;
@@ -213,12 +214,13 @@ class Particles<DeviceType, PMB, Dimension>
         int num_particles = particles_per_cell * owned_cells.size();
         resize( num_particles, 0 );
 
-        auto x = sliceRefPosition();
+        auto x = sliceReferencePosition();
         auto v = sliceVelocity();
         auto f = sliceForce();
         auto type = sliceType();
         auto rho = sliceDensity();
         auto u = sliceDisplacement();
+        auto y = sliceCurrentPosition();
         auto vol = sliceVolume();
         auto nofail = sliceNoFail();
 
@@ -253,6 +255,7 @@ class Particles<DeviceType, PMB, Dimension>
                 {
                     x( pid, d ) = cell_coord[d];
                     u( pid, d ) = 0.0;
+                    y( pid, d ) = 0.0;
                     v( pid, d ) = 0.0;
                     f( pid, d ) = 0.0;
                 }
@@ -295,13 +298,21 @@ class Particles<DeviceType, PMB, Dimension>
             KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
     }
 
-    auto sliceRefPosition()
+    auto sliceReferencePosition()
     {
-        return Cabana::slice<0>( _aosoa_x, "positions" );
+        return Cabana::slice<0>( _aosoa_x, "reference_positions" );
     }
-    auto sliceRefPosition() const
+    auto sliceReferencePosition() const
     {
-        return Cabana::slice<0>( _aosoa_x, "positions" );
+        return Cabana::slice<0>( _aosoa_x, "reference_positions" );
+    }
+    auto sliceCurrentPosition()
+    {
+        return Cabana::slice<0>( _aosoa_y, "current_positions" );
+    }
+    auto sliceCurrentPosition() const
+    {
+        return Cabana::slice<0>( _aosoa_y, "current_positions" );
     }
     auto sliceDisplacement()
     {
@@ -369,6 +380,7 @@ class Particles<DeviceType, PMB, Dimension>
 
         _aosoa_x.resize( new_local + new_ghost );
         _aosoa_u.resize( new_local + new_ghost );
+        _aosoa_y.resize( new_local + new_ghost );
         _aosoa_vol.resize( new_local + new_ghost );
         _aosoa_f.resize( new_local );
         _aosoa_other.resize( new_local );
@@ -376,19 +388,28 @@ class Particles<DeviceType, PMB, Dimension>
         size = _aosoa_x.size();
     };
 
-    void output( const int output_step, const double output_time )
+    auto getPosition( const bool use_reference )
+    {
+        if ( use_reference )
+            return sliceReferencePosition();
+        else
+            return sliceCurrentPosition();
+    }
+
+    void output( const int output_step, const double output_time,
+                 const bool use_reference = true )
     {
 #ifdef Cabana_ENABLE_HDF5
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
-            n_local, sliceRefPosition(), sliceStrainEnergy(), sliceForce(),
-            sliceDisplacement(), sliceVelocity(), sliceDamage() );
+            n_local, getPosition( use_reference ), sliceStrainEnergy(),
+            sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage() );
 #else
 #ifdef Cabana_ENABLE_SILO
         Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
             "particles", local_grid->globalGrid(), output_step, output_time, 0,
-            n_local, sliceRefPosition(), sliceStrainEnergy(), sliceForce(),
-            sliceDisplacement(), sliceVelocity(), sliceDamage() );
+            n_local, getPosition( use_reference ), sliceStrainEnergy(),
+            sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage() );
 #else
         log( std::cout, "No particle output enabled for step ", output_step,
              " (", output_time, ")" );
@@ -401,6 +422,7 @@ class Particles<DeviceType, PMB, Dimension>
   protected:
     aosoa_x_type _aosoa_x;
     aosoa_u_type _aosoa_u;
+    aosoa_y_type _aosoa_y;
     aosoa_f_type _aosoa_f;
     aosoa_vol_type _aosoa_vol;
     aosoa_nofail_type _aosoa_nofail;
@@ -505,12 +527,13 @@ class Particles<DeviceType, LPS, Dimension>
         _aosoa_m.resize( new_local + new_ghost );
     }
 
-    void output( const int output_step, const double output_time )
+    void output( const int output_step, const double output_time,
+                 const bool use_reference = true )
     {
 #ifdef Cabana_ENABLE_HDF5
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
-            n_local, base_type::sliceRefPosition(),
+            n_local, base_type::getPosition( use_reference ),
             base_type::sliceStrainEnergy(), base_type::sliceForce(),
             base_type::sliceDisplacement(), base_type::sliceVelocity(),
             base_type::sliceDamage(), sliceWeightedVolume(),
@@ -519,7 +542,7 @@ class Particles<DeviceType, LPS, Dimension>
 #ifdef Cabana_ENABLE_SILO
         Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
             "particles", local_grid->globalGrid(), output_step, output_time, 0,
-            n_local, base_type::sliceRefPosition(),
+            n_local, base_type::getPosition( use_reference ),
             base_type::sliceStrainEnergy(), base_type::sliceForce(),
             base_type::sliceDisplacement(), base_type::sliceVelocity(),
             base_type::sliceDamage(), sliceWeightedVolume(),

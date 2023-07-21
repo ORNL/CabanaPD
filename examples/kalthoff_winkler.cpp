@@ -95,7 +95,7 @@ int main( int argc, char* argv[] )
             inputs.num_cells, halo_width );
 
         // Define particle initialization.
-        auto x = particles->sliceRefPosition();
+        auto x = particles->sliceReferencePosition();
         auto v = particles->sliceVelocity();
         auto f = particles->sliceForce();
         auto rho = particles->sliceDensity();

@@ -64,7 +64,7 @@ int main( int argc, char* argv[] )
             inputs.num_cells, halo_width );
 
         // Define particle initialization.
-        auto x = particles->sliceRefPosition();
+        auto x = particles->sliceReferencePosition();
         auto u = particles->sliceDisplacement();
         auto v = particles->sliceVelocity();
         auto rho = particles->sliceDensity();
@@ -96,7 +96,7 @@ int main( int argc, char* argv[] )
         cabana_pd->init_force();
         cabana_pd->run();
 
-        x = particles->sliceRefPosition();
+        x = particles->sliceReferencePosition();
         u = particles->sliceDisplacement();
         double num_cell_x = inputs.num_cells[0];
         auto profile = Kokkos::View<double* [2], memory_space>(
