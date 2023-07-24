@@ -396,8 +396,9 @@ class Particles<DeviceType, PMB, Dimension>
             return sliceCurrentPosition();
     }
 
-    void output( const int output_step, const double output_time,
-                 const bool use_reference = true )
+    void output( [[maybe_unused]] const int output_step,
+                 [[maybe_unused]] const double output_time,
+                 [[maybe_unused]] const bool use_reference = true )
     {
 #ifdef Cabana_ENABLE_HDF5
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
@@ -411,8 +412,7 @@ class Particles<DeviceType, PMB, Dimension>
             n_local, getPosition( use_reference ), sliceStrainEnergy(),
             sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage() );
 #else
-        log( std::cout, "No particle output enabled for step ", output_step,
-             " (", output_time, ")" );
+        log( std::cout, "No particle output enabled." );
 #endif
 #endif
     }
@@ -527,8 +527,9 @@ class Particles<DeviceType, LPS, Dimension>
         _aosoa_m.resize( new_local + new_ghost );
     }
 
-    void output( const int output_step, const double output_time,
-                 const bool use_reference = true )
+    void output( [[maybe_unused]] const int output_step,
+                 [[maybe_unused]] const double output_time,
+                 [[maybe_unused]] const bool use_reference = true )
     {
 #ifdef Cabana_ENABLE_HDF5
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
@@ -548,8 +549,7 @@ class Particles<DeviceType, LPS, Dimension>
             base_type::sliceDamage(), sliceWeightedVolume(),
             sliceDilatation() );
 #else
-        log( std::cout, "No particle output enabled for ", output_step, "(",
-             output_time, ")" );
+        log( std::cout, "No particle output enabled." );
 #endif
 #endif
     }
