@@ -289,7 +289,8 @@ class Particles<DeviceType, PMB, Dimension>
     }
 
     template <class ExecSpace>
-    void create_particles_from_file( const ExecSpace& exec_space, std::string file_name )
+    void create_particles_from_file( const ExecSpace& exec_space,
+                                     std::string file_name )
     {
 
         // read the csv file
@@ -298,28 +299,27 @@ class Particles<DeviceType, PMB, Dimension>
         std::vector<double> csv_vol;
 
         std::vector<std::string> row;
-    std::string line, word;
+        std::string line, word;
 
-    std::fstream file (file_name, std::ios::in);
-	if(file.is_open())
-	{
-        std::getline(file, line);
-		while(std::getline(file, line))
-		{
-			row.clear();
-
-            std::stringstream str(line);
-
-			while(std::getline(str, word, ','))
+        std::fstream file( file_name, std::ios::in );
+        if ( file.is_open() )
+        {
+            std::getline( file, line );
+            while ( std::getline( file, line ) )
             {
-                row.push_back(word);
-            }
-            csv_x.push_back(std::stod(row[1]));
-            csv_y.push_back(std::stod(row[2]));
-            csv_vol.push_back(std::stod(row[3]));
+                row.clear();
 
-		}
-	}
+                std::stringstream str( line );
+
+                while ( std::getline( str, word, ',' ) )
+                {
+                    row.push_back( word );
+                }
+                csv_x.push_back( std::stod( row[1] ) );
+                csv_y.push_back( std::stod( row[2] ) );
+                csv_vol.push_back( std::stod( row[3] ) );
+            }
+        }
 
         // Create a local mesh and owned space.
         auto local_mesh = Cajita::createLocalMesh<device_type>( *local_grid );
@@ -343,44 +343,43 @@ class Particles<DeviceType, PMB, Dimension>
             Kokkos::ViewAllocateWithoutInitializing( "particle_created" ),
             num_particles );
 
-  // Initialize particles.
- int mpi_rank = -1;
-          MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
-   
-               double cell_coord[3];
-  
-                for (size_t i = 0; i < csv_x.size(); i++){
+        // Initialize particles.
+        int mpi_rank = -1;
+        MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
 
-                   cell_coord = {csv_x[i],csv_y[i],0};
-                   // Set the particle position.
-                   for ( int d = 0; d < 3; d++ )
-                   {
-                       x( i, d ) = cell_coord[d];
-                       u( i, d ) = 0.0;
-                       v( i, d ) = 0.0;
-                       f( i, d ) = 0.0;
-                   }
-                  // FIXME: hardcoded
-                  type( i ) = 0;
-                  nofail( i ) = 0;
-                  rho( i ) = 1.0;
+        double cell_coord[3];
 
-                  // Get the volume of the cell.
-                   int empty[3];
-                   vol( i ) = csv_vol[i];
+        for ( size_t i = 0; i < csv_x.size(); i++ )
+        {
 
-                }
+            cell_coord = { csv_x[i], csv_y[i], 0 };
+            // Set the particle position.
+            for ( int d = 0; d < 3; d++ )
+            {
+                x( i, d ) = cell_coord[d];
+                u( i, d ) = 0.0;
+                v( i, d ) = 0.0;
+                f( i, d ) = 0.0;
+            }
+            // FIXME: hardcoded
+            type( i ) = 0;
+            nofail( i ) = 0;
+            rho( i ) = 1.0;
 
-          n_local = csv_x.size();;
-          resize( n_local, 0 );
-          size = _aosoa_x.size();
-  
-          // Not using Allreduce because global count is only used for printing.
-          MPI_Reduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0,
-                      MPI_COMM_WORLD );
+            // Get the volume of the cell.
+            int empty[3];
+            vol( i ) = csv_vol[i];
+        }
 
+        n_local = csv_x.size();
+        ;
+        resize( n_local, 0 );
+        size = _aosoa_x.size();
+
+        // Not using Allreduce because global count is only used for printing.
+        MPI_Reduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0,
+                    MPI_COMM_WORLD );
     }
-
 
     template <class ExecSpace, class FunctorType>
     void update_particles( const ExecSpace, const FunctorType init_functor )
