@@ -275,6 +275,34 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         createParticles( exec_space, x, vol, 0, create_frozen );
     }
 
+    // Constructor with existing particle data, without box size information.
+    template <class ModelType, class ExecSpace, class PositionType,
+              class VolumeType>
+    Particles( MemorySpace, ModelType, TemperatureIndependent,
+               const PositionType& x, const VolumeType& vol,
+               const std::array<double, dim> dx, const int max_halo_width,
+               const ExecSpace exec_space, const bool create_frozen = false )
+        : _plist_x( "positions" )
+        , _plist_f( "forces" )
+    {
+        // In this case, create particles, then construct the grid which
+        // contains them.
+        createParticles( exec_space, x, vol, 0, create_frozen );
+        createDomain( exec_space, dx, max_halo_width );
+    }
+    template <class ModelType, class ExecSpace, class PositionType,
+              class VolumeType>
+    Particles( MemorySpace, ModelType, const PositionType& x,
+               const VolumeType& vol, const std::array<double, dim> dx,
+               const int max_halo_width, const ExecSpace exec_space,
+               const bool create_frozen = false )
+        : _plist_x( "positions" )
+        , _plist_f( "forces" )
+    {
+        createParticles( exec_space, x, vol, 0, create_frozen );
+        createDomain( exec_space, dx, max_halo_width );
+    }
+
     template <class ModelType, class ExecSpace>
     Particles( MemorySpace, ModelType, TemperatureIndependent, BaseOutput,
                CabanaPD::Inputs inputs, ExecSpace exec_space )
@@ -539,6 +567,69 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             static_cast<unsigned long long int>( local_offset );
         MPI_Reduce( &local_offset_mpi, &num_global, 1, MPI_UNSIGNED_LONG_LONG,
                     MPI_SUM, 0, MPI_COMM_WORLD );
+    }
+
+    // Create a domain that encapsulates all particles.
+    template <class ExecSpace>
+    void createDomain( const ExecSpace& exec_space, std::array<double, dim> dx,
+                       const int hw )
+    {
+        halo_width = hw;
+        auto x = sliceReferencePosition();
+        // n_local = x.size();
+        // n_ghost = 0;
+        // size = n_local;
+        updateGlobal();
+
+        double max_x;
+        Kokkos::Max<double> max_x_reducer( max_x );
+        double min_x;
+        Kokkos::Min<double> min_x_reducer( min_x );
+        double max_y;
+        Kokkos::Max<double> max_y_reducer( max_y );
+        double min_y;
+        Kokkos::Min<double> min_y_reducer( min_y );
+        double max_z;
+        Kokkos::Max<double> max_z_reducer( max_z );
+        double min_z;
+        Kokkos::Min<double> min_z_reducer( min_z );
+        Kokkos::parallel_reduce(
+            "CabanaPD::Particles::min_max_positions",
+            Kokkos::RangePolicy<ExecSpace>( exec_space, 0, localOffset() ),
+            KOKKOS_LAMBDA( const int i, double& min_x, double& min_y,
+                           double& min_z, double& max_x, double& max_y,
+                           double& max_z ) {
+                if ( x( i, 0 ) > max_x )
+                    max_x = x( i, 0 );
+                else if ( x( i, 0 ) < min_x )
+                    min_x = x( i, 0 );
+                if ( x( i, 1 ) > max_y )
+                    max_y = x( i, 1 );
+                else if ( x( i, 1 ) < min_y )
+                    min_y = x( i, 1 );
+                if ( x( i, 2 ) > max_z )
+                    max_z = x( i, 2 );
+                else if ( x( i, 2 ) < min_z )
+                    min_z = x( i, 2 );
+            },
+            min_x_reducer, min_y_reducer, min_z_reducer, max_x_reducer,
+            max_y_reducer, max_z_reducer );
+
+        std::array<double, 3> min_corner = { min_x, min_y, min_z };
+        std::array<double, 3> max_corner = { max_x, max_y, max_z };
+
+        std::array<int, 3> num_cells;
+        for ( int d = 0; d < 3; d++ )
+        {
+            // if ( max_corner[d] - min_corner[d] < dx )
+            {
+                max_corner[d] += dx[d] / 2.0;
+                min_corner[d] -= dx[d] / 2.0;
+            }
+            num_cells[d] =
+                static_cast<int>( ( max_corner[d] - min_corner[d] ) / dx[d] );
+        }
+        createDomain( min_corner, max_corner, num_cells, hw );
     }
 
     template <class ExecSpace, class FunctorType>
@@ -1493,6 +1584,52 @@ Particles( MemorySpace, ModelType, OutputType, const PositionType&,
            const VolumeType&, std::array<double, Dim>, std::array<double, Dim>,
            const std::array<int, Dim>, const int, const ExecSpace,
            const bool = false,
+           typename std::enable_if<(is_output<OutputType>::value &&
+                                    Kokkos::is_execution_space_v<ExecSpace>),
+                                   int>::type* = 0 )
+    -> Particles<MemorySpace, typename ModelType::base_model,
+                 TemperatureIndependent, OutputType>;
+
+template <typename MemorySpace, typename ModelType, typename ThermalType,
+          typename ExecSpace, typename PositionType, typename VolumeType,
+          std::size_t Dim>
+Particles( MemorySpace, ModelType, ThermalType, const PositionType&,
+           const VolumeType&, std::array<double, Dim>, const int,
+           const ExecSpace, const bool = false,
+           typename std::enable_if<(is_temperature<ThermalType>::value &&
+                                    Kokkos::is_execution_space_v<ExecSpace>),
+                                   int>::type* = 0 )
+    -> Particles<MemorySpace, typename ModelType::base_model,
+                 typename ThermalType::base_type, EnergyOutput>;
+
+template <typename MemorySpace, typename ModelType, typename ThermalType,
+          typename ExecSpace, typename PositionType, typename VolumeType,
+          std::size_t Dim, typename OutputType>
+Particles( MemorySpace, ModelType, ThermalType, OutputType, const PositionType&,
+           const VolumeType&, std::array<double, Dim>, const int,
+           const ExecSpace, const bool = false,
+           typename std::enable_if<(is_temperature<ThermalType>::value &&
+                                    Kokkos::is_execution_space_v<ExecSpace>),
+                                   int>::type* = 0 )
+    -> Particles<MemorySpace, typename ModelType::base_model,
+                 typename ThermalType::base_type, OutputType>;
+
+template <typename MemorySpace, typename ModelType, typename ExecSpace,
+          typename PositionType, typename VolumeType, std::size_t Dim>
+Particles( MemorySpace, ModelType, const PositionType&, const VolumeType&,
+           std::array<double, Dim>, const int, const ExecSpace,
+           const bool = false,
+           typename std::enable_if<(Kokkos::is_execution_space_v<ExecSpace>),
+                                   int>::type* = 0 )
+    -> Particles<MemorySpace, typename ModelType::base_model,
+                 TemperatureIndependent, EnergyOutput>;
+
+template <typename MemorySpace, typename ModelType, typename ExecSpace,
+          typename PositionType, typename VolumeType, std::size_t Dim,
+          typename OutputType>
+Particles( MemorySpace, ModelType, OutputType, const PositionType&,
+           const VolumeType&, std::array<double, Dim>, const int,
+           const ExecSpace, const bool = false,
            typename std::enable_if<(is_output<OutputType>::value &&
                                     Kokkos::is_execution_space_v<ExecSpace>),
                                    int>::type* = 0 )
