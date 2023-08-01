@@ -283,99 +283,54 @@ class Particles<DeviceType, PMB, Dimension>
         resize( n_local, 0 );
         size = _aosoa_x.size();
 
-        // Not using Allreduce because global count is only used for printing.
-        MPI_Reduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0,
-                    MPI_COMM_WORLD );
+        update_global();
     }
 
+    // This is necessary after reading in particles from file for a consistent
+    // state.
     template <class ExecSpace>
-    void create_particles_from_file( const ExecSpace& exec_space,
-                                     std::string file_name )
+    void update_after_read( const ExecSpace& exec_space, const int hw,
+                            const std::array<int, 3> num_cells )
     {
-
-        // read the csv file
-        std::vector<double> csv_x;
-        std::vector<double> csv_y;
-        std::vector<double> csv_vol;
-
-        std::vector<std::string> row;
-        std::string line, word;
-
-        std::fstream file( file_name, std::ios::in );
-        if ( file.is_open() )
-        {
-            std::getline( file, line );
-            while ( std::getline( file, line ) )
-            {
-                row.clear();
-
-                std::stringstream str( line );
-
-                while ( std::getline( str, word, ',' ) )
-                {
-                    row.push_back( word );
-                }
-                csv_x.push_back( std::stod( row[1] ) );
-                csv_y.push_back( std::stod( row[2] ) );
-                csv_vol.push_back( std::stod( row[3] ) );
-            }
-        }
-
-        // Create a local mesh and owned space.
-        auto local_mesh = Cajita::createLocalMesh<device_type>( *local_grid );
-        auto owned_cells = local_grid->indexSpace(
-            Cajita::Own(), Cajita::Cell(), Cajita::Local() );
-
-        int particles_per_cell = 1;
-        int num_particles = particles_per_cell * csv_x.size();
-        resize( num_particles, 0 );
-
+        halo_width = hw;
         auto x = slice_x();
-        auto v = slice_v();
-        auto f = slice_f();
-        auto type = slice_type();
-        auto rho = slice_rho();
-        auto u = slice_u();
-        auto vol = slice_vol();
-        auto nofail = slice_nofail();
+        n_local = x.size();
+        n_ghost = 0;
+        size = n_local;
+        update_global();
 
-        auto created = Kokkos::View<bool*, memory_space>(
-            Kokkos::ViewAllocateWithoutInitializing( "particle_created" ),
-            num_particles );
+        double min_x = 0.0;
+        double min_y = 0.0;
+        double min_z = 0.0;
+        double max_x = 0.0;
+        double max_y = 0.0;
+        double max_z = 0.0;
+        Kokkos::parallel_reduce(
+            "CabanaPD::Particles::min_max_positions",
+            Kokkos::RangePolicy<ExecSpace>( exec_space, 0, n_local ),
+            KOKKOS_LAMBDA( const int i, int& min_x, int& min_y, int& min_z,
+                           int& max_x, int& max_y, int& max_z ) {
+                if ( x( i, 0 ) > max_x )
+                    max_x = x( i, 0 );
+                else if ( x( i, 0 ) < min_x )
+                    min_x = x( i, 0 );
+                if ( x( i, 1 ) > max_y )
+                    max_y = x( i, 1 );
+                else if ( x( i, 1 ) < min_y )
+                    min_y = x( i, 1 );
+                if ( x( i, 2 ) > max_z )
+                    max_z = x( i, 2 );
+                else if ( x( i, 2 ) < min_z )
+                    min_z = x( i, 2 );
+            },
+            min_x, min_y, min_z, max_x, max_y, max_z );
 
-        // Initialize particles.
-        int mpi_rank = -1;
-        MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
+        create_domain( { min_x, min_y, min_z }, { max_x, max_y, max_z },
+                       num_cells );
+    }
 
-        double cell_coord[3];
-
-        for ( size_t i = 0; i < csv_x.size(); i++ )
-        {
-
-            cell_coord = { csv_x[i], csv_y[i], 0 };
-            // Set the particle position.
-            for ( int d = 0; d < 3; d++ )
-            {
-                x( i, d ) = cell_coord[d];
-                u( i, d ) = 0.0;
-                v( i, d ) = 0.0;
-                f( i, d ) = 0.0;
-            }
-            // FIXME: hardcoded
-            type( i ) = 0;
-            nofail( i ) = 0;
-            rho( i ) = 1.0;
-
-            // Get the volume of the cell.
-            int empty[3];
-            vol( i ) = csv_vol[i];
-        }
-
-        n_local = csv_x.size();
-        ;
-        resize( n_local, 0 );
-        size = _aosoa_x.size();
-
+    void update_global()
+    {
         // Not using Allreduce because global count is only used for printing.
         MPI_Reduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0,
                     MPI_COMM_WORLD );
