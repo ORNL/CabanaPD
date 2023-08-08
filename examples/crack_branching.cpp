@@ -25,7 +25,7 @@ int main( int argc, char* argv[] )
         double thickness = 0.002;
 
         // Domain
-        std::array<int, 3> num_cell = { 300, 121, 6 }; // 300 x 120 x 6
+        std::array<int, 3> num_cell = { 400, 160, 8 }; // 400 x 160 x 8
         double low_x = -0.5 * height;
         double low_y = -0.5 * width;
         double low_z = -0.5 * thickness;
@@ -37,7 +37,7 @@ int main( int argc, char* argv[] )
 
         // Time
         double t_final = 43e-6;
-        double dt = 6.7e-8;
+        double dt = 5e-8;
         double output_frequency = 5;
 
         // Material constants
@@ -48,7 +48,7 @@ int main( int argc, char* argv[] )
         double G0 = 3.8;                       // [J/m^2]
 
         // PD horizon
-        double delta = 0.001;
+        double delta = 0.001 + 1e-10;
 
         // FIXME: set halo width based on delta
         int m = std::floor(
