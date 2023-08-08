@@ -385,7 +385,7 @@ class SolverFracture
         compute_force( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
         compute_energy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
 
-        // Add boundary condition - resetting boundary forces to zero.
+        // Add boundary condition.
         boundary_condition.apply( exec_space(), *particles );
 
         particles->output( 0, 0.0 );
@@ -430,7 +430,7 @@ class SolverFracture
                            neigh_iter_tag{} );
             force_time += force_timer.seconds();
 
-            // Add boundary condition - resetting boundary forces to zero.
+            // Add boundary condition.
             boundary_condition.apply( exec_space{}, *particles );
 
             // Integrate - velocity Verlet second half
