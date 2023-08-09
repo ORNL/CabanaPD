@@ -218,7 +218,7 @@ class SolverElastic
             comm->gatherDilatation();
             comm_time += comm_timer.seconds();
 
-            // Compute short range force
+            // Compute internal forces
             force_timer.reset();
             compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
             force_time += force_timer.seconds();
@@ -373,12 +373,11 @@ class SolverFracture
     void init_force()
     {
         init_timer.reset();
-        // Compute weighted volume for LPS (does nothing for PMB).
+        // Compute/communicate weighted volume for LPS (does nothing for PMB).
         force->compute_weighted_volume( *particles, *neighbors, mu );
         comm->gatherWeightedVolume();
-        // Compute dilatation for LPS (does nothing for PMB).
+        // Compute/communicate dilatation for LPS (does nothing for PMB).
         force->compute_dilatation( *particles, *neighbors, mu );
-        // Communicate dilatation for LPS (does nothing for PMB).
         comm->gatherDilatation();
 
         // Compute initial forces
@@ -424,7 +423,7 @@ class SolverFracture
             comm->gatherDilatation();
             comm_time += comm_timer.seconds();
 
-            // Compute short range force
+            // Compute internal forces
             force_timer.reset();
             compute_force( *force, *particles, *neighbors, mu,
                            neigh_iter_tag{} );
