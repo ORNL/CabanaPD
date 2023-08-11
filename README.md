@@ -138,6 +138,11 @@ loading, in Impact Loading and Dynamic Behavior of Materials, C.Y. Chiem, H.-D.
 Kunze, and L.W. Meyer, eds., Vol 1, DGM Informationsgesellschaft Verlag (1988)
 185-195.
 
+## Contributing
+
+We encourage you to contribute to CabanaPD! Please check the
+[guidelines](CONTRIBUTING.md) on how to do so.
+
 ## Citing CabanaPD
 
 If you use CabanaPD in your work, please cite the [Zenodo release](https://zenodo.org/record/7087781#.Y309w7LMLKI).
