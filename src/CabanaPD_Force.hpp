@@ -807,7 +807,7 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
             double fy_i = 0.0;
             double fz_i = 0.0;
 
-            // Get the bond distance and stretch
+            // Get the bond distance and linearized stretch
             double xi, linear_s;
             double xi_x, xi_y, xi_z;
             getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
@@ -965,8 +965,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
-            // 1/2 from outside the integral; 1/2 from the integrand (pairwise
-            // potential).
+            // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
+            // the integrand (pairwise potential).
             double w = 0.25 * c * s * s * xi * vol( j );
             W( i ) += w;
             Phi += w * vol( i );
@@ -1087,8 +1087,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
 
-                // 1/2 from outside the integral; 1/2 from the integrand
-                // (pairwise potential).
+                // 0.25 factor is due to 1/2 from outside the integral and 1/2
+                // from the integrand (pairwise potential).
                 double w = mu( i, n ) * 0.25 * c * s * s * xi * vol( j );
                 W( i ) += w;
 
@@ -1143,7 +1143,7 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
             double fy_i = 0.0;
             double fz_i = 0.0;
 
-            // Get the bond distance, displacement, and stretch
+            // Get the bond distance, displacement, and linearized stretch
             double xi, linear_s;
             double xi_x, xi_y, xi_z;
             getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
@@ -1179,12 +1179,12 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
-            // Get the bond distance, displacement, and stretch
+            // Get the bond distance, displacement, and linearized stretch
             double xi, linear_s;
             getLinearizedDistance( x, u, i, j, xi, linear_s );
 
-            // 1/2 from outside the integral; 1/2 from the integrand (pairwise
-            // potential).
+            // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
+            // the integrand (pairwise potential).
             double w = 0.25 * c * linear_s * linear_s * xi * vol( j );
             W( i ) += w;
             Phi += w * vol( i );

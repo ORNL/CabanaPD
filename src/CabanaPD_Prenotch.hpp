@@ -166,6 +166,7 @@ int bond_prenotch_intersection( const Kokkos::Array<double, 3> v1,
             keep_bond = 0;
     }
     // Case II: no intersection
+
     // Case III: single point intersection
     else if ( case_flag == 3 )
     {
@@ -174,9 +175,9 @@ int bond_prenotch_intersection( const Kokkos::Array<double, 3> v1,
         // Check if intersection point belongs to the bond
         auto d = dot( diff( p0, l0 ), n ) / dot( l, n );
 
-        // Check if intersection point belongs to the plane
         if ( -tol < d && d < 1 + tol )
         {
+            // Check if intersection point belongs to the plane
             auto p = sum( l0, scale( l, d ) );
 
             double norm2_cross_v1_v2 = norm_cross_v1_v2 * norm_cross_v1_v2;
