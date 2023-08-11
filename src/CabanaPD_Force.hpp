@@ -161,8 +161,14 @@ struct ForceModel<LPS, Fracture> : public ForceModel<LPS, Elastic>
     {
         base_type::set_param( _delta, _K, _G );
         G0 = _G0;
-        // s0 = sqrt( 5.0 * G0 / 9.0 / K / delta ); // 1/xi
-        s0 = sqrt( 8.0 * G0 / 15.0 / K / delta ); // 1
+        if ( influence_type == 1 )
+        {
+            s0 = sqrt( 5.0 * G0 / 9.0 / K / delta ); // 1/xi
+        }
+        else
+        {
+            s0 = sqrt( 8.0 * G0 / 15.0 / K / delta ); // 1
+        }
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 };
