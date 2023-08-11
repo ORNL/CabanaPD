@@ -852,7 +852,6 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
-
             // Do we need to recompute linear_theta_i?
 
             double xi, linear_s;
