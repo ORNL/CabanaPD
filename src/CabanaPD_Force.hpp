@@ -434,7 +434,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
 
         auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
         {
-            // Get the bond distance, displacement, and stretch
+            // Get the bond distance, displacement, and stretch.
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
             double theta_i =
@@ -624,7 +624,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                         Cabana::NeighborList<NeighListType>::getNeighbor(
                             neigh_list, i, n );
 
-                    // Get the bond distance, displacement, and stretch
+                    // Get the bond distance, displacement, and stretch.
                     double xi, r, s;
                     getDistance( x, u, i, j, xi, r, s );
                     double theta_i =
@@ -738,7 +738,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                 std::size_t j =
                     Cabana::NeighborList<NeighListType>::getNeighbor(
                         neigh_list, i, n );
-                // Get the bond distance, displacement, and stretch
+                // Get the bond distance, displacement, and stretch.
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
 
@@ -807,7 +807,7 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
             double fy_i = 0.0;
             double fz_i = 0.0;
 
-            // Get the bond distance and linearized stretch
+            // Get the bond distance and linearized stretch.
             double xi, linear_s;
             double xi_x, xi_y, xi_z;
             getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
@@ -961,7 +961,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
-            // Get the bond distance, displacement, and stretch
+            // Get the bond distance, displacement, and stretch.
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
@@ -1083,7 +1083,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                 std::size_t j =
                     Cabana::NeighborList<NeighListType>::getNeighbor(
                         neigh_list, i, n );
-                // Get the bond distance, displacement, and stretch
+                // Get the bond distance, displacement, and stretch.
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
 
@@ -1143,7 +1143,7 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
             double fy_i = 0.0;
             double fz_i = 0.0;
 
-            // Get the bond distance, displacement, and linearized stretch
+            // Get the bond distance, displacement, and linearized stretch.
             double xi, linear_s;
             double xi_x, xi_y, xi_z;
             getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
@@ -1179,7 +1179,7 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
-            // Get the bond distance, displacement, and linearized stretch
+            // Get the bond distance, displacement, and linearized stretch.
             double xi, linear_s;
             getLinearizedDistance( x, u, i, j, xi, linear_s );
 
@@ -1221,7 +1221,7 @@ void compute_force( const ForceType& force, ParticleType& particles,
     // compute_force_half( f_a, x, u, neigh_list, n_local,
     //                    neigh_op_tag );
 
-    // Forces only atomic if using team threading
+    // Forces only atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
         force.compute_force_full( f_a, x, u, particles, neigh_list, n_local,
                                   neigh_op_tag );
@@ -1280,7 +1280,7 @@ void compute_force( const ForceType& force, ParticleType& particles,
     // compute_force_half( f_a, x, u, neigh_list, n_local,
     //                    neigh_op_tag );
 
-    // Forces only atomic if using team threading
+    // Forces only atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
         force.compute_force_full( f_a, x, u, particles, neigh_list, mu, n_local,
                                   neigh_op_tag );

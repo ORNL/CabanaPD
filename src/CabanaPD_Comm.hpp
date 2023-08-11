@@ -186,7 +186,7 @@ class Comm<ParticleType, PMB>
     int max_export;
 
     // FIXME: this should use MemorySpace directly, but Cabana::Halo currently
-    // uses DeviceType
+    // uses DeviceType.
     using device_type = typename ParticleType::device_type;
     using halo_type = Cabana::Halo<device_type>;
     using gather_u_type =
@@ -203,12 +203,12 @@ class Comm<ParticleType, PMB>
 
         auto positions = particles.slice_x();
         // Get all 26 neighbor ranks.
-        // FIXME: remove Impl
+        // FIXME: remove Impl.
         auto halo_width = local_grid->haloCellWidth();
         auto topology = Cajita::Impl::getTopology( *local_grid );
 
         // Determine which particles need to be ghosted to neighbors.
-        // FIXME: set halo width based on cutoff distance
+        // FIXME: set halo width based on cutoff distance.
         auto halo_ids =
             createHaloIds( *local_grid, positions, halo_width, max_export );
         // Rebuild if needed.

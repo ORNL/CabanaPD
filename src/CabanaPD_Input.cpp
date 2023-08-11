@@ -67,7 +67,7 @@
 namespace CabanaPD
 {
 
-// FIXME: hardcoded
+// FIXME: hardcoded.
 Inputs::Inputs( const std::array<int, 3> nc, std::array<double, 3> lc,
                 std::array<double, 3> hc, const double t_f, const double dt,
                 const int of )
@@ -87,7 +87,7 @@ void Inputs::read_args( int argc, char* argv[] )
 {
     for ( int i = 1; i < argc; i++ )
     {
-        // Help command
+        // Help command.
         if ( ( strcmp( argv[i], "-h" ) == 0 ) ||
              ( strcmp( argv[i], "--help" ) == 0 ) )
         {
@@ -110,7 +110,7 @@ void Inputs::read_args( int argc, char* argv[] )
                 */
             }
         }
-        // Output file names
+        // Output file names.
         else if ( ( strcmp( argv[i], "-o" ) == 0 ) ||
                   ( strcmp( argv[i], "--output-file" ) == 0 ) )
         {
@@ -124,7 +124,7 @@ void Inputs::read_args( int argc, char* argv[] )
             ++i;
         }
 
-        // Kokkos device type
+        // Kokkos device type.
         else if ( ( strcmp( argv[i], "--device-type" ) == 0 ) )
         {
             device_type = argv[i + 1];
