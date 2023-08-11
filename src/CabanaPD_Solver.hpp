@@ -126,8 +126,7 @@ class SolverElastic
         output_frequency = inputs->output_frequency;
 
         // Create integrator.
-        // FIXME: hardcoded.
-        integrator = std::make_shared<integrator_type>( inputs->timestep, 1.0 );
+        integrator = std::make_shared<integrator_type>( inputs->timestep );
 
         // Add ghosts from other MPI ranks.
         comm = std::make_shared<comm_type>( *particles );
