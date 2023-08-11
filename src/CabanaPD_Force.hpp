@@ -575,19 +575,16 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                                                                   i );
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
-                if ( mu( i, n ) > 0 )
-                {
-                    std::size_t j =
-                        Cabana::NeighborList<NeighListType>::getNeighbor(
-                            neigh_list, i, n );
+                std::size_t j =
+                    Cabana::NeighborList<NeighListType>::getNeighbor(
+                        neigh_list, i, n );
 
-                    // Get the reference positions and displacements.
-                    double xi, r, s;
-                    getDistance( x, u, i, j, xi, r, s );
-                    double m_j =
-                        model.influence_function( xi ) * xi * xi * vol( j );
-                    m( i ) += m_j;
-                }
+                // Get the reference positions and displacements.
+                double xi, r, s;
+                getDistance( x, u, i, j, xi, r, s );
+                double m_j = mu( i, n ) * model.influence_function( xi ) * xi *
+                             xi * vol( j );
+                m( i ) += m_j;
             }
         };
 
@@ -618,6 +615,9 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                                                                   i );
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
+                // This if statement is in place to prevent division by 0 when
+                // m( i ) = 0 which can result when all bonds of particle i are
+                // broken
                 if ( mu( i, n ) > 0 )
                 {
                     std::size_t j =
@@ -662,42 +662,40 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                                                                   i );
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
-                if ( mu( i, n ) > 0 )
+                double fx_i = 0.0;
+                double fy_i = 0.0;
+                double fz_i = 0.0;
+
+                std::size_t j =
+                    Cabana::NeighborList<NeighListType>::getNeighbor(
+                        neigh_list, i, n );
+
+                // Get the reference positions and displacements.
+                double xi, r, s;
+                double rx, ry, rz;
+                getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+
+                // Break if beyond critical stretch unless in no-fail zone.
+                if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
+                     !nofail( i ) )
                 {
-                    double fx_i = 0.0;
-                    double fy_i = 0.0;
-                    double fz_i = 0.0;
+                    mu( i, n ) = 0;
+                }
+                else if ( mu( i, n ) > 0 )
+                {
+                    const double coeff =
+                        ( theta_coeff *
+                              ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
+                          s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
+                        model.influence_function( xi ) * xi * vol( j );
+                    double muij = mu( i, n );
+                    fx_i = muij * coeff * rx / r;
+                    fy_i = muij * coeff * ry / r;
+                    fz_i = muij * coeff * rz / r;
 
-                    std::size_t j =
-                        Cabana::NeighborList<NeighListType>::getNeighbor(
-                            neigh_list, i, n );
-
-                    // Get the reference positions and displacements.
-                    double xi, r, s;
-                    double rx, ry, rz;
-                    getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-
-                    // Break if beyond critical stretch unless in no-fail zone.
-                    if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
-                         !nofail( i ) )
-                        mu( i, n ) = 0;
-
-                    if ( mu( i, n ) > 0 )
-                    {
-                        const double coeff =
-                            ( theta_coeff * ( theta( i ) / m( i ) +
-                                              theta( j ) / m( j ) ) +
-                              s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                            model.influence_function( xi ) * xi * vol( j );
-                        double muij = mu( i, n );
-                        fx_i = muij * coeff * rx / r;
-                        fy_i = muij * coeff * ry / r;
-                        fz_i = muij * coeff * rz / r;
-
-                        f( i, 0 ) += fx_i;
-                        f( i, 1 ) += fy_i;
-                        f( i, 2 ) += fz_i;
-                    }
+                    f( i, 0 ) += fx_i;
+                    f( i, 1 ) += fy_i;
+                    f( i, 2 ) += fz_i;
                 }
             }
         };
@@ -1020,38 +1018,36 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                                                                   i );
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
-                if ( mu( i, n ) > 0 )
+                double fx_i = 0.0;
+                double fy_i = 0.0;
+                double fz_i = 0.0;
+
+                std::size_t j =
+                    Cabana::NeighborList<NeighListType>::getNeighbor(
+                        neigh_list, i, n );
+
+                // Get the reference positions and displacements.
+                double xi, r, s;
+                double rx, ry, rz;
+                getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+
+                // Break if beyond critical stretch unless in no-fail zone.
+                if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
+                     !nofail( j ) )
                 {
-                    double fx_i = 0.0;
-                    double fy_i = 0.0;
-                    double fz_i = 0.0;
+                    mu( i, n ) = 0;
+                }
+                else if ( mu( i, n ) > 0 )
+                {
+                    const double coeff = c * s * vol( j );
+                    double muij = mu( i, n );
+                    fx_i = muij * coeff * rx / r;
+                    fy_i = muij * coeff * ry / r;
+                    fz_i = muij * coeff * rz / r;
 
-                    std::size_t j =
-                        Cabana::NeighborList<NeighListType>::getNeighbor(
-                            neigh_list, i, n );
-
-                    // Get the reference positions and displacements.
-                    double xi, r, s;
-                    double rx, ry, rz;
-                    getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-
-                    // Break if beyond critical stretch unless in no-fail zone.
-                    if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
-                         !nofail( j ) )
-                        mu( i, n ) = 0;
-
-                    if ( mu( i, n ) > 0 )
-                    {
-                        const double coeff = c * s * vol( j );
-                        double muij = mu( i, n );
-                        fx_i = muij * coeff * rx / r;
-                        fy_i = muij * coeff * ry / r;
-                        fz_i = muij * coeff * rz / r;
-
-                        f( i, 0 ) += fx_i;
-                        f( i, 1 ) += fy_i;
-                        f( i, 2 ) += fz_i;
-                    }
+                    f( i, 0 ) += fx_i;
+                    f( i, 1 ) += fy_i;
+                    f( i, 2 ) += fz_i;
                 }
             }
         };
