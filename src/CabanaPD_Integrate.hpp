@@ -89,13 +89,13 @@ class Integrator
         auto u = p.slice_u();
         auto v = p.slice_v();
         auto f = p.slice_f();
-        auto density = p.slice_rho();
+        auto rho = p.slice_rho();
 
         auto dt = _dt;
         auto half_dt = _half_dt;
         auto init_func = KOKKOS_LAMBDA( const int i )
         {
-            const double half_dt_m = half_dt / density( i );
+            const double half_dt_m = half_dt / rho( i );
             v( i, 0 ) += half_dt_m * f( i, 0 );
             v( i, 1 ) += half_dt_m * f( i, 1 );
             v( i, 2 ) += half_dt_m * f( i, 2 );
@@ -113,12 +113,12 @@ class Integrator
     {
         auto v = p.slice_v();
         auto f = p.slice_f();
-        auto density = p.slice_rho();
+        auto rho = p.slice_rho();
 
         auto half_dt = _half_dt;
         auto final_func = KOKKOS_LAMBDA( const int i )
         {
-            const double half_dt_m = half_dt / density( i );
+            const double half_dt_m = half_dt / rho( i );
             v( i, 0 ) += half_dt_m * f( i, 0 );
             v( i, 1 ) += half_dt_m * f( i, 1 );
             v( i, 2 ) += half_dt_m * f( i, 2 );
