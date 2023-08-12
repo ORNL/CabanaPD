@@ -128,25 +128,25 @@ int bond_prenotch_intersection( const Kokkos::Array<double, 3> v1,
                                 const Kokkos::Array<double, 3> x_j,
                                 const double tol = 1e-10 )
 {
-    // Define plane vectors cross product
+    // Define plane vectors cross product.
     auto cross_v1_v2 = cross( v1, v2 );
     double norm_cross_v1_v2 = norm( cross_v1_v2 );
 
-    // Check if v1 and v2 are parallel
+    // Check if v1 and v2 are parallel.
     assert( abs( norm( cross( v1, v2 ) ) ) > tol );
 
-    // Define plane normal
+    // Define plane normal.
     auto n = scale( cross_v1_v2, 1.0 / norm_cross_v1_v2 );
 
-    // Define line
+    // Define line.
     auto l0 = x_i;
     auto l = diff( x_j, x_i );
 
-    // Check line-plane intersection
+    // Check line-plane intersection.
     int case_flag = line_plane_intersection( p0, n, l0, l );
     int keep_bond = 1;
 
-    // Case I: full intersection
+    // Case I: full intersection.
     if ( case_flag == 1 )
     {
         double norm2_cross_v1_v2 = norm_cross_v1_v2 * norm_cross_v1_v2;
@@ -165,19 +165,19 @@ int bond_prenotch_intersection( const Kokkos::Array<double, 3> v1,
                 fmin( li2, lj2 ) > 1 + tol || fmax( li2, lj2 ) < -tol ) )
             keep_bond = 0;
     }
-    // Case II: no intersection
+    // Case II: no intersection.
 
-    // Case III: single point intersection
+    // Case III: single point intersection.
     else if ( case_flag == 3 )
     {
         assert( abs( dot( l, n ) ) > tol );
 
-        // Check if intersection point belongs to the bond
+        // Check if intersection point belongs to the bond.
         auto d = dot( diff( p0, l0 ), n ) / dot( l, n );
 
         if ( -tol < d && d < 1 + tol )
         {
-            // Check if intersection point belongs to the plane
+            // Check if intersection point belongs to the plane.
             auto p = sum( l0, scale( l, d ) );
 
             double norm2_cross_v1_v2 = norm_cross_v1_v2 * norm_cross_v1_v2;
@@ -188,7 +188,7 @@ int bond_prenotch_intersection( const Kokkos::Array<double, 3> v1,
                         norm2_cross_v1_v2;
 
             if ( -tol < fmin( l1, l2 ) && fmax( l1, l2 ) < 1 + tol )
-                // Intersection
+                // Intersection.
                 keep_bond = 0;
         }
     }

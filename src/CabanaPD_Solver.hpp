@@ -126,10 +126,10 @@ class SolverElastic
         output_frequency = inputs->output_frequency;
 
         // Create integrator.
-        // FIXME: hardcoded
+        // FIXME: hardcoded.
         integrator = std::make_shared<integrator_type>( inputs->timestep, 1.0 );
 
-        // Add ghosts from other MPI ranks
+        // Add ghosts from other MPI ranks.
         comm = std::make_shared<comm_type>( *particles );
 
         // Create the neighbor list.
@@ -183,7 +183,7 @@ class SolverElastic
         force->compute_dilatation( *particles, *neighbors, neigh_iter_tag{} );
         comm->gatherDilatation();
 
-        // Compute initial forces
+        // Compute initial forces.
         compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
         compute_energy( *force, *particles, *neighbors, neigh_iter_tag() );
 
@@ -195,10 +195,10 @@ class SolverElastic
     {
         init_output();
 
-        // Main timestep loop
+        // Main timestep loop.
         for ( int step = 1; step <= num_steps; step++ )
         {
-            // Integrate - velocity Verlet first half
+            // Integrate - velocity Verlet first half.
             integrate_timer.reset();
             integrator->initial_integrate( *particles );
             integrate_time += integrate_timer.seconds();
@@ -218,17 +218,17 @@ class SolverElastic
             comm->gatherDilatation();
             comm_time += comm_timer.seconds();
 
-            // Compute internal forces
+            // Compute internal forces.
             force_timer.reset();
             compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
             force_time += force_timer.seconds();
 
-            // Integrate - velocity Verlet second half
+            // Integrate - velocity Verlet second half.
             integrate_timer.reset();
             integrator->final_integrate( *particles );
             integrate_time += integrate_timer.seconds();
 
-            // Print output
+            // Print output.
             other_timer.reset();
             if ( step % output_frequency == 0 )
             {
@@ -242,7 +242,7 @@ class SolverElastic
             other_time += other_timer.seconds();
         }
 
-        // Final output and timings
+        // Final output and timings.
         final_output();
     }
 
@@ -380,7 +380,7 @@ class SolverFracture
         force->compute_dilatation( *particles, *neighbors, mu );
         comm->gatherDilatation();
 
-        // Compute initial forces
+        // Compute initial forces.
         compute_force( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
         compute_energy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
 
@@ -395,10 +395,10 @@ class SolverFracture
     {
         this->init_output();
 
-        // Main timestep loop
+        // Main timestep loop.
         for ( int step = 1; step <= num_steps; step++ )
         {
-            // Integrate - velocity Verlet first half
+            // Integrate - velocity Verlet first half.
             integrate_timer.reset();
             integrator->initial_integrate( *particles );
             integrate_time += integrate_timer.seconds();
@@ -423,7 +423,7 @@ class SolverFracture
             comm->gatherDilatation();
             comm_time += comm_timer.seconds();
 
-            // Compute internal forces
+            // Compute internal forces.
             force_timer.reset();
             compute_force( *force, *particles, *neighbors, mu,
                            neigh_iter_tag{} );
@@ -432,12 +432,12 @@ class SolverFracture
             // Add boundary condition.
             boundary_condition.apply( exec_space{}, *particles );
 
-            // Integrate - velocity Verlet second half
+            // Integrate - velocity Verlet second half.
             integrate_timer.reset();
             integrator->final_integrate( *particles );
             integrate_time += integrate_timer.seconds();
 
-            // Print output
+            // Print output.
             other_timer.reset();
             if ( step % output_frequency == 0 )
             {
@@ -451,7 +451,7 @@ class SolverFracture
             other_time += other_timer.seconds();
         }
 
-        // Final output and timings
+        // Final output and timings.
         this->final_output();
     }
 
