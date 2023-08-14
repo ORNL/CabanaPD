@@ -29,24 +29,7 @@ int main( int argc, char* argv[] )
         using exec_space = Kokkos::DefaultExecutionSpace;
         using memory_space = typename exec_space::memory_space;
 
-        // Plate dimension)
-        double height = 0.1;      // [m] (100 mm)
-        double width = 0.2;       // [m] (200 mm)
-        double thickness = 0.009; // [m] (  9 mm)
-
-        // Domain
-        // This is a relatively large example for CPU - reduce the number of
-        // cells and increase delta if needed. Note this is also a relatively
-        // small example for GPU.
-        std::array<int, 3> num_cell = { 151, 301, 14 };
-        std::array<double, 3> low_corner = { -0.5 * height, -0.5 * width,
-                                             -0.5 * thickness };
-        std::array<double, 3> high_corner = { 0.5 * height, 0.5 * width,
-                                              0.5 * thickness };
-        double t_final = 70e-6;
-        double dt = 0.133e-6;
-        int output_frequency = 10;
-        bool output_reference = true;
+        CabanaPD::Inputs inputs( argv[1] );
 
         // Material constants
         double E = 191e+9;                           // [Pa]
@@ -60,19 +43,23 @@ int main( int argc, char* argv[] )
         double L_prenotch = 0.05;    // [m] (50 mm)
         double y_prenotch1 = -0.025; // [m] (-25 mm)
         double y_prenotch2 = 0.025;  // [m] ( 25 mm)
-        Kokkos::Array<double, 3> p01 = { low_corner[0], y_prenotch1,
-                                         low_corner[2] };
-        Kokkos::Array<double, 3> p02 = { low_corner[0], y_prenotch2,
-                                         low_corner[2] };
+        double low_x = inputs["low_corner"][0];
+        double low_z = inputs["low_corner"][2];
+        Kokkos::Array<double, 3> p01 = { low_x, y_prenotch1, low_z };
+        Kokkos::Array<double, 3> p02 = { low_x, y_prenotch2, low_z };
         Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
+        double thickness = inputs["system_size"][2];
         Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
         Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { p01,
                                                                        p02 };
         CabanaPD::Prenotch<2> prenotch( v1, v2, notch_positions );
 
         double delta = 0.0020000001;
+        std::array<double, 3> low_corner = inputs["low_corner"];
+        std::array<double, 3> high_corner = inputs["high_corner"];
+        std::array<int, 3> num_cells = inputs["num_cells"];
         int m = std::floor(
-            delta / ( ( high_corner[0] - low_corner[0] ) / num_cell[0] ) );
+            delta / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
         int halo_width = m + 1; // Just to be safe.
 
         // Choose force model type.
@@ -82,16 +69,12 @@ int main( int argc, char* argv[] )
         // using model_type =
         //     CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
         // model_type force_model( delta, K, G, G0 );
-        CabanaPD::Inputs<3> inputs( num_cell, low_corner, high_corner, t_final,
-                                    dt, output_frequency, output_reference );
-        inputs.read_args( argc, argv );
 
         // Create particles from mesh.
         // Does not set displacements, velocities, etc.
         auto particles = std::make_shared<
             CabanaPD::Particles<memory_space, typename model_type::base_model>>(
-            exec_space(), inputs.low_corner, inputs.high_corner,
-            inputs.num_cells, halo_width );
+            exec_space(), low_corner, high_corner, num_cells, halo_width );
 
         // Define particle initialization.
         auto x = particles->sliceReferencePosition();
@@ -101,6 +84,7 @@ int main( int argc, char* argv[] )
 
         double dx = particles->dx[0];
 
+        double height = inputs["system_size"][0];
         double x_bc = -0.5 * height;
         CabanaPD::RegionBoundary plane(
             x_bc - dx, x_bc + dx * 1.25, y_prenotch1 - dx * 0.25,

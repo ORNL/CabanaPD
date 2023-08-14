@@ -1,0 +1,8 @@
+{
+    "num_cells": [41, 41, 41],
+    "system_size": [1.0, 1.0, 1.0],
+    "final_time": 0.6, 
+    "timestep": 0.01,
+    "output_frequency": 5,
+    "output_reference": true
+}
