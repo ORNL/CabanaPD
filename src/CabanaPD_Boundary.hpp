@@ -167,11 +167,12 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
         auto x = particles.slice_x();
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
+        auto value = _value;
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
                 for ( int d = 0; d < 3; d++ )
-                    f( pid, d ) = _value;
+                    f( pid, d ) = value;
             } );
     }
 };
@@ -201,11 +202,12 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
         auto f = particles.slice_f();
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
+        auto value = _value;
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
                 for ( int d = 0; d < 3; d++ )
-                    f( pid, d ) += _value;
+                    f( pid, d ) += value;
             } );
     }
 };
@@ -236,12 +238,13 @@ struct BoundaryCondition<BCIndexSpace, ForceCrackBranchBCTag>
         auto x = particles.slice_x();
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
+        auto value = _value;
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
                 // This is specifically for the crack branching.
                 auto sign = std::abs( x( pid, 1 ) ) / x( pid, 1 );
-                f( pid, 1 ) += _value * sign;
+                f( pid, 1 ) += value * sign;
             } );
     }
 };
