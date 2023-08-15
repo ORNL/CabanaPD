@@ -615,10 +615,8 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                                                                   i );
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
-                // This if statement is in place to prevent division by 0 when
-                // m( i ) = 0 which can result when all bonds of particle i are
-                // broken
-                if ( mu( i, n ) > 0 )
+                // The condition m(i) > 0 is to avoid dividing by 0.
+                if ( m( i ) > 0 )
                 {
                     std::size_t j =
                         Cabana::NeighborList<NeighListType>::getNeighbor(
@@ -627,8 +625,9 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                     // Get the bond distance, displacement, and stretch
                     double xi, r, s;
                     getDistance( x, u, i, j, xi, r, s );
-                    double theta_i =
-                        model.influence_function( xi ) * s * xi * xi * vol( j );
+                    double theta_i = mu( i, n ) *
+                                     model.influence_function( xi ) * s * xi *
+                                     xi * vol( j );
                     theta( i ) += 3.0 * theta_i / m( i );
                 }
             }
@@ -678,17 +677,21 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                 // Break if beyond critical stretch unless in no-fail zone.
                 if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
                      !nofail( i ) )
-                {
                     mu( i, n ) = 0;
-                }
-                else if ( mu( i, n ) > 0 )
+
+                // The condition m(i) > 0 && m( j ) > 0 is to avoid dividing by
+                // 0. Note that if either m(i) = 0 or m( j ) = 0, then mu( i, n
+                // ) = 0, so we avoid the cases m(i) ~= 0 & m( j ) = 0 as well
+                // as m(i) = 0 & m( j ) ~= 0.
+                if ( m( i ) > 0 && m( j ) > 0 )
                 {
+                    double muij = mu( i, n );
                     const double coeff =
+                        muij *
                         ( theta_coeff *
                               ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
                           s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
                         model.influence_function( xi ) * xi * vol( j );
-                    double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;
                     fy_i = muij * coeff * ry / r;
                     fz_i = muij * coeff * rz / r;
@@ -1034,21 +1037,17 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                 // Break if beyond critical stretch unless in no-fail zone.
                 if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
                      !nofail( j ) )
-                {
                     mu( i, n ) = 0;
-                }
-                else if ( mu( i, n ) > 0 )
-                {
-                    const double coeff = c * s * vol( j );
-                    double muij = mu( i, n );
-                    fx_i = muij * coeff * rx / r;
-                    fy_i = muij * coeff * ry / r;
-                    fz_i = muij * coeff * rz / r;
 
-                    f( i, 0 ) += fx_i;
-                    f( i, 1 ) += fy_i;
-                    f( i, 2 ) += fz_i;
-                }
+                const double coeff = c * s * vol( j );
+                double muij = mu( i, n );
+                fx_i = muij * coeff * rx / r;
+                fy_i = muij * coeff * ry / r;
+                fz_i = muij * coeff * rz / r;
+
+                f( i, 0 ) += fx_i;
+                f( i, 1 ) += fy_i;
+                f( i, 2 ) += fz_i;
             }
         };
 
