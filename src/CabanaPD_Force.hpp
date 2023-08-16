@@ -588,7 +588,6 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                 // Get the reference positions and displacements.
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
-                // Added mu to account for bond breaking.
                 double m_j = mu( i, n ) * model.influence_function( xi ) * xi *
                              xi * vol( j );
                 m( i ) += m_j;
@@ -629,11 +628,11 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                 // Get the bond distance, displacement, and stretch.
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
-                // Added mu to account for bond breaking.
                 double theta_i = mu( i, n ) * model.influence_function( xi ) *
                                  s * xi * xi * vol( j );
-                // m( i ) is 0 when all bonds connected to particle i are
-                // broken.
+                // Check if all bonds are broken (m=0) to avoid dividing by
+                // zero. Alternatively, once could check if this bond mu(i,n) is
+                // broken, beacuse m=0 only occurs when all bonds are broken.
                 if ( m( i ) > 0 )
                     theta( i ) += 3.0 * theta_i / m( i );
             }
@@ -685,10 +684,10 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                      !nofail( i ) )
                 {
                     mu( i, n ) = 0;
-                    // Note m( i ) = 0 when all bonds connected to particle i
-                    // are broken, which implies mu( i, n ) = 0 for all
-                    // neighbors of particle i. Similarly for m( j ).
                 }
+                // Check if this bond is broken (mu=0) to ensure m(i) and m(j)
+                // are both >0 (m=0 only occurs when all bonds are broken) to
+                // avoid dividing by zero.
                 else if ( mu( i, n ) > 0 )
                 {
                     const double coeff =
