@@ -588,6 +588,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                 // Get the reference positions and displacements.
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
+                // mu is included to account for bond breaking.
                 double m_j = mu( i, n ) * model.influence_function( xi ) * xi *
                              xi * vol( j );
                 m( i ) += m_j;
@@ -628,6 +629,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                 // Get the bond distance, displacement, and stretch.
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
+                // mu is included to account for bond breaking.
                 double theta_i = mu( i, n ) * model.influence_function( xi ) *
                                  s * xi * xi * vol( j );
                 // Check if all bonds are broken (m=0) to avoid dividing by
