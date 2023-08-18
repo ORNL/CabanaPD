@@ -633,7 +633,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                 double theta_i = mu( i, n ) * model.influence_function( xi ) *
                                  s * xi * xi * vol( j );
                 // Check if all bonds are broken (m=0) to avoid dividing by
-                // zero. Alternatively, once could check if this bond mu(i,n) is
+                // zero. Alternatively, one could check if this bond mu(i,n) is
                 // broken, beacuse m=0 only occurs when all bonds are broken.
                 if ( m( i ) > 0 )
                     theta( i ) += 3.0 * theta_i / m( i );
@@ -1046,6 +1046,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                 {
                     mu( i, n ) = 0;
                 }
+                // Else if statement is only for performance.
                 else if ( mu( i, n ) > 0 )
                 {
                     const double coeff = c * s * vol( j );
