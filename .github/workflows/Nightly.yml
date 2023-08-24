@@ -33,7 +33,8 @@ jobs:
         uses: actions/checkout@v2.2.0
         with:
           repository: ECP-CoPA/Cabana
-          ref: master
+          # This version is post-release 0.5
+          ref: 31ba70d9e8f8e20f2e55e7e310905f950b21776f
           path: cabana
       - name: Build Cabana
         working-directory: cabana
