@@ -134,7 +134,6 @@ class Particles<DeviceType, PMB, Dimension>
     double dy;
     double dz;
 
-    std::vector<int> halo_neighbors;
     int halo_width;
 
     // Default constructor.
@@ -198,9 +197,6 @@ class Particles<DeviceType, PMB, Dimension>
         dx = local_mesh.measure( Cajita::Edge<Cajita::Dim::I>(), zero );
         dy = local_mesh.measure( Cajita::Edge<Cajita::Dim::J>(), zero );
         dz = local_mesh.measure( Cajita::Edge<Cajita::Dim::K>(), zero );
-
-        // FIXME: remove Impl.
-        halo_neighbors = Cajita::Impl::getTopology( *local_grid );
     }
 
     template <class ExecSpace>
@@ -436,7 +432,6 @@ class Particles<DeviceType, LPS, Dimension>
     using base_type::dz;
     using base_type::local_grid;
 
-    using base_type::halo_neighbors;
     using base_type::halo_width;
 
     // Default constructor.
