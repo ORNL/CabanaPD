@@ -10,6 +10,7 @@ jobs:
       matrix:
         backend: ["OPENMP", "SERIAL"]
         kokkos_ver: ["develop"]
+        cmake_build_type: ['Release']
     runs-on: ubuntu-20.04
     container: ghcr.io/ecp-copa/ci-containers/ubuntu:latest
     steps:
