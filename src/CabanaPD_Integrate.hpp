@@ -75,10 +75,10 @@ class Integrator
     double _dt, _half_dt;
 
   public:
-    Integrator( double dt, double mvv2e )
+    Integrator( double dt )
         : _dt( dt )
     {
-        _half_dt = 0.5 * dt / mvv2e;
+        _half_dt = 0.5 * dt;
     }
 
     ~Integrator() {}
