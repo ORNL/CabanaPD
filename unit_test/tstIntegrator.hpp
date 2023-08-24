@@ -48,7 +48,7 @@ void testIntegratorReversibility( int steps )
     auto x = particles.slice_x();
     std::size_t num_particle = x.size();
 
-    CabanaPD::Integrator<exec_space> integrator( 0.001, 1.0 );
+    CabanaPD::Integrator<exec_space> integrator( 0.001 );
 
     // Keep a copy of initial positions on the host
     using DataTypes = Cabana::MemberTypes<double[3]>;
