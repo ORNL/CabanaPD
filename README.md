@@ -87,7 +87,7 @@ must be used:
 
 Note that `hipcc` should be used for Kokkos, Cabana, and CabanaPD.
 
-## Test
+## Tests
 
 Unit tests can be built by updating the CabanaPD CMake configuration in the
 script above with:
@@ -122,9 +122,14 @@ example can be run with:
 ./CabanaPD/build/install/bin/KalthoffWinkler
 ```
 
-New examples can be created by using the existing `KalthoffWinkler` as a
-template to simulate other fracture problems. All inputs are currently
-specified in `examples/kalthoff_winkler.cpp`
+The third example is cracking branching in soda-lime glass. The example can be
+run with:
+
+```
+./CabanaPD/build/install/bin/CrackBranching
+```
+
+New examples can be created by using any of the current cases as a template. All inputs are currently specified in the example source files themselves.
 
 ## References
 
