@@ -88,6 +88,7 @@ class Particles<DeviceType, PMB, Dimension>
     using self_type = Particles<DeviceType, PMB, Dimension>;
     using device_type = DeviceType;
     using memory_space = typename device_type::memory_space;
+    using execution_space = typename memory_space::execution_space;
     static constexpr int dim = Dimension;
 
     // Per particle.
@@ -308,10 +309,14 @@ class Particles<DeviceType, PMB, Dimension>
     }
     auto sliceCurrentPosition()
     {
+        // Update before returning data.
+        updateCurrentPosition();
         return Cabana::slice<0>( _aosoa_y, "current_positions" );
     }
     auto sliceCurrentPosition() const
     {
+        // Update before returning data.
+        updateCurrentPosition();
         return Cabana::slice<0>( _aosoa_y, "current_positions" );
     }
     auto sliceDisplacement()
@@ -371,6 +376,22 @@ class Particles<DeviceType, PMB, Dimension>
     auto sliceNoFail() const
     {
         return Cabana::slice<0>( _aosoa_nofail, "no_fail_region" );
+    }
+
+    void updateCurrentPosition()
+    {
+        // Not using slice function because this is called inside.
+        auto y = Cabana::slice<0>( _aosoa_y, "current_positions" );
+        auto x = sliceReferencePosition();
+        auto u = sliceDisplacement();
+        Kokkos::RangePolicy<execution_space> policy( 0, n_local + n_ghost );
+        auto sum_x_u = KOKKOS_LAMBDA( const std::size_t pid )
+        {
+            for ( int d = 0; d < 3; d++ )
+                y( pid, d ) = x( pid, d ) + u( pid, d );
+        };
+        Kokkos::parallel_for( "CabanaPD::CalculateCurrentPositions", policy,
+                              sum_x_u );
     }
 
     void resize( int new_local, int new_ghost )
