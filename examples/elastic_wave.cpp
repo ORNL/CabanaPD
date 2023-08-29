@@ -35,6 +35,7 @@ int main( int argc, char* argv[] )
         double t_final = 0.6;
         double dt = 0.01;
         int output_frequency = 5;
+        bool output_reference = true;
         double K = 1.0;
         double G = 0.5;
         double delta = 0.075;
@@ -51,7 +52,7 @@ int main( int argc, char* argv[] )
         model_type force_model( delta, K, G );
 
         CabanaPD::Inputs<3> inputs( num_cell, low_corner, high_corner, t_final,
-                                    dt, output_frequency );
+                                    dt, output_frequency, output_reference );
         inputs.read_args( argc, argv );
 
         // Create particles from mesh.

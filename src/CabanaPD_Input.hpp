@@ -34,18 +34,20 @@ class Inputs
     double final_time;
     double timestep;
     int output_frequency;
+    bool output_reference;
 
     bool half_neigh = false;
 
     Inputs( const std::array<int, Dim> nc, std::array<double, Dim> lc,
             std::array<double, Dim> hc, const double t_f, const double dt,
-            const int of )
+            const int of, const bool output_ref )
         : num_cells( nc )
         , low_corner( lc )
         , high_corner( hc )
         , final_time( t_f )
         , timestep( dt )
         , output_frequency( of )
+        , output_reference( output_ref )
     {
         num_steps = final_time / timestep;
     }

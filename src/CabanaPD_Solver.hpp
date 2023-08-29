@@ -126,6 +126,7 @@ class SolverElastic
 
         num_steps = inputs->num_steps;
         output_frequency = inputs->output_frequency;
+        output_reference = inputs->output_reference;
 
         // Create integrator.
         integrator = std::make_shared<integrator_type>( inputs->timestep );
@@ -188,7 +189,7 @@ class SolverElastic
         computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
         computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
 
-        particles->output( 0, 0.0 );
+        particles->output( 0, 0.0, output_reference );
         init_time += init_timer.seconds();
     }
 
@@ -238,7 +239,7 @@ class SolverElastic
 
                 step_output( step, W );
                 particles->output( step / output_frequency,
-                                   step * inputs->timestep );
+                                   step * inputs->timestep, output_reference );
             }
             other_time += other_timer.seconds();
         }
@@ -305,6 +306,7 @@ class SolverElastic
 
     int num_steps;
     int output_frequency;
+    bool output_reference;
 
   protected:
     std::shared_ptr<particle_type> particles;
@@ -391,7 +393,7 @@ class SolverFracture
         // Add boundary condition.
         boundary_condition.apply( exec_space(), *particles );
 
-        particles->output( 0, 0.0 );
+        particles->output( 0, 0.0, output_reference );
         init_time += init_timer.seconds();
     }
 
@@ -450,7 +452,7 @@ class SolverFracture
 
                 this->step_output( step, W );
                 particles->output( step / output_frequency,
-                                   step * inputs->timestep );
+                                   step * inputs->timestep, output_reference );
             }
             other_time += other_timer.seconds();
         }
@@ -461,6 +463,7 @@ class SolverFracture
 
     using base_type::num_steps;
     using base_type::output_frequency;
+    using base_type::output_reference;
 
   protected:
     using base_type::comm;
