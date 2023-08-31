@@ -53,22 +53,21 @@ void read_particles( const std::string filename, ParticleType& particles )
 
     auto px = particles.slice_x();
     auto pvol = particles.slice_vol();
-    auto v = slice_v();
-    auto f = slice_f();
-    auto type = slice_type();
-    auto rho = slice_rho();
-    auto u = slice_u();
-    auto nofail = slice_nofail();
+    auto v = particles.slice_v();
+    auto f = particles.slice_f();
+    auto type = particles.slice_type();
+    auto rho = particles.slice_rho();
+    auto u = particles.slice_u();
+    auto nofail = particles.slice_nofail();
 
     using exec_space = typename memory_space::execution_space;
     Kokkos::parallel_for(
-        "copy_to_particles",
-        Kokkos::RangePolicy<exec_space> policy( 0, x.size() ),
-        KOKKOS_LAMBDA( const int i ) {
+        "copy_to_particles", Kokkos::RangePolicy<exec_space>( 0, x.size() ),
+        KOKKOS_LAMBDA( const int pid ) {
             // Set the particle position and volume.
-            pvol( pid ) = vol( i );
-            px( pid, 0 ) = x( i );
-            px( pid, 1 ) = y( i );
+            pvol( pid ) = vol( pid );
+            px( pid, 0 ) = x( pid );
+            px( pid, 1 ) = y( pid );
 
             // Initialize everything else to zero.
             px( pid, 2 ) = 0.0;
@@ -154,9 +153,9 @@ int main( int argc, char* argv[] )
 
         // Read particles from file.
         std::string file_name = "file.csv";
-        read_particles( file_name, particles );
+        read_particles( file_name, *particles );
         // Update after reading.
-        particles.update_after_read( exec_space(), halo_width, num_cell );
+        particles->update_after_read( exec_space(), halo_width, num_cell );
 
         // Define particle initialization.
         auto x = particles->slice_x();
