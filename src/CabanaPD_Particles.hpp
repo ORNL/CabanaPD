@@ -304,8 +304,9 @@ class Particles<DeviceType, PMB, Dimension>
         Kokkos::parallel_reduce(
             "CabanaPD::Particles::min_max_positions",
             Kokkos::RangePolicy<ExecSpace>( exec_space, 0, n_local ),
-            KOKKOS_LAMBDA( const int i, int& min_x, int& min_y, int& min_z,
-                           int& max_x, int& max_y, int& max_z ) {
+            KOKKOS_LAMBDA( const int i, double& min_x, double& min_y,
+                           double& min_z, double& max_x, double& max_y,
+                           double& max_z ) {
                 if ( x( i, 0 ) > max_x )
                     max_x = x( i, 0 );
                 else if ( x( i, 0 ) < min_x )
