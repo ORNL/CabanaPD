@@ -13,12 +13,12 @@ void read_particles( const std::string filename, ParticleType& particles )
     // Read particles from csv file.
     std::vector<double> csv_x;
     std::vector<double> csv_y;
-    std::vector<double> csv_vol;
+    std::vector<double> csv_v;
 
     std::vector<std::string> row;
     std::string line, word;
 
-    std::fstream file( file_name, std::ios::in );
+    std::fstream file( filename, std::ios::in );
     if ( file.is_open() )
     {
         std::getline( file, line );
@@ -34,7 +34,7 @@ void read_particles( const std::string filename, ParticleType& particles )
             }
             csv_x.push_back( std::stod( row[1] ) );
             csv_y.push_back( std::stod( row[2] ) );
-            csv_vol.push_back( std::stod( row[3] ) );
+            csv_v.push_back( std::stod( row[3] ) );
         }
     }
     else
