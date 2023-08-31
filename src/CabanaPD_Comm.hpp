@@ -111,8 +111,8 @@ struct HaloIds
         // Add a ghost if this particle is near the local boundary, potentially
         // for each of the 26 neighbors cells. Do this one neighbor rank at a
         // time so that sends are contiguous.
-        auto topology = Cajita::Impl::getTopology( local_grid );
-        auto unique_topology = Cabana::Impl::getUniqueTopology(
+        auto topology = Cajita::getTopology( local_grid );
+        auto unique_topology = Cabana::getUniqueTopology(
             local_grid.globalGrid().comm(), topology );
         for ( std::size_t ar = 0; ar < unique_topology.size(); ar++ )
         {
@@ -186,7 +186,7 @@ class Comm<ParticleType, PMB>
     int max_export;
 
     // FIXME: this should use MemorySpace directly, but Cabana::Halo currently
-    // uses DeviceType
+    // uses DeviceType.
     using device_type = typename ParticleType::device_type;
     using halo_type = Cabana::Halo<device_type>;
     using gather_u_type =
@@ -203,12 +203,11 @@ class Comm<ParticleType, PMB>
 
         auto positions = particles.slice_x();
         // Get all 26 neighbor ranks.
-        // FIXME: remove Impl
         auto halo_width = local_grid->haloCellWidth();
-        auto topology = Cajita::Impl::getTopology( *local_grid );
+        auto topology = Cajita::getTopology( *local_grid );
 
         // Determine which particles need to be ghosted to neighbors.
-        // FIXME: set halo width based on cutoff distance
+        // FIXME: set halo width based on cutoff distance.
         auto halo_ids =
             createHaloIds( *local_grid, positions, halo_width, max_export );
         // Rebuild if needed.

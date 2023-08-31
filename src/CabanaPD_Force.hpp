@@ -161,8 +161,14 @@ struct ForceModel<LPS, Fracture> : public ForceModel<LPS, Elastic>
     {
         base_type::set_param( _delta, _K, _G );
         G0 = _G0;
-        // s0 = sqrt( 5.0 * G0 / 9.0 / K / delta ); // 1/xi
-        s0 = sqrt( 8.0 * G0 / 15.0 / K / delta ); // 1
+        if ( influence_type == 1 )
+        {
+            s0 = sqrt( 5.0 * G0 / 9.0 / K / delta ); // 1/xi
+        }
+        else
+        {
+            s0 = sqrt( 8.0 * G0 / 15.0 / K / delta ); // 1
+        }
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 };
@@ -434,7 +440,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
 
         auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
         {
-            // Get the bond distance, displacement, and stretch
+            // Get the bond distance, displacement, and stretch.
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
             double theta_i =
@@ -575,19 +581,17 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                                                                   i );
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
-                if ( mu( i, n ) > 0 )
-                {
-                    std::size_t j =
-                        Cabana::NeighborList<NeighListType>::getNeighbor(
-                            neigh_list, i, n );
+                std::size_t j =
+                    Cabana::NeighborList<NeighListType>::getNeighbor(
+                        neigh_list, i, n );
 
-                    // Get the reference positions and displacements.
-                    double xi, r, s;
-                    getDistance( x, u, i, j, xi, r, s );
-                    double m_j =
-                        model.influence_function( xi ) * xi * xi * vol( j );
-                    m( i ) += m_j;
-                }
+                // Get the reference positions and displacements.
+                double xi, r, s;
+                getDistance( x, u, i, j, xi, r, s );
+                // mu is included to account for bond breaking.
+                double m_j = mu( i, n ) * model.influence_function( xi ) * xi *
+                             xi * vol( j );
+                m( i ) += m_j;
             }
         };
 
@@ -618,19 +622,21 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                                                                   i );
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
-                if ( mu( i, n ) > 0 )
-                {
-                    std::size_t j =
-                        Cabana::NeighborList<NeighListType>::getNeighbor(
-                            neigh_list, i, n );
+                std::size_t j =
+                    Cabana::NeighborList<NeighListType>::getNeighbor(
+                        neigh_list, i, n );
 
-                    // Get the bond distance, displacement, and stretch
-                    double xi, r, s;
-                    getDistance( x, u, i, j, xi, r, s );
-                    double theta_i =
-                        model.influence_function( xi ) * s * xi * xi * vol( j );
+                // Get the bond distance, displacement, and stretch.
+                double xi, r, s;
+                getDistance( x, u, i, j, xi, r, s );
+                // mu is included to account for bond breaking.
+                double theta_i = mu( i, n ) * model.influence_function( xi ) *
+                                 s * xi * xi * vol( j );
+                // Check if all bonds are broken (m=0) to avoid dividing by
+                // zero. Alternatively, one could check if this bond mu(i,n) is
+                // broken, beacuse m=0 only occurs when all bonds are broken.
+                if ( m( i ) > 0 )
                     theta( i ) += 3.0 * theta_i / m( i );
-                }
             }
         };
 
@@ -662,42 +668,43 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                                                                   i );
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
-                if ( mu( i, n ) > 0 )
+                double fx_i = 0.0;
+                double fy_i = 0.0;
+                double fz_i = 0.0;
+
+                std::size_t j =
+                    Cabana::NeighborList<NeighListType>::getNeighbor(
+                        neigh_list, i, n );
+
+                // Get the reference positions and displacements.
+                double xi, r, s;
+                double rx, ry, rz;
+                getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+
+                // Break if beyond critical stretch unless in no-fail zone.
+                if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
+                     !nofail( i ) )
                 {
-                    double fx_i = 0.0;
-                    double fy_i = 0.0;
-                    double fz_i = 0.0;
+                    mu( i, n ) = 0;
+                }
+                // Check if this bond is broken (mu=0) to ensure m(i) and m(j)
+                // are both >0 (m=0 only occurs when all bonds are broken) to
+                // avoid dividing by zero.
+                else if ( mu( i, n ) > 0 )
+                {
+                    const double coeff =
+                        ( theta_coeff *
+                              ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
+                          s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
+                        model.influence_function( xi ) * xi * vol( j );
+                    double muij = mu( i, n );
+                    fx_i = muij * coeff * rx / r;
+                    fy_i = muij * coeff * ry / r;
+                    fz_i = muij * coeff * rz / r;
 
-                    std::size_t j =
-                        Cabana::NeighborList<NeighListType>::getNeighbor(
-                            neigh_list, i, n );
-
-                    // Get the reference positions and displacements.
-                    double xi, r, s;
-                    double rx, ry, rz;
-                    getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-
-                    // Break if beyond critical stretch unless in no-fail zone.
-                    if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
-                         !nofail( i ) )
-                        mu( i, n ) = 0;
-
-                    if ( mu( i, n ) > 0 )
-                    {
-                        const double coeff =
-                            ( theta_coeff * ( theta( i ) / m( i ) +
-                                              theta( j ) / m( j ) ) +
-                              s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                            model.influence_function( xi ) * xi * vol( j );
-                        double muij = mu( i, n );
-                        fx_i = muij * coeff * rx / r;
-                        fy_i = muij * coeff * ry / r;
-                        fz_i = muij * coeff * rz / r;
-
-                        f( i, 0 ) += fx_i;
-                        f( i, 1 ) += fy_i;
-                        f( i, 2 ) += fz_i;
-                    }
+                    f( i, 0 ) += fx_i;
+                    f( i, 1 ) += fy_i;
+                    f( i, 2 ) += fz_i;
                 }
             }
         };
@@ -738,7 +745,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                 std::size_t j =
                     Cabana::NeighborList<NeighListType>::getNeighbor(
                         neigh_list, i, n );
-                // Get the bond distance, displacement, and stretch
+                // Get the bond distance, displacement, and stretch.
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
 
@@ -807,7 +814,7 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
             double fy_i = 0.0;
             double fz_i = 0.0;
 
-            // Get the bond distance and stretch
+            // Get the bond distance and linearized stretch.
             double xi, linear_s;
             double xi_x, xi_y, xi_z;
             getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
@@ -852,7 +859,6 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
-
             // Do we need to recompute linear_theta_i?
 
             double xi, linear_s;
@@ -962,12 +968,12 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
-            // Get the bond distance, displacement, and stretch
+            // Get the bond distance, displacement, and stretch.
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
-            // 1/2 from outside the integral; 1/2 from the integrand (pairwise
-            // potential).
+            // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
+            // the integrand (pairwise potential).
             double w = 0.25 * c * s * s * xi * vol( j );
             W( i ) += w;
             Phi += w * vol( i );
@@ -1021,38 +1027,37 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                                                                   i );
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
-                if ( mu( i, n ) > 0 )
+                double fx_i = 0.0;
+                double fy_i = 0.0;
+                double fz_i = 0.0;
+
+                std::size_t j =
+                    Cabana::NeighborList<NeighListType>::getNeighbor(
+                        neigh_list, i, n );
+
+                // Get the reference positions and displacements.
+                double xi, r, s;
+                double rx, ry, rz;
+                getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+
+                // Break if beyond critical stretch unless in no-fail zone.
+                if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
+                     !nofail( j ) )
                 {
-                    double fx_i = 0.0;
-                    double fy_i = 0.0;
-                    double fz_i = 0.0;
+                    mu( i, n ) = 0;
+                }
+                // Else if statement is only for performance.
+                else if ( mu( i, n ) > 0 )
+                {
+                    const double coeff = c * s * vol( j );
+                    double muij = mu( i, n );
+                    fx_i = muij * coeff * rx / r;
+                    fy_i = muij * coeff * ry / r;
+                    fz_i = muij * coeff * rz / r;
 
-                    std::size_t j =
-                        Cabana::NeighborList<NeighListType>::getNeighbor(
-                            neigh_list, i, n );
-
-                    // Get the reference positions and displacements.
-                    double xi, r, s;
-                    double rx, ry, rz;
-                    getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-
-                    // Break if beyond critical stretch unless in no-fail zone.
-                    if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
-                         !nofail( j ) )
-                        mu( i, n ) = 0;
-
-                    if ( mu( i, n ) > 0 )
-                    {
-                        const double coeff = c * s * vol( j );
-                        double muij = mu( i, n );
-                        fx_i = muij * coeff * rx / r;
-                        fy_i = muij * coeff * ry / r;
-                        fz_i = muij * coeff * rz / r;
-
-                        f( i, 0 ) += fx_i;
-                        f( i, 1 ) += fy_i;
-                        f( i, 2 ) += fz_i;
-                    }
+                    f( i, 0 ) += fx_i;
+                    f( i, 1 ) += fy_i;
+                    f( i, 2 ) += fz_i;
                 }
             }
         };
@@ -1084,12 +1089,12 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                 std::size_t j =
                     Cabana::NeighborList<NeighListType>::getNeighbor(
                         neigh_list, i, n );
-                // Get the bond distance, displacement, and stretch
+                // Get the bond distance, displacement, and stretch.
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
 
-                // 1/2 from outside the integral; 1/2 from the integrand
-                // (pairwise potential).
+                // 0.25 factor is due to 1/2 from outside the integral and 1/2
+                // from the integrand (pairwise potential).
                 double w = mu( i, n ) * 0.25 * c * s * s * xi * vol( j );
                 W( i ) += w;
 
@@ -1144,7 +1149,7 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
             double fy_i = 0.0;
             double fz_i = 0.0;
 
-            // Get the bond distance, displacement, and stretch
+            // Get the bond distance, displacement, and linearized stretch.
             double xi, linear_s;
             double xi_x, xi_y, xi_z;
             getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
@@ -1180,12 +1185,12 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
-            // Get the bond distance, displacement, and stretch
+            // Get the bond distance, displacement, and linearized stretch.
             double xi, linear_s;
             getLinearizedDistance( x, u, i, j, xi, linear_s );
 
-            // 1/2 from outside the integral; 1/2 from the integrand (pairwise
-            // potential).
+            // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
+            // the integrand (pairwise potential).
             double w = 0.25 * c * linear_s * linear_s * xi * vol( j );
             W( i ) += w;
             Phi += w * vol( i );
@@ -1222,7 +1227,7 @@ void compute_force( const ForceType& force, ParticleType& particles,
     // compute_force_half( f_a, x, u, neigh_list, n_local,
     //                    neigh_op_tag );
 
-    // Forces only atomic if using team threading
+    // Forces only atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
         force.compute_force_full( f_a, x, u, particles, neigh_list, n_local,
                                   neigh_op_tag );
@@ -1281,7 +1286,7 @@ void compute_force( const ForceType& force, ParticleType& particles,
     // compute_force_half( f_a, x, u, neigh_list, n_local,
     //                    neigh_op_tag );
 
-    // Forces only atomic if using team threading
+    // Forces only atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
         force.compute_force_full( f_a, x, u, particles, neigh_list, mu, n_local,
                                   neigh_op_tag );

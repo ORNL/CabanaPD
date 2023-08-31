@@ -6,7 +6,9 @@ on:
   pull_request:
     branches:
       - main
-
+concurrency:
+  group: ${ {github.event_name }}-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{github.event_name == 'pull_request'}}
 jobs:
   CI:
     defaults:
@@ -64,7 +66,7 @@ jobs:
         with:
           repository: ECP-CoPA/Cabana
           # This version is post-release 0.5
-          ref: 4fdb7eeb3ea32557444766a917fb9252af8540d6
+          ref: 31ba70d9e8f8e20f2e55e7e310905f950b21776f
           path: cabana
       - name: Build Cabana
         working-directory: cabana
