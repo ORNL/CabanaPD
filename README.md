@@ -8,7 +8,7 @@ CabanaPD has the following dependencies:
 |Dependency | Version  | Required | Details|
 |---------- | -------  |--------  |------- |
 |CMake      | 3.11+    | Yes      | Build system
-|Cabana     | 4fdb7eeb | Yes      | Performance portable particle algorithms
+|Cabana     | 31ba70d9 | Yes      | Performance portable particle algorithms
 |GTest      | 1.10+    | No       | Unit test framework
 
 Cabana must be built with the following in order to work with CabanaPD:
@@ -16,7 +16,7 @@ Cabana must be built with the following in order to work with CabanaPD:
 |---------- | ------- |--------  |------- |
 |CMake      | 3.16+   | Yes      | Build system
 |MPI        | GPU-Aware if CUDA/HIP enabled | Yes | Message Passing Interface
-|Kokkos     | 3.6.0+  | Yes      | Performance portable on-node parallelism
+|Kokkos     | 3.7.0+  | Yes      | Performance portable on-node parallelism
 |HDF5       | master  | No       | Particle output
 |SILO       | master  | No       | Particle output
 
@@ -87,7 +87,7 @@ must be used:
 
 Note that `hipcc` should be used for Kokkos, Cabana, and CabanaPD.
 
-## Test
+## Tests
 
 Unit tests can be built by updating the CabanaPD CMake configuration in the
 script above with:
@@ -122,9 +122,14 @@ example can be run with:
 ./CabanaPD/build/install/bin/KalthoffWinkler
 ```
 
-New examples can be created by using the existing `KalthoffWinkler` as a
-template to simulate other fracture problems. All inputs are currently
-specified in `examples/kalthoff_winkler.cpp`
+The third example is cracking branching in soda-lime glass. The example can be
+run with:
+
+```
+./CabanaPD/build/install/bin/CrackBranching
+```
+
+New examples can be created by using any of the current cases as a template. All inputs are currently specified in the example source files themselves.
 
 ## References
 
