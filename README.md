@@ -122,7 +122,7 @@ example can be run with:
 ./CabanaPD/build/install/bin/KalthoffWinkler
 ```
 
-The third example is cracking branching in soda-lime glass. The example can be
+The third example is crack branching in soda-lime glass [3]. The example can be
 run with:
 
 ```
@@ -142,6 +142,8 @@ Mechanics for Materials and Structures, G. Voyiadjis, ed., Springer, Cham,
 loading, in Impact Loading and Dynamic Behavior of Materials, C.Y. Chiem, H.-D.
 Kunze, and L.W. Meyer, eds., Vol 1, DGM Informationsgesellschaft Verlag (1988)
 185-195.
+
+[3] F. Bobaru and G. Zhang, Why do cracks branch? A peridynamic investigation of dynamic brittle fracture, International Journal of Fracture 196 (2015): 59–98.
 
 ## Contributing
 
