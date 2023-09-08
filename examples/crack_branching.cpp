@@ -91,11 +91,11 @@ int main( int argc, char* argv[] )
             inputs.num_cells, halo_width );
 
         // Define particle initialization.
-        auto x = particles->slice_x();
-        auto v = particles->slice_v();
-        auto f = particles->slice_f();
-        auto rho = particles->slice_rho();
-        auto nofail = particles->slice_nofail();
+        auto x = particles->sliceRefPosition();
+        auto v = particles->sliceVelocity();
+        auto f = particles->sliceForce();
+        auto rho = particles->sliceDensity();
+        auto nofail = particles->sliceNoFail();
 
         // Relying on uniform grid here.
         double dy = particles->dy;
@@ -118,7 +118,7 @@ int main( int argc, char* argv[] )
                  x( pid, 1 ) >= plane2.high_y - delta - 1e-10 )
                 nofail( pid ) = 1;
         };
-        particles->update_particles( exec_space{}, init_functor );
+        particles->updateParticles( exec_space{}, init_functor );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<device_type>(

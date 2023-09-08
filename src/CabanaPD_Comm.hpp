@@ -22,7 +22,6 @@
 
 namespace CabanaPD
 {
-
 // Functor to determine which particles should be ghosted with Cajita grid.
 template <class LocalGridType, class PositionSliceType>
 struct HaloIds
@@ -201,7 +200,7 @@ class Comm<ParticleType, PMB>
         MPI_Comm_size( local_grid->globalGrid().comm(), &mpi_size );
         MPI_Comm_rank( local_grid->globalGrid().comm(), &mpi_rank );
 
-        auto positions = particles.slice_x();
+        auto positions = particles.sliceRefPosition();
         // Get all 26 neighbor ranks.
         auto halo_width = local_grid->haloCellWidth();
         auto topology = Cajita::getTopology( *local_grid );
