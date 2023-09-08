@@ -22,36 +22,38 @@
 
 namespace CabanaPD
 {
+template <std::size_t Size, class Scalar>
+auto vectorToArray( std::vector<Scalar> vector )
+{
+    Kokkos::Array<Scalar, Size> array;
+    for ( std::size_t i = 0; i < Size; ++i )
+        array[i] = vector[i];
+    return array;
+}
+
 // Functor to determine which particles should be ghosted with Cajita grid.
-template <class LocalGridType, class PositionSliceType>
+template <class MemorySpace, class LocalGridType>
 struct HaloIds
 {
     static constexpr std::size_t num_space_dim = LocalGridType::num_space_dim;
 
     int _min_halo;
-    int _neighbor_rank;
 
-    using device_type = typename PositionSliceType::device_type;
-    using pos_value = typename PositionSliceType::value_type;
+    using memory_space = MemorySpace;
 
-    using DestinationRankView = typename Kokkos::View<int*, device_type>;
+    using DestinationRankView = typename Kokkos::View<int*, memory_space>;
     using CountView =
-        typename Kokkos::View<int, Kokkos::LayoutRight, device_type,
+        typename Kokkos::View<int, Kokkos::LayoutRight, memory_space,
                               Kokkos::MemoryTraits<Kokkos::Atomic>>;
     CountView _send_count;
     DestinationRankView _destinations;
     DestinationRankView _ids;
-    PositionSliceType _positions;
 
-    Kokkos::Array<int, num_space_dim> _ijk;
-    Kokkos::Array<double, num_space_dim> _min_coord;
-    Kokkos::Array<double, num_space_dim> _max_coord;
-
+    template <class PositionSliceType>
     HaloIds( const LocalGridType& local_grid,
              const PositionSliceType& positions, const int minimum_halo_width,
              const int max_export_guess )
     {
-        _positions = positions;
         _destinations = DestinationRankView(
             Kokkos::ViewAllocateWithoutInitializing( "destinations" ),
             max_export_guess );
@@ -63,94 +65,115 @@ struct HaloIds
         // Check within the halo width, within the local domain.
         _min_halo = minimum_halo_width;
 
-        build( local_grid );
-    }
-
-    KOKKOS_INLINE_FUNCTION void operator()( const int p ) const
-    {
-        // Check the if particle is both in the owned space
-        // and the ghosted space of this neighbor (ignore
-        // the current cell).
-        bool within_halo = false;
-        if ( _positions( p, 0 ) > _min_coord[0] &&
-             _positions( p, 0 ) < _max_coord[0] &&
-             _positions( p, 1 ) > _min_coord[1] &&
-             _positions( p, 1 ) < _max_coord[1] &&
-             _positions( p, 2 ) > _min_coord[2] &&
-             _positions( p, 2 ) < _max_coord[2] )
-            within_halo = true;
-        if ( within_halo )
-        {
-            const std::size_t sc = _send_count()++;
-            // If the size of the arrays is exceeded, keep
-            // counting to resize and fill next.
-            if ( sc < _destinations.extent( 0 ) )
-            {
-                // Keep the destination MPI rank.
-                _destinations( sc ) = _neighbor_rank;
-                // Keep the particle ID.
-                _ids( sc ) = p;
-            }
-        }
+        build( local_grid, positions );
     }
 
     //---------------------------------------------------------------------------//
     // Locate particles within the local grid and determine if any from this
     // rank need to be ghosted to one (or more) of the 26 neighbor ranks,
     // keeping track of destination rank and index in the container.
-    void build( const LocalGridType& local_grid )
+    template <class PositionSliceType>
+    void build( const LocalGridType& local_grid,
+                const PositionSliceType& positions )
     {
         using execution_space = typename PositionSliceType::execution_space;
         const auto& local_mesh =
             Cajita::createLocalMesh<Kokkos::HostSpace>( local_grid );
 
-        auto policy =
-            Kokkos::RangePolicy<execution_space>( 0, _positions.size() );
-
-        // Add a ghost if this particle is near the local boundary, potentially
-        // for each of the 26 neighbors cells. Do this one neighbor rank at a
-        // time so that sends are contiguous.
         auto topology = Cajita::getTopology( local_grid );
-        auto unique_topology = Cabana::getUniqueTopology(
-            local_grid.globalGrid().comm(), topology );
-        for ( std::size_t ar = 0; ar < unique_topology.size(); ar++ )
+        // FIXME: 2d
+        constexpr int topology_size = 26;
+        Kokkos::Array<Cajita::IndexSpace<4>, topology_size> index_spaces;
+
+        using coord_type = Kokkos::Array<double, num_space_dim>;
+        Kokkos::Array<coord_type, topology_size> min_coord;
+        Kokkos::Array<coord_type, topology_size> max_coord;
+
+        // Look for ghosts within the halo width of the local mesh boundary,
+        // potentially for each of the 26 neighbors cells. Do this one neighbor
+        // rank at a time so that sends are contiguous. Store all neighboring
+        // mesh bounds so we only have to launch one kernel below.
+        int n = 0;
+        for ( int k = -1; k < 2; ++k )
         {
-            int nr = 0;
-            for ( int k = -1; k < 2; ++k )
+            for ( int j = -1; j < 2; ++j )
             {
-                for ( int j = -1; j < 2; ++j )
+                for ( int i = -1; i < 2; ++i, ++n )
                 {
-                    for ( int i = -1; i < 2; ++i, ++nr )
+                    if ( i != 0 || j != 0 || k != 0 )
                     {
-                        if ( i != 0 || j != 0 || k != 0 )
+                        int neighbor_rank = local_grid.neighborRank( i, j, k );
+                        // Potentially invalid neighbor ranks (non-periodic
+                        // global boundary)
+                        if ( neighbor_rank != -1 )
                         {
-                            _neighbor_rank = topology[nr];
-                            if ( _neighbor_rank == unique_topology[ar] )
-                            {
-                                auto sis = local_grid.sharedIndexSpace(
-                                    Cajita::Own(), Cajita::Cell(), i, j, k,
-                                    _min_halo );
-                                auto min_ind = sis.min();
-                                auto max_ind = sis.max();
-                                local_mesh.coordinates( Cajita::Node(),
-                                                        min_ind.data(),
-                                                        _min_coord.data() );
-                                local_mesh.coordinates( Cajita::Node(),
-                                                        max_ind.data(),
-                                                        _max_coord.data() );
-                                _ijk = { i, j, k };
-                                Kokkos::parallel_for( "get_halo_ids", policy,
-                                                      *this );
-                                Kokkos::fence();
-                            }
+                            auto sis = local_grid.sharedIndexSpace(
+                                Cajita::Own(), Cajita::Cell(), i, j, k,
+                                _min_halo );
+                            auto min_ind = sis.min();
+                            auto max_ind = sis.max();
+                            local_mesh.coordinates( Cajita::Node(),
+                                                    min_ind.data(),
+                                                    min_coord[n].data() );
+                            local_mesh.coordinates( Cajita::Node(),
+                                                    max_ind.data(),
+                                                    max_coord[n].data() );
                         }
                     }
                 }
             }
         }
+
+        auto device_topology = vectorToArray<topology_size>( topology );
+        auto send_count = _send_count;
+        auto destinations = _destinations;
+        auto ids = _ids;
+        auto ghost_search = KOKKOS_LAMBDA( const int p )
+        {
+            for ( std::size_t n = 0; n < topology_size; n++ )
+            {
+                // Potentially invalid neighbor ranks (non-periodic global
+                // boundary)
+                if ( device_topology[n] != -1 )
+                {
+                    // Check the if particle is both in the owned
+                    // space and the ghosted space of this neighbor
+                    // (ignore the current cell).
+                    bool within_halo = false;
+                    if ( positions( p, 0 ) > min_coord[n][0] &&
+                         positions( p, 0 ) < max_coord[n][0] &&
+                         positions( p, 1 ) > min_coord[n][1] &&
+                         positions( p, 1 ) < max_coord[n][1] &&
+                         positions( p, 2 ) > min_coord[n][2] &&
+                         positions( p, 2 ) < max_coord[n][2] )
+                        within_halo = true;
+                    if ( within_halo )
+                    {
+                        const std::size_t sc = send_count()++;
+                        // If the size of the arrays is exceeded,
+                        // keep counting to resize and fill next.
+                        if ( sc < destinations.extent( 0 ) )
+                        {
+                            // Keep the destination MPI rank.
+                            destinations( sc ) = device_topology[n];
+                            // Keep the particle ID.
+                            ids( sc ) = p;
+                        }
+                    }
+                }
+            }
+        };
+
+        auto policy =
+            Kokkos::RangePolicy<execution_space>( 0, positions.size() );
+        Kokkos::parallel_for( "CabanaPD::Comm::GhostSearch", policy,
+                              ghost_search );
+        Kokkos::fence();
     }
 
-    void rebuild( const LocalGridType& local_grid )
+    template <class PositionSliceType>
+    void rebuild( const LocalGridType& local_grid,
+                  const PositionSliceType& positions )
     {
         // Resize views to actual send sizes.
         int dest_size = _destinations.extent( 0 );
@@ -167,7 +190,7 @@ struct HaloIds
         if ( dest_count > dest_size )
         {
             Kokkos::deep_copy( _send_count, 0 );
-            build( local_grid );
+            build( local_grid, positions );
         }
     }
 };
@@ -210,7 +233,7 @@ class Comm<ParticleType, PMB>
         auto halo_ids =
             createHaloIds( *local_grid, positions, halo_width, max_export );
         // Rebuild if needed.
-        halo_ids.rebuild( *local_grid );
+        halo_ids.rebuild( *local_grid, positions );
 
         // Create the Cabana Halo.
         halo = std::make_shared<halo_type>( local_grid->globalGrid().comm(),
@@ -237,7 +260,7 @@ class Comm<ParticleType, PMB>
                         const PositionSliceType& positions,
                         const int min_halo_width, const int max_export )
     {
-        return HaloIds<LocalGridType, PositionSliceType>(
+        return HaloIds<typename PositionSliceType::memory_space, LocalGridType>(
             local_grid, positions, min_halo_width, max_export );
     }
 
