@@ -65,16 +65,18 @@ struct HaloIds
         // Check within the halo width, within the local domain.
         _min_halo = minimum_halo_width;
 
-        build( local_grid, positions );
+        build(
+            local_grid, positions,
+            KOKKOS_LAMBDA( const int, const double[3] ) { return true; } );
     }
 
     //---------------------------------------------------------------------------//
     // Locate particles within the local grid and determine if any from this
     // rank need to be ghosted to one (or more) of the 26 neighbor ranks,
     // keeping track of destination rank and index in the container.
-    template <class PositionSliceType>
+    template <class PositionSliceType, class UserFunctor>
     void build( const LocalGridType& local_grid,
-                const PositionSliceType& positions )
+                const PositionSliceType& positions, UserFunctor user_functor )
     {
         using execution_space = typename PositionSliceType::execution_space;
         const auto& local_mesh =
@@ -149,15 +151,22 @@ struct HaloIds
                         within_halo = true;
                     if ( within_halo )
                     {
-                        const std::size_t sc = send_count()++;
-                        // If the size of the arrays is exceeded,
-                        // keep counting to resize and fill next.
-                        if ( sc < destinations.extent( 0 ) )
+                        double px[3] = { positions( p, 0 ), positions( p, 1 ),
+                                         positions( p, 2 ) };
+                        // Let the user restrict to a subset of the boundary.
+                        bool create_ghost = user_functor( p, px );
+                        if ( create_ghost )
                         {
-                            // Keep the destination MPI rank.
-                            destinations( sc ) = device_topology[n];
-                            // Keep the particle ID.
-                            ids( sc ) = p;
+                            const std::size_t sc = send_count()++;
+                            // If the size of the arrays is exceeded,
+                            // keep counting to resize and fill next.
+                            if ( sc < destinations.extent( 0 ) )
+                            {
+                                // Keep the destination MPI rank.
+                                destinations( sc ) = device_topology[n];
+                                // Keep the particle ID.
+                                ids( sc ) = p;
+                            }
                         }
                     }
                 }
@@ -190,7 +199,9 @@ struct HaloIds
         if ( dest_count > dest_size )
         {
             Kokkos::deep_copy( _send_count, 0 );
-            build( local_grid, positions );
+            build(
+                local_grid, positions,
+                KOKKOS_LAMBDA( const int, const double[3] ) { return true; } );
         }
     }
 };
