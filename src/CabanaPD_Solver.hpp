@@ -82,7 +82,6 @@
 
 namespace CabanaPD
 {
-
 class SolverBase
 {
   public:
@@ -138,7 +137,7 @@ class SolverElastic
         double mesh_max[3] = { particles->ghost_mesh_hi[0],
                                particles->ghost_mesh_hi[1],
                                particles->ghost_mesh_hi[2] };
-        auto x = particles->slice_x();
+        auto x = particles->sliceRefPosition();
         neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
                                                      force_model.delta, 1.0,
                                                      mesh_min, mesh_max );
@@ -175,16 +174,16 @@ class SolverElastic
     {
         init_timer.reset();
         // Compute/communicate LPS weighted volume (does nothing for PMB).
-        force->compute_weighted_volume( *particles, *neighbors,
-                                        neigh_iter_tag{} );
+        force->computeWeightedVolume( *particles, *neighbors,
+                                      neigh_iter_tag{} );
         comm->gatherWeightedVolume();
         // Compute/communicate LPS dilatation (does nothing for PMB).
-        force->compute_dilatation( *particles, *neighbors, neigh_iter_tag{} );
+        force->computeDilatation( *particles, *neighbors, neigh_iter_tag{} );
         comm->gatherDilatation();
 
         // Compute initial forces.
-        compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
-        compute_energy( *force, *particles, *neighbors, neigh_iter_tag() );
+        computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
+        computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
 
         particles->output( 0, 0.0 );
         init_time += init_timer.seconds();
@@ -199,7 +198,7 @@ class SolverElastic
         {
             // Integrate - velocity Verlet first half.
             integrate_timer.reset();
-            integrator->initial_integrate( *particles );
+            integrator->initialHalfStep( *particles );
             integrate_time += integrate_timer.seconds();
 
             // Update ghost particles.
@@ -210,8 +209,8 @@ class SolverElastic
             // Do not need to recompute LPS weighted volume here without damage.
             // Compute/communicate LPS dilatation (does nothing for PMB).
             force_timer.reset();
-            force->compute_dilatation( *particles, *neighbors,
-                                       neigh_iter_tag{} );
+            force->computeDilatation( *particles, *neighbors,
+                                      neigh_iter_tag{} );
             force_time += force_timer.seconds();
             comm_timer.reset();
             comm->gatherDilatation();
@@ -219,20 +218,20 @@ class SolverElastic
 
             // Compute internal forces.
             force_timer.reset();
-            compute_force( *force, *particles, *neighbors, neigh_iter_tag{} );
+            computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
             force_time += force_timer.seconds();
 
             // Integrate - velocity Verlet second half.
             integrate_timer.reset();
-            integrator->final_integrate( *particles );
+            integrator->finalHalfStep( *particles );
             integrate_time += integrate_timer.seconds();
 
             // Print output.
             other_timer.reset();
             if ( step % output_frequency == 0 )
             {
-                auto W = compute_energy( *force, *particles, *neighbors,
-                                         neigh_iter_tag() );
+                auto W = computeEnergy( *force, *particles, *neighbors,
+                                        neigh_iter_tag() );
 
                 step_output( step, W );
                 particles->output( step / output_frequency,
@@ -373,15 +372,15 @@ class SolverFracture
     {
         init_timer.reset();
         // Compute/communicate weighted volume for LPS (does nothing for PMB).
-        force->compute_weighted_volume( *particles, *neighbors, mu );
+        force->computeWeightedVolume( *particles, *neighbors, mu );
         comm->gatherWeightedVolume();
         // Compute/communicate dilatation for LPS (does nothing for PMB).
-        force->compute_dilatation( *particles, *neighbors, mu );
+        force->computeDilatation( *particles, *neighbors, mu );
         comm->gatherDilatation();
 
         // Compute initial forces.
-        compute_force( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
-        compute_energy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
+        computeForce( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
+        computeEnergy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
 
         // Add boundary condition.
         boundary_condition.apply( exec_space(), *particles );
@@ -399,7 +398,7 @@ class SolverFracture
         {
             // Integrate - velocity Verlet first half.
             integrate_timer.reset();
-            integrator->initial_integrate( *particles );
+            integrator->initialHalfStep( *particles );
             integrate_time += integrate_timer.seconds();
 
             // Update ghost particles.
@@ -409,14 +408,14 @@ class SolverFracture
 
             // Compute/communicate LPS weighted volume (does nothing for PMB).
             force_timer.reset();
-            force->compute_weighted_volume( *particles, *neighbors, mu );
+            force->computeWeightedVolume( *particles, *neighbors, mu );
             force_time += force_timer.seconds();
             comm_timer.reset();
             comm->gatherWeightedVolume();
             comm_time += comm_timer.seconds();
             // Compute/communicate LPS dilatation (does nothing for PMB).
             force_timer.reset();
-            force->compute_dilatation( *particles, *neighbors, mu );
+            force->computeDilatation( *particles, *neighbors, mu );
             force_time += force_timer.seconds();
             comm_timer.reset();
             comm->gatherDilatation();
@@ -424,8 +423,8 @@ class SolverFracture
 
             // Compute internal forces.
             force_timer.reset();
-            compute_force( *force, *particles, *neighbors, mu,
-                           neigh_iter_tag{} );
+            computeForce( *force, *particles, *neighbors, mu,
+                          neigh_iter_tag{} );
             force_time += force_timer.seconds();
 
             // Add boundary condition.
@@ -433,15 +432,15 @@ class SolverFracture
 
             // Integrate - velocity Verlet second half.
             integrate_timer.reset();
-            integrator->final_integrate( *particles );
+            integrator->finalHalfStep( *particles );
             integrate_time += integrate_timer.seconds();
 
             // Print output.
             other_timer.reset();
             if ( step % output_frequency == 0 )
             {
-                auto W = compute_energy( *force, *particles, *neighbors, mu,
-                                         neigh_iter_tag() );
+                auto W = computeEnergy( *force, *particles, *neighbors, mu,
+                                        neigh_iter_tag() );
 
                 this->step_output( step, W );
                 particles->output( step / output_frequency,

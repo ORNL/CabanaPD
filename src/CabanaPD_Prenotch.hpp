@@ -21,7 +21,6 @@
 
 namespace CabanaPD
 {
-
 KOKKOS_INLINE_FUNCTION
 double abs( const double a )
 {
@@ -104,11 +103,11 @@ Kokkos::Array<double, 3> sum( Kokkos::Array<double, 3> a,
 }
 
 KOKKOS_INLINE_FUNCTION
-int line_plane_intersection( const Kokkos::Array<double, 3> p0,
-                             const Kokkos::Array<double, 3> n,
-                             const Kokkos::Array<double, 3> l0,
-                             const Kokkos::Array<double, 3> l,
-                             const double tol = 1e-10 )
+int linePlaneIntersection( const Kokkos::Array<double, 3> p0,
+                           const Kokkos::Array<double, 3> n,
+                           const Kokkos::Array<double, 3> l0,
+                           const Kokkos::Array<double, 3> l,
+                           const double tol = 1e-10 )
 {
     if ( abs( dot( l, n ) ) < tol )
     {
@@ -121,12 +120,12 @@ int line_plane_intersection( const Kokkos::Array<double, 3> p0,
 }
 
 KOKKOS_INLINE_FUNCTION
-int bond_prenotch_intersection( const Kokkos::Array<double, 3> v1,
-                                const Kokkos::Array<double, 3> v2,
-                                const Kokkos::Array<double, 3> p0,
-                                const Kokkos::Array<double, 3> x_i,
-                                const Kokkos::Array<double, 3> x_j,
-                                const double tol = 1e-10 )
+int bondPrenotchIntersection( const Kokkos::Array<double, 3> v1,
+                              const Kokkos::Array<double, 3> v2,
+                              const Kokkos::Array<double, 3> p0,
+                              const Kokkos::Array<double, 3> x_i,
+                              const Kokkos::Array<double, 3> x_j,
+                              const double tol = 1e-10 )
 {
     // Define plane vectors cross product.
     auto cross_v1_v2 = cross( v1, v2 );
@@ -143,7 +142,7 @@ int bond_prenotch_intersection( const Kokkos::Array<double, 3> v1,
     auto l = diff( x_j, x_i );
 
     // Check line-plane intersection.
-    int case_flag = line_plane_intersection( p0, n, l0, l );
+    int case_flag = linePlaneIntersection( p0, n, l0, l );
     int keep_bond = 1;
 
     // Case I: full intersection.
@@ -219,7 +218,7 @@ struct Prenotch
     void create( ExecSpace, NeighborView& mu, Particles& particles,
                  Neighbors& neighbors )
     {
-        auto x = particles.slice_x();
+        auto x = particles.sliceRefPosition();
         Kokkos::RangePolicy<ExecSpace> policy( 0, particles.n_local );
 
         auto v1 = _v1;
@@ -245,7 +244,7 @@ struct Prenotch
                         xj[d] = x( j, d );
                     }
                     int keep_bond =
-                        bond_prenotch_intersection( v1, v2, p0, xi, xj );
+                        bondPrenotchIntersection( v1, v2, p0, xi, xj );
                     if ( !keep_bond )
                         mu( i, n ) = 0;
                 }

@@ -64,10 +64,10 @@ int main( int argc, char* argv[] )
             inputs.num_cells, halo_width );
 
         // Define particle initialization.
-        auto x = particles->slice_x();
-        auto u = particles->slice_u();
-        auto v = particles->slice_v();
-        auto rho = particles->slice_rho();
+        auto x = particles->sliceRefPosition();
+        auto u = particles->sliceDisplacement();
+        auto v = particles->sliceVelocity();
+        auto rho = particles->sliceDensity();
 
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {
@@ -89,15 +89,15 @@ int main( int argc, char* argv[] )
             }
             rho( pid ) = 100.0;
         };
-        particles->update_particles( exec_space{}, init_functor );
+        particles->updateParticles( exec_space{}, init_functor );
 
         auto cabana_pd = CabanaPD::createSolverElastic<device_type>(
             inputs, particles, force_model );
         cabana_pd->init_force();
         cabana_pd->run();
 
-        x = particles->slice_x();
-        u = particles->slice_u();
+        x = particles->sliceRefPosition();
+        u = particles->sliceDisplacement();
         double num_cell_x = inputs.num_cells[0];
         auto profile = Kokkos::View<double* [2], memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "displacement_profile" ),

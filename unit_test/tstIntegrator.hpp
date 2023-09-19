@@ -45,7 +45,7 @@ void testIntegratorReversibility( int steps )
 
     CabanaPD::Particles<TEST_DEVICE, CabanaPD::PMB> particles(
         exec_space(), box_min, box_max, num_cells, 0 );
-    auto x = particles.slice_x();
+    auto x = particles.sliceRefPosition();
     std::size_t num_particle = x.size();
 
     CabanaPD::Integrator<exec_space> integrator( 0.001 );
@@ -60,12 +60,12 @@ void testIntegratorReversibility( int steps )
     // Integrate one step
     for ( int s = 0; s < steps; ++s )
     {
-        integrator.initial_integrate( particles );
-        integrator.final_integrate( particles );
+        integrator.initialHalfStep( particles );
+        integrator.finalHalfStep( particles );
     }
 
     // Reverse the system.
-    auto v = particles.slice_v();
+    auto v = particles.sliceVelocity();
     Kokkos::RangePolicy<TEST_EXECSPACE> exec_policy( 0, num_particle );
     Kokkos::parallel_for(
         exec_policy, KOKKOS_LAMBDA( const int p ) {
@@ -76,8 +76,8 @@ void testIntegratorReversibility( int steps )
     // Integrate back
     for ( int s = 0; s < steps; ++s )
     {
-        integrator.initial_integrate( particles );
-        integrator.final_integrate( particles );
+        integrator.initialHalfStep( particles );
+        integrator.finalHalfStep( particles );
     }
 
     // Make a copy of final results on the host
@@ -86,7 +86,7 @@ void testIntegratorReversibility( int steps )
     Cabana::deep_copy( x_final, x );
 
     // Check the results
-    x = particles.slice_x();
+    x = particles.sliceRefPosition();
     for ( std::size_t p = 0; p < num_particle; ++p )
         for ( std::size_t d = 0; d < 3; ++d )
             EXPECT_DOUBLE_EQ( x_final( p, d ), x_init( p, d ) );

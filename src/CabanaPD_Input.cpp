@@ -66,7 +66,6 @@
 
 namespace CabanaPD
 {
-
 // FIXME: hardcoded.
 Inputs::Inputs( const std::array<int, 3> nc, std::array<double, 3> lc,
                 std::array<double, 3> hc, const double t_f, const double dt,

@@ -16,7 +16,6 @@
 
 namespace CabanaPD
 {
-
 class Inputs
 {
   public:

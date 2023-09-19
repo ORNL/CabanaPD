@@ -95,10 +95,10 @@ int main( int argc, char* argv[] )
             inputs.num_cells, halo_width );
 
         // Define particle initialization.
-        auto x = particles->slice_x();
-        auto v = particles->slice_v();
-        auto f = particles->slice_f();
-        auto rho = particles->slice_rho();
+        auto x = particles->sliceRefPosition();
+        auto v = particles->sliceVelocity();
+        auto f = particles->sliceForce();
+        auto rho = particles->sliceDensity();
 
         double dx = particles->dx;
 
@@ -119,7 +119,7 @@ int main( int argc, char* argv[] )
                  x( pid, 0 ) < -0.5 * height + dx )
                 v( pid, 0 ) = v0;
         };
-        particles->update_particles( exec_space{}, init_functor );
+        particles->updateParticles( exec_space{}, init_functor );
 
         auto cabana_pd = CabanaPD::createSolverFracture<device_type>(
             inputs, particles, force_model, bc, prenotch );
