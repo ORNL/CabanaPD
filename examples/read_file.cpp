@@ -51,14 +51,14 @@ void read_particles( const std::string filename, ParticleType& particles )
     auto y = Kokkos::create_mirror_view_and_copy( memory_space(), y_host );
     auto vol = Kokkos::create_mirror_view_and_copy( memory_space(), vol_host );
 
-    auto px = particles.slice_x();
-    auto pvol = particles.slice_vol();
-    auto v = particles.slice_v();
-    auto f = particles.slice_f();
-    auto type = particles.slice_type();
-    auto rho = particles.slice_rho();
-    auto u = particles.slice_u();
-    auto nofail = particles.slice_nofail();
+    auto px = particles.sliceRefPosition();
+    auto pvol = particles.sliceVolume();
+    auto v = particles.sliceVelocity();
+    auto f = particles.sliceForce();
+    auto type = particles.sliceType();
+    auto rho = particles.sliceDensity();
+    auto u = particles.sliceDisplacement();
+    auto nofail = particles.sliceNoFail();
 
     using exec_space = typename memory_space::execution_space;
     Kokkos::parallel_for(
@@ -158,11 +158,11 @@ int main( int argc, char* argv[] )
         particles->update_after_read( exec_space(), halo_width, num_cell );
 
         // Define particle initialization.
-        auto x = particles->slice_x();
-        auto v = particles->slice_v();
-        auto f = particles->slice_f();
-        auto rho = particles->slice_rho();
-        auto nofail = particles->slice_nofail();
+        auto x = particles->sliceRefPosition();
+        auto v = particles->sliceVelocity();
+        auto f = particles->sliceForce();
+        auto rho = particles->sliceDensity();
+        auto nofail = particles->sliceNoFail();
 
         // Relying on uniform grid here.
         double dy = particles->dy;
@@ -185,7 +185,7 @@ int main( int argc, char* argv[] )
                  x( pid, 1 ) >= plane2.high_y - delta - 1e-10 )
                 nofail( pid ) = 1;
         };
-        particles->update_particles( exec_space{}, init_functor );
+        particles->updateParticles( exec_space{}, init_functor );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<device_type>(

@@ -288,7 +288,7 @@ class Particles<DeviceType, PMB, Dimension>
                             const std::array<int, 3> num_cells )
     {
         halo_width = hw;
-        auto x = slice_x();
+        auto x = sliceRefPosition();
         n_local = x.size();
         n_ghost = 0;
         size = n_local;
@@ -321,8 +321,8 @@ class Particles<DeviceType, PMB, Dimension>
             },
             min_x, min_y, min_z, max_x, max_y, max_z );
 
-        create_domain( { min_x, min_y, min_z }, { max_x, max_y, max_z },
-                       num_cells );
+        createDomain( { min_x, min_y, min_z }, { max_x, max_y, max_z },
+                      num_cells );
     }
 
     void update_global()
