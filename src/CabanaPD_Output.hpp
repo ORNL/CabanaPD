@@ -32,7 +32,6 @@
 
 namespace CabanaPD
 {
-
 inline bool print_rank()
 {
     int proc_rank;

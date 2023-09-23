@@ -75,7 +75,6 @@
 
 namespace CabanaPD
 {
-
 // FIXME: this should use MemorySpace directly, but DeviceType enables the
 // friend class with Comm (which only uses DeviceType because Cabana::Halo
 // currently does).
@@ -156,13 +155,13 @@ class Particles<DeviceType, PMB, Dimension>
                const std::array<int, 3> num_cells, const int max_halo_width )
         : halo_width( max_halo_width )
     {
-        create_domain( low_corner, high_corner, num_cells );
-        create_particles( exec_space );
+        createDomain( low_corner, high_corner, num_cells );
+        createParticles( exec_space );
     }
 
-    void create_domain( std::array<double, 3> low_corner,
-                        std::array<double, 3> high_corner,
-                        const std::array<int, 3> num_cells )
+    void createDomain( std::array<double, 3> low_corner,
+                       std::array<double, 3> high_corner,
+                       const std::array<int, 3> num_cells )
     {
         // Create the MPI partitions.
         Cajita::DimBlockPartitioner<3> partitioner;
@@ -200,7 +199,7 @@ class Particles<DeviceType, PMB, Dimension>
     }
 
     template <class ExecSpace>
-    void create_particles( const ExecSpace& exec_space )
+    void createParticles( const ExecSpace& exec_space )
     {
         // Create a local mesh and owned space.
         auto local_mesh = Cajita::createLocalMesh<device_type>( *local_grid );
@@ -211,14 +210,14 @@ class Particles<DeviceType, PMB, Dimension>
         int num_particles = particles_per_cell * owned_cells.size();
         resize( num_particles, 0 );
 
-        auto x = slice_x();
-        auto v = slice_v();
-        auto f = slice_f();
-        auto type = slice_type();
-        auto rho = slice_rho();
-        auto u = slice_u();
-        auto vol = slice_vol();
-        auto nofail = slice_nofail();
+        auto x = sliceRefPosition();
+        auto v = sliceVelocity();
+        auto f = sliceForce();
+        auto type = sliceType();
+        auto rho = sliceDensity();
+        auto u = sliceDisplacement();
+        auto vol = sliceVolume();
+        auto nofail = sliceNoFail();
 
         auto created = Kokkos::View<bool*, memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "particle_created" ),
@@ -334,7 +333,7 @@ class Particles<DeviceType, PMB, Dimension>
     }
 
     template <class ExecSpace, class FunctorType>
-    void update_particles( const ExecSpace, const FunctorType init_functor )
+    void updateParticles( const ExecSpace, const FunctorType init_functor )
     {
         Kokkos::RangePolicy<ExecSpace> policy( 0, n_local );
         Kokkos::parallel_for(
@@ -342,51 +341,69 @@ class Particles<DeviceType, PMB, Dimension>
             KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
     }
 
-    auto slice_x() { return Cabana::slice<0>( _aosoa_x, "positions" ); }
-    auto slice_x() const { return Cabana::slice<0>( _aosoa_x, "positions" ); }
-    auto slice_u() { return Cabana::slice<0>( _aosoa_u, "displacements" ); }
-    auto slice_u() const
+    auto sliceRefPosition()
+    {
+        return Cabana::slice<0>( _aosoa_x, "positions" );
+    }
+    auto sliceRefPosition() const
+    {
+        return Cabana::slice<0>( _aosoa_x, "positions" );
+    }
+    auto sliceDisplacement()
     {
         return Cabana::slice<0>( _aosoa_u, "displacements" );
     }
-    auto slice_f() { return Cabana::slice<0>( _aosoa_f, "forces" ); }
-    auto slice_f_a()
+    auto sliceDisplacement() const
     {
-        auto f = slice_f();
+        return Cabana::slice<0>( _aosoa_u, "displacements" );
+    }
+    auto sliceForce() { return Cabana::slice<0>( _aosoa_f, "forces" ); }
+    auto sliceForceAtomic()
+    {
+        auto f = sliceForce();
         using slice_type = decltype( f );
         using atomic_type = typename slice_type::atomic_access_slice;
         atomic_type f_a = f;
         return f_a;
     }
-    auto slice_vol() { return Cabana::slice<0>( _aosoa_vol, "volume" ); }
-    auto slice_vol() const { return Cabana::slice<0>( _aosoa_vol, "volume" ); }
-    auto slice_type() { return Cabana::slice<0>( _aosoa_other, "type" ); }
-    auto slice_type() const { return Cabana::slice<0>( _aosoa_other, "type" ); }
-    auto slice_W() { return Cabana::slice<1>( _aosoa_other, "strain_energy" ); }
-    auto slice_W() const
+    auto sliceVolume() { return Cabana::slice<0>( _aosoa_vol, "volume" ); }
+    auto sliceVolume() const
+    {
+        return Cabana::slice<0>( _aosoa_vol, "volume" );
+    }
+    auto sliceType() { return Cabana::slice<0>( _aosoa_other, "type" ); }
+    auto sliceType() const { return Cabana::slice<0>( _aosoa_other, "type" ); }
+    auto sliceStrainEnergy()
     {
         return Cabana::slice<1>( _aosoa_other, "strain_energy" );
     }
-    auto slice_v() { return Cabana::slice<2>( _aosoa_other, "velocities" ); }
-    auto slice_v() const
+    auto sliceStrainEnergy() const
+    {
+        return Cabana::slice<1>( _aosoa_other, "strain_energy" );
+    }
+    auto sliceVelocity()
     {
         return Cabana::slice<2>( _aosoa_other, "velocities" );
     }
-    auto slice_rho() { return Cabana::slice<3>( _aosoa_other, "density" ); }
-    auto slice_rho() const
+    auto sliceVelocity() const
+    {
+        return Cabana::slice<2>( _aosoa_other, "velocities" );
+    }
+    auto sliceDensity() { return Cabana::slice<3>( _aosoa_other, "density" ); }
+    auto sliceDensity() const
     {
         return Cabana::slice<3>( _aosoa_other, "density" );
     }
-    auto slice_phi() { return Cabana::slice<4>( _aosoa_other, "damage" ); }
-    auto slice_phi() const
+    auto sliceDamage() { return Cabana::slice<4>( _aosoa_other, "damage" ); }
+    auto sliceDamage() const
     {
         return Cabana::slice<4>( _aosoa_other, "damage" );
     }
-    auto slice_nofail()
+    auto sliceNoFail()
     {
         return Cabana::slice<0>( _aosoa_nofail, "no_fail_region" );
     }
-    auto slice_nofail() const
+    auto sliceNoFail() const
     {
         return Cabana::slice<0>( _aosoa_nofail, "no_fail_region" );
     }
@@ -410,14 +427,14 @@ class Particles<DeviceType, PMB, Dimension>
 #ifdef Cabana_ENABLE_HDF5
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
-            n_local, slice_x(), slice_W(), slice_f(), slice_u(), slice_v(),
-            slice_phi() );
+            n_local, sliceRefPosition(), sliceStrainEnergy(), sliceForce(),
+            sliceDisplacement(), sliceVelocity(), sliceDamage() );
 #else
 #ifdef Cabana_ENABLE_SILO
         Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
             "particles", local_grid->globalGrid(), output_step, output_time, 0,
-            n_local, slice_x(), slice_W(), slice_f(), slice_u(), slice_v(),
-            slice_phi() );
+            n_local, sliceRefPosition(), sliceStrainEnergy(), sliceForce(),
+            sliceDisplacement(), sliceVelocity(), sliceDamage() );
 #else
         log( std::cout, "No particle output enabled for step ", output_step,
              " (", output_time, ")" );
@@ -505,23 +522,26 @@ class Particles<DeviceType, LPS, Dimension>
     }
 
     template <class ExecSpace>
-    void create_particles( const ExecSpace& exec_space )
+    void createParticles( const ExecSpace& exec_space )
     {
-        base_type::create_particles( exec_space );
+        base_type::createParticles( exec_space );
         _aosoa_m.resize( 0 );
         _aosoa_theta.resize( 0 );
     }
 
-    auto slice_theta()
+    auto sliceDilatation()
     {
         return Cabana::slice<0>( _aosoa_theta, "dilatation" );
     }
-    auto slice_theta() const
+    auto sliceDilatation() const
     {
         return Cabana::slice<0>( _aosoa_theta, "dilatation" );
     }
-    auto slice_m() { return Cabana::slice<0>( _aosoa_m, "weighted_volume" ); }
-    auto slice_m() const
+    auto sliceWeightedVolume()
+    {
+        return Cabana::slice<0>( _aosoa_m, "weighted_volume" );
+    }
+    auto sliceWeightedVolume() const
     {
         return Cabana::slice<0>( _aosoa_m, "weighted_volume" );
     }
@@ -538,16 +558,20 @@ class Particles<DeviceType, LPS, Dimension>
 #ifdef Cabana_ENABLE_HDF5
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
-            n_local, base_type::slice_x(), base_type::slice_W(),
-            base_type::slice_f(), base_type::slice_u(), base_type::slice_v(),
-            base_type::slice_phi(), slice_m(), slice_theta() );
+            n_local, base_type::sliceRefPosition(),
+            base_type::sliceStrainEnergy(), base_type::sliceForce(),
+            base_type::sliceDisplacement(), base_type::sliceVelocity(),
+            base_type::sliceDamage(), sliceWeightedVolume(),
+            sliceDilatation() );
 #else
 #ifdef Cabana_ENABLE_SILO
         Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
             "particles", local_grid->globalGrid(), output_step, output_time, 0,
-            n_local, base_type::slice_x(), base_type::slice_W(),
-            base_type::slice_f(), base_type::slice_u(), base_type::slice_v(),
-            base_type::slice_phi(), slice_m(), slice_theta() );
+            n_local, base_type::sliceRefPosition(),
+            base_type::sliceStrainEnergy(), base_type::sliceForce(),
+            base_type::sliceDisplacement(), base_type::sliceVelocity(),
+            base_type::sliceDamage(), sliceWeightedVolume(),
+            sliceDilatation() );
 #else
         log( std::cout, "No particle output enabled for ", output_step, "(",
              output_time, ")" );
@@ -561,9 +585,9 @@ class Particles<DeviceType, LPS, Dimension>
   protected:
     void init_lps()
     {
-        auto theta = slice_theta();
+        auto theta = sliceDilatation();
         Cabana::deep_copy( theta, 0.0 );
-        auto m = slice_m();
+        auto m = sliceWeightedVolume();
         Cabana::deep_copy( m, 0.0 );
     }
 

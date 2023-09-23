@@ -34,7 +34,6 @@
 
 namespace Test
 {
-
 //---------------------------------------------------------------------------//
 void testHalo()
 {
@@ -58,13 +57,13 @@ void testHalo()
 
     // No ints are communicated in CabanaPD. We use the volume field for MPI
     // rank here for convenience.
-    auto rank = particles.slice_vol();
-    auto x = particles.slice_x();
+    auto rank = particles.sliceVolume();
+    auto x = particles.sliceRefPosition();
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         rank( pid ) = static_cast<double>( current_rank );
     };
-    particles.update_particles( exec_space{}, init_functor );
+    particles.updateParticles( exec_space{}, init_functor );
 
     int init_num_particles = particles.n_local;
     using HostAoSoA = Cabana::AoSoA<Cabana::MemberTypes<double[3], double>,
@@ -79,8 +78,8 @@ void testHalo()
     CabanaPD::Comm<particles_type, CabanaPD::PMB> comm( particles );
 
     HostAoSoA aosoa_host( "host_aosoa", particles.size );
-    x = particles.slice_x();
-    rank = particles.slice_vol();
+    x = particles.sliceRefPosition();
+    rank = particles.sliceVolume();
     auto x_host = Cabana::slice<0>( aosoa_host );
     auto rank_host = Cabana::slice<1>( aosoa_host );
     Cabana::deep_copy( x_host, x );

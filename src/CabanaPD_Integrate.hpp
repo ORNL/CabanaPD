@@ -66,7 +66,6 @@
 
 namespace CabanaPD
 {
-
 template <class ExecutionSpace>
 class Integrator
 {
@@ -84,12 +83,12 @@ class Integrator
     ~Integrator() {}
 
     template <class ParticlesType>
-    void initial_integrate( ParticlesType& p )
+    void initialHalfStep( ParticlesType& p )
     {
-        auto u = p.slice_u();
-        auto v = p.slice_v();
-        auto f = p.slice_f();
-        auto rho = p.slice_rho();
+        auto u = p.sliceDisplacement();
+        auto v = p.sliceVelocity();
+        auto f = p.sliceForce();
+        auto rho = p.sliceDensity();
 
         auto dt = _dt;
         auto half_dt = _half_dt;
@@ -109,11 +108,11 @@ class Integrator
     }
 
     template <class ParticlesType>
-    void final_integrate( ParticlesType& p )
+    void finalHalfStep( ParticlesType& p )
     {
-        auto v = p.slice_v();
-        auto f = p.slice_f();
-        auto rho = p.slice_rho();
+        auto v = p.sliceVelocity();
+        auto f = p.sliceForce();
+        auto rho = p.sliceDensity();
 
         auto half_dt = _half_dt;
         auto final_func = KOKKOS_LAMBDA( const int i )
