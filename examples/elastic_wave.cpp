@@ -50,8 +50,8 @@ int main( int argc, char* argv[] )
             CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::Elastic>;
         model_type force_model( delta, K, G );
 
-        CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final, dt,
-                                 output_frequency );
+        CabanaPD::Inputs<3> inputs( num_cell, low_corner, high_corner, t_final,
+                                    dt, output_frequency );
         inputs.read_args( argc, argv );
 
         // Create particles from mesh.

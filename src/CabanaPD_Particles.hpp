@@ -120,15 +120,16 @@ class Particles<DeviceType, PMB, Dimension>
     int n_types = 1;
 
     // Simulation total domain.
-    std::array<double, 3> global_mesh_ext;
+    std::array<double, dim> global_mesh_ext;
 
     // Simulation sub domain (single MPI rank).
-    std::array<double, 3> local_mesh_ext;
-    std::array<double, 3> local_mesh_lo;
-    std::array<double, 3> local_mesh_hi;
-    std::array<double, 3> ghost_mesh_lo;
-    std::array<double, 3> ghost_mesh_hi;
-    std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double>>> local_grid;
+    std::array<double, dim> local_mesh_ext;
+    std::array<double, dim> local_mesh_lo;
+    std::array<double, dim> local_mesh_hi;
+    std::array<double, dim> ghost_mesh_lo;
+    std::array<double, dim> ghost_mesh_hi;
+    std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double, dim>>>
+        local_grid;
     double dx[dim];
 
     int halo_width;
@@ -136,33 +137,39 @@ class Particles<DeviceType, PMB, Dimension>
     // Default constructor.
     Particles()
     {
-        global_mesh_ext = { 0.0, 0.0, 0.0 };
-        local_mesh_lo = { 0.0, 0.0, 0.0 };
-        local_mesh_hi = { 0.0, 0.0, 0.0 };
-        ghost_mesh_lo = { 0.0, 0.0, 0.0 };
-        ghost_mesh_hi = { 0.0, 0.0, 0.0 };
-        local_mesh_ext = { 0.0, 0.0, 0.0 };
-
+        for ( int d = 0; d < dim; d++ )
+        {
+            global_mesh_ext[d] = 0.0;
+            local_mesh_lo[d] = 0.0;
+            local_mesh_hi[d] = 0.0;
+            ghost_mesh_lo[d] = 0.0;
+            ghost_mesh_hi[d] = 0.0;
+            local_mesh_ext[d] = 0.0;
+        }
         resize( 0, 0 );
     }
 
     // Constructor which initializes particles on regular grid.
     template <class ExecSpace>
-    Particles( const ExecSpace& exec_space, std::array<double, 3> low_corner,
-               std::array<double, 3> high_corner,
-               const std::array<int, 3> num_cells, const int max_halo_width )
+    Particles( const ExecSpace& exec_space, std::array<double, dim> low_corner,
+               std::array<double, dim> high_corner,
+               const std::array<int, dim> num_cells, const int max_halo_width )
         : halo_width( max_halo_width )
     {
         createDomain( low_corner, high_corner, num_cells );
         createParticles( exec_space );
     }
 
-    void createDomain( std::array<double, 3> low_corner,
-                       std::array<double, 3> high_corner,
-                       const std::array<int, 3> num_cells )
+    void createDomain( std::array<double, dim> low_corner,
+                       std::array<double, dim> high_corner,
+                       const std::array<int, dim> num_cells )
     {
+        for ( int d = 0; d < dim; d++ )
+            std::cout << low_corner[d] << " " << high_corner[d] << " "
+                      << num_cells[d] << std::endl;
+
         // Create the MPI partitions.
-        Cajita::DimBlockPartitioner<3> partitioner;
+        Cajita::DimBlockPartitioner<dim> partitioner;
 
         // Create global mesh of MPI partitions.
         auto global_mesh = Cajita::createUniformGlobalMesh(
@@ -170,11 +177,13 @@ class Particles<DeviceType, PMB, Dimension>
         for ( int d = 0; d < 3; d++ )
             dx[d] = global_mesh->cellSize( d );
 
-        for ( int d = 0; d < 3; d++ )
+        std::array<bool, dim> is_periodic;
+        for ( int d = 0; d < dim; d++ )
+        {
             global_mesh_ext[d] = global_mesh->extent( d );
-
+            is_periodic[d] = false;
+        }
         // Create the global grid.
-        std::array<bool, 3> is_periodic = { false, false, false };
         auto global_grid = Cajita::createGlobalGrid(
             MPI_COMM_WORLD, global_mesh, is_periodic, partitioner );
 
@@ -182,7 +191,7 @@ class Particles<DeviceType, PMB, Dimension>
         local_grid = Cajita::createLocalGrid( global_grid, halo_width );
         auto local_mesh = Cajita::createLocalMesh<device_type>( *local_grid );
 
-        for ( int d = 0; d < 3; d++ )
+        for ( int d = 0; d < dim; d++ )
         {
             local_mesh_lo[d] = local_mesh.lowCorner( Cajita::Own(), d );
             local_mesh_hi[d] = local_mesh.highCorner( Cajita::Own(), d );
@@ -453,9 +462,9 @@ class Particles<DeviceType, LPS, Dimension>
 
     // Constructor which initializes particles on regular grid.
     template <class ExecSpace>
-    Particles( const ExecSpace& exec_space, std::array<double, 3> low_corner,
-               std::array<double, 3> high_corner,
-               const std::array<int, 3> num_cells, const int max_halo_width )
+    Particles( const ExecSpace& exec_space, std::array<double, dim> low_corner,
+               std::array<double, dim> high_corner,
+               const std::array<int, dim> num_cells, const int max_halo_width )
         : base_type( exec_space, low_corner, high_corner, num_cells,
                      max_halo_width )
     {
