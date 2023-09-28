@@ -98,7 +98,7 @@ int main( int argc, char* argv[] )
         auto nofail = particles->sliceNoFail();
 
         // Relying on uniform grid here.
-        double dy = particles->dy;
+        double dy = particles->dx[1];
         double b0 = 2e6 / dy; // Pa
 
         CabanaPD::RegionBoundary plane1( low_x, high_x, low_y - dy, low_y + dy,

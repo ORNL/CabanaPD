@@ -102,13 +102,12 @@ int main( int argc, char* argv[] )
         auto profile = Kokkos::View<double* [2], memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "displacement_profile" ),
             num_cell_x );
-        double length = ( high_corner[0] - low_corner[0] );
         int mpi_rank;
         MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
         Kokkos::View<int*, memory_space> count( "c", 1 );
+        double dx = particles->dx[0];
         auto measure_profile = KOKKOS_LAMBDA( const int pid )
         {
-            double dx = length / num_cell_x;
             if ( x( pid, 1 ) < dx / 2.0 && x( pid, 1 ) > -dx / 2.0 &&
                  x( pid, 2 ) < dx / 2.0 && x( pid, 2 ) > -dx / 2.0 )
             {

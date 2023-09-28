@@ -100,7 +100,7 @@ int main( int argc, char* argv[] )
         auto f = particles->sliceForce();
         auto rho = particles->sliceDensity();
 
-        double dx = particles->dx;
+        double dx = particles->dx[0];
 
         double x_bc = -0.5 * height;
         CabanaPD::RegionBoundary plane(

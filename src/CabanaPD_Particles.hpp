@@ -129,9 +129,7 @@ class Particles<DeviceType, PMB, Dimension>
     std::array<double, 3> ghost_mesh_lo;
     std::array<double, 3> ghost_mesh_hi;
     std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double>>> local_grid;
-    double dx;
-    double dy;
-    double dz;
+    double dx[dim];
 
     int halo_width;
 
@@ -169,6 +167,8 @@ class Particles<DeviceType, PMB, Dimension>
         // Create global mesh of MPI partitions.
         auto global_mesh = Cajita::createUniformGlobalMesh(
             low_corner, high_corner, num_cells );
+        for ( int d = 0; d < 3; d++ )
+            dx[d] = global_mesh->cellSize( d );
 
         for ( int d = 0; d < 3; d++ )
             global_mesh_ext[d] = global_mesh->extent( d );
@@ -190,12 +190,6 @@ class Particles<DeviceType, PMB, Dimension>
             ghost_mesh_hi[d] = local_mesh.highCorner( Cajita::Ghost(), d );
             local_mesh_ext[d] = local_mesh.extent( Cajita::Own(), d );
         }
-
-        // Uniform mesh spacing.
-        int zero[3] = { 0, 0, 0 };
-        dx = local_mesh.measure( Cajita::Edge<Cajita::Dim::I>(), zero );
-        dy = local_mesh.measure( Cajita::Edge<Cajita::Dim::J>(), zero );
-        dz = local_mesh.measure( Cajita::Edge<Cajita::Dim::K>(), zero );
     }
 
     template <class ExecSpace>
@@ -445,8 +439,6 @@ class Particles<DeviceType, LPS, Dimension>
     using base_type::local_mesh_lo;
 
     using base_type::dx;
-    using base_type::dy;
-    using base_type::dz;
     using base_type::local_grid;
 
     using base_type::halo_width;
