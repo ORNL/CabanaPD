@@ -21,6 +21,7 @@ class Inputs
   public:
     std::string output_file = "cabanaPD.out";
     std::string error_file = "cabanaPD.err";
+    std::string input_file = "particles.csv";
     std::string device_type = "SERIAL";
 
     std::array<int, 3> num_cells;

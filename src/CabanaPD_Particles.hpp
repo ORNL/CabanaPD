@@ -284,8 +284,7 @@ class Particles<DeviceType, PMB, Dimension>
     // This is necessary after reading in particles from file for a consistent
     // state.
     template <class ExecSpace>
-    void update_after_read( const ExecSpace& exec_space, const int hw,
-                            const std::array<int, 3> num_cells )
+    void updateAfterRead( const ExecSpace& exec_space, const int hw, double dx )
     {
         halo_width = hw;
         auto x = sliceRefPosition();
@@ -294,12 +293,18 @@ class Particles<DeviceType, PMB, Dimension>
         size = n_local;
         update_global();
 
-        double min_x = 0.0;
-        double min_y = 0.0;
-        double min_z = 0.0;
-        double max_x = 0.0;
-        double max_y = 0.0;
-        double max_z = 0.0;
+        double max_x;
+        Kokkos::Max<double> max_x_reducer( max_x );
+        double min_x;
+        Kokkos::Min<double> min_x_reducer( min_x );
+        double max_y;
+        Kokkos::Max<double> max_y_reducer( max_y );
+        double min_y;
+        Kokkos::Min<double> min_y_reducer( min_y );
+        double max_z;
+        Kokkos::Max<double> max_z_reducer( max_z );
+        double min_z;
+        Kokkos::Min<double> min_z_reducer( min_z );
         Kokkos::parallel_reduce(
             "CabanaPD::Particles::min_max_positions",
             Kokkos::RangePolicy<ExecSpace>( exec_space, 0, n_local ),
@@ -319,10 +324,24 @@ class Particles<DeviceType, PMB, Dimension>
                 else if ( x( i, 2 ) < min_z )
                     min_z = x( i, 2 );
             },
-            min_x, min_y, min_z, max_x, max_y, max_z );
+            min_x_reducer, min_y_reducer, min_z_reducer, max_x_reducer,
+            max_y_reducer, max_z_reducer );
 
-        createDomain( { min_x, min_y, min_z }, { max_x, max_y, max_z },
-                      num_cells );
+        std::array<double, 3> min_corner = { min_x, min_y, min_z };
+        std::array<double, 3> max_corner = { max_x, max_y, max_z };
+
+        std::array<int, 3> num_cells;
+        for ( int d = 0; d < 3; d++ )
+        {
+            // if ( max_corner[d] - min_corner[d] < dx )
+            {
+                max_corner[d] += dx / 2.0;
+                min_corner[d] -= dx / 2.0;
+            }
+            num_cells[d] =
+                static_cast<int>( ( max_corner[d] - min_corner[d] ) / dx );
+        }
+        createDomain( min_corner, max_corner, num_cells );
     }
 
     void update_global()

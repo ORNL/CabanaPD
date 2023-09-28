@@ -116,6 +116,12 @@ void Inputs::read_args( int argc, char* argv[] )
             output_file = argv[i + 1];
             ++i;
         }
+        else if ( ( strcmp( argv[i], "-i" ) == 0 ) ||
+                  ( strcmp( argv[i], "--input-file" ) == 0 ) )
+        {
+            input_file = argv[i + 1];
+            ++i;
+        }
         else if ( ( strcmp( argv[i], "-e" ) == 0 ) ||
                   ( strcmp( argv[i], "--error-file" ) == 0 ) )
         {

@@ -32,24 +32,29 @@ void read_particles( const std::string filename, ParticleType& particles )
             {
                 row.push_back( word );
             }
-            csv_x.push_back( std::stod( row[1] ) );
-            csv_y.push_back( std::stod( row[2] ) );
-            csv_v.push_back( std::stod( row[3] ) );
+            csv_x.push_back( std::stod( row[0] ) );
+            csv_y.push_back( std::stod( row[1] ) );
+            csv_v.push_back( std::stod( row[2] ) );
         }
     }
     else
         throw( "Could not open file." + filename );
 
     // Create unmanaged Views in order to copy to device.
-    Kokkos::View<double*, Kokkos::HostSpace> x_host( csv_x.data() );
-    Kokkos::View<double*, Kokkos::HostSpace> y_host( csv_y.data() );
-    Kokkos::View<double*, Kokkos::HostSpace> vol_host( csv_v.data() );
+    Kokkos::View<double*, Kokkos::HostSpace> x_host( csv_x.data(),
+                                                     csv_x.size() );
+    Kokkos::View<double*, Kokkos::HostSpace> y_host( csv_y.data(),
+                                                     csv_y.size() );
+    Kokkos::View<double*, Kokkos::HostSpace> vol_host( csv_v.data(),
+                                                       csv_v.size() );
 
     // Copy to the device.
     using memory_space = typename ParticleType::memory_space;
     auto x = Kokkos::create_mirror_view_and_copy( memory_space(), x_host );
     auto y = Kokkos::create_mirror_view_and_copy( memory_space(), y_host );
     auto vol = Kokkos::create_mirror_view_and_copy( memory_space(), vol_host );
+    // Resize internal variables (no ghosts initially).
+    particles.resize( x.size(), 0 );
 
     auto px = particles.sliceRefPosition();
     auto pvol = particles.sliceVolume();
@@ -68,6 +73,7 @@ void read_particles( const std::string filename, ParticleType& particles )
             pvol( pid ) = vol( pid );
             px( pid, 0 ) = x( pid );
             px( pid, 1 ) = y( pid );
+            px( pid, 2 ) = 0.0;
 
             // Initialize everything else to zero.
             px( pid, 2 ) = 0.0;
@@ -93,56 +99,28 @@ int main( int argc, char* argv[] )
         using exec_space = Kokkos::DefaultExecutionSpace;
         using memory_space = typename exec_space::memory_space;
 
-        // Plate dimensions (m)
-        double height = 0.1;
-        double width = 0.04;
-        double thickness = 0.002;
-
-        // Domain
-        std::array<int, 3> num_cell = { 300, 121, 6 }; // 300 x 120 x 6
-        double low_x = -0.5 * height;
-        double low_y = -0.5 * width;
-        double low_z = -0.5 * thickness;
-        double high_x = 0.5 * height;
-        double high_y = 0.5 * width;
-        double high_z = 0.5 * thickness;
-        std::array<double, 3> low_corner = { low_x, low_y, low_z };
-        std::array<double, 3> high_corner = { high_x, high_y, high_z };
-
         // Time
-        double t_final = 43e-6;
-        double dt = 6.7e-8;
-        double output_frequency = 5;
+        double t_final = 1e-6;
+        double dt = 1e-8;
+        double output_frequency = 10;
 
         // Material constants
         double E = 72e+9;                      // [Pa]
         double nu = 0.25;                      // unitless
         double K = E / ( 3 * ( 1 - 2 * nu ) ); // [Pa]
-        double rho0 = 2440;                    // [kg/m^3]
         double G0 = 3.8;                       // [J/m^2]
 
         // PD horizon
-        double delta = 0.001;
-
-        // FIXME: set halo width based on delta
-        int m = std::floor(
-            delta / ( ( high_corner[0] - low_corner[0] ) / num_cell[0] ) );
-        int halo_width = m + 1;
-
-        // Prenotch
-        double L_prenotch = height / 2.0;
-        double y_prenotch1 = 0.0;
-        Kokkos::Array<double, 3> p01 = { low_x, y_prenotch1, low_z };
-        Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
-        Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-        Kokkos::Array<Kokkos::Array<double, 3>, 1> notch_positions = { p01 };
-        CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
+        double delta = 0.1;
+        int halo_width = 1;
 
         // Choose force model type.
         using model_type =
             CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
         model_type force_model( delta, K, G0 );
-        CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final, dt,
+        std::array<double, 3> zero = { 0.0, 0.0, 0.0 };
+        std::array<int, 3> num_cell = { 2, 20, 1 };
+        CabanaPD::Inputs inputs( num_cell, zero, zero, t_final, dt,
                                  output_frequency );
         inputs.read_args( argc, argv );
 
@@ -152,10 +130,10 @@ int main( int argc, char* argv[] )
             device_type, typename model_type::base_model>>();
 
         // Read particles from file.
-        std::string file_name = "file.csv";
-        read_particles( file_name, *particles );
-        // Update after reading.
-        particles->update_after_read( exec_space(), halo_width, num_cell );
+        read_particles( inputs.input_file, *particles );
+        // Update after reading. Currently requires fixed cell spacing.
+        double dx = 0.5;
+        particles->updateAfterRead( exec_space(), halo_width, dx );
 
         // Define particle initialization.
         auto x = particles->sliceRefPosition();
@@ -164,28 +142,11 @@ int main( int argc, char* argv[] )
         auto rho = particles->sliceDensity();
         auto nofail = particles->sliceNoFail();
 
-        // Relying on uniform grid here.
-        double dy = particles->dy;
-        double b0 = 2e6 / dy; // Pa
-
-        CabanaPD::RegionBoundary plane1( low_x, high_x, low_y - dy, low_y + dy,
-                                         low_z, high_z );
-        CabanaPD::RegionBoundary plane2( low_x, high_x, high_y - dy,
-                                         high_y + dy, low_z, high_z );
-        std::vector<CabanaPD::RegionBoundary> planes = { plane1, plane2 };
+        CabanaPD::Prenotch<0> prenotch;
+        std::vector<CabanaPD::RegionBoundary> planes = {};
         auto bc =
             createBoundaryCondition( CabanaPD::ForceCrackBranchBCTag{},
-                                     exec_space{}, *particles, planes, b0 );
-
-        auto init_functor = KOKKOS_LAMBDA( const int pid )
-        {
-            rho( pid ) = rho0;
-            // Set the no-fail zone.
-            if ( x( pid, 1 ) <= plane1.low_y + delta + 1e-10 ||
-                 x( pid, 1 ) >= plane2.high_y - delta - 1e-10 )
-                nofail( pid ) = 1;
-        };
-        particles->updateParticles( exec_space{}, init_functor );
+                                     exec_space{}, *particles, planes, 10.0 );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<device_type>(
