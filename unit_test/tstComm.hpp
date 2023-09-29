@@ -97,6 +97,13 @@ void testHalo()
         EXPECT_EQ( rank_host( p ), rank_init_host( p ) );
     }
 
+    int current_size = -1;
+    MPI_Comm_size( MPI_COMM_WORLD, &current_size );
+    // Ghosts should have been created for all but single rank systems.
+    if ( current_size > 1 )
+    {
+        EXPECT_GT( particles.n_ghost, 0 );
+    }
     // Check all ghost particles in the halo region.
     for ( std::size_t p = particles.n_local; p < particles.size; ++p )
     {
