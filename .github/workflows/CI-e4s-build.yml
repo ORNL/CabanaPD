@@ -20,7 +20,7 @@ jobs:
         cmake_build_type: ['Release']
         kokkos_ver: ['3.6.01']
     runs-on: ubuntu-20.04
-    container: docker.io/ecpe4s/e4s-base-rocm:23.05
+    container: ghcr.io/ecp-copa/ci-containers/rocm:latest
     steps:
       - name: Checkout GTest
         uses: actions/checkout@v3
