@@ -14,28 +14,17 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      # Needed because FindMPI relies heavily on the compiler wrappers, which aren't used with hipcc
+      MPI_LOCATION: /usr/lib/x86_64-linux-gnu/openmpi/
     strategy:
       matrix:
         cxx: ['hipcc']
         cmake_build_type: ['Release']
         kokkos_ver: ['3.6.01']
     runs-on: ubuntu-20.04
-    container: docker.io/ecpe4s/e4s-base-rocm:23.05
+    container: ghcr.io/ecp-copa/ci-containers/rocm:latest
     steps:
-      - name: Checkout GTest
-        uses: actions/checkout@v3
-        with:
-          repository: google/googletest
-          ref: release-1.11.0
-          path: gtest
-      - name: Build gtest
-        working-directory: gtest
-        run: |
-          cmake -B build \
-            -DCMAKE_INSTALL_PREFIX=$HOME/gtest \
-            -DCMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }}
-          cmake --build build --parallel 2
-          cmake --install build
       - name: Checkout json
         uses: actions/checkout@v3
         with:
@@ -83,7 +72,11 @@ jobs:
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
             -DCMAKE_INSTALL_PREFIX=$HOME/Cabana \
             -DCMAKE_PREFIX_PATH="$HOME/kokkos" \
-            -DCMAKE_DISABLE_FIND_PACKAGE_HDF5=ON
+            -DCMAKE_CXX_FLAGS="-I${MPI_LOCATION}/include" \
+            -DCMAKE_EXE_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
+            -DCMAKE_DISABLE_FIND_PACKAGE_HDF5=ON \
+            -DCabana_REQUIRE_MPI=ON
           cmake --build build --parallel 2
           cmake --install build
       - name: Checkout CabanaPD
@@ -95,7 +88,10 @@ jobs:
             -D CMAKE_CXX_COMPILER=${{ matrix.cxx }} \
             -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Werror" \
             -D CMAKE_INSTALL_PREFIX=$HOME/CabanaPD \
-            -D CMAKE_PREFIX_PATH="$HOME/Cabana;$HOME/gtest;$HOME/json" \
+            -D CMAKE_PREFIX_PATH="$HOME/Cabana;$HOME/json" \
+            -D CMAKE_CXX_FLAGS="-I${MPI_LOCATION}/include" \
+            -D CMAKE_EXE_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
+            -D CMAKE_SHARED_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
             -D MPIEXEC_MAX_NUMPROCS=2 \
             -D MPIEXEC_PREFLAGS="--oversubscribe" \
             -D CabanaPD_ENABLE_TESTING=ON
