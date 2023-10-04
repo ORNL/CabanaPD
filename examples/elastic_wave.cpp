@@ -35,6 +35,7 @@ int main( int argc, char* argv[] )
         double t_final = 0.6;
         double dt = 0.01;
         int output_frequency = 5;
+        bool output_reference = true;
         double K = 1.0;
         double G = 0.5;
         double delta = 0.075;
@@ -51,7 +52,7 @@ int main( int argc, char* argv[] )
         model_type force_model( delta, K, G );
 
         CabanaPD::Inputs<3> inputs( num_cell, low_corner, high_corner, t_final,
-                                    dt, output_frequency );
+                                    dt, output_frequency, output_reference );
         inputs.read_args( argc, argv );
 
         // Create particles from mesh.
@@ -64,7 +65,7 @@ int main( int argc, char* argv[] )
             inputs.num_cells, halo_width );
 
         // Define particle initialization.
-        auto x = particles->sliceRefPosition();
+        auto x = particles->sliceReferencePosition();
         auto u = particles->sliceDisplacement();
         auto v = particles->sliceVelocity();
         auto rho = particles->sliceDensity();
@@ -96,7 +97,7 @@ int main( int argc, char* argv[] )
         cabana_pd->init_force();
         cabana_pd->run();
 
-        x = particles->sliceRefPosition();
+        x = particles->sliceReferencePosition();
         u = particles->sliceDisplacement();
         double num_cell_x = inputs.num_cells[0];
         auto profile = Kokkos::View<double* [2], memory_space>(

@@ -49,6 +49,7 @@ int main( int argc, char* argv[] )
         double t_final = 43e-6;
         double dt = 5e-8;
         double output_frequency = 5;
+        bool output_reference = true;
 
         // Material constants
         double E = 72e+9;                      // [Pa]
@@ -79,7 +80,7 @@ int main( int argc, char* argv[] )
             CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
         model_type force_model( delta, K, G0 );
         CabanaPD::Inputs<3> inputs( num_cell, low_corner, high_corner, t_final,
-                                    dt, output_frequency );
+                                    dt, output_frequency, output_reference );
         inputs.read_args( argc, argv );
 
         // Create particles from mesh.
@@ -91,7 +92,7 @@ int main( int argc, char* argv[] )
             inputs.num_cells, halo_width );
 
         // Define particle initialization.
-        auto x = particles->sliceRefPosition();
+        auto x = particles->sliceReferencePosition();
         auto v = particles->sliceVelocity();
         auto f = particles->sliceForce();
         auto rho = particles->sliceDensity();

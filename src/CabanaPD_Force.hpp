@@ -402,7 +402,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
                                 const ParallelType neigh_op_tag )
     {
         auto n_local = particles.n_local;
-        auto x = particles.sliceRefPosition();
+        auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();
         auto m = particles.sliceWeightedVolume();
@@ -430,7 +430,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
                             const ParallelType neigh_op_tag ) const
     {
         auto n_local = particles.n_local;
-        const auto x = particles.sliceRefPosition();
+        const auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();
         auto m = particles.sliceWeightedVolume();
@@ -567,7 +567,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                                 const MuView& mu )
     {
         auto n_local = particles.n_local;
-        auto x = particles.sliceRefPosition();
+        auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();
         auto m = particles.sliceWeightedVolume();
@@ -606,7 +606,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                             const MuView& mu ) const
     {
         auto n_local = particles.n_local;
-        const auto x = particles.sliceRefPosition();
+        const auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();
         auto m = particles.sliceWeightedVolume();
@@ -1210,7 +1210,7 @@ void computeForce( const ForceType& force, ParticleType& particles,
                    const ParallelType& neigh_op_tag )
 {
     auto n_local = particles.n_local;
-    auto x = particles.sliceRefPosition();
+    auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto f = particles.sliceForce();
     auto f_a = particles.sliceForceAtomic();
@@ -1240,7 +1240,7 @@ double computeEnergy( const ForceType force, ParticleType& particles,
                       const ParallelType& neigh_op_tag )
 {
     auto n_local = particles.n_local;
-    auto x = particles.sliceRefPosition();
+    auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto f = particles.sliceForce();
     auto W = particles.sliceStrainEnergy();
@@ -1269,7 +1269,7 @@ void computeForce( const ForceType& force, ParticleType& particles,
                    const ParallelType& neigh_op_tag )
 {
     auto n_local = particles.n_local;
-    auto x = particles.sliceRefPosition();
+    auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto f = particles.sliceForce();
     auto f_a = particles.sliceForceAtomic();
@@ -1300,7 +1300,7 @@ double computeEnergy( const ForceType force, ParticleType& particles,
                       const ParallelType& neigh_op_tag )
 {
     auto n_local = particles.n_local;
-    auto x = particles.sliceRefPosition();
+    auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto f = particles.sliceForce();
     auto W = particles.sliceStrainEnergy();
