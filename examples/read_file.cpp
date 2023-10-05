@@ -111,7 +111,7 @@ int main( int argc, char* argv[] )
         double G0 = 3.8;                       // [J/m^2]
 
         // PD horizon
-        double delta = 0.1;
+        double delta = 1.5;
         int halo_width = 1;
 
         // Choose force model type.
@@ -143,10 +143,14 @@ int main( int argc, char* argv[] )
         auto nofail = particles->sliceNoFail();
 
         CabanaPD::Prenotch<0> prenotch;
-        std::vector<CabanaPD::RegionBoundary> planes = {};
+
+        CabanaPD::RegionBoundary plane1( 0 , 1, 9, 10,
+                                         -1, 1 );
+
+        std::vector<CabanaPD::RegionBoundary> planes = { plane1};
         auto bc =
             createBoundaryCondition( CabanaPD::ForceCrackBranchBCTag{},
-                                     exec_space{}, *particles, planes, 10.0 );
+                                     exec_space{}, *particles, planes, 1.0 );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<device_type>(
