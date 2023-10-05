@@ -144,10 +144,9 @@ int main( int argc, char* argv[] )
 
         CabanaPD::Prenotch<0> prenotch;
 
-        CabanaPD::RegionBoundary plane1( 0 , 1, 9, 10,
-                                         -1, 1 );
+        CabanaPD::RegionBoundary plane1( 0, 1, 9, 10, -1, 1 );
 
-        std::vector<CabanaPD::RegionBoundary> planes = { plane1};
+        std::vector<CabanaPD::RegionBoundary> planes = { plane1 };
         auto bc =
             createBoundaryCondition( CabanaPD::ForceCrackBranchBCTag{},
                                      exec_space{}, *particles, planes, 1.0 );
