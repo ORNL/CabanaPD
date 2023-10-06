@@ -147,9 +147,12 @@ int main( int argc, char* argv[] )
         CabanaPD::RegionBoundary plane1( 0, 1, 9, 10, -1, 1 );
 
         std::vector<CabanaPD::RegionBoundary> planes = { plane1 };
-        auto bc =
-            createBoundaryCondition( CabanaPD::ForceUpdateBCTag{}, exec_space{},
-                                     *particles, planes, 2e6 / dx / dx );
+        int bc_dim = 2;
+        double center = particles->local_mesh_ext[bc_dim] / 2.0 +
+                        particles->local_mesh_lo[bc_dim];
+        auto bc = createBoundaryCondition( CabanaPD::ForceSymmetric1dBCTag{},
+                                           exec_space{}, *particles, planes,
+                                           2e6 / dx / dx, bc_dim, center );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<device_type>(
