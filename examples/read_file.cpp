@@ -111,7 +111,7 @@ int main( int argc, char* argv[] )
         double G0 = 3.8;                       // [J/m^2]
 
         // PD horizon
-        double delta = 3*0.1299999999999999;
+        double delta = 3 * 0.1299999999999999;
         int halo_width = 1;
 
         // Choose force model type.
@@ -132,7 +132,7 @@ int main( int argc, char* argv[] )
         // Read particles from file.
         read_particles( inputs.input_file, *particles );
         // Update after reading. Currently requires fixed cell spacing.
-        double dx =0.1299999999999999;
+        double dx = 0.1299999999999999;
         particles->updateAfterRead( exec_space(), halo_width, dx );
 
         // Define particle initialization.
@@ -145,12 +145,11 @@ int main( int argc, char* argv[] )
         CabanaPD::Prenotch<0> prenotch;
 
         CabanaPD::RegionBoundary plane1( 0, 1, 9, 10, -1, 1 );
-        
 
         std::vector<CabanaPD::RegionBoundary> planes = { plane1 };
         auto bc =
-            createBoundaryCondition( CabanaPD::ForceUpdateBCTag{},
-                                     exec_space{}, *particles, planes, 2e6 / dx / dx );
+            createBoundaryCondition( CabanaPD::ForceUpdateBCTag{}, exec_space{},
+                                     *particles, planes, 2e6 / dx / dx );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<device_type>(
