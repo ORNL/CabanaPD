@@ -35,6 +35,7 @@ int main( int argc, char* argv[] )
         double t_final = 0.6;
         double dt = 0.01;
         int output_frequency = 5;
+        bool output_reference = true;
         double K = 1.0;
         double G = 0.5;
         double delta = 0.075;
@@ -50,8 +51,8 @@ int main( int argc, char* argv[] )
             CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::Elastic>;
         model_type force_model( delta, K, G );
 
-        CabanaPD::Inputs inputs( num_cell, low_corner, high_corner, t_final, dt,
-                                 output_frequency );
+        CabanaPD::Inputs<3> inputs( num_cell, low_corner, high_corner, t_final,
+                                    dt, output_frequency, output_reference );
         inputs.read_args( argc, argv );
 
         // Create particles from mesh.
@@ -64,7 +65,7 @@ int main( int argc, char* argv[] )
             inputs.num_cells, halo_width );
 
         // Define particle initialization.
-        auto x = particles->sliceRefPosition();
+        auto x = particles->sliceReferencePosition();
         auto u = particles->sliceDisplacement();
         auto v = particles->sliceVelocity();
         auto rho = particles->sliceDensity();
@@ -96,19 +97,18 @@ int main( int argc, char* argv[] )
         cabana_pd->init_force();
         cabana_pd->run();
 
-        x = particles->sliceRefPosition();
+        x = particles->sliceReferencePosition();
         u = particles->sliceDisplacement();
         double num_cell_x = inputs.num_cells[0];
         auto profile = Kokkos::View<double* [2], memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "displacement_profile" ),
             num_cell_x );
-        double length = ( high_corner[0] - low_corner[0] );
         int mpi_rank;
         MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
         Kokkos::View<int*, memory_space> count( "c", 1 );
+        double dx = particles->dx[0];
         auto measure_profile = KOKKOS_LAMBDA( const int pid )
         {
-            double dx = length / num_cell_x;
             if ( x( pid, 1 ) < dx / 2.0 && x( pid, 1 ) > -dx / 2.0 &&
                  x( pid, 2 ) < dx / 2.0 && x( pid, 2 ) > -dx / 2.0 )
             {

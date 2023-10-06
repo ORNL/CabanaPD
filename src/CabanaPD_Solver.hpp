@@ -89,7 +89,8 @@ class SolverBase
     virtual void run() = 0;
 };
 
-template <class DeviceType, class ParticleType, class ForceModel>
+template <class DeviceType, class InputType, class ParticleType,
+          class ForceModel>
 class SolverElastic
 {
   public:
@@ -106,11 +107,13 @@ class SolverElastic
         Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
                            Cabana::VerletLayout2D, Cabana::TeamOpTag>;
     using neigh_iter_tag = Cabana::SerialOpTag;
+    using input_type = InputType;
 
-    SolverElastic( Inputs _inputs, std::shared_ptr<particle_type> _particles,
+    SolverElastic( input_type _inputs,
+                   std::shared_ptr<particle_type> _particles,
                    force_model_type force_model )
         : particles( _particles )
-        , inputs( std::make_shared<Inputs>( _inputs ) )
+        , inputs( std::make_shared<input_type>( _inputs ) )
     {
         force_time = 0;
         integrate_time = 0;
@@ -123,6 +126,7 @@ class SolverElastic
 
         num_steps = inputs->num_steps;
         output_frequency = inputs->output_frequency;
+        output_reference = inputs->output_reference;
 
         // Create integrator.
         integrator = std::make_shared<integrator_type>( inputs->timestep );
@@ -137,7 +141,7 @@ class SolverElastic
         double mesh_max[3] = { particles->ghost_mesh_hi[0],
                                particles->ghost_mesh_hi[1],
                                particles->ghost_mesh_hi[2] };
-        auto x = particles->sliceRefPosition();
+        auto x = particles->sliceReferencePosition();
         neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
                                                      force_model.delta, 1.0,
                                                      mesh_min, mesh_max );
@@ -185,7 +189,7 @@ class SolverElastic
         computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
         computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
 
-        particles->output( 0, 0.0 );
+        particles->output( 0, 0.0, output_reference );
         init_time += init_timer.seconds();
     }
 
@@ -235,7 +239,7 @@ class SolverElastic
 
                 step_output( step, W );
                 particles->output( step / output_frequency,
-                                   step * inputs->timestep );
+                                   step * inputs->timestep, output_reference );
             }
             other_time += other_timer.seconds();
         }
@@ -302,10 +306,11 @@ class SolverElastic
 
     int num_steps;
     int output_frequency;
+    bool output_reference;
 
   protected:
     std::shared_ptr<particle_type> particles;
-    std::shared_ptr<Inputs> inputs;
+    std::shared_ptr<input_type> inputs;
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
@@ -327,13 +332,14 @@ class SolverElastic
     bool print;
 };
 
-template <class DeviceType, class ParticleType, class ForceModel,
-          class BoundaryCondition, class PrenotchType>
+template <class DeviceType, class InputType, class ParticleType,
+          class ForceModel, class BoundaryCondition, class PrenotchType>
 class SolverFracture
-    : public SolverElastic<DeviceType, ParticleType, ForceModel>
+    : public SolverElastic<DeviceType, InputType, ParticleType, ForceModel>
 {
   public:
-    using base_type = SolverElastic<DeviceType, ParticleType, ForceModel>;
+    using base_type =
+        SolverElastic<DeviceType, InputType, ParticleType, ForceModel>;
     using exec_space = typename base_type::exec_space;
     using memory_space = typename base_type::memory_space;
 
@@ -346,8 +352,10 @@ class SolverFracture
     using neigh_iter_tag = Cabana::SerialOpTag;
     using bc_type = BoundaryCondition;
     using prenotch_type = PrenotchType;
+    using input_type = typename base_type::input_type;
 
-    SolverFracture( Inputs _inputs, std::shared_ptr<particle_type> _particles,
+    SolverFracture( input_type _inputs,
+                    std::shared_ptr<particle_type> _particles,
                     force_model_type force_model, bc_type bc,
                     prenotch_type prenotch )
         : base_type( _inputs, _particles, force_model )
@@ -385,7 +393,7 @@ class SolverFracture
         // Add boundary condition.
         boundary_condition.apply( exec_space(), *particles );
 
-        particles->output( 0, 0.0 );
+        particles->output( 0, 0.0, output_reference );
         init_time += init_timer.seconds();
     }
 
@@ -444,7 +452,7 @@ class SolverFracture
 
                 this->step_output( step, W );
                 particles->output( step / output_frequency,
-                                   step * inputs->timestep );
+                                   step * inputs->timestep, output_reference );
             }
             other_time += other_timer.seconds();
         }
@@ -455,6 +463,7 @@ class SolverFracture
 
     using base_type::num_steps;
     using base_type::output_frequency;
+    using base_type::output_reference;
 
   protected:
     using base_type::comm;
@@ -486,24 +495,25 @@ class SolverFracture
     using base_type::print;
 };
 
-template <class DeviceType, class ParticleType, class ForceModel>
-auto createSolverElastic( Inputs inputs,
+template <class DeviceType, class InputsType, class ParticleType,
+          class ForceModel>
+auto createSolverElastic( InputsType inputs,
                           std::shared_ptr<ParticleType> particles,
                           ForceModel model )
 {
     return std::make_shared<
-        SolverElastic<DeviceType, ParticleType, ForceModel>>( inputs, particles,
-                                                              model );
+        SolverElastic<DeviceType, InputsType, ParticleType, ForceModel>>(
+        inputs, particles, model );
 }
 
-template <class DeviceType, class ParticleType, class ForceModel, class BCType,
-          class PrenotchType>
-auto createSolverFracture( Inputs inputs,
+template <class DeviceType, class InputsType, class ParticleType,
+          class ForceModel, class BCType, class PrenotchType>
+auto createSolverFracture( InputsType inputs,
                            std::shared_ptr<ParticleType> particles,
                            ForceModel model, BCType bc, PrenotchType prenotch )
 {
-    return std::make_shared<SolverFracture<DeviceType, ParticleType, ForceModel,
-                                           BCType, PrenotchType>>(
+    return std::make_shared<SolverFracture<DeviceType, InputsType, ParticleType,
+                                           ForceModel, BCType, PrenotchType>>(
         inputs, particles, model, bc, prenotch );
 }
 

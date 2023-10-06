@@ -58,7 +58,7 @@ void testHalo()
     // No ints are communicated in CabanaPD. We use the volume field for MPI
     // rank here for convenience.
     auto rank = particles.sliceVolume();
-    auto x = particles.sliceRefPosition();
+    auto x = particles.sliceReferencePosition();
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         rank( pid ) = static_cast<double>( current_rank );
@@ -78,7 +78,7 @@ void testHalo()
     CabanaPD::Comm<particles_type, CabanaPD::PMB> comm( particles );
 
     HostAoSoA aosoa_host( "host_aosoa", particles.size );
-    x = particles.sliceRefPosition();
+    x = particles.sliceReferencePosition();
     rank = particles.sliceVolume();
     auto x_host = Cabana::slice<0>( aosoa_host );
     auto rank_host = Cabana::slice<1>( aosoa_host );
@@ -97,6 +97,13 @@ void testHalo()
         EXPECT_EQ( rank_host( p ), rank_init_host( p ) );
     }
 
+    int current_size = -1;
+    MPI_Comm_size( MPI_COMM_WORLD, &current_size );
+    // Ghosts should have been created for all but single rank systems.
+    if ( current_size > 1 )
+    {
+        EXPECT_GT( particles.n_ghost, 0 );
+    }
     // Check all ghost particles in the halo region.
     for ( std::size_t p = particles.n_local; p < particles.size; ++p )
     {

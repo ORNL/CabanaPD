@@ -56,7 +56,7 @@ void read_particles( const std::string filename, ParticleType& particles )
     // Resize internal variables (no ghosts initially).
     particles.resize( x.size(), 0 );
 
-    auto px = particles.sliceRefPosition();
+    auto px = particles.sliceReferencePosition();
     auto pvol = particles.sliceVolume();
     auto v = particles.sliceVelocity();
     auto f = particles.sliceForce();
@@ -73,11 +73,9 @@ void read_particles( const std::string filename, ParticleType& particles )
             pvol( pid ) = vol( pid );
             px( pid, 0 ) = x( pid );
             px( pid, 1 ) = y( pid );
-            px( pid, 2 ) = 0.0;
 
             // Initialize everything else to zero.
-            px( pid, 2 ) = 0.0;
-            for ( int d = 0; d < 3; d++ )
+            for ( int d = 0; d < 2; d++ )
             {
                 u( pid, d ) = 0.0;
                 v( pid, d ) = 0.0;
@@ -118,10 +116,7 @@ int main( int argc, char* argv[] )
         using model_type =
             CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
         model_type force_model( delta, K, G0 );
-        std::array<double, 3> zero = { 0.0, 0.0, 0.0 };
-        std::array<int, 3> num_cell = { 8, 80, 1 };
-        CabanaPD::Inputs inputs( num_cell, zero, zero, t_final, dt,
-                                 output_frequency );
+        CabanaPD::Inputs<2> inputs( t_final, dt, output_frequency, true );
         inputs.read_args( argc, argv );
 
         // Default construct to then read particles.
@@ -136,7 +131,7 @@ int main( int argc, char* argv[] )
         particles->updateAfterRead( exec_space(), halo_width, dx );
 
         // Define particle initialization.
-        auto x = particles->sliceRefPosition();
+        auto x = particles->sliceReferencePosition();
         auto v = particles->sliceVelocity();
         auto f = particles->sliceForce();
         auto rho = particles->sliceDensity();

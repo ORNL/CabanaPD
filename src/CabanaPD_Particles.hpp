@@ -88,6 +88,7 @@ class Particles<DeviceType, PMB, Dimension>
     using self_type = Particles<DeviceType, PMB, Dimension>;
     using device_type = DeviceType;
     using memory_space = typename device_type::memory_space;
+    using execution_space = typename memory_space::execution_space;
     static constexpr int dim = Dimension;
 
     // Per particle.
@@ -111,6 +112,7 @@ class Particles<DeviceType, PMB, Dimension>
     // FIXME: enable variable aosoa.
     using aosoa_x_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_u_type = Cabana::AoSoA<vector_type, memory_space, 1>;
+    using aosoa_y_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_f_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_vol_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
     using aosoa_nofail_type = Cabana::AoSoA<int_type, memory_space, 1>;
@@ -120,61 +122,70 @@ class Particles<DeviceType, PMB, Dimension>
     int n_types = 1;
 
     // Simulation total domain.
-    std::array<double, 3> global_mesh_ext;
+    std::array<double, dim> global_mesh_ext;
 
     // Simulation sub domain (single MPI rank).
-    std::array<double, 3> local_mesh_ext;
-    std::array<double, 3> local_mesh_lo;
-    std::array<double, 3> local_mesh_hi;
-    std::array<double, 3> ghost_mesh_lo;
-    std::array<double, 3> ghost_mesh_hi;
-    std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double>>> local_grid;
-    double dx;
-    double dy;
-    double dz;
+    std::array<double, dim> local_mesh_ext;
+    std::array<double, dim> local_mesh_lo;
+    std::array<double, dim> local_mesh_hi;
+    std::array<double, dim> ghost_mesh_lo;
+    std::array<double, dim> ghost_mesh_hi;
+    std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double, dim>>>
+        local_grid;
+    double dx[dim];
 
     int halo_width;
 
     // Default constructor.
     Particles()
     {
-        global_mesh_ext = { 0.0, 0.0, 0.0 };
-        local_mesh_lo = { 0.0, 0.0, 0.0 };
-        local_mesh_hi = { 0.0, 0.0, 0.0 };
-        ghost_mesh_lo = { 0.0, 0.0, 0.0 };
-        ghost_mesh_hi = { 0.0, 0.0, 0.0 };
-        local_mesh_ext = { 0.0, 0.0, 0.0 };
-
+        for ( int d = 0; d < dim; d++ )
+        {
+            global_mesh_ext[d] = 0.0;
+            local_mesh_lo[d] = 0.0;
+            local_mesh_hi[d] = 0.0;
+            ghost_mesh_lo[d] = 0.0;
+            ghost_mesh_hi[d] = 0.0;
+            local_mesh_ext[d] = 0.0;
+        }
         resize( 0, 0 );
     }
 
     // Constructor which initializes particles on regular grid.
     template <class ExecSpace>
-    Particles( const ExecSpace& exec_space, std::array<double, 3> low_corner,
-               std::array<double, 3> high_corner,
-               const std::array<int, 3> num_cells, const int max_halo_width )
+    Particles( const ExecSpace& exec_space, std::array<double, dim> low_corner,
+               std::array<double, dim> high_corner,
+               const std::array<int, dim> num_cells, const int max_halo_width )
         : halo_width( max_halo_width )
     {
         createDomain( low_corner, high_corner, num_cells );
         createParticles( exec_space );
     }
 
-    void createDomain( std::array<double, 3> low_corner,
-                       std::array<double, 3> high_corner,
-                       const std::array<int, 3> num_cells )
+    void createDomain( std::array<double, dim> low_corner,
+                       std::array<double, dim> high_corner,
+                       const std::array<int, dim> num_cells )
     {
+        for ( int d = 0; d < dim; d++ )
+            std::cout << low_corner[d] << " " << high_corner[d] << " "
+                      << num_cells[d] << std::endl;
+
         // Create the MPI partitions.
-        Cajita::DimBlockPartitioner<3> partitioner;
+        Cajita::DimBlockPartitioner<dim> partitioner;
 
         // Create global mesh of MPI partitions.
         auto global_mesh = Cajita::createUniformGlobalMesh(
             low_corner, high_corner, num_cells );
-
         for ( int d = 0; d < 3; d++ )
-            global_mesh_ext[d] = global_mesh->extent( d );
+            dx[d] = global_mesh->cellSize( d );
 
+        std::array<bool, dim> is_periodic;
+        for ( int d = 0; d < dim; d++ )
+        {
+            global_mesh_ext[d] = global_mesh->extent( d );
+            is_periodic[d] = false;
+        }
         // Create the global grid.
-        std::array<bool, 3> is_periodic = { false, false, false };
         auto global_grid = Cajita::createGlobalGrid(
             MPI_COMM_WORLD, global_mesh, is_periodic, partitioner );
 
@@ -182,7 +193,7 @@ class Particles<DeviceType, PMB, Dimension>
         local_grid = Cajita::createLocalGrid( global_grid, halo_width );
         auto local_mesh = Cajita::createLocalMesh<device_type>( *local_grid );
 
-        for ( int d = 0; d < 3; d++ )
+        for ( int d = 0; d < dim; d++ )
         {
             local_mesh_lo[d] = local_mesh.lowCorner( Cajita::Own(), d );
             local_mesh_hi[d] = local_mesh.highCorner( Cajita::Own(), d );
@@ -190,12 +201,6 @@ class Particles<DeviceType, PMB, Dimension>
             ghost_mesh_hi[d] = local_mesh.highCorner( Cajita::Ghost(), d );
             local_mesh_ext[d] = local_mesh.extent( Cajita::Own(), d );
         }
-
-        // Uniform mesh spacing.
-        int zero[3] = { 0, 0, 0 };
-        dx = local_mesh.measure( Cajita::Edge<Cajita::Dim::I>(), zero );
-        dy = local_mesh.measure( Cajita::Edge<Cajita::Dim::J>(), zero );
-        dz = local_mesh.measure( Cajita::Edge<Cajita::Dim::K>(), zero );
     }
 
     template <class ExecSpace>
@@ -210,12 +215,13 @@ class Particles<DeviceType, PMB, Dimension>
         int num_particles = particles_per_cell * owned_cells.size();
         resize( num_particles, 0 );
 
-        auto x = sliceRefPosition();
+        auto x = sliceReferencePosition();
         auto v = sliceVelocity();
         auto f = sliceForce();
         auto type = sliceType();
         auto rho = sliceDensity();
         auto u = sliceDisplacement();
+        auto y = sliceCurrentPosition();
         auto vol = sliceVolume();
         auto nofail = sliceNoFail();
 
@@ -250,6 +256,7 @@ class Particles<DeviceType, PMB, Dimension>
                 {
                     x( pid, d ) = cell_coord[d];
                     u( pid, d ) = 0.0;
+                    y( pid, d ) = 0.0;
                     v( pid, d ) = 0.0;
                     f( pid, d ) = 0.0;
                 }
@@ -283,11 +290,12 @@ class Particles<DeviceType, PMB, Dimension>
 
     // This is necessary after reading in particles from file for a consistent
     // state.
-    template <class ExecSpace>
-    void updateAfterRead( const ExecSpace& exec_space, const int hw, double dx )
+    template <class ExecSpace, std::size_t NSD = dim>
+    std::enable_if_t<3 == NSD, void>
+    updateAfterRead( const ExecSpace& exec_space, const int hw, double dx )
     {
         halo_width = hw;
-        auto x = sliceRefPosition();
+        auto x = sliceReferencePosition();
         n_local = x.size();
         n_ghost = 0;
         size = n_local;
@@ -333,11 +341,57 @@ class Particles<DeviceType, PMB, Dimension>
         std::array<int, 3> num_cells;
         for ( int d = 0; d < 3; d++ )
         {
-            // if ( max_corner[d] - min_corner[d] < dx )
-            {
-                max_corner[d] += dx / 2.0;
-                min_corner[d] -= dx / 2.0;
-            }
+            max_corner[d] += dx / 2.0;
+            min_corner[d] -= dx / 2.0;
+            num_cells[d] =
+                static_cast<int>( ( max_corner[d] - min_corner[d] ) / dx );
+        }
+        createDomain( min_corner, max_corner, num_cells );
+    }
+
+    template <class ExecSpace, std::size_t NSD = dim>
+    std::enable_if_t<2 == NSD, void>
+    updateAfterRead( const ExecSpace& exec_space, const int hw, double dx )
+    {
+        halo_width = hw;
+        auto x = sliceReferencePosition();
+        n_local = x.size();
+        n_ghost = 0;
+        size = n_local;
+        update_global();
+
+        double max_x;
+        Kokkos::Max<double> max_x_reducer( max_x );
+        double min_x;
+        Kokkos::Min<double> min_x_reducer( min_x );
+        double max_y;
+        Kokkos::Max<double> max_y_reducer( max_y );
+        double min_y;
+        Kokkos::Min<double> min_y_reducer( min_y );
+        Kokkos::parallel_reduce(
+            "CabanaPD::Particles::min_max_positions",
+            Kokkos::RangePolicy<ExecSpace>( exec_space, 0, n_local ),
+            KOKKOS_LAMBDA( const int i, double& min_x, double& min_y,
+                           double& max_x, double& max_y ) {
+                if ( x( i, 0 ) > max_x )
+                    max_x = x( i, 0 );
+                else if ( x( i, 0 ) < min_x )
+                    min_x = x( i, 0 );
+                if ( x( i, 1 ) > max_y )
+                    max_y = x( i, 1 );
+                else if ( x( i, 1 ) < min_y )
+                    min_y = x( i, 1 );
+            },
+            min_x_reducer, min_y_reducer, max_x_reducer, max_y_reducer );
+
+        std::array<double, 2> min_corner = { min_x, min_y };
+        std::array<double, 2> max_corner = { max_x, max_y };
+
+        std::array<int, 2> num_cells;
+        for ( int d = 0; d < 2; d++ )
+        {
+            max_corner[d] += dx / 2.0;
+            min_corner[d] -= dx / 2.0;
             num_cells[d] =
                 static_cast<int>( ( max_corner[d] - min_corner[d] ) / dx );
         }
@@ -360,13 +414,25 @@ class Particles<DeviceType, PMB, Dimension>
             KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
     }
 
-    auto sliceRefPosition()
+    auto sliceReferencePosition()
     {
-        return Cabana::slice<0>( _aosoa_x, "positions" );
+        return Cabana::slice<0>( _aosoa_x, "reference_positions" );
     }
-    auto sliceRefPosition() const
+    auto sliceReferencePosition() const
     {
-        return Cabana::slice<0>( _aosoa_x, "positions" );
+        return Cabana::slice<0>( _aosoa_x, "reference_positions" );
+    }
+    auto sliceCurrentPosition()
+    {
+        // Update before returning data.
+        updateCurrentPosition();
+        return Cabana::slice<0>( _aosoa_y, "current_positions" );
+    }
+    auto sliceCurrentPosition() const
+    {
+        // Update before returning data.
+        updateCurrentPosition();
+        return Cabana::slice<0>( _aosoa_y, "current_positions" );
     }
     auto sliceDisplacement()
     {
@@ -427,6 +493,22 @@ class Particles<DeviceType, PMB, Dimension>
         return Cabana::slice<0>( _aosoa_nofail, "no_fail_region" );
     }
 
+    void updateCurrentPosition()
+    {
+        // Not using slice function because this is called inside.
+        auto y = Cabana::slice<0>( _aosoa_y, "current_positions" );
+        auto x = sliceReferencePosition();
+        auto u = sliceDisplacement();
+        Kokkos::RangePolicy<execution_space> policy( 0, n_local + n_ghost );
+        auto sum_x_u = KOKKOS_LAMBDA( const std::size_t pid )
+        {
+            for ( int d = 0; d < 3; d++ )
+                y( pid, d ) = x( pid, d ) + u( pid, d );
+        };
+        Kokkos::parallel_for( "CabanaPD::CalculateCurrentPositions", policy,
+                              sum_x_u );
+    }
+
     void resize( int new_local, int new_ghost )
     {
         n_local = new_local;
@@ -434,6 +516,7 @@ class Particles<DeviceType, PMB, Dimension>
 
         _aosoa_x.resize( new_local + new_ghost );
         _aosoa_u.resize( new_local + new_ghost );
+        _aosoa_y.resize( new_local + new_ghost );
         _aosoa_vol.resize( new_local + new_ghost );
         _aosoa_f.resize( new_local );
         _aosoa_other.resize( new_local );
@@ -441,22 +524,31 @@ class Particles<DeviceType, PMB, Dimension>
         size = _aosoa_x.size();
     };
 
-    void output( const int output_step, const double output_time )
+    auto getPosition( const bool use_reference )
+    {
+        if ( use_reference )
+            return sliceReferencePosition();
+        else
+            return sliceCurrentPosition();
+    }
+
+    void output( [[maybe_unused]] const int output_step,
+                 [[maybe_unused]] const double output_time,
+                 [[maybe_unused]] const bool use_reference = true )
     {
 #ifdef Cabana_ENABLE_HDF5
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
-            n_local, sliceRefPosition(), sliceStrainEnergy(), sliceForce(),
-            sliceDisplacement(), sliceVelocity(), sliceDamage() );
+            n_local, getPosition( use_reference ), sliceStrainEnergy(),
+            sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage() );
 #else
 #ifdef Cabana_ENABLE_SILO
         Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
             "particles", local_grid->globalGrid(), output_step, output_time, 0,
-            n_local, sliceRefPosition(), sliceStrainEnergy(), sliceForce(),
-            sliceDisplacement(), sliceVelocity(), sliceDamage() );
+            n_local, getPosition( use_reference ), sliceStrainEnergy(),
+            sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage() );
 #else
-        log( std::cout, "No particle output enabled for step ", output_step,
-             " (", output_time, ")" );
+        log( std::cout, "No particle output enabled." );
 #endif
 #endif
     }
@@ -466,6 +558,7 @@ class Particles<DeviceType, PMB, Dimension>
   protected:
     aosoa_x_type _aosoa_x;
     aosoa_u_type _aosoa_u;
+    aosoa_y_type _aosoa_y;
     aosoa_f_type _aosoa_f;
     aosoa_vol_type _aosoa_vol;
     aosoa_nofail_type _aosoa_nofail;
@@ -513,8 +606,6 @@ class Particles<DeviceType, LPS, Dimension>
     using base_type::local_mesh_lo;
 
     using base_type::dx;
-    using base_type::dy;
-    using base_type::dz;
     using base_type::local_grid;
 
     using base_type::halo_width;
@@ -529,9 +620,9 @@ class Particles<DeviceType, LPS, Dimension>
 
     // Constructor which initializes particles on regular grid.
     template <class ExecSpace>
-    Particles( const ExecSpace& exec_space, std::array<double, 3> low_corner,
-               std::array<double, 3> high_corner,
-               const std::array<int, 3> num_cells, const int max_halo_width )
+    Particles( const ExecSpace& exec_space, std::array<double, dim> low_corner,
+               std::array<double, dim> high_corner,
+               const std::array<int, dim> num_cells, const int max_halo_width )
         : base_type( exec_space, low_corner, high_corner, num_cells,
                      max_halo_width )
     {
@@ -572,12 +663,14 @@ class Particles<DeviceType, LPS, Dimension>
         _aosoa_m.resize( new_local + new_ghost );
     }
 
-    void output( const int output_step, const double output_time )
+    void output( [[maybe_unused]] const int output_step,
+                 [[maybe_unused]] const double output_time,
+                 [[maybe_unused]] const bool use_reference = true )
     {
 #ifdef Cabana_ENABLE_HDF5
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
-            n_local, base_type::sliceRefPosition(),
+            n_local, base_type::getPosition( use_reference ),
             base_type::sliceStrainEnergy(), base_type::sliceForce(),
             base_type::sliceDisplacement(), base_type::sliceVelocity(),
             base_type::sliceDamage(), sliceWeightedVolume(),
@@ -586,14 +679,13 @@ class Particles<DeviceType, LPS, Dimension>
 #ifdef Cabana_ENABLE_SILO
         Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
             "particles", local_grid->globalGrid(), output_step, output_time, 0,
-            n_local, base_type::sliceRefPosition(),
+            n_local, base_type::getPosition( use_reference ),
             base_type::sliceStrainEnergy(), base_type::sliceForce(),
             base_type::sliceDisplacement(), base_type::sliceVelocity(),
             base_type::sliceDamage(), sliceWeightedVolume(),
             sliceDilatation() );
 #else
-        log( std::cout, "No particle output enabled for ", output_step, "(",
-             output_time, ")" );
+        log( std::cout, "No particle output enabled." );
 #endif
 #endif
     }

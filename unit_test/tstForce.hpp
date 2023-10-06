@@ -386,7 +386,7 @@ createParticles( ModelType, LinearTag, const double dx, const double s0 )
         CabanaPD::Particles<TEST_DEVICE, typename ModelType::base_model>;
     ptype particles( TEST_EXECSPACE{}, box_min, box_max, num_cells, 0 );
 
-    auto x = particles.sliceRefPosition();
+    auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto v = particles.sliceVelocity();
     auto init_functor = KOKKOS_LAMBDA( const int pid )
@@ -414,7 +414,7 @@ createParticles( ModelType, QuadraticTag, const double dx, const double s0 )
     using ptype =
         CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model>;
     ptype particles( TEST_EXECSPACE{}, box_min, box_max, num_cells, 0 );
-    auto x = particles.sliceRefPosition();
+    auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto v = particles.sliceVelocity();
     auto init_functor = KOKKOS_LAMBDA( const int pid )
@@ -702,7 +702,7 @@ void testForce( ModelType model, const DamageType damage_tag, const double dx,
         Cabana::VerletList<TEST_MEMSPACE, Cabana::FullNeighborTag,
                            Cabana::VerletLayout2D, Cabana::TeamOpTag>;
     // Add to delta to make sure neighbors are found.
-    auto x = particles.sliceRefPosition();
+    auto x = particles.sliceReferencePosition();
     verlet_list neigh_list( x, 0, particles.n_local, model.delta + 1e-14, 1.0,
                             mesh_min, mesh_max );
     int max_neighbors =

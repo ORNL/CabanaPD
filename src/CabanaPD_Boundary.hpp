@@ -87,7 +87,7 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
 
         auto index_space = _view;
         auto count = _count;
-        auto x = particles.sliceRefPosition();
+        auto x = particles.sliceReferencePosition();
         Kokkos::RangePolicy<ExecSpace> policy( 0, particles.n_local );
         auto index_functor = KOKKOS_LAMBDA( const std::size_t pid )
         {
@@ -164,7 +164,7 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     void apply( ExecSpace, ParticleType& particles )
     {
         auto f = particles.sliceForce();
-        auto x = particles.sliceRefPosition();
+        auto x = particles.sliceReferencePosition();
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         auto value = _value;
@@ -243,7 +243,7 @@ struct BoundaryCondition<BCIndexSpace, ForceSymmetric1dBCTag>
     void apply( ExecSpace, ParticleType& particles )
     {
         auto f = particles.sliceForce();
-        auto x = particles.sliceRefPosition();
+        auto x = particles.sliceReferencePosition();
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         auto value = _value;

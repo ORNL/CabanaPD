@@ -45,7 +45,7 @@ void testIntegratorReversibility( int steps )
 
     CabanaPD::Particles<TEST_DEVICE, CabanaPD::PMB> particles(
         exec_space(), box_min, box_max, num_cells, 0 );
-    auto x = particles.sliceRefPosition();
+    auto x = particles.sliceReferencePosition();
     std::size_t num_particle = x.size();
 
     CabanaPD::Integrator<exec_space> integrator( 0.001 );
@@ -86,7 +86,7 @@ void testIntegratorReversibility( int steps )
     Cabana::deep_copy( x_final, x );
 
     // Check the results
-    x = particles.sliceRefPosition();
+    x = particles.sliceReferencePosition();
     for ( std::size_t p = 0; p < num_particle; ++p )
         for ( std::size_t d = 0; d < 3; ++d )
             EXPECT_DOUBLE_EQ( x_final( p, d ), x_init( p, d ) );
