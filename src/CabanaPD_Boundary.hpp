@@ -118,7 +118,7 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
 
 template <class BoundaryType, class ExecSpace, class Particles>
 auto createBoundaryIndexSpace( ExecSpace exec_space, Particles particles,
-                               std::vector<RegionBoundary> planes,
+                               std::vector<BoundaryType> planes,
                                const double initial_guess )
 {
     using memory_space = typename Particles::memory_space;
@@ -133,13 +133,14 @@ struct ForceUpdateBCTag
 {
 };
 
-struct ForceCrackBranchBCTag
+struct ForceSymmetric1dBCTag
 {
 };
 
 template <class BCIndexSpace, class BCTag>
 struct BoundaryCondition;
 
+// Reset BC (all dimensions).
 template <class BCIndexSpace>
 struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
 {
@@ -176,6 +177,7 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     }
 };
 
+// Increment BC (all dimensions).
 template <class BCIndexSpace>
 struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
 {
@@ -211,15 +213,22 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     }
 };
 
+// Symmetric 1d BC applied with opposite sign based on position from the
+// midplane in the specified direction.
 template <class BCIndexSpace>
-struct BoundaryCondition<BCIndexSpace, ForceCrackBranchBCTag>
+struct BoundaryCondition<BCIndexSpace, ForceSymmetric1dBCTag>
 {
     double _value;
     BCIndexSpace _index_space;
+    int _dim;
+    double _center;
 
-    BoundaryCondition( const double value, BCIndexSpace bc_index_space )
+    BoundaryCondition( const double value, BCIndexSpace bc_index_space,
+                       const int dim = 1, const double center = 0.0 )
         : _value( value )
         , _index_space( bc_index_space )
+        , _dim( dim )
+        , _center( center )
     {
     }
 
@@ -238,18 +247,21 @@ struct BoundaryCondition<BCIndexSpace, ForceCrackBranchBCTag>
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         auto value = _value;
+        auto dim = _dim;
+        auto center = _center;
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
-                // This is specifically for the crack branching.
-                auto sign = std::abs( x( pid, 1 ) ) / x( pid, 1 );
+                auto relative_x = x( pid, dim ) - center;
+                auto sign = std::abs( relative_x ) / relative_x;
                 f( pid, 1 ) += value * sign;
             } );
     }
 };
 
 // FIXME: relatively large initial guess for allocation.
-template <class BoundaryType, class BCTag, class ExecSpace, class Particles>
+template <class BoundaryType, class BCTag, class ExecSpace, class Particles,
+          class... Args>
 auto createBoundaryCondition( BCTag, ExecSpace exec_space, Particles particles,
                               std::vector<BoundaryType> planes,
                               const double value,
@@ -260,6 +272,23 @@ auto createBoundaryCondition( BCTag, ExecSpace exec_space, Particles particles,
     bc_index_type bc_indices = createBoundaryIndexSpace<BoundaryType>(
         exec_space, particles, planes, initial_guess );
     return BoundaryCondition<bc_index_type, BCTag>( value, bc_indices );
+}
+
+// FIXME: relatively large initial guess for allocation.
+template <class BoundaryType, class ExecSpace, class Particles>
+auto createBoundaryCondition( ForceSymmetric1dBCTag, ExecSpace exec_space,
+                              Particles particles,
+                              std::vector<BoundaryType> planes,
+                              const double value, const int dim,
+                              const double center,
+                              const double initial_guess = 0.5 )
+{
+    using memory_space = typename Particles::memory_space;
+    using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;
+    bc_index_type bc_indices = createBoundaryIndexSpace(
+        exec_space, particles, planes, initial_guess );
+    return BoundaryCondition<bc_index_type, ForceSymmetric1dBCTag>(
+        value, bc_indices, dim, center );
 }
 
 } // namespace CabanaPD
