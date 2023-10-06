@@ -101,7 +101,7 @@ int main( int argc, char* argv[] )
 
         // Time
         double t_final = 1e-6;
-        double dt = 1e-8;
+        double dt = 1e-9;
         double output_frequency = 10;
 
         // Material constants
@@ -111,7 +111,7 @@ int main( int argc, char* argv[] )
         double G0 = 3.8;                       // [J/m^2]
 
         // PD horizon
-        double delta = 1.5;
+        double delta = 3*0.1299999999999999;
         int halo_width = 1;
 
         // Choose force model type.
@@ -119,7 +119,7 @@ int main( int argc, char* argv[] )
             CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
         model_type force_model( delta, K, G0 );
         std::array<double, 3> zero = { 0.0, 0.0, 0.0 };
-        std::array<int, 3> num_cell = { 2, 20, 1 };
+        std::array<int, 3> num_cell = { 8, 80, 1 };
         CabanaPD::Inputs inputs( num_cell, zero, zero, t_final, dt,
                                  output_frequency );
         inputs.read_args( argc, argv );
@@ -132,7 +132,7 @@ int main( int argc, char* argv[] )
         // Read particles from file.
         read_particles( inputs.input_file, *particles );
         // Update after reading. Currently requires fixed cell spacing.
-        double dx = 0.5;
+        double dx =0.1299999999999999;
         particles->updateAfterRead( exec_space(), halo_width, dx );
 
         // Define particle initialization.
@@ -145,11 +145,12 @@ int main( int argc, char* argv[] )
         CabanaPD::Prenotch<0> prenotch;
 
         CabanaPD::RegionBoundary plane1( 0, 1, 9, 10, -1, 1 );
+        
 
         std::vector<CabanaPD::RegionBoundary> planes = { plane1 };
         auto bc =
-            createBoundaryCondition( CabanaPD::ForceCrackBranchBCTag{},
-                                     exec_space{}, *particles, planes, 1.0 );
+            createBoundaryCondition( CabanaPD::ForceUpdateBCTag{},
+                                     exec_space{}, *particles, planes, 2e6 / dx / dx );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<device_type>(
