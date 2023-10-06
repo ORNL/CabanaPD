@@ -139,9 +139,11 @@ int main( int argc, char* argv[] )
 
         CabanaPD::Prenotch<0> prenotch;
 
-        CabanaPD::RegionBoundary plane1( 0, 1, 9, 10, -1, 1 );
+        CabanaPD::RegionBoundary planeUpper( -0.5, 0.5, 4.5, 5, -1, 1 );
+        CabanaPD::RegionBoundary planeLower( -0.5, 0.5, -5, -4.5, -1, 1 );
 
-        std::vector<CabanaPD::RegionBoundary> planes = { plane1 };
+        std::vector<CabanaPD::RegionBoundary> planes = { planeUpper,
+                                                         planeLower };
         int bc_dim = 2;
         double center = particles->local_mesh_ext[bc_dim] / 2.0 +
                         particles->local_mesh_lo[bc_dim];
