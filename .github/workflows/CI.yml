@@ -45,7 +45,7 @@ jobs:
     container: ghcr.io/ecp-copa/ci-containers/${{ matrix.distro }}
     steps:
       - name: Checkout kokkos
-        uses: actions/checkout@v2.2.0
+        uses: actions/checkout@v3
         with:
           repository: kokkos/kokkos
           ref: ${{ matrix.kokkos_ver }}
@@ -62,7 +62,7 @@ jobs:
           cmake --build build --parallel 2
           cmake --install build
       - name: Checkout Cabana
-        uses: actions/checkout@v2.2.0
+        uses: actions/checkout@v3
         with:
           repository: ECP-CoPA/Cabana
           # This version is post-release 0.5
@@ -89,7 +89,7 @@ jobs:
           cmake --build build --parallel 2
           cmake --install build
       - name: Checkout CabanaPD
-        uses: actions/checkout@v2.2.0
+        uses: actions/checkout@v3
       - name: Build CabanaPD
         run: |
           cmake -B build \
