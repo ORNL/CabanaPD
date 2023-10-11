@@ -100,7 +100,7 @@ int main( int argc, char* argv[] )
 
         // Relying on uniform grid here.
         double dy = particles->dx[1];
-        double b0 = 2e6 / dy; // Pa
+        double b0 = 2e6 / dy; // Pa/m
 
         CabanaPD::RegionBoundary plane1( low_x, high_x, low_y - dy, low_y + dy,
                                          low_z, high_z );
