@@ -109,7 +109,8 @@ int main( int argc, char* argv[] )
         double G0 = 3.8;                       // [J/m^2]
 
         // PD horizon
-        double delta = 3 * 0.1299999999999999;
+        double dx = 0.1299999999999999;
+        double delta = 3 * dx;
         int halo_width = 1;
 
         // Choose force model type.
@@ -127,15 +128,7 @@ int main( int argc, char* argv[] )
         // Read particles from file.
         read_particles( inputs.input_file, *particles );
         // Update after reading. Currently requires fixed cell spacing.
-        double dx = 0.1299999999999999;
         particles->updateAfterRead( exec_space(), halo_width, dx );
-
-        // Define particle initialization.
-        auto x = particles->sliceReferencePosition();
-        auto v = particles->sliceVelocity();
-        auto f = particles->sliceForce();
-        auto rho = particles->sliceDensity();
-        auto nofail = particles->sliceNoFail();
 
         CabanaPD::Prenotch<0> prenotch;
 
