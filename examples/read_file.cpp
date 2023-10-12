@@ -116,13 +116,13 @@ int main( int argc, char* argv[] )
         using model_type =
             CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
         model_type force_model( delta, K, G0 );
-        CabanaPD::Inputs<2> inputs( t_final, dt, output_frequency, true );
+        CabanaPD::Inputs<3> inputs( t_final, dt, output_frequency, true );
         inputs.read_args( argc, argv );
 
         // Default construct to then read particles.
         using device_type = Kokkos::Device<exec_space, memory_space>;
         auto particles = std::make_shared<CabanaPD::Particles<
-            device_type, typename model_type::base_model>>();
+            device_type, typename model_type::base_model, 3>>();
 
         // Read particles from file.
         read_particles( inputs.input_file, *particles );
