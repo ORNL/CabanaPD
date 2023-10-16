@@ -64,6 +64,7 @@ void read_particles( const std::string filename, ParticleType& particles )
     auto rho = particles.sliceDensity();
     auto u = particles.sliceDisplacement();
     auto nofail = particles.sliceNoFail();
+    auto damage = particles.sliceDamage();
 
     using exec_space = typename memory_space::execution_space;
     Kokkos::parallel_for(
@@ -75,7 +76,9 @@ void read_particles( const std::string filename, ParticleType& particles )
             px( pid, 1 ) = y( pid );
 
             // Initialize everything else to zero.
-            for ( int d = 0; d < 2; d++ )
+            // Currently psuedo-2d.
+            px( pid, 2 ) = 0.0;
+            for ( int d = 0; d < 3; d++ )
             {
                 u( pid, d ) = 0.0;
                 v( pid, d ) = 0.0;
@@ -84,6 +87,7 @@ void read_particles( const std::string filename, ParticleType& particles )
             type( pid ) = 0;
             nofail( pid ) = 0;
             rho( pid ) = 1.0;
+            damage( pid ) = 0;
         } );
 }
 

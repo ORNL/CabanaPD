@@ -639,6 +639,16 @@ class Particles<DeviceType, LPS, Dimension>
         _aosoa_theta.resize( 0 );
     }
 
+    template <class ExecSpace>
+    void updateAfterRead( const ExecSpace& exec_space, const int hw, double dx )
+    {
+        base_type::updateAfterRead( exec_space, hw, dx );
+
+        // Only need to resize LPS variables
+        _aosoa_theta.resize( n_local + n_ghost );
+        _aosoa_m.resize( n_local + n_ghost );
+    }
+
     auto sliceDilatation()
     {
         return Cabana::slice<0>( _aosoa_theta, "dilatation" );
