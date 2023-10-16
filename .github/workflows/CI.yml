@@ -183,10 +183,9 @@ jobs:
           cmake -B build \
             -D CMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }} \
             -D CMAKE_CXX_COMPILER=${{ matrix.cxx }} \
-            -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Werror" \
             -D CMAKE_INSTALL_PREFIX=$HOME/CabanaPD \
             -D CMAKE_PREFIX_PATH="$HOME/Cabana;$HOME/json" \
-            -D CMAKE_CXX_FLAGS="-I${MPI_LOCATION}/include" \
+            -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Werror -I${MPI_LOCATION}/include" \
             -D CMAKE_EXE_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
             -D CMAKE_SHARED_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
             -D MPIEXEC_MAX_NUMPROCS=2 \
@@ -252,10 +251,6 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }} \
             -DCMAKE_INSTALL_PREFIX=$HOME/Cabana \
             -DCMAKE_PREFIX_PATH="$HOME/kokkos" \
-            -DCMAKE_CXX_FLAGS="-I${MPI_LOCATION}/include" \
-            -DCMAKE_EXE_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
-            -DCMAKE_DISABLE_FIND_PACKAGE_HDF5=ON \
             -DCabana_REQUIRE_MPI=ON
           cmake --build build --parallel 2
           cmake --install build
@@ -268,9 +263,6 @@ jobs:
             -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Werror" \
             -D CMAKE_INSTALL_PREFIX=$HOME/CabanaPD \
             -D CMAKE_PREFIX_PATH="$HOME/Cabana;$HOME/json" \
-            -D CMAKE_CXX_FLAGS="-I${MPI_LOCATION}/include" \
-            -D CMAKE_EXE_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
-            -D CMAKE_SHARED_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
             -D MPIEXEC_MAX_NUMPROCS=2 \
             -D MPIEXEC_PREFLAGS="--oversubscribe" \
             -D CabanaPD_ENABLE_TESTING=ON
