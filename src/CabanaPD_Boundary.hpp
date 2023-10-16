@@ -42,7 +42,12 @@ struct RegionBoundary
         , low_y( _low_y )
         , high_y( _high_y )
         , low_z( _low_z )
-        , high_z( _high_z ){};
+        , high_z( _high_z )
+    {
+        assert( low_x < high_x );
+        assert( low_y < high_y );
+        assert( low_z < high_z );
+    };
 };
 
 template <class MemorySpace, class BoundaryType>
