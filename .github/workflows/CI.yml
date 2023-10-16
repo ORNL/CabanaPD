@@ -193,3 +193,85 @@ jobs:
             -D CabanaPD_ENABLE_TESTING=ON
           cmake --build build --parallel 2
           cmake --install build
+  CUDA:
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        cmake_build_type: ['Release']
+        # 3.7 needed for kokkos_compiler_launcher
+        kokkos_ver: ['3.7.02']
+    runs-on: ubuntu-20.04
+    container: ghcr.io/ecp-copa/ci-containers/cuda:12.2.0
+    steps:
+      - name: Checkout json
+        uses: actions/checkout@v3
+        with:
+          repository: nlohmann/json
+          ref: v3.11.2
+          path: json
+      - name: Build json
+        working-directory: json
+        run: |
+          cmake -B build \
+            -DCMAKE_INSTALL_PREFIX=$HOME/json \
+            -DCMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }} \
+            -DJSON_BuildTests=OFF
+          cmake --build build --parallel 2
+          cmake --install build
+      - name: Checkout kokkos
+        uses: actions/checkout@v3
+        with:
+          repository: kokkos/kokkos
+          ref: ${{ matrix.kokkos_ver }}
+          path: kokkos
+      - name: Build kokkos
+        working-directory: kokkos
+        run: |
+          cmake -B build \
+            -DCMAKE_INSTALL_PREFIX=$HOME/kokkos \
+            -DKokkos_ENABLE_CUDA=ON \
+            -DKokkos_ARCH_VOLTA72=ON \
+            -DKokkos_ENABLE_CUDA_LAMBDA=ON \
+            -DCMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }}
+          cmake --build build --parallel 2
+          cmake --install build
+      - name: Checkout Cabana
+        uses: actions/checkout@v3
+        with:
+          repository: ECP-CoPA/Cabana
+          # This version is post-release 0.5
+          ref: 31ba70d9e8f8e20f2e55e7e310905f950b21776f
+          path: cabana
+      - name: Build Cabana
+        working-directory: cabana
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }} \
+            -DCMAKE_INSTALL_PREFIX=$HOME/Cabana \
+            -DCMAKE_PREFIX_PATH="$HOME/kokkos" \
+            -DCMAKE_CXX_FLAGS="-I${MPI_LOCATION}/include" \
+            -DCMAKE_EXE_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
+            -DCMAKE_DISABLE_FIND_PACKAGE_HDF5=ON \
+            -DCabana_REQUIRE_MPI=ON
+          cmake --build build --parallel 2
+          cmake --install build
+      - name: Checkout CabanaPD
+        uses: actions/checkout@v3
+      - name: Build CabanaPD
+        run: |
+          cmake -B build \
+            -D CMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }} \
+            -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Werror" \
+            -D CMAKE_INSTALL_PREFIX=$HOME/CabanaPD \
+            -D CMAKE_PREFIX_PATH="$HOME/Cabana;$HOME/json" \
+            -D CMAKE_CXX_FLAGS="-I${MPI_LOCATION}/include" \
+            -D CMAKE_EXE_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
+            -D CMAKE_SHARED_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
+            -D MPIEXEC_MAX_NUMPROCS=2 \
+            -D MPIEXEC_PREFLAGS="--oversubscribe" \
+            -D CabanaPD_ENABLE_TESTING=ON
+          cmake --build build --parallel 2
+          cmake --install build
