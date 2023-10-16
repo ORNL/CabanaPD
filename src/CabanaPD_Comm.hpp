@@ -80,9 +80,7 @@ struct HaloIds
         // balancing).
         neighborBounds( local_grid );
 
-        build(
-            positions,
-            KOKKOS_LAMBDA( const int, const double[3] ) { return true; } );
+        build( positions );
     }
 
     // Find the bounds of each neighbor rank and store for determining which
@@ -199,6 +197,16 @@ struct HaloIds
     }
 
     template <class PositionSliceType>
+    void build( const PositionSliceType& positions )
+    {
+        auto empty_functor = KOKKOS_LAMBDA( const int, const double[3] )
+        {
+            return true;
+        };
+        build( positions, empty_functor );
+    }
+
+    template <class PositionSliceType>
     void rebuild( const PositionSliceType& positions )
     {
         // Resize views to actual send sizes.
@@ -216,9 +224,7 @@ struct HaloIds
         if ( dest_count > dest_size )
         {
             Kokkos::deep_copy( _send_count, 0 );
-            build(
-                positions,
-                KOKKOS_LAMBDA( const int, const double[3] ) { return true; } );
+            build( positions );
         }
     }
 };
