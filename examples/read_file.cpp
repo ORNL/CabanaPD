@@ -113,7 +113,7 @@ int main( int argc, char* argv[] )
         double G0 = 3.8;                       // [J/m^2]
 
         // PD horizon
-        double dx = 0.1299999999999999;
+        double dx = 0.5;
         double delta = 3 * dx;
         int halo_width = 1;
 
@@ -136,17 +136,17 @@ int main( int argc, char* argv[] )
 
         CabanaPD::Prenotch<0> prenotch;
 
-        CabanaPD::RegionBoundary planeUpper( -0.5, 0.5, 4.5, 5, -1, 1 );
-        CabanaPD::RegionBoundary planeLower( -0.5, 0.5, -5, -4.5, -1, 1 );
+        CabanaPD::RegionBoundary planeUpper( -0.5, 1.5, 8.5, 10.5, -1, 1 );
+        CabanaPD::RegionBoundary planeLower( -0.5, 1.5, -0.5, 1.5, -1, 1 );
 
         std::vector<CabanaPD::RegionBoundary> planes = { planeUpper,
                                                          planeLower };
-        int bc_dim = 2;
+        int bc_dim = 1;
         double center = particles->local_mesh_ext[bc_dim] / 2.0 +
                         particles->local_mesh_lo[bc_dim];
         auto bc = createBoundaryCondition( CabanaPD::ForceSymmetric1dBCTag{},
                                            exec_space{}, *particles, planes,
-                                           2e6 / dx / dx, bc_dim, center );
+                                           2e6, bc_dim, center );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<device_type>(
