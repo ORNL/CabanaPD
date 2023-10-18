@@ -241,10 +241,8 @@ class Comm<ParticleType, PMB>
     int mpi_rank = -1;
     int max_export;
 
-    // FIXME: this should use MemorySpace directly, but Cabana::Halo currently
-    // uses DeviceType.
-    using device_type = typename ParticleType::device_type;
-    using halo_type = Cabana::Halo<device_type>;
+    using memory_space = typename ParticleType::memory_space;
+    using halo_type = Cabana::Halo<memory_space>;
     using gather_u_type =
         Cabana::Gather<halo_type, typename ParticleType::aosoa_u_type>;
     std::shared_ptr<gather_u_type> gather_u;
@@ -311,7 +309,7 @@ class Comm<ParticleType, LPS> : public Comm<ParticleType, PMB>
 {
   public:
     using base_type = Comm<ParticleType, PMB>;
-    using device_type = typename base_type::device_type;
+    using memory_space = typename base_type::memory_space;
     using halo_type = typename base_type::halo_type;
     using base_type::gather_u;
     using base_type::halo;

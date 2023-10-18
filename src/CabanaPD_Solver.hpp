@@ -89,13 +89,13 @@ class SolverBase
     virtual void run() = 0;
 };
 
-template <class DeviceType, class InputType, class ParticleType,
+template <class MemorySpace, class InputType, class ParticleType,
           class ForceModel>
 class SolverElastic
 {
   public:
-    using exec_space = typename DeviceType::execution_space;
-    using memory_space = typename DeviceType::memory_space;
+    using memory_space = MemorySpace;
+    using exec_space = typename memory_space::execution_space;
 
     using particle_type = ParticleType;
     using integrator_type = Integrator<exec_space>;
@@ -332,14 +332,14 @@ class SolverElastic
     bool print;
 };
 
-template <class DeviceType, class InputType, class ParticleType,
+template <class MemorySpace, class InputType, class ParticleType,
           class ForceModel, class BoundaryCondition, class PrenotchType>
 class SolverFracture
-    : public SolverElastic<DeviceType, InputType, ParticleType, ForceModel>
+    : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>
 {
   public:
     using base_type =
-        SolverElastic<DeviceType, InputType, ParticleType, ForceModel>;
+        SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>;
     using exec_space = typename base_type::exec_space;
     using memory_space = typename base_type::memory_space;
 
@@ -495,26 +495,27 @@ class SolverFracture
     using base_type::print;
 };
 
-template <class DeviceType, class InputsType, class ParticleType,
+template <class MemorySpace, class InputsType, class ParticleType,
           class ForceModel>
 auto createSolverElastic( InputsType inputs,
                           std::shared_ptr<ParticleType> particles,
                           ForceModel model )
 {
     return std::make_shared<
-        SolverElastic<DeviceType, InputsType, ParticleType, ForceModel>>(
+        SolverElastic<MemorySpace, InputsType, ParticleType, ForceModel>>(
         inputs, particles, model );
 }
 
-template <class DeviceType, class InputsType, class ParticleType,
+template <class MemorySpace, class InputsType, class ParticleType,
           class ForceModel, class BCType, class PrenotchType>
 auto createSolverFracture( InputsType inputs,
                            std::shared_ptr<ParticleType> particles,
                            ForceModel model, BCType bc, PrenotchType prenotch )
 {
-    return std::make_shared<SolverFracture<DeviceType, InputsType, ParticleType,
-                                           ForceModel, BCType, PrenotchType>>(
-        inputs, particles, model, bc, prenotch );
+    return std::make_shared<
+        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModel,
+                       BCType, PrenotchType>>( inputs, particles, model, bc,
+                                               prenotch );
 }
 
 /*

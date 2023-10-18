@@ -38,7 +38,7 @@ namespace Test
 void testHalo()
 {
     using exec_space = TEST_EXECSPACE;
-    using device_type = TEST_DEVICE;
+    using memory_space = TEST_MEMSPACE;
 
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -48,7 +48,7 @@ void testHalo()
     int halo_width = 2;
     // FIXME: This is for m = 1; should be calculated from m
     int expected_n = 6;
-    using particles_type = CabanaPD::Particles<device_type, CabanaPD::PMB>;
+    using particles_type = CabanaPD::Particles<memory_space, CabanaPD::PMB>;
     particles_type particles( exec_space(), box_min, box_max, num_cells,
                               halo_width );
     // Set ID equal to MPI rank.

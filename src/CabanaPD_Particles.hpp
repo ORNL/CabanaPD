@@ -75,19 +75,15 @@
 
 namespace CabanaPD
 {
-// FIXME: this should use MemorySpace directly, but DeviceType enables the
-// friend class with Comm (which only uses DeviceType because Cabana::Halo
-// currently does).
-template <class DeviceType, class ModelType, int Dimension = 3>
+template <class MemorySpace, class ModelType, int Dimension = 3>
 class Particles;
 
-template <class DeviceType, int Dimension>
-class Particles<DeviceType, PMB, Dimension>
+template <class MemorySpace, int Dimension>
+class Particles<MemorySpace, PMB, Dimension>
 {
   public:
-    using self_type = Particles<DeviceType, PMB, Dimension>;
-    using device_type = DeviceType;
-    using memory_space = typename device_type::memory_space;
+    using self_type = Particles<MemorySpace, PMB, Dimension>;
+    using memory_space = MemorySpace;
     using execution_space = typename memory_space::execution_space;
     static constexpr int dim = Dimension;
 
@@ -191,7 +187,7 @@ class Particles<DeviceType, PMB, Dimension>
 
         // Create a local mesh.
         local_grid = Cajita::createLocalGrid( global_grid, halo_width );
-        auto local_mesh = Cajita::createLocalMesh<device_type>( *local_grid );
+        auto local_mesh = Cajita::createLocalMesh<memory_space>( *local_grid );
 
         for ( int d = 0; d < dim; d++ )
         {
@@ -207,7 +203,7 @@ class Particles<DeviceType, PMB, Dimension>
     void createParticles( const ExecSpace& exec_space )
     {
         // Create a local mesh and owned space.
-        auto local_mesh = Cajita::createLocalMesh<device_type>( *local_grid );
+        auto local_mesh = Cajita::createLocalMesh<memory_space>( *local_grid );
         auto owned_cells = local_grid->indexSpace(
             Cajita::Own(), Cajita::Cell(), Cajita::Local() );
 
@@ -454,14 +450,13 @@ class Particles<DeviceType, PMB, Dimension>
 #endif
 };
 
-template <class DeviceType, int Dimension>
-class Particles<DeviceType, LPS, Dimension>
-    : public Particles<DeviceType, PMB, Dimension>
+template <class MemorySpace, int Dimension>
+class Particles<MemorySpace, LPS, Dimension>
+    : public Particles<MemorySpace, PMB, Dimension>
 {
   public:
-    using self_type = Particles<DeviceType, LPS, Dimension>;
-    using base_type = Particles<DeviceType, PMB, Dimension>;
-    using device_type = typename base_type::device_type;
+    using self_type = Particles<MemorySpace, LPS, Dimension>;
+    using base_type = Particles<MemorySpace, PMB, Dimension>;
     using memory_space = typename base_type::memory_space;
     using base_type::dim;
 
