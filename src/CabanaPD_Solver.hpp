@@ -90,7 +90,7 @@ class SolverBase
 };
 
 template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel>
+          class ForceModel, class BoundaryCondition>
 class SolverElastic
 {
   public:
@@ -108,12 +108,14 @@ class SolverElastic
                            Cabana::VerletLayout2D, Cabana::TeamOpTag>;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using input_type = InputType;
+    using bc_type = BoundaryCondition;
 
     SolverElastic( input_type _inputs,
                    std::shared_ptr<particle_type> _particles,
-                   force_model_type force_model )
+                   force_model_type force_model, bc_type bc )
         : inputs( _inputs )
         , particles( _particles )
+        , boundary_condition( bc )
     {
         force_time = 0;
         integrate_time = 0;
@@ -193,6 +195,9 @@ class SolverElastic
         computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
         computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
 
+        // Add boundary condition.
+        boundary_condition.apply( exec_space(), *particles );
+
         particles->output( 0, 0.0, output_reference );
         init_time += init_timer.seconds();
     }
@@ -228,6 +233,9 @@ class SolverElastic
             force_timer.reset();
             computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
             force_time += force_timer.seconds();
+
+            // Add boundary condition.
+            boundary_condition.apply( exec_space(), *particles );
 
             // Integrate - velocity Verlet second half.
             integrate_timer.reset();
@@ -320,6 +328,7 @@ class SolverElastic
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
     std::shared_ptr<neighbor_type> neighbors;
+    bc_type boundary_condition;
 
     std::string output_file;
     std::string error_file;
@@ -343,11 +352,12 @@ class SolverElastic
 template <class MemorySpace, class InputType, class ParticleType,
           class ForceModel, class BoundaryCondition, class PrenotchType>
 class SolverFracture
-    : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>
+    : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModel,
+                           BoundaryCondition>
 {
   public:
-    using base_type =
-        SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>;
+    using base_type = SolverElastic<MemorySpace, InputType, ParticleType,
+                                    ForceModel, BoundaryCondition>;
     using exec_space = typename base_type::exec_space;
     using memory_space = typename base_type::memory_space;
 
@@ -366,8 +376,7 @@ class SolverFracture
                     std::shared_ptr<particle_type> _particles,
                     force_model_type force_model, bc_type bc,
                     prenotch_type prenotch )
-        : base_type( _inputs, _particles, force_model )
-        , boundary_condition( bc )
+        : base_type( _inputs, _particles, force_model, bc )
     {
         init_timer.reset();
 
@@ -475,13 +484,13 @@ class SolverFracture
     using base_type::output_reference;
 
   protected:
+    using base_type::boundary_condition;
     using base_type::comm;
     using base_type::force;
     using base_type::inputs;
     using base_type::integrator;
     using base_type::neighbors;
     using base_type::particles;
-    bc_type boundary_condition;
 
     using NeighborView = typename Kokkos::View<int**, memory_space>;
     NeighborView mu;
@@ -505,14 +514,14 @@ class SolverFracture
 };
 
 template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel>
+          class ForceModel, class BCType>
 auto createSolverElastic( InputsType inputs,
                           std::shared_ptr<ParticleType> particles,
-                          ForceModel model )
+                          ForceModel model, BCType bc )
 {
-    return std::make_shared<
-        SolverElastic<MemorySpace, InputsType, ParticleType, ForceModel>>(
-        inputs, particles, model );
+    return std::make_shared<SolverElastic<MemorySpace, InputsType, ParticleType,
+                                          ForceModel, BCType>>(
+        inputs, particles, model, bc );
 }
 
 template <class MemorySpace, class InputsType, class ParticleType,
