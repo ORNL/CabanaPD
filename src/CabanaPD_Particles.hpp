@@ -151,11 +151,12 @@ class Particles<MemorySpace, PMB, Dimension>
     template <class ExecSpace>
     Particles( const ExecSpace& exec_space, std::array<double, dim> low_corner,
                std::array<double, dim> high_corner,
-               const std::array<int, dim> num_cells, const int max_halo_width )
+               const std::array<int, dim> num_cells, const int max_halo_width,
+               const bool build_cylinder = false )
         : halo_width( max_halo_width )
     {
         createDomain( low_corner, high_corner, num_cells );
-        createParticles( exec_space );
+        createParticles( exec_space, build_cylinder );
     }
 
     void createDomain( std::array<double, dim> low_corner,
@@ -199,8 +200,10 @@ class Particles<MemorySpace, PMB, Dimension>
         }
     }
 
+    // FIXME: extra option here only meant for quick route to disk impact.
     template <class ExecSpace>
-    void createParticles( const ExecSpace& exec_space )
+    void createParticles( const ExecSpace& exec_space,
+                          const bool build_cylinder = false )
     {
         // Create a local mesh and owned space.
         auto local_mesh = Cajita::createLocalMesh<memory_space>( *local_grid );
@@ -221,63 +224,57 @@ class Particles<MemorySpace, PMB, Dimension>
         auto vol = sliceVolume();
         auto nofail = sliceNoFail();
 
-        auto created = Kokkos::View<bool*, memory_space>(
-            Kokkos::ViewAllocateWithoutInitializing( "particle_created" ),
-            num_particles );
+        auto count = Kokkos::View<int*, memory_space>( "particle_count", 1 );
 
         // Initialize particles.
         int mpi_rank = -1;
         MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
-        int local_num_create = 0;
-        Kokkos::parallel_reduce(
+        Kokkos::parallel_for(
             "CabanaPD::Particles::init_particles_uniform",
             Cajita::createExecutionPolicy( owned_cells, exec_space ),
-            KOKKOS_LAMBDA( const int i, const int j, const int k,
-                           int& create_count ) {
-                // Compute the owned local cell id.
-                int i_own = i - owned_cells.min( Cajita::Dim::I );
-                int j_own = j - owned_cells.min( Cajita::Dim::J );
-                int k_own = k - owned_cells.min( Cajita::Dim::K );
-                int pid = i_own + owned_cells.extent( Cajita::Dim::I ) *
-                                      ( j_own + k_own * owned_cells.extent(
-                                                            Cajita::Dim::J ) );
-
+            KOKKOS_LAMBDA( const int i, const int j, const int k ) {
                 // Get the coordinates of the cell.
                 int node[3] = { i, j, k };
                 double cell_coord[3];
                 local_mesh.coordinates( Cajita::Cell(), node, cell_coord );
 
-                // Set the particle position.
-                for ( int d = 0; d < 3; d++ )
-                {
-                    x( pid, d ) = cell_coord[d];
-                    u( pid, d ) = 0.0;
-                    y( pid, d ) = 0.0;
-                    v( pid, d ) = 0.0;
-                    f( pid, d ) = 0.0;
-                }
-                // FIXME: hardcoded.
-                type( pid ) = 0;
-                nofail( pid ) = 0;
-                rho( pid ) = 1.0;
-
-                // Get the volume of the cell.
-                int empty[3];
-                vol( pid ) = local_mesh.measure( Cajita::Cell(), empty );
-
                 // Customize new particle.
                 // created( pid ) = create_functor( px, particle );
-                created( pid ) = true;
-
-                // If we created a new particle insert it into the
-                // list.
-                if ( created( pid ) )
+                bool create = true;
+                if ( build_cylinder )
                 {
-                    ++create_count;
+                    auto width = global_mesh_ext[0] / 2.0;
+                    auto r2 = cell_coord[0] * cell_coord[0] +
+                              cell_coord[1] * cell_coord[1];
+                    if ( r2 > width * width )
+                        create = false;
                 }
-            },
-            local_num_create );
-        n_local = local_num_create;
+
+                if ( create )
+                {
+                    auto pid = Kokkos::atomic_fetch_add( &count( 0 ), 1 );
+                    // Set the particle position.
+                    for ( int d = 0; d < 3; d++ )
+                    {
+                        x( pid, d ) = cell_coord[d];
+                        u( pid, d ) = 0.0;
+                        y( pid, d ) = 0.0;
+                        v( pid, d ) = 0.0;
+                        f( pid, d ) = 0.0;
+                    }
+                    // FIXME: hardcoded
+                    type( pid ) = 0;
+                    nofail( pid ) = 0;
+                    rho( pid ) = 1.0;
+
+                    // Get the volume of the cell.
+                    int empty[3];
+                    vol( pid ) = local_mesh.measure( Cajita::Cell(), empty );
+                }
+            } );
+        auto count_host =
+            Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), count );
+        n_local = count_host( 0 );
         resize( n_local, 0 );
         size = _aosoa_x.size();
 
@@ -374,7 +371,7 @@ class Particles<MemorySpace, PMB, Dimension>
         return Cabana::slice<0>( _aosoa_nofail, "no_fail_region" );
     }
 
-    void updateCurrentPosition()
+    void updateCurrentPosition() const
     {
         // Not using slice function because this is called inside.
         auto y = Cabana::slice<0>( _aosoa_y, "current_positions" );

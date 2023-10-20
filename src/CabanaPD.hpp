@@ -14,6 +14,7 @@
 
 #include <CabanaPD_Boundary.hpp>
 #include <CabanaPD_Comm.hpp>
+#include <CabanaPD_Contact.hpp>
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Integrate.hpp>

@@ -262,6 +262,59 @@ auto createBoundaryCondition( BCTag, ExecSpace exec_space, Particles particles,
     return BoundaryCondition<bc_index_type, BCTag>( value, bc_indices );
 }
 
+struct ImpactBCTag
+{
+};
+struct AllTag
+{
+};
+
+template <class AllTag, class BCTag>
+struct BoundaryCondition;
+
+template <>
+struct BoundaryCondition<AllTag, ImpactBCTag>
+{
+    double _R;
+    double _v;
+    double _dt;
+    double _x;
+    double _y;
+    double _z;
+
+    BoundaryCondition( const double R, const double v, const double dt )
+        : _R( R )
+        , _v( v )
+        , _dt( dt )
+        , _x( 0.0 )
+        , _y( 0.0 )
+        , _z( R )
+    {
+    }
+
+    template <class ExecSpace, class ParticleType>
+    void apply( ExecSpace, ParticleType& particles )
+    {
+        _z += _dt * _v;
+        auto f = particles.sliceForce();
+        auto x = particles.sliceReferencePosition();
+        Kokkos::RangePolicy<ExecSpace> policy( 0, x.size() );
+        Kokkos::parallel_for(
+            "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int p ) {
+                double r = sqrt( ( x( p, 0 ) - _x ) * ( x( p, 0 ) - _x ) +
+                                 ( x( p, 1 ) - _y ) * ( x( p, 1 ) - _y ) +
+                                 ( x( p, 2 ) - _z ) * ( x( p, 2 ) - _z ) );
+                if ( r < _R )
+                {
+                    double fmag = -1.0e17 * ( r - _R ) * ( r - _R );
+                    f( p, 0 ) += fmag * x( p, 0 ) / r;
+                    f( p, 1 ) += fmag * x( p, 1 ) / r;
+                    f( p, 2 ) += fmag * ( x( p, 2 ) - _z ) / r;
+                }
+            } );
+    }
+};
+
 } // namespace CabanaPD
 
 #endif

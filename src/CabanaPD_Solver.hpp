@@ -333,7 +333,7 @@ class SolverElastic
 };
 
 template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel, class BoundaryCondition, class PrenotchType>
+          class ForceModel, class BCType, class PrenotchType>
 class SolverFracture
     : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>
 {
@@ -350,7 +350,7 @@ class SolverFracture
     using force_model_type = ForceModel;
     using force_type = typename base_type::force_type;
     using neigh_iter_tag = Cabana::SerialOpTag;
-    using bc_type = BoundaryCondition;
+    using bc_type = BCType;
     using prenotch_type = PrenotchType;
     using input_type = typename base_type::input_type;
 
@@ -436,7 +436,9 @@ class SolverFracture
             force_time += force_timer.seconds();
 
             // Add boundary condition.
+            other_timer.reset();
             boundary_condition.apply( exec_space{}, *particles );
+            other_time += other_timer.seconds();
 
             // Integrate - velocity Verlet second half.
             integrate_timer.reset();
@@ -495,6 +497,172 @@ class SolverFracture
     using base_type::print;
 };
 
+template <class MemorySpace, class InputType, class ParticleType,
+          class ForceModel, class BCType, class PrenotchType,
+          class ContactModel>
+class SolverContact
+    : public SolverFracture<MemorySpace, InputType, ParticleType, ForceModel,
+                            BCType, PrenotchType>
+{
+  public:
+    using base_type = SolverFracture<MemorySpace, InputType, ParticleType,
+                                     ForceModel, BCType, PrenotchType>;
+    using exec_space = typename base_type::exec_space;
+    using memory_space = typename base_type::memory_space;
+
+    using particle_type = typename base_type::particle_type;
+    using integrator_type = typename base_type::integrator_type;
+    using comm_type = typename base_type::comm_type;
+    using neighbor_type = typename base_type::neighbor_type;
+    using force_model_type = ForceModel;
+    using force_type = typename base_type::force_type;
+    using neigh_iter_tag = Cabana::SerialOpTag;
+    using input_type = typename base_type::input_type;
+    using bc_type = BCType;
+    using prenotch_type = PrenotchType;
+    using contact_type = Contact<memory_space, ContactModel>;
+    using contact_model_type = ContactModel;
+
+    SolverContact( input_type _inputs,
+                   std::shared_ptr<particle_type> _particles,
+                   force_model_type force_model, bc_type bc,
+                   prenotch_type prenotch, contact_model_type _contact_model )
+        : base_type( _inputs, _particles, force_model, bc, prenotch )
+    {
+        contact = std::make_shared<contact_type>( _inputs.half_neigh,
+                                                  _contact_model, *particles );
+    }
+
+    void init_force()
+    {
+        init_timer.reset();
+        // Compute weighted volume for LPS (does nothing for PMB).
+        force->computeWeightedVolume( *particles, *neighbors, mu );
+        comm->gatherWeightedVolume();
+        // Compute dilatation for LPS (does nothing for PMB).
+        force->computeDilatation( *particles, *neighbors, mu );
+        // Communicate dilatation for LPS (does nothing for PMB).
+        comm->gatherDilatation();
+
+        // Compute initial forces
+        computeForce( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
+        computeEnergy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
+
+        // Compute initial contact
+        computeContact( *contact, *particles, neigh_iter_tag{} );
+
+        // Add boundary condition - resetting boundary forces to zero.
+        boundary_condition.apply( exec_space(), *particles );
+
+        particles->output( 0, 0.0 );
+        init_time += init_timer.seconds();
+    }
+
+    void run()
+    {
+        this->init_output();
+
+        // Main timestep loop
+        for ( int step = 1; step <= num_steps; step++ )
+        {
+            // Integrate - velocity Verlet first half
+            integrate_timer.reset();
+            integrator->initialHalfStep( *particles );
+            integrate_time += integrate_timer.seconds();
+
+            // Update ghost particles.
+            comm_timer.reset();
+            comm->gatherDisplacement();
+            comm_time += comm_timer.seconds();
+
+            // Compute/communicate LPS weighted volume (does nothing for PMB).
+            force_timer.reset();
+            force->computeWeightedVolume( *particles, *neighbors, mu );
+            force_time += force_timer.seconds();
+            comm_timer.reset();
+            comm->gatherWeightedVolume();
+            comm_time += comm_timer.seconds();
+            // Compute/communicate LPS dilatation (does nothing for PMB).
+            force_timer.reset();
+            force->computeDilatation( *particles, *neighbors, mu );
+            force_time += force_timer.seconds();
+            comm_timer.reset();
+            comm->gatherDilatation();
+            comm_time += comm_timer.seconds();
+
+            // Compute short range force
+            force_timer.reset();
+            computeForce( *force, *particles, *neighbors, mu,
+                          neigh_iter_tag{} );
+            force_time += force_timer.seconds();
+
+            // Compute contact forces.
+            other_timer.reset();
+            computeContact( *contact, *particles, neigh_iter_tag{} );
+
+            // Add boundary condition - resetting boundary forces to zero.
+            boundary_condition.apply( exec_space{}, *particles );
+            other_time += other_timer.seconds();
+
+            // Integrate - velocity Verlet second half
+            integrate_timer.reset();
+            integrator->finalHalfStep( *particles );
+            integrate_time += integrate_timer.seconds();
+
+            // Print output
+            other_timer.reset();
+            if ( step % output_frequency == 0 )
+            {
+                auto W = computeEnergy( *force, *particles, *neighbors, mu,
+                                        neigh_iter_tag() );
+
+                this->step_output( step, W );
+                particles->output( step / output_frequency,
+                                   step * inputs->timestep );
+            }
+            other_time += other_timer.seconds();
+        }
+
+        // Final output and timings
+        this->final_output();
+    }
+
+    using base_type::num_steps;
+    using base_type::output_frequency;
+
+  protected:
+    using base_type::comm;
+    using base_type::force;
+    using base_type::inputs;
+    using base_type::integrator;
+    using base_type::neighbors;
+    using base_type::particles;
+
+    using base_type::boundary_condition;
+    using base_type::mu;
+
+    std::shared_ptr<contact_type> contact;
+
+    using base_type::comm_time;
+    using base_type::force_time;
+    using base_type::init_time;
+    using base_type::integrate_time;
+    using base_type::last_time;
+    using base_type::other_time;
+    using base_type::total_time;
+
+    using base_type::comm_timer;
+    using base_type::force_timer;
+    using base_type::init_timer;
+    using base_type::integrate_timer;
+    using base_type::other_timer;
+    using base_type::total_timer;
+
+    using base_type::print;
+};
+
+// ===============================================================
+
 template <class MemorySpace, class InputsType, class ParticleType,
           class ForceModel>
 auto createSolverElastic( InputsType inputs,
@@ -516,6 +684,20 @@ auto createSolverFracture( InputsType inputs,
         SolverFracture<MemorySpace, InputsType, ParticleType, ForceModel,
                        BCType, PrenotchType>>( inputs, particles, model, bc,
                                                prenotch );
+}
+
+template <class MemorySpace, class InputType, class ParticleType,
+          class ForceModel, class BCType, class PrenotchType,
+          class ContactModel>
+auto createSolverContact( InputType inputs,
+                          std::shared_ptr<ParticleType> particles,
+                          ForceModel model, BCType bc, PrenotchType prenotch,
+                          ContactModel contact )
+{
+    return std::make_shared<
+        SolverContact<MemorySpace, InputType, ParticleType, ForceModel, BCType,
+                      PrenotchType, ContactModel>>( inputs, particles, model,
+                                                    bc, prenotch, contact );
 }
 
 /*
