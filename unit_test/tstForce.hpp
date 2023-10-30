@@ -645,12 +645,14 @@ template <class ModelType, class ForceType, class ParticleType,
 void initializeForce( ModelType, ForceType& force, ParticleType& particles,
                       const NeighborList& neigh_list )
 {
+    // 3rd argument is dummy value.
     force.computeWeightedVolume( particles, neigh_list, Cabana::SerialOpTag() );
     force.computeDilatation( particles, neigh_list, Cabana::SerialOpTag() );
 }
 
-template <class ForceType, class ParticleType, class NeighborList>
-void initializeForce( CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>,
+template <class ModelType, class ForceType, class ParticleType,
+          class NeighborList>
+void initializeForce( CabanaPD::ForceModel<ModelType, CabanaPD::Fracture>,
                       ForceType& force, ParticleType& particles,
                       const NeighborList& neigh_list )
 {
@@ -659,8 +661,9 @@ void initializeForce( CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>,
     Kokkos::View<int**, TEST_MEMSPACE> mu( "broken_bonds", particles.n_local,
                                            max_neighbors );
     Kokkos::deep_copy( mu, 1 );
-    force.computeWeightedVolume( particles, neigh_list, mu );
-    force.computeDilatation( particles, neigh_list, mu );
+    force.computeWeightedVolume( particles, neigh_list, mu,
+                                 Cabana::SerialOpTag() );
+    force.computeDilatation( particles, neigh_list, mu, Cabana::SerialOpTag() );
 }
 
 template <class ParticleType, class AoSoAType>

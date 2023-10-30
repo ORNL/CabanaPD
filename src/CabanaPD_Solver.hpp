@@ -380,10 +380,12 @@ class SolverFracture
     {
         init_timer.reset();
         // Compute/communicate weighted volume for LPS (does nothing for PMB).
-        force->computeWeightedVolume( *particles, *neighbors, mu );
+        force->computeWeightedVolume( *particles, *neighbors, mu,
+                                      neigh_iter_tag{} );
         comm->gatherWeightedVolume();
         // Compute/communicate dilatation for LPS (does nothing for PMB).
-        force->computeDilatation( *particles, *neighbors, mu );
+        force->computeDilatation( *particles, *neighbors, mu,
+                                  neigh_iter_tag{} );
         comm->gatherDilatation();
 
         // Compute initial forces.
@@ -416,14 +418,16 @@ class SolverFracture
 
             // Compute/communicate LPS weighted volume (does nothing for PMB).
             force_timer.reset();
-            force->computeWeightedVolume( *particles, *neighbors, mu );
+            force->computeWeightedVolume( *particles, *neighbors, mu,
+                                          neigh_iter_tag{} );
             force_time += force_timer.seconds();
             comm_timer.reset();
             comm->gatherWeightedVolume();
             comm_time += comm_timer.seconds();
             // Compute/communicate LPS dilatation (does nothing for PMB).
             force_timer.reset();
-            force->computeDilatation( *particles, *neighbors, mu );
+            force->computeDilatation( *particles, *neighbors, mu,
+                                      neigh_iter_tag{} );
             force_time += force_timer.seconds();
             comm_timer.reset();
             comm->gatherDilatation();
