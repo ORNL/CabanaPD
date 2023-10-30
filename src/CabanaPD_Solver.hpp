@@ -357,9 +357,11 @@ class SolverFracture
     SolverFracture( input_type _inputs,
                     std::shared_ptr<particle_type> _particles,
                     force_model_type force_model, bc_type bc,
-                    prenotch_type prenotch )
+                    prenotch_type prenotch,
+                    const bool force_boundary_condition )
         : base_type( _inputs, _particles, force_model )
         , boundary_condition( bc )
+        , force_bc( force_boundary_condition )
     {
         init_timer.reset();
 
@@ -391,8 +393,18 @@ class SolverFracture
         computeEnergy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
 
         // Add boundary condition.
-        boundary_condition.apply( exec_space(), *particles );
-
+        auto x = particles->sliceReferencePosition();
+        // FIXME: this needs to be generalized to any field.
+        if ( force_bc )
+        {
+            auto f = particles->sliceForce();
+            boundary_condition.apply( exec_space(), f, x );
+        }
+        else
+        {
+            auto u = particles->sliceDisplacement();
+            boundary_condition.apply( exec_space(), u, x );
+        }
         particles->output( 0, 0.0, output_reference );
         init_time += init_timer.seconds();
     }
@@ -436,7 +448,18 @@ class SolverFracture
             force_time += force_timer.seconds();
 
             // Add boundary condition.
-            boundary_condition.apply( exec_space{}, *particles );
+            auto x = particles->sliceReferencePosition();
+            // FIXME: this needs to be generalized to any field.
+            if ( force_bc )
+            {
+                auto f = particles->sliceForce();
+                boundary_condition.apply( exec_space(), f, x );
+            }
+            else
+            {
+                auto u = particles->sliceDisplacement();
+                boundary_condition.apply( exec_space(), u, x );
+            }
 
             // Integrate - velocity Verlet second half.
             integrate_timer.reset();
@@ -473,6 +496,7 @@ class SolverFracture
     using base_type::neighbors;
     using base_type::particles;
     bc_type boundary_condition;
+    bool force_bc;
 
     using NeighborView = typename Kokkos::View<int**, memory_space>;
     NeighborView mu;
@@ -510,11 +534,12 @@ template <class DeviceType, class InputsType, class ParticleType,
           class ForceModel, class BCType, class PrenotchType>
 auto createSolverFracture( InputsType inputs,
                            std::shared_ptr<ParticleType> particles,
-                           ForceModel model, BCType bc, PrenotchType prenotch )
+                           ForceModel model, BCType bc, PrenotchType prenotch,
+                           const bool force_bc = true )
 {
     return std::make_shared<SolverFracture<DeviceType, InputsType, ParticleType,
                                            ForceModel, BCType, PrenotchType>>(
-        inputs, particles, model, bc, prenotch );
+        inputs, particles, model, bc, prenotch, force_bc );
 }
 
 /*

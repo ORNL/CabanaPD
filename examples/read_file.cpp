@@ -150,7 +150,7 @@ int main( int argc, char* argv[] )
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<device_type>(
-            inputs, particles, force_model, bc, prenotch );
+            inputs, particles, force_model, bc, prenotch, false );
         cabana_pd->init_force();
         cabana_pd->run();
     }

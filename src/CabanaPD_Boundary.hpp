@@ -165,11 +165,9 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
         _index_space.update( exec_space, particles, plane );
     }
 
-    template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles )
+    template <class ExecSpace, class FieldType, class PositionType>
+    void apply( ExecSpace, FieldType& f, PositionType& )
     {
-        auto f = particles.sliceForce();
-        auto x = particles.sliceReferencePosition();
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         auto value = _value;
@@ -202,10 +200,9 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
         _index_space.update( exec_space, particles, plane );
     }
 
-    template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles )
+    template <class ExecSpace, class FieldType, class PositionType>
+    void apply( ExecSpace, FieldType& f, PositionType& )
     {
-        auto f = particles.sliceForce();
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         auto value = _value;
@@ -244,11 +241,9 @@ struct BoundaryCondition<BCIndexSpace, ForceSymmetric1dBCTag>
         _index_space.update( exec_space, particles, plane );
     }
 
-    template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles )
+    template <class ExecSpace, class FieldType, class PositionType>
+    void apply( ExecSpace, FieldType& f, PositionType& x )
     {
-        auto f = particles.sliceForce();
-        auto x = particles.sliceReferencePosition();
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         auto value = _value;
