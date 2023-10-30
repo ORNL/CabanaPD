@@ -162,10 +162,6 @@ class Particles<MemorySpace, PMB, Dimension>
                        std::array<double, dim> high_corner,
                        const std::array<int, dim> num_cells )
     {
-        for ( int d = 0; d < dim; d++ )
-            std::cout << low_corner[d] << " " << high_corner[d] << " "
-                      << num_cells[d] << std::endl;
-
         // Create the MPI partitions.
         Cajita::DimBlockPartitioner<dim> partitioner;
 
