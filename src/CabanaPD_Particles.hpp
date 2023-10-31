@@ -292,9 +292,11 @@ class Particles<DeviceType, PMB, Dimension>
     // state.
     template <class ExecSpace, std::size_t NSD = dim>
     std::enable_if_t<3 == NSD, void>
-    updateAfterRead( const ExecSpace& exec_space, const int hw, double dx )
+    updateAfterRead( const ExecSpace& exec_space, const double cutoff )
     {
-        halo_width = hw;
+        // Because this may be a non-uniform mesh, build a background mesh with
+        // dx=cutoff and a halo_width=1
+        halo_width = 1;
         auto x = sliceReferencePosition();
         n_local = x.size();
         n_ghost = 0;
@@ -341,19 +343,19 @@ class Particles<DeviceType, PMB, Dimension>
         std::array<int, 3> num_cells;
         for ( int d = 0; d < 3; d++ )
         {
-            max_corner[d] += dx / 2.0;
-            min_corner[d] -= dx / 2.0;
             num_cells[d] =
-                static_cast<int>( ( max_corner[d] - min_corner[d] ) / dx );
+                static_cast<int>( ( max_corner[d] - min_corner[d] ) / cutoff );
         }
         createDomain( min_corner, max_corner, num_cells );
     }
 
     template <class ExecSpace, std::size_t NSD = dim>
     std::enable_if_t<2 == NSD, void>
-    updateAfterRead( const ExecSpace& exec_space, const int hw, double dx )
+    updateAfterRead( const ExecSpace& exec_space, double cutoff )
     {
-        halo_width = hw;
+        // Because this may be a non-uniform mesh, build a background mesh with
+        // dx=cutoff and a halo_width=1
+        halo_width = 1;
         auto x = sliceReferencePosition();
         n_local = x.size();
         n_ghost = 0;
@@ -390,10 +392,8 @@ class Particles<DeviceType, PMB, Dimension>
         std::array<int, 2> num_cells;
         for ( int d = 0; d < 2; d++ )
         {
-            max_corner[d] += dx / 2.0;
-            min_corner[d] -= dx / 2.0;
             num_cells[d] =
-                static_cast<int>( ( max_corner[d] - min_corner[d] ) / dx );
+                static_cast<int>( ( max_corner[d] - min_corner[d] ) / cutoff );
         }
         createDomain( min_corner, max_corner, num_cells );
     }

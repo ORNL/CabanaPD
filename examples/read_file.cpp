@@ -115,7 +115,6 @@ int main( int argc, char* argv[] )
         // PD horizon
         double dx = 0.5;
         double delta = 3 * dx;
-        int halo_width = 1;
 
         // Choose force model type.
         using model_type =
@@ -132,7 +131,7 @@ int main( int argc, char* argv[] )
         // Read particles from file.
         read_particles( inputs.input_file, *particles );
         // Update after reading. Currently requires fixed cell spacing.
-        particles->updateAfterRead( exec_space(), halo_width, dx );
+        particles->updateAfterRead( exec_space(), delta );
 
         CabanaPD::Prenotch<0> prenotch;
 
