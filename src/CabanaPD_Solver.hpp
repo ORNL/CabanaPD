@@ -155,6 +155,17 @@ class SolverElastic
             mesh_min, mesh_max );
         stencil = std::make_shared<stencil_type>( force_model.delta, 1.0, mesh_min, mesh_max );
 
+        std::cout << "# linked particles " << linked_neighbors->numParticles() << std::endl;
+        std::cout << "# linked bins " << linked_neighbors->totalBins() << std::endl;
+        for (int i = 0; i < linked_neighbors->totalBins(); ++i )
+        {
+            int ii;
+            int jj;
+            int kk;
+            linked_neighbors->ijkBinIndex(i, ii, jj, kk);
+            std::cout << i << " " << linked_neighbors->binSize(ii, jj, kk) << std::endl;
+        }
+
         int max_neighbors =
             Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
 
@@ -207,7 +218,7 @@ class SolverElastic
 //        computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
         computeForce( *force, *particles, *linked_neighbors, neigh_iter_tag{}, *stencil );
         // FIXME:: need parallel reduce for linked cell list before this is functional
-        computeEnergy( *force, *particles, *neighbors, neigh_iter_tag(), *stencil );
+//        computeEnergy( *force, *particles, *neighbors, neigh_iter_tag(), *stencil );
 
         particles->output( 0, 0.0, output_reference );
         init_time += init_timer.seconds();
@@ -260,10 +271,10 @@ class SolverElastic
 //                auto W = computeEnergy( *force, *particles, *neighbors,
 //                                        neigh_iter_tag() );
                 // FIXME:: need parallel reduce for linked cell list before this is functional
-                auto W = computeEnergy( *force, *particles, *neighbors,
-                                        neigh_iter_tag(), *stencil );
+//                auto W = computeEnergy( *force, *particles, *neighbors,
+//                                        neigh_iter_tag(), *stencil );
 
-                step_output( step, W );
+//                step_output( step, W );
                 particles->output( step / output_frequency,
                                    step * inputs->timestep, output_reference );
             }
