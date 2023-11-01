@@ -89,8 +89,8 @@ class SolverBase
     virtual void run() = 0;
 };
 
-template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel>
+template <class MemorySpace, class IterationTag, class InputType,
+          class ParticleType, class ForceModel>
 class SolverElastic
 {
   public:
@@ -106,7 +106,7 @@ class SolverElastic
     using neighbor_type =
         Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
                            Cabana::VerletLayout2D, Cabana::TeamOpTag>;
-    using neigh_iter_tag = Cabana::SerialOpTag;
+    using neigh_iter_tag = IterationTag;
     using input_type = InputType;
 
     SolverElastic( input_type _inputs,
@@ -332,14 +332,15 @@ class SolverElastic
     bool print;
 };
 
-template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel, class BoundaryCondition, class PrenotchType>
-class SolverFracture
-    : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>
+template <class MemorySpace, class IterationTag, class InputType,
+          class ParticleType, class ForceModel, class BoundaryCondition,
+          class PrenotchType>
+class SolverFracture : public SolverElastic<MemorySpace, IterationTag,
+                                            InputType, ParticleType, ForceModel>
 {
   public:
-    using base_type =
-        SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>;
+    using base_type = SolverElastic<MemorySpace, IterationTag, InputType,
+                                    ParticleType, ForceModel>;
     using exec_space = typename base_type::exec_space;
     using memory_space = typename base_type::memory_space;
 
@@ -349,7 +350,7 @@ class SolverFracture
     using neighbor_type = typename base_type::neighbor_type;
     using force_model_type = ForceModel;
     using force_type = typename base_type::force_type;
-    using neigh_iter_tag = Cabana::SerialOpTag;
+    using neigh_iter_tag = typename base_type::neigh_iter_tag;
     using bc_type = BoundaryCondition;
     using prenotch_type = PrenotchType;
     using input_type = typename base_type::input_type;
@@ -499,27 +500,28 @@ class SolverFracture
     using base_type::print;
 };
 
-template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel>
+template <class MemorySpace, class IterationTag, class InputsType,
+          class ParticleType, class ForceModel>
 auto createSolverElastic( InputsType inputs,
                           std::shared_ptr<ParticleType> particles,
                           ForceModel model )
 {
-    return std::make_shared<
-        SolverElastic<MemorySpace, InputsType, ParticleType, ForceModel>>(
+    return std::make_shared<SolverElastic<MemorySpace, IterationTag, InputsType,
+                                          ParticleType, ForceModel>>(
         inputs, particles, model );
 }
 
-template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel, class BCType, class PrenotchType>
+template <class MemorySpace, class IterationTag, class InputsType,
+          class ParticleType, class ForceModel, class BCType,
+          class PrenotchType>
 auto createSolverFracture( InputsType inputs,
                            std::shared_ptr<ParticleType> particles,
                            ForceModel model, BCType bc, PrenotchType prenotch )
 {
     return std::make_shared<
-        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModel,
-                       BCType, PrenotchType>>( inputs, particles, model, bc,
-                                               prenotch );
+        SolverFracture<MemorySpace, IterationTag, InputsType, ParticleType,
+                       ForceModel, BCType, PrenotchType>>(
+        inputs, particles, model, bc, prenotch );
 }
 
 /*
