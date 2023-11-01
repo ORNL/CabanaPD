@@ -295,7 +295,7 @@ class Particles<DeviceType, PMB, Dimension>
     updateAfterRead( const ExecSpace& exec_space, const double cutoff )
     {
         // Because this may be a non-uniform mesh, build a background mesh with
-        // dx=cutoff and a halo_width=1
+        // dx=cutoff and force halo_width=1
         halo_width = 1;
         auto x = sliceReferencePosition();
         n_local = x.size();
@@ -345,6 +345,11 @@ class Particles<DeviceType, PMB, Dimension>
         {
             num_cells[d] =
                 static_cast<int>( ( max_corner[d] - min_corner[d] ) / cutoff );
+            if ( num_cells[d] == 0 )
+            {
+                num_cells[d]++;
+                max_corner[d] += 1e-16;
+            }
         }
         createDomain( min_corner, max_corner, num_cells );
     }
@@ -354,7 +359,7 @@ class Particles<DeviceType, PMB, Dimension>
     updateAfterRead( const ExecSpace& exec_space, double cutoff )
     {
         // Because this may be a non-uniform mesh, build a background mesh with
-        // dx=cutoff and a halo_width=1
+        // dx=cutoff and force halo_width=1
         halo_width = 1;
         auto x = sliceReferencePosition();
         n_local = x.size();
