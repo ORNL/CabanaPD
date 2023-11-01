@@ -113,8 +113,9 @@ int main( int argc, char* argv[] )
         double G0 = 3.8;                       // [J/m^2]
 
         // PD horizon
-        double dx = 0.5;
-        double delta = 3 * dx;
+        double dx = 0.12;
+        int m = 3;
+        double delta = m * dx;
 
         // Choose force model type.
         using model_type =

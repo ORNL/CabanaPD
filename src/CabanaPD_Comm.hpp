@@ -80,9 +80,7 @@ struct HaloIds
         // balancing).
         neighborBounds( local_grid );
 
-        build(
-            positions,
-            KOKKOS_LAMBDA( const int, const double[3] ) { return true; } );
+        build( positions );
     }
 
     // Find the bounds of each neighbor rank and store for determining which
@@ -199,6 +197,16 @@ struct HaloIds
     }
 
     template <class PositionSliceType>
+    void build( const PositionSliceType& positions )
+    {
+        auto empty_functor = KOKKOS_LAMBDA( const int, const double[3] )
+        {
+            return true;
+        };
+        build( positions, empty_functor );
+    }
+
+    template <class PositionSliceType>
     void rebuild( const PositionSliceType& positions )
     {
         // Resize views to actual send sizes.
@@ -216,9 +224,7 @@ struct HaloIds
         if ( dest_count > dest_size )
         {
             Kokkos::deep_copy( _send_count, 0 );
-            build(
-                positions,
-                KOKKOS_LAMBDA( const int, const double[3] ) { return true; } );
+            build( positions );
         }
     }
 };
@@ -235,10 +241,8 @@ class Comm<ParticleType, PMB>
     int mpi_rank = -1;
     int max_export;
 
-    // FIXME: this should use MemorySpace directly, but Cabana::Halo currently
-    // uses DeviceType.
-    using device_type = typename ParticleType::device_type;
-    using halo_type = Cabana::Halo<device_type>;
+    using memory_space = typename ParticleType::memory_space;
+    using halo_type = Cabana::Halo<memory_space>;
     using gather_u_type =
         Cabana::Gather<halo_type, typename ParticleType::aosoa_u_type>;
     std::shared_ptr<gather_u_type> gather_u;
@@ -305,7 +309,7 @@ class Comm<ParticleType, LPS> : public Comm<ParticleType, PMB>
 {
   public:
     using base_type = Comm<ParticleType, PMB>;
-    using device_type = typename base_type::device_type;
+    using memory_space = typename base_type::memory_space;
     using halo_type = typename base_type::halo_type;
     using base_type::gather_u;
     using base_type::halo;
