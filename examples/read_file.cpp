@@ -125,9 +125,8 @@ int main( int argc, char* argv[] )
         inputs.read_args( argc, argv );
 
         // Default construct to then read particles.
-        using device_type = Kokkos::Device<exec_space, memory_space>;
         auto particles = std::make_shared<CabanaPD::Particles<
-            device_type, typename model_type::base_model, 3>>();
+            memory_space, typename model_type::base_model, 3>>();
 
         // Read particles from file.
         read_particles( inputs.input_file, *particles );
@@ -149,7 +148,7 @@ int main( int argc, char* argv[] )
                                            2e6, bc_dim, center );
 
         // FIXME: use createSolver to switch backend at runtime.
-        auto cabana_pd = CabanaPD::createSolverFracture<device_type>(
+        auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
             inputs, particles, force_model, bc, prenotch, false );
         cabana_pd->init_force();
         cabana_pd->run();
