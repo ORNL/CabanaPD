@@ -430,7 +430,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
     void computeWeightedVolume( ParticleType& particles,
                                 const NeighListType& neigh_list,
                                 const ParallelType neigh_op_tag,
-                                const StencilType stencil )
+                                const StencilType stencil, const bool sorted )
     {
         auto n_local = particles.n_local;
         auto x = particles.sliceReferencePosition();
@@ -446,7 +446,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
             double cutoff = stencil.rsqr;
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
-            if( r*r < cutoff )
+            if( xi * xi < cutoff + 1e-7 )
             {
                 double m_j = model.influence_function( xi ) * xi * xi * vol( j );
                 m( i ) += m_j;
@@ -456,7 +456,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Cabana::linkedcell_parallel_for(
             policy, weighted_volume, neigh_list, stencil, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::computeWeightedVolume" );
+            neigh_op_tag, sorted, "CabanaPD::ForceLPS::computeWeightedVolume" );
     }
 
 
@@ -496,7 +496,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
     void computeDilatation( ParticleType& particles,
                             const NeighListType& neigh_list,
                             const ParallelType neigh_op_tag,
-                            const StencilType stencil ) const
+                            const StencilType stencil, const bool sorted ) const
     {
         auto n_local = particles.n_local;
         const auto x = particles.sliceReferencePosition();
@@ -513,7 +513,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
             double cutoff = stencil.rsqr;
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
-            if( r*r < cutoff )
+            if( xi * xi < cutoff + 1e-7 )
             {
                 double theta_i =
                     model.influence_function( xi ) * s * xi * xi * vol( j );
@@ -524,7 +524,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Cabana::linkedcell_parallel_for(
             policy, dilatation, neigh_list, stencil, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::computeDilation" );
+            neigh_op_tag, sorted, "CabanaPD::ForceLPS::computeDilation" );
     }
 
 
@@ -577,7 +577,8 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            const NeighListType& neigh_list, const int n_local,
-                           ParallelType& neigh_op_tag, const StencilType stencil ) const
+                           ParallelType& neigh_op_tag, const StencilType stencil,
+                           const bool sorted ) const
     {
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
@@ -596,7 +597,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
             double xi, r, s;
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-            if( xi * xi < cutoff )
+            if( xi * xi < cutoff + 1e-7 )
             {
                 const double coeff =
                     ( theta_coeff * ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
@@ -606,10 +607,6 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
                 fy_i = coeff * ry / r;
                 fz_i = coeff * rz / r;
 
-                auto cell = neigh_list.cells( 0, n_local );
-//                std::cout << "Particle " << i << " and " << j << " "
-//                          << cell( i ) << " " << cell( j ) << " d "
-//                          << fx_i << " " << fy_i << " " << fz_i << std::endl;
                 f( i, 0 ) += fx_i;
                 f( i, 1 ) += fy_i;
                 f( i, 2 ) += fz_i;
@@ -619,7 +616,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Cabana::linkedcell_parallel_for(
             policy, force_full, neigh_list, stencil, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::computeFull" );
+            neigh_op_tag, sorted, "CabanaPD::ForceLPS::computeFull" );
     }
 
 
@@ -649,54 +646,6 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
             double num_neighbors = static_cast<double>(
                 Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
                                                                   i ) );
-
-            double w = ( 1.0 / num_neighbors ) * 0.5 * theta_coeff / 3.0 *
-                           ( theta( i ) * theta( i ) ) +
-                       0.5 * ( s_coeff / m( i ) ) *
-                           model.influence_function( xi ) * s * s * xi * xi *
-                           vol( j );
-            W( i ) += w;
-            Phi += w * vol( i );
-        };
-
-        double strain_energy = 0.0;
-
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-        Cabana::neighbor_parallel_reduce(
-            policy, energy_full, neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, strain_energy,
-            "CabanaPD::ForceLPS::computeEnergyFull" );
-
-        return strain_energy;
-    }
-
-    // template for linked cell list energyfull
-    template <class PosType, class WType, class ParticleType,
-              class NeighListType, class ParallelType, class StencilType>
-    double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              const ParticleType& particles,
-                              const NeighListType& neigh_list,
-                              const int n_local,
-                              ParallelType& neigh_op_tag, const StencilType stencil ) const
-    {
-        auto theta_coeff = _model.theta_coeff;
-        auto s_coeff = _model.s_coeff;
-        auto model = _model;
-
-        const auto vol = particles.sliceVolume();
-        const auto theta = particles.sliceDilatation();
-        auto m = particles.sliceWeightedVolume();
-
-        auto energy_full =
-            KOKKOS_LAMBDA( const int i, const int j, double& Phi )
-        {
-            double xi, r, s;
-            getDistance( x, u, i, j, xi, r, s );
-
-            auto cell = neigh_list.cells( 0, n_local );
-            double num_neighbors = static_cast<double>(
-                Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list, cell,
-                                                                  stencil, i ) );
 
             double w = ( 1.0 / num_neighbors ) * 0.5 * theta_coeff / 3.0 *
                            ( theta( i ) * theta( i ) ) +
@@ -1021,7 +970,8 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            const NeighListType& neigh_list, const int n_local,
-                           ParallelType& neigh_op_tag, const StencilType stencil ) const
+                           ParallelType& neigh_op_tag, const StencilType stencil,
+                           const bool sorted ) const
     {
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
@@ -1044,7 +994,7 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
             double xi_x, xi_y, xi_z;
             getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
                                              xi_y, xi_z );
-            if( xi * xi < cutoff )
+            if( xi * xi < cutoff + 1e-7 )
             {
                 const double coeff =
                     ( theta_coeff * ( linear_theta( i ) / m( i ) +
@@ -1054,11 +1004,8 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
                 fx_i = coeff * xi_x / xi;
                 fy_i = coeff * xi_y / xi;
                 fz_i = coeff * xi_z / xi;
+                std::cout << coeff << " " << fx_i << " " << fy_i << " " << fz_i << std::endl;
 
-                auto cell = neigh_list.cells( 0, n_local );
-//                std::cout << "Particle " << i << " and " << j << " "
-//                          << cell( i ) << " " << cell( j ) << " a "
-//                          << fx_i << " " << fy_i << " " << fz_i << std::endl;
                 f( i, 0 ) += fx_i;
                 f( i, 1 ) += fy_i;
                 f( i, 2 ) += fz_i;
@@ -1068,7 +1015,7 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Cabana::linkedcell_parallel_for(
             policy, force_full, neigh_list, stencil, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::computeFull" );
+            neigh_op_tag, sorted, "CabanaPD::ForceLPS::computeFull" );
     }
 
 
@@ -1120,58 +1067,6 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
 
         return strain_energy;
     }
-/*
-    // template for linked cell list energyFull
-    template <class PosType, class WType, class ParticleType,
-              class NeighListType, class ParallelType, class StencilType>
-    double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              const ParticleType& particles,
-                              const NeighListType& neigh_list,
-                              const int n_local,
-                              ParallelType& neigh_op_tag, const StencilType stencil ) const
-    {
-        auto theta_coeff = _model.theta_coeff;
-        auto s_coeff = _model.s_coeff;
-        auto model = _model;
-
-        const auto vol = particles.sliceVolume();
-        const auto linear_theta = particles.sliceDilatation();
-        auto m = particles.sliceWeightedVolume();
-
-        auto energy_full =
-            KOKKOS_LAMBDA( const int i, const int j, double& Phi )
-        {
-            // Do we need to recompute linear_theta_i?
-
-            double xi, linear_s;
-            getLinearizedDistance( x, u, i, j, xi, linear_s );
-
-            auto cell = neigh_list.cells( 0, n_local );
-            double num_neighbors = static_cast<double>(
-                Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
-                                                                  cell, stencil, i ) );
-
-            double w = ( 1.0 / num_neighbors ) * 0.5 * theta_coeff / 3.0 *
-                           ( linear_theta( i ) * linear_theta( i ) ) +
-                       0.5 * ( s_coeff / m( i ) ) *
-                           model.influence_function( xi ) * linear_s *
-                           linear_s * xi * xi * vol( j );
-            W( i ) += w;
-            Phi += w * vol( i );
-        };
-
-        double strain_energy = 0.0;
-
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-        std::cout << "Breaking on missing linkedcell reduce" << std::endl;
-        Cabana::neighbor_parallel_reduce(
-            policy, energy_full, neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, strain_energy,
-            "CabanaPD::ForceLPS::computeEnergyFull" );
-
-        return strain_energy;
-    }
-*/
 };
 
 /******************************************************************************
@@ -1200,7 +1095,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
     }
     template <class ParticleType, class NeighListType, class ParallelType, class StencilType>
     void computeWeightedVolume( ParticleType&, const NeighListType&,
-                                const ParallelType, const StencilType )
+                                const ParallelType, const StencilType, const bool )
     {
     }
     template <class ParticleType, class NeighListType, class ParallelType>
@@ -1210,7 +1105,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
     }
     template <class ParticleType, class NeighListType, class ParallelType, class StencilType>
     void computeDilatation( ParticleType&, const NeighListType&,
-                            const ParallelType, const StencilType )
+                            const ParallelType, const StencilType, const bool )
     {
     }
 
@@ -1237,6 +1132,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
+            std::cout << "Particles " << i << " and " << j << " " << coeff << " "
+                      << fx_i << " " << fy_i << " " << fz_i << std::endl;
 
             f( i, 0 ) += fx_i;
             f( i, 1 ) += fy_i;
@@ -1255,7 +1152,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
                            const ParticleType& particles,
                            const NeighListType& neigh_list, const int n_local,
                            ParallelType& neigh_op_tag,
-                           const StencilType stencil ) const
+                           const StencilType stencil, const bool sorted ) const
     {
         auto c = _model.c;
         const auto vol = particles.sliceVolume();
@@ -1270,18 +1167,14 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
             double xi, r, s;
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-            if( xi * xi < cutoff )
+            if( xi * xi < cutoff + 1e-7 )
             {
                 const double coeff = c * s * vol( j );
                 fx_i = coeff * rx / r;
                 fy_i = coeff * ry / r;
                 fz_i = coeff * rz / r;
-                auto cell = neigh_list.cells( 0, n_local );
-//                std::cout << "Particle " << i << " and " << j << " "
-//                          << cell( i ) << " " << cell( j ) << " b " << std::endl;
-//                std::cout << rx << " " << ry << " " << rz << " " << r << std::endl;
-//                std::cout << x(i,0)-x(j,0) << " " << x(i,1)-x(j,1)
-//                          << " " << x(i,2)-x(j,2) << " " << xi << std::endl;
+                std::cout << "Particles " << i << " and " << j << " " << coeff << " "
+                          << fx_i << " " << fy_i << " " << fz_i << std::endl;
 
                 f( i, 0 ) += fx_i;
                 f( i, 1 ) += fy_i;
@@ -1292,7 +1185,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Cabana::linkedcell_parallel_for(
             policy, force_full, neigh_list, stencil, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForcePMB::computeFull" );
+            neigh_op_tag, sorted, "CabanaPD::ForcePMB::computeFull" );
     }
 
     template <class PosType, class WType, class ParticleType,
@@ -1517,7 +1410,7 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
                            ParticleType& particles,
                            const NeighListType& neigh_list, const int n_local,
                            ParallelType& neigh_op_tag,
-                           const StencilType stencil ) const
+                           const StencilType stencil, const bool sorted ) const
     {
         auto c = _model.c;
         const auto vol = particles.sliceVolume();
@@ -1535,16 +1428,12 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
             getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
                                              xi_y, xi_z );
 
-            if( xi * xi < cutoff )
+            if( xi * xi < cutoff + 1e-7 )
             {
                 const double coeff = c * linear_s * vol( j );
                 fx_i = coeff * xi_x / xi;
                 fy_i = coeff * xi_y / xi;
                 fz_i = coeff * xi_z / xi;
-                auto cell = neigh_list.cells( 0, n_local );
-//                std::cout << "Particle " << i << " and " << j << " "
-//                          << cell( i ) << " " << cell( j ) << " c "
-//                          << fx_i << " " << fy_i << " " << fz_i << std::endl;
 
                 f( i, 0 ) += fx_i;
                 f( i, 1 ) += fy_i;
@@ -1555,7 +1444,7 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Cabana::linkedcell_parallel_for(
             policy, force_full, neigh_list, stencil, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLinearPMB::computeFull" );
+            neigh_op_tag, sorted, "CabanaPD::ForceLinearPMB::computeFull" );
     }
 
 
@@ -1632,7 +1521,7 @@ template <class ForceType, class ParticleType, class NeighListType,
 void computeForce( const ForceType& force, ParticleType& particles,
                    const NeighListType& neigh_list,
                    const ParallelType& neigh_op_tag,
-                   const StencilType stencil )
+                   const StencilType stencil, bool sorted )
 {
     auto n_local = particles.n_local;
     auto x = particles.sliceReferencePosition();
@@ -1652,10 +1541,10 @@ void computeForce( const ForceType& force, ParticleType& particles,
 
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
         force.computeForceFull( f_a, x, u, particles, neigh_list, n_local,
-                                neigh_op_tag, stencil );
+                                neigh_op_tag, stencil, sorted );
     else
         force.computeForceFull( f, x, u, particles, neigh_list, n_local,
-                                neigh_op_tag, stencil );
+                                neigh_op_tag, stencil, sorted );
     Kokkos::fence();
 }
 

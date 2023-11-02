@@ -153,6 +153,8 @@ class SolverElastic
                                  force_model.delta * 1.0 };
         linked_neighbors = std::make_shared<linked_neighbor_type>( x, grid_delta,
             mesh_min, mesh_max );
+        Cabana::permute( *linked_neighbors, x );
+        sorted = true;
         stencil = std::make_shared<stencil_type>( force_model.delta, 1.0, mesh_min, mesh_max );
 
         std::cout << "# linked particles " << linked_neighbors->numParticles() << std::endl;
@@ -206,17 +208,17 @@ class SolverElastic
 //        force->computeWeightedVolume( *particles, *neighbors,
 //                                      neigh_iter_tag{} );
         force->computeWeightedVolume( *particles, *linked_neighbors,
-                                      neigh_iter_tag{}, *stencil );
+                                      neigh_iter_tag{}, *stencil, sorted );
         comm->gatherWeightedVolume();
         // Compute/communicate LPS dilatation (does nothing for PMB).
 //        force->computeDilatation( *particles, *neighbors, neigh_iter_tag{} );
-        force->computeDilatation( *particles, *linked_neighbors, neigh_iter_tag{}, *stencil );
+        force->computeDilatation( *particles, *linked_neighbors, neigh_iter_tag{}, *stencil, sorted );
         comm->gatherDilatation();
 
         // Compute initial forces.
 //        computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
 //        computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
-        computeForce( *force, *particles, *linked_neighbors, neigh_iter_tag{}, *stencil );
+        computeForce( *force, *particles, *linked_neighbors, neigh_iter_tag{}, *stencil, sorted );
         // FIXME:: need parallel reduce for linked cell list before this is functional
 //        computeEnergy( *force, *particles, *neighbors, neigh_iter_tag(), *stencil );
 
@@ -247,7 +249,7 @@ class SolverElastic
 //            force->computeDilatation( *particles, *neighbors,
 //                                      neigh_iter_tag{} );
             force->computeDilatation( *particles, *linked_neighbors,
-                                      neigh_iter_tag{}, *stencil );
+                                      neigh_iter_tag{}, *stencil, sorted );
             force_time += force_timer.seconds();
             comm_timer.reset();
             comm->gatherDilatation();
@@ -256,7 +258,7 @@ class SolverElastic
             // Compute internal forces.
             force_timer.reset();
 //            computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
-            computeForce( *force, *particles, *linked_neighbors, neigh_iter_tag{}, *stencil );
+            computeForce( *force, *particles, *linked_neighbors, neigh_iter_tag{}, *stencil, sorted );
             force_time += force_timer.seconds();
 
             // Integrate - velocity Verlet second half.
@@ -354,6 +356,8 @@ class SolverElastic
     std::shared_ptr<neighbor_type> neighbors;
     std::shared_ptr<linked_neighbor_type> linked_neighbors;
     std::shared_ptr<stencil_type> stencil;
+
+    bool sorted;
 
     double total_time;
     double force_time;

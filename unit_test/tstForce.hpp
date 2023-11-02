@@ -453,6 +453,7 @@ void checkResults( HostParticleType aosoa_host, double local_min[3],
         double x = x_host( p, 0 );
         double y = x_host( p, 1 );
         double z = x_host( p, 2 );
+
         if ( x > local_min[0] + delta * boundary_width &&
              x < local_max[0] - delta * boundary_width &&
              y > local_min[1] + delta * boundary_width &&
@@ -629,9 +630,9 @@ double computeEnergyAndForce( NoDamageTag, const ForceType force,
 template <class ForceType, class ParticleType, class NeighborList, class StencilType>
 double computeEnergyAndForce( NoDamageTag, const ForceType force,
                               ParticleType& particles,
-                              const NeighborList& neigh_list, const StencilType stencil )
+                              const NeighborList& neigh_list, const StencilType stencil, bool sorted )
 {
-    computeForce( force, particles, neigh_list, Cabana::SerialOpTag(), stencil );
+    computeForce( force, particles, neigh_list, Cabana::SerialOpTag(), stencil, sorted );
     double Phi = 0.0;
 //        computeEnergy( force, particles, neigh_list, Cabana::SerialOpTag(), stencil );
     return Phi;
@@ -679,10 +680,11 @@ void initializeForce( CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>,
 template <class ModelType, class ForceType, class ParticleType,
           class NeighborList, class StencilType>
 void initializeForce( ModelType, ForceType& force, ParticleType& particles,
-                      const NeighborList& neigh_list, const StencilType stencil )
+                      const NeighborList& neigh_list, const StencilType stencil,
+                      const bool sorted )
 {
-    force.computeWeightedVolume( particles, neigh_list, Cabana::SerialOpTag(), stencil );
-    force.computeDilatation( particles, neigh_list, Cabana::SerialOpTag(), stencil );
+    force.computeWeightedVolume( particles, neigh_list, Cabana::SerialOpTag(), stencil, sorted );
+    force.computeDilatation( particles, neigh_list, Cabana::SerialOpTag(), stencil, sorted );
 }
 
 template <class ParticleType, class AoSoAType>
@@ -797,7 +799,8 @@ void testForce( ModelType model, const DamageType damage_tag, const double dx,
                              ( model.delta + 1e-14 ) * 1.0,
                              ( model.delta + 1e-14 ) * 1.0 };
     linked_list neigh_list( x, grid_delta, mesh_min, mesh_max);
-    Cabana::permute( neigh_list, x );
+    Cabana::permute( neigh_list, x);
+    bool sorted = true;
     stencil_type stencil( model.delta + 1e-14, 1.0, mesh_min, mesh_max );
 //    int max_neighbors =
 //        Cabana::NeighborList<verlet_list>::maxNeighbor( neigh_list );
@@ -807,20 +810,10 @@ void testForce( ModelType model, const DamageType damage_tag, const double dx,
     auto vol = particles.sliceVolume();
     //  No communication needed (as in the main solver) since this test is only
     //  intended for one rank.
-    initializeForce( model, force, particles, neigh_list, stencil );
-
-    auto n_local = particles.n_local;
-    auto cell = neigh_list.cells(0, n_local);
-    for ( int p = 0; p < n_local; ++p )
-    {
-        auto xi = x(p,0);
-        auto yi = x(p,1);
-        auto zi = x(p,2);
-        std::cout << "Particle # " << p << " ("<<xi<<","<<yi<<","<<zi<<")" << cell( p) << std::endl;
-    }
+    initializeForce( model, force, particles, neigh_list, stencil, sorted );
 
     double Phi = computeEnergyAndForce( damage_tag, force, particles,
-                                        neigh_list, stencil );
+                                        neigh_list, stencil, sorted );
 
     // Make a copy of final results on the host
     std::size_t num_particle = x.size();
