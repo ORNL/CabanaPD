@@ -32,14 +32,14 @@ int main( int argc, char* argv[] )
         CabanaPD::Inputs inputs( argv[1] );
 
         // Material constants
-        double E = 72e+9;                      // [Pa]
-        double nu = 0.25;                      // unitless
-        double K = E / ( 3 * ( 1 - 2 * nu ) ); // [Pa]
-        double rho0 = 2440;                    // [kg/m^3]
-        double G0 = 3.8;                       // [J/m^2]
+        double E = inputs["elastic_modulus"]["value"];  
+        double nu = 0.25;                      
+        double K = E / ( 3 * ( 1 - 2 * nu ) ); 
+        double rho0 = inputs["density"]["value"];       
+        double G0 = inputs["fracture_energy"]["value"];
 
         // PD horizon
-        double delta = 0.001 + 1e-10;
+        double delta = inputs["horizon"]["value"];  + 1e-10; 
 
         // FIXME: set halo width based on delta
         std::array<double, 3> low_corner = inputs["low_corner"];
@@ -79,9 +79,9 @@ int main( int argc, char* argv[] )
         auto rho = particles->sliceDensity();
         auto nofail = particles->sliceNoFail();
 
-        // Relying on uniform grid here.
+        // Relying on uniform grid here
         double dy = particles->dx[1];
-        double b0 = 2e6 / dy; // Pa/m
+        double b0 = inputs["traction"]["value"] / dy; 
 
         CabanaPD::RegionBoundary plane1(
             low_corner[0], high_corner[0], low_corner[1] - dy,

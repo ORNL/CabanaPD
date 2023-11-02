@@ -130,7 +130,7 @@ class SolverElastic
 
         // Create integrator.
         // FIXME: hardcoded.
-        dt = inputs["timestep"];
+        dt = inputs["timestep"]["value"];
         integrator = std::make_shared<integrator_type>( dt );
 
         // Add ghosts from other MPI ranks.

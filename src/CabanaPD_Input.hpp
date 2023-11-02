@@ -29,7 +29,7 @@ class Inputs
         inputs = parse( filename );
 
         // Add additional derived inputs to json. System size.
-        auto size = inputs["system_size"];
+        auto size = inputs["system_size"]["value"];
         for ( std::size_t d = 0; d < size.size(); d++ )
         {
             double s = size[d];
@@ -37,8 +37,8 @@ class Inputs
             inputs["high_corner"][d] = 0.5 * s;
         }
         // Number of steps.
-        double tf = inputs["final_time"];
-        double dt = inputs["timestep"];
+        double tf = inputs["final_time"]["value"];
+        double dt = inputs["timestep"]["value"];
         int num_steps = tf / dt;
         inputs["num_steps"] = num_steps;
 
