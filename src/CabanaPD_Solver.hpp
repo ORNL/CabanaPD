@@ -55,7 +55,7 @@
 //  IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 //  POSSIBILITY OF SUCH DAMAGE.
 //
-//************************************************************************
+//************************************************************************/
 
 #ifndef SOLVER_H
 #define SOLVER_H
@@ -106,6 +106,9 @@ class SolverElastic
     using neighbor_type =
         Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
                            Cabana::VerletLayout2D, Cabana::TeamOpTag>;
+    using linked_neighbor_type =
+        Cabana::LinkedCellList<memory_space>;
+    using stencil_type = Cabana::LinkedCellStencil<double>;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using input_type = InputType;
 
@@ -145,8 +148,32 @@ class SolverElastic
         neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
                                                      force_model.delta, 1.0,
                                                      mesh_min, mesh_max );
+        double grid_delta[3] = { force_model.delta * 1.0,
+                                 force_model.delta * 1.0,
+                                 force_model.delta * 1.0 };
+        linked_neighbors = std::make_shared<linked_neighbor_type>( x, grid_delta,
+            mesh_min, mesh_max );
+        Cabana::permute( *linked_neighbors, x );
+        sorted = true;
+        stencil = std::make_shared<stencil_type>( force_model.delta, 1.0, mesh_min, mesh_max );
+
+        std::cout << "# linked particles " << linked_neighbors->numParticles() << std::endl;
+        std::cout << "# linked bins " << linked_neighbors->totalBins() << std::endl;
+        for (int i = 0; i < linked_neighbors->totalBins(); ++i )
+        {
+            int ii;
+            int jj;
+            int kk;
+            linked_neighbors->ijkBinIndex(i, ii, jj, kk);
+            std::cout << i << " " << linked_neighbors->binSize(ii, jj, kk) << std::endl;
+        }
+
         int max_neighbors =
             Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
+
+//        int max_linked_neighbors =
+//            Cabana::LinkedCellList<linked_neighbor_type>::maxNeighbor( *linked_neighbors,
+//                cell, stencil );
 
         force = std::make_shared<force_type>( inputs->half_neigh, force_model );
 
@@ -178,16 +205,22 @@ class SolverElastic
     {
         init_timer.reset();
         // Compute/communicate LPS weighted volume (does nothing for PMB).
-        force->computeWeightedVolume( *particles, *neighbors,
-                                      neigh_iter_tag{} );
+//        force->computeWeightedVolume( *particles, *neighbors,
+//                                      neigh_iter_tag{} );
+        force->computeWeightedVolume( *particles, *linked_neighbors,
+                                      neigh_iter_tag{}, *stencil, sorted );
         comm->gatherWeightedVolume();
         // Compute/communicate LPS dilatation (does nothing for PMB).
-        force->computeDilatation( *particles, *neighbors, neigh_iter_tag{} );
+//        force->computeDilatation( *particles, *neighbors, neigh_iter_tag{} );
+        force->computeDilatation( *particles, *linked_neighbors, neigh_iter_tag{}, *stencil, sorted );
         comm->gatherDilatation();
 
         // Compute initial forces.
-        computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
-        computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
+//        computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
+//        computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
+        computeForce( *force, *particles, *linked_neighbors, neigh_iter_tag{}, *stencil, sorted );
+        // FIXME:: need parallel reduce for linked cell list before this is functional
+//        computeEnergy( *force, *particles, *neighbors, neigh_iter_tag(), *stencil );
 
         particles->output( 0, 0.0, output_reference );
         init_time += init_timer.seconds();
@@ -213,8 +246,10 @@ class SolverElastic
             // Do not need to recompute LPS weighted volume here without damage.
             // Compute/communicate LPS dilatation (does nothing for PMB).
             force_timer.reset();
-            force->computeDilatation( *particles, *neighbors,
-                                      neigh_iter_tag{} );
+//            force->computeDilatation( *particles, *neighbors,
+//                                      neigh_iter_tag{} );
+            force->computeDilatation( *particles, *linked_neighbors,
+                                      neigh_iter_tag{}, *stencil, sorted );
             force_time += force_timer.seconds();
             comm_timer.reset();
             comm->gatherDilatation();
@@ -222,7 +257,8 @@ class SolverElastic
 
             // Compute internal forces.
             force_timer.reset();
-            computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
+//            computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
+            computeForce( *force, *particles, *linked_neighbors, neigh_iter_tag{}, *stencil, sorted );
             force_time += force_timer.seconds();
 
             // Integrate - velocity Verlet second half.
@@ -234,10 +270,13 @@ class SolverElastic
             other_timer.reset();
             if ( step % output_frequency == 0 )
             {
-                auto W = computeEnergy( *force, *particles, *neighbors,
-                                        neigh_iter_tag() );
+//                auto W = computeEnergy( *force, *particles, *neighbors,
+//                                        neigh_iter_tag() );
+                // FIXME:: need parallel reduce for linked cell list before this is functional
+//                auto W = computeEnergy( *force, *particles, *neighbors,
+//                                        neigh_iter_tag(), *stencil );
 
-                step_output( step, W );
+//                step_output( step, W );
                 particles->output( step / output_frequency,
                                    step * inputs->timestep, output_reference );
             }
@@ -315,6 +354,10 @@ class SolverElastic
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
     std::shared_ptr<neighbor_type> neighbors;
+    std::shared_ptr<linked_neighbor_type> linked_neighbors;
+    std::shared_ptr<stencil_type> stencil;
+
+    bool sorted;
 
     double total_time;
     double force_time;
