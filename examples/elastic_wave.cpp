@@ -90,7 +90,8 @@ int main( int argc, char* argv[] )
         };
         particles->updateParticles( exec_space{}, init_functor );
 
-        auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
+        using iter_tag = Cabana::SerialOpTag;
+        auto cabana_pd = CabanaPD::createSolverElastic<memory_space, iter_tag>(
             inputs, particles, force_model );
         cabana_pd->init_force();
         cabana_pd->run();

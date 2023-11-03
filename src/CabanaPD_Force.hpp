@@ -561,10 +561,12 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
     {
     }
 
-    template <class ParticleType, class NeighListType, class MuView>
+    template <class ParticleType, class NeighListType, class MuView,
+              class ParallelType>
     void computeWeightedVolume( ParticleType& particles,
                                 const NeighListType& neigh_list,
-                                const MuView& mu )
+                                const MuView& mu,
+                                const ParallelType neigh_op_tag )
     {
         auto n_local = particles.n_local;
         auto x = particles.sliceReferencePosition();
@@ -574,36 +576,33 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
         Cabana::deep_copy( m, 0.0 );
         auto model = _model;
 
-        auto weighted_volume = KOKKOS_LAMBDA( const int i )
+        auto weighted_volume = KOKKOS_LAMBDA( const int i, const int n )
         {
-            std::size_t num_neighbors =
-                Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
-                                                                  i );
-            for ( std::size_t n = 0; n < num_neighbors; n++ )
-            {
-                std::size_t j =
-                    Cabana::NeighborList<NeighListType>::getNeighbor(
-                        neigh_list, i, n );
+            std::size_t j = Cabana::NeighborList<NeighListType>::getNeighbor(
+                neigh_list, i, n );
 
-                // Get the reference positions and displacements.
-                double xi, r, s;
-                getDistance( x, u, i, j, xi, r, s );
-                // mu is included to account for bond breaking.
-                double m_j = mu( i, n ) * model.influence_function( xi ) * xi *
-                             xi * vol( j );
-                m( i ) += m_j;
-            }
+            // Get the reference positions and displacements.
+            double xi, r, s;
+            getDistance( x, u, i, j, xi, r, s );
+            // mu is included to account for bond breaking.
+            double m_j = mu( i, n ) * model.influence_function( xi ) * xi * xi *
+                         vol( j );
+            m( i ) += m_j;
         };
 
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-        Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::computeWeightedVolume",
-                              policy, weighted_volume );
+        // Indirect indexing needed to access the broken bonds array.
+        Cabana::neighbor_parallel_for(
+            policy, weighted_volume, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForceLPSDamage::computeWeightedVolume",
+            false );
     }
 
-    template <class ParticleType, class NeighListType, class MuView>
+    template <class ParticleType, class NeighListType, class MuView,
+              class ParallelType>
     void computeDilatation( ParticleType& particles,
-                            const NeighListType& neigh_list,
-                            const MuView& mu ) const
+                            const NeighListType& neigh_list, const MuView& mu,
+                            const ParallelType neigh_op_tag ) const
     {
         auto n_local = particles.n_local;
         const auto x = particles.sliceReferencePosition();
@@ -614,34 +613,30 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
         auto model = _model;
         Cabana::deep_copy( theta, 0.0 );
 
-        auto dilatation = KOKKOS_LAMBDA( const int i )
+        auto dilatation = KOKKOS_LAMBDA( const int i, const int n )
         {
-            std::size_t num_neighbors =
-                Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
-                                                                  i );
-            for ( std::size_t n = 0; n < num_neighbors; n++ )
-            {
-                std::size_t j =
-                    Cabana::NeighborList<NeighListType>::getNeighbor(
-                        neigh_list, i, n );
+            std::size_t j = Cabana::NeighborList<NeighListType>::getNeighbor(
+                neigh_list, i, n );
 
-                // Get the bond distance, displacement, and stretch.
-                double xi, r, s;
-                getDistance( x, u, i, j, xi, r, s );
-                // mu is included to account for bond breaking.
-                double theta_i = mu( i, n ) * model.influence_function( xi ) *
-                                 s * xi * xi * vol( j );
-                // Check if all bonds are broken (m=0) to avoid dividing by
-                // zero. Alternatively, one could check if this bond mu(i,n) is
-                // broken, beacuse m=0 only occurs when all bonds are broken.
-                if ( m( i ) > 0 )
-                    theta( i ) += 3.0 * theta_i / m( i );
-            }
+            // Get the bond distance, displacement, and stretch.
+            double xi, r, s;
+            getDistance( x, u, i, j, xi, r, s );
+            // mu is included to account for bond breaking.
+            double theta_i = mu( i, n ) * model.influence_function( xi ) * s *
+                             xi * xi * vol( j );
+            // Check if all bonds are broken (m=0) to avoid dividing by
+            // zero. Alternatively, one could check if this bond mu(i,n) is
+            // broken, beacuse m=0 only occurs when all bonds are broken.
+            if ( m( i ) > 0 )
+                theta( i ) += 3.0 * theta_i / m( i );
         };
 
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-        Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::computeDilatation",
-                              policy, dilatation );
+        // Indirect indexing needed to access the broken bonds array.
+        Cabana::neighbor_parallel_for(
+            policy, dilatation, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForceLPSDamage::computeDilatation",
+            false );
     }
 
     template <class ForceType, class PosType, class ParticleType,
@@ -649,7 +644,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            const NeighListType& neigh_list, MuView& mu,
-                           const int n_local, ParallelType& ) const
+                           const int n_local, ParallelType& neigh_op_tag ) const
     {
         auto break_coeff = _model.bond_break_coeff;
         auto theta_coeff = _model.theta_coeff;
@@ -660,57 +655,52 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
         auto theta = particles.sliceDilatation();
         auto m = particles.sliceWeightedVolume();
         const auto nofail = particles.sliceNoFail();
-        auto force_full = KOKKOS_LAMBDA( const int i )
+        auto force_full = KOKKOS_LAMBDA( const int i, const int n )
         {
-            std::size_t num_neighbors =
-                Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
-                                                                  i );
-            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            double fx_i = 0.0;
+            double fy_i = 0.0;
+            double fz_i = 0.0;
+
+            std::size_t j = Cabana::NeighborList<NeighListType>::getNeighbor(
+                neigh_list, i, n );
+
+            // Get the reference positions and displacements.
+            double xi, r, s;
+            double rx, ry, rz;
+            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+
+            // Break if beyond critical stretch unless in no-fail zone.
+            if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
+                 !nofail( i ) )
             {
-                double fx_i = 0.0;
-                double fy_i = 0.0;
-                double fz_i = 0.0;
+                mu( i, n ) = 0;
+            }
+            // Check if this bond is broken (mu=0) to ensure m(i) and m(j)
+            // are both >0 (m=0 only occurs when all bonds are broken) to
+            // avoid dividing by zero.
+            else if ( mu( i, n ) > 0 )
+            {
+                const double coeff =
+                    ( theta_coeff *
+                          ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
+                      s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
+                    model.influence_function( xi ) * xi * vol( j );
+                double muij = mu( i, n );
+                fx_i = muij * coeff * rx / r;
+                fy_i = muij * coeff * ry / r;
+                fz_i = muij * coeff * rz / r;
 
-                std::size_t j =
-                    Cabana::NeighborList<NeighListType>::getNeighbor(
-                        neigh_list, i, n );
-
-                // Get the reference positions and displacements.
-                double xi, r, s;
-                double rx, ry, rz;
-                getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-
-                // Break if beyond critical stretch unless in no-fail zone.
-                if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
-                     !nofail( i ) )
-                {
-                    mu( i, n ) = 0;
-                }
-                // Check if this bond is broken (mu=0) to ensure m(i) and m(j)
-                // are both >0 (m=0 only occurs when all bonds are broken) to
-                // avoid dividing by zero.
-                else if ( mu( i, n ) > 0 )
-                {
-                    const double coeff =
-                        ( theta_coeff *
-                              ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
-                          s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                        model.influence_function( xi ) * xi * vol( j );
-                    double muij = mu( i, n );
-                    fx_i = muij * coeff * rx / r;
-                    fy_i = muij * coeff * ry / r;
-                    fz_i = muij * coeff * rz / r;
-
-                    f( i, 0 ) += fx_i;
-                    f( i, 1 ) += fy_i;
-                    f( i, 2 ) += fz_i;
-                }
+                f( i, 0 ) += fx_i;
+                f( i, 1 ) += fy_i;
+                f( i, 2 ) += fz_i;
             }
         };
 
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-        Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::computeFull", policy,
-                              force_full );
+        // Indirect indexing needed to access the broken bonds array.
+        Cabana::neighbor_parallel_for(
+            policy, force_full, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForceLPSDamage::computeFull", false );
     }
 
     template <class PosType, class WType, class DamageType, class ParticleType,
@@ -1006,63 +996,71 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
     {
     }
 
+    template <class ParticleType, class NeighListType, class MuView,
+              class ParallelType>
+    void computeWeightedVolume( ParticleType&, const NeighListType&,
+                                const MuView&, const ParallelType )
+    {
+    }
+    template <class ParticleType, class NeighListType, class MuView,
+              class ParallelType>
+    void computeDilatation( ParticleType&, const NeighListType&, const MuView&,
+                            const ParallelType )
+    {
+    }
+
     template <class ForceType, class PosType, class ParticleType,
               class NeighListType, class MuView, class ParallelType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            const NeighListType& neigh_list, MuView& mu,
-                           const int n_local, ParallelType& ) const
+                           const int n_local, ParallelType& neigh_op_tag ) const
     {
         auto c = _model.c;
         auto break_coeff = _model.bond_break_coeff;
         const auto vol = particles.sliceVolume();
         const auto nofail = particles.sliceNoFail();
 
-        auto force_full = KOKKOS_LAMBDA( const int i )
+        auto force_full = KOKKOS_LAMBDA( const int i, const int n )
         {
-            std::size_t num_neighbors =
-                Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
-                                                                  i );
-            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            double fx_i = 0.0;
+            double fy_i = 0.0;
+            double fz_i = 0.0;
+
+            std::size_t j = Cabana::NeighborList<NeighListType>::getNeighbor(
+                neigh_list, i, n );
+
+            // Get the reference positions and displacements.
+            double xi, r, s;
+            double rx, ry, rz;
+            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+
+            // Break if beyond critical stretch unless in no-fail zone.
+            if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
+                 !nofail( j ) )
             {
-                double fx_i = 0.0;
-                double fy_i = 0.0;
-                double fz_i = 0.0;
+                mu( i, n ) = 0;
+            }
+            // Else if statement is only for performance.
+            else if ( mu( i, n ) > 0 )
+            {
+                const double coeff = c * s * vol( j );
+                double muij = mu( i, n );
+                fx_i = muij * coeff * rx / r;
+                fy_i = muij * coeff * ry / r;
+                fz_i = muij * coeff * rz / r;
 
-                std::size_t j =
-                    Cabana::NeighborList<NeighListType>::getNeighbor(
-                        neigh_list, i, n );
-
-                // Get the reference positions and displacements.
-                double xi, r, s;
-                double rx, ry, rz;
-                getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-
-                // Break if beyond critical stretch unless in no-fail zone.
-                if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
-                     !nofail( j ) )
-                {
-                    mu( i, n ) = 0;
-                }
-                // Else if statement is only for performance.
-                else if ( mu( i, n ) > 0 )
-                {
-                    const double coeff = c * s * vol( j );
-                    double muij = mu( i, n );
-                    fx_i = muij * coeff * rx / r;
-                    fy_i = muij * coeff * ry / r;
-                    fz_i = muij * coeff * rz / r;
-
-                    f( i, 0 ) += fx_i;
-                    f( i, 1 ) += fy_i;
-                    f( i, 2 ) += fz_i;
-                }
+                f( i, 0 ) += fx_i;
+                f( i, 1 ) += fy_i;
+                f( i, 2 ) += fz_i;
             }
         };
 
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-        Kokkos::parallel_for( "CabanaPD::ForcePMBDamage::computeFull", policy,
-                              force_full );
+        // Indirect indexing needed to access the broken bonds array.
+        Cabana::neighbor_parallel_for(
+            policy, force_full, neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForcePMBDamage::computeFull", false );
     }
 
     template <class PosType, class WType, class DamageType, class ParticleType,
