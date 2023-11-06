@@ -288,7 +288,7 @@ class Particles<MemorySpace, PMB, Dimension>
     // state.
     template <class ExecSpace, std::size_t NSD = dim>
     std::enable_if_t<3 == NSD, void>
-    updateAfterRead( const ExecSpace& exec_space, const double cutoff )
+    updateAfterRead( const ExecSpace& exec_space, const double dx )
     {
         // Because this may be a non-uniform mesh, build a background mesh with
         // dx=cutoff and force halo_width=1
@@ -340,11 +340,13 @@ class Particles<MemorySpace, PMB, Dimension>
         for ( int d = 0; d < 3; d++ )
         {
             num_cells[d] =
-                static_cast<int>( ( max_corner[d] - min_corner[d] ) / cutoff );
+                static_cast<int>( ( max_corner[d] - min_corner[d] ) / dx );
             if ( num_cells[d] == 0 )
             {
                 num_cells[d]++;
-                max_corner[d] += 1e-16;
+                // Issues with pseudo-2d with only one bin in a given direction.
+                max_corner[d] += dx * 3;
+                min_corner[d] -= dx * 3;
             }
         }
         createDomain( min_corner, max_corner, num_cells );
@@ -352,7 +354,7 @@ class Particles<MemorySpace, PMB, Dimension>
 
     template <class ExecSpace, std::size_t NSD = dim>
     std::enable_if_t<2 == NSD, void>
-    updateAfterRead( const ExecSpace& exec_space, double cutoff )
+    updateAfterRead( const ExecSpace& exec_space, double dx )
     {
         // Because this may be a non-uniform mesh, build a background mesh with
         // dx=cutoff and force halo_width=1
@@ -394,9 +396,17 @@ class Particles<MemorySpace, PMB, Dimension>
         for ( int d = 0; d < 2; d++ )
         {
             num_cells[d] =
-                static_cast<int>( ( max_corner[d] - min_corner[d] ) / cutoff );
+                static_cast<int>( ( max_corner[d] - min_corner[d] ) / dx );
+            if ( num_cells[d] == 0 )
+            {
+                num_cells[d]++;
+                // Potentially issues with pseudo-1d with only one bin in a
+                // given direction.
+                max_corner[d] += dx * 3;
+                min_corner[d] -= dx * 3;
+            }
+            createDomain( min_corner, max_corner, num_cells );
         }
-        createDomain( min_corner, max_corner, num_cells );
     }
 
     void update_global()
