@@ -151,7 +151,7 @@ int main( int argc, char* argv[] )
                         particles->local_mesh_lo[bc_dim];
         auto bc = createBoundaryCondition( CabanaPD::ForceSymmetric1dBCTag{},
                                            exec_space{}, *particles, planes,
-                                           2e6, bc_dim, center );
+                                           1e-4, bc_dim, center );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
