@@ -135,8 +135,14 @@ int main( int argc, char* argv[] )
 
         CabanaPD::Prenotch<0> prenotch;
 
-        CabanaPD::RegionBoundary planeUpper( -0.5, 1.5, 8.5, 10.5, -1, 1 );
-        CabanaPD::RegionBoundary planeLower( -0.5, 1.5, -0.5, 1.5, -1, 1 );
+        CabanaPD::RegionBoundary planeUpper(
+            particles->local_mesh_lo[0], particles->local_mesh_hi[0],
+            particles->local_mesh_hi[1] - delta, particles->local_mesh_hi[1],
+            particles->local_mesh_lo[2], particles->local_mesh_hi[2] );
+        CabanaPD::RegionBoundary planeLower(
+            particles->local_mesh_lo[0], particles->local_mesh_hi[0],
+            particles->local_mesh_lo[1], particles->local_mesh_lo[1] + delta,
+            particles->local_mesh_lo[2], particles->local_mesh_hi[2] );
 
         std::vector<CabanaPD::RegionBoundary> planes = { planeUpper,
                                                          planeLower };
