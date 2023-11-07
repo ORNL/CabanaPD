@@ -133,16 +133,30 @@ int main( int argc, char* argv[] )
         // Update after reading. Currently requires fixed cell spacing.
         particles->updateAfterRead( exec_space(), dx );
 
+        // Do this separately so that the mesh is already set up.
+        auto x = particles->sliceReferencePosition();
+        auto nofail = particles->sliceNoFail();
+        auto f = particles->sliceForce();
+        double max_bc = particles->local_mesh_hi[1] - delta;
+        double min_bc = particles->local_mesh_lo[1] + delta;
+        auto init_functor = KOKKOS_LAMBDA( const int pid )
+        {
+            if ( x( pid, 1 ) <= min_bc + 1e-10 ||
+                 x( pid, 1 ) >= max_bc - 1e-10 )
+                nofail( pid ) = 1;
+        };
+        particles->updateParticles( exec_space{}, init_functor );
+
         CabanaPD::Prenotch<0> prenotch;
 
         CabanaPD::RegionBoundary planeUpper(
-            particles->local_mesh_lo[0], particles->local_mesh_hi[0],
-            particles->local_mesh_hi[1] - delta, particles->local_mesh_hi[1],
-            particles->local_mesh_lo[2], particles->local_mesh_hi[2] );
+            particles->local_mesh_lo[0], particles->local_mesh_hi[0], max_bc,
+            particles->local_mesh_hi[1], particles->local_mesh_lo[2],
+            particles->local_mesh_hi[2] );
         CabanaPD::RegionBoundary planeLower(
             particles->local_mesh_lo[0], particles->local_mesh_hi[0],
-            particles->local_mesh_lo[1], particles->local_mesh_lo[1] + delta,
-            particles->local_mesh_lo[2], particles->local_mesh_hi[2] );
+            particles->local_mesh_lo[1], min_bc, particles->local_mesh_lo[2],
+            particles->local_mesh_hi[2] );
 
         std::vector<CabanaPD::RegionBoundary> planes = { planeUpper,
                                                          planeLower };
@@ -151,7 +165,7 @@ int main( int argc, char* argv[] )
                         particles->local_mesh_lo[bc_dim];
         auto bc = createBoundaryCondition( CabanaPD::ForceSymmetric1dBCTag{},
                                            exec_space{}, *particles, planes,
-                                           1e-4, bc_dim, center );
+                                           1e-9, bc_dim, center );
 
         // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
