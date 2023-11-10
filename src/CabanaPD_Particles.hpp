@@ -277,6 +277,136 @@ class Particles<MemorySpace, PMB, Dimension>
         resize( n_local, 0 );
         size = _aosoa_x.size();
 
+        update_global();
+    }
+
+    // This is necessary after reading in particles from file for a consistent
+    // state.
+    template <class ExecSpace, std::size_t NSD = dim>
+    std::enable_if_t<3 == NSD, void>
+    updateAfterRead( const ExecSpace& exec_space, const double dx )
+    {
+        // Because this may be a non-uniform mesh, build a background mesh with
+        // dx=cutoff and force halo_width=1
+        halo_width = 1;
+        auto x = sliceReferencePosition();
+        n_local = x.size();
+        n_ghost = 0;
+        size = n_local;
+        update_global();
+
+        double max_x;
+        Kokkos::Max<double> max_x_reducer( max_x );
+        double min_x;
+        Kokkos::Min<double> min_x_reducer( min_x );
+        double max_y;
+        Kokkos::Max<double> max_y_reducer( max_y );
+        double min_y;
+        Kokkos::Min<double> min_y_reducer( min_y );
+        double max_z;
+        Kokkos::Max<double> max_z_reducer( max_z );
+        double min_z;
+        Kokkos::Min<double> min_z_reducer( min_z );
+        Kokkos::parallel_reduce(
+            "CabanaPD::Particles::min_max_positions",
+            Kokkos::RangePolicy<ExecSpace>( exec_space, 0, n_local ),
+            KOKKOS_LAMBDA( const int i, double& min_x, double& min_y,
+                           double& min_z, double& max_x, double& max_y,
+                           double& max_z ) {
+                if ( x( i, 0 ) > max_x )
+                    max_x = x( i, 0 );
+                else if ( x( i, 0 ) < min_x )
+                    min_x = x( i, 0 );
+                if ( x( i, 1 ) > max_y )
+                    max_y = x( i, 1 );
+                else if ( x( i, 1 ) < min_y )
+                    min_y = x( i, 1 );
+                if ( x( i, 2 ) > max_z )
+                    max_z = x( i, 2 );
+                else if ( x( i, 2 ) < min_z )
+                    min_z = x( i, 2 );
+            },
+            min_x_reducer, min_y_reducer, min_z_reducer, max_x_reducer,
+            max_y_reducer, max_z_reducer );
+
+        std::array<double, 3> min_corner = { min_x, min_y, min_z };
+        std::array<double, 3> max_corner = { max_x, max_y, max_z };
+
+        std::array<int, 3> num_cells;
+        for ( int d = 0; d < 3; d++ )
+        {
+            num_cells[d] =
+                static_cast<int>( ( max_corner[d] - min_corner[d] ) / dx );
+            if ( num_cells[d] == 0 )
+            {
+                num_cells[d]++;
+                // Issues with pseudo-2d with only one bin in a given direction.
+                max_corner[d] += dx * 3;
+                min_corner[d] -= dx * 3;
+            }
+        }
+        createDomain( min_corner, max_corner, num_cells );
+    }
+
+    template <class ExecSpace, std::size_t NSD = dim>
+    std::enable_if_t<2 == NSD, void>
+    updateAfterRead( const ExecSpace& exec_space, double dx )
+    {
+        // Because this may be a non-uniform mesh, build a background mesh with
+        // dx=cutoff and force halo_width=1
+        halo_width = 1;
+        auto x = sliceReferencePosition();
+        n_local = x.size();
+        n_ghost = 0;
+        size = n_local;
+        update_global();
+
+        double max_x;
+        Kokkos::Max<double> max_x_reducer( max_x );
+        double min_x;
+        Kokkos::Min<double> min_x_reducer( min_x );
+        double max_y;
+        Kokkos::Max<double> max_y_reducer( max_y );
+        double min_y;
+        Kokkos::Min<double> min_y_reducer( min_y );
+        Kokkos::parallel_reduce(
+            "CabanaPD::Particles::min_max_positions",
+            Kokkos::RangePolicy<ExecSpace>( exec_space, 0, n_local ),
+            KOKKOS_LAMBDA( const int i, double& min_x, double& min_y,
+                           double& max_x, double& max_y ) {
+                if ( x( i, 0 ) > max_x )
+                    max_x = x( i, 0 );
+                else if ( x( i, 0 ) < min_x )
+                    min_x = x( i, 0 );
+                if ( x( i, 1 ) > max_y )
+                    max_y = x( i, 1 );
+                else if ( x( i, 1 ) < min_y )
+                    min_y = x( i, 1 );
+            },
+            min_x_reducer, min_y_reducer, max_x_reducer, max_y_reducer );
+
+        std::array<double, 2> min_corner = { min_x, min_y };
+        std::array<double, 2> max_corner = { max_x, max_y };
+
+        std::array<int, 2> num_cells;
+        for ( int d = 0; d < 2; d++ )
+        {
+            num_cells[d] =
+                static_cast<int>( ( max_corner[d] - min_corner[d] ) / dx );
+            if ( num_cells[d] == 0 )
+            {
+                num_cells[d]++;
+                // Potentially issues with pseudo-1d with only one bin in a
+                // given direction.
+                max_corner[d] += dx * 3;
+                min_corner[d] -= dx * 3;
+            }
+            createDomain( min_corner, max_corner, num_cells );
+        }
+    }
+
+    void update_global()
+    {
         // Not using Allreduce because global count is only used for printing.
         MPI_Reduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0,
                     MPI_COMM_WORLD );
@@ -513,6 +643,16 @@ class Particles<MemorySpace, LPS, Dimension>
         base_type::createParticles( exec_space );
         _aosoa_m.resize( 0 );
         _aosoa_theta.resize( 0 );
+    }
+
+    template <class ExecSpace>
+    void updateAfterRead( const ExecSpace& exec_space, const int hw, double dx )
+    {
+        base_type::updateAfterRead( exec_space, hw, dx );
+
+        // Only need to resize LPS variables
+        _aosoa_theta.resize( n_local + n_ghost );
+        _aosoa_m.resize( n_local + n_ghost );
     }
 
     auto sliceDilatation()

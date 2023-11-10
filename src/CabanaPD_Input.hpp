@@ -24,6 +24,7 @@ class Inputs
   public:
     std::string output_file = "cabanaPD.out";
     std::string error_file = "cabanaPD.err";
+    std::string input_file = "particles.csv";
     std::string device_type = "SERIAL";
 
     std::array<int, Dim> num_cells;
@@ -45,6 +46,15 @@ class Inputs
         , low_corner( lc )
         , high_corner( hc )
         , final_time( t_f )
+        , timestep( dt )
+        , output_frequency( of )
+        , output_reference( output_ref )
+    {
+        num_steps = final_time / timestep;
+    }
+    Inputs( const double t_f, const double dt, const int of,
+            const bool output_ref )
+        : final_time( t_f )
         , timestep( dt )
         , output_frequency( of )
         , output_reference( output_ref )
@@ -85,6 +95,12 @@ class Inputs
                       ( strcmp( argv[i], "--output-file" ) == 0 ) )
             {
                 output_file = argv[i + 1];
+                ++i;
+            }
+            else if ( ( strcmp( argv[i], "-i" ) == 0 ) ||
+                      ( strcmp( argv[i], "--input-file" ) == 0 ) )
+            {
+                input_file = argv[i + 1];
                 ++i;
             }
             else if ( ( strcmp( argv[i], "-e" ) == 0 ) ||
