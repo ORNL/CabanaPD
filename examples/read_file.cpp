@@ -77,11 +77,13 @@ void read_particles( const std::string filename, ParticleType& particles )
         "copy_to_particles", Kokkos::RangePolicy<exec_space>( 0, x.size() ),
         KOKKOS_LAMBDA( const int pid ) {
             // Guard against duplicate points. This threaded loop should be
-            // faster than reading the data on the host.
+            // faster than checking during the host read.
             for ( int p = 0; p < pid; p++ )
             {
-                if ( ( Kokkos::abs( x( p ) - x( pid ) ) < 1e-14 ) &&
-                     ( Kokkos::abs( y( p ) - y( pid ) ) < 1e-14 ) )
+                auto xdiff = x( p ) - x( pid );
+                auto ydiff = y( p ) - y( pid );
+                if ( ( Kokkos::abs( xdiff ) < 1e-14 ) &&
+                     ( Kokkos::abs( ydiff ) < 1e-14 ) )
                     return;
             }
             const std::size_t c = count()++;
