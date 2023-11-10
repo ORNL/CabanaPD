@@ -220,14 +220,27 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
 template <class BCIndexSpace>
 struct BoundaryCondition<BCIndexSpace, ForceSymmetric1dBCTag>
 {
-    double _value;
+    double _value_top;
+    double _value_bottom;
     BCIndexSpace _index_space;
     int _dim;
     double _center;
 
     BoundaryCondition( const double value, BCIndexSpace bc_index_space,
                        const int dim = 1, const double center = 0.0 )
-        : _value( value )
+        : _value_top( value )
+        , _value_bottom( value )
+        , _index_space( bc_index_space )
+        , _dim( dim )
+        , _center( center )
+    {
+    }
+
+    BoundaryCondition( const double value_top, const double value_bottom,
+                       BCIndexSpace bc_index_space, const int dim = 1,
+                       const double center = 0.0 )
+        : _value_top( value_top )
+        , _value_bottom( value_bottom )
         , _index_space( bc_index_space )
         , _dim( dim )
         , _center( center )
@@ -246,15 +259,17 @@ struct BoundaryCondition<BCIndexSpace, ForceSymmetric1dBCTag>
     {
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
-        auto value = _value;
         auto dim = _dim;
         auto center = _center;
+        auto value_top = _value_top;
+        auto value_bottom = _value_bottom;
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
-                auto relative_x = x( pid, dim ) - center;
-                auto sign = std::abs( relative_x ) / relative_x;
-                f( pid, 1 ) += value * sign;
+                if ( x( pid, dim ) > center )
+                    f( pid, dim ) += value_top;
+                else
+                    f( pid, dim ) += value_bottom;
             } );
     }
 };
@@ -291,6 +306,22 @@ auto createBoundaryCondition( ForceSymmetric1dBCTag, ExecSpace exec_space,
         value, bc_indices, dim, center );
 }
 
+// FIXME: relatively large initial guess for allocation.
+template <class BoundaryType, class ExecSpace, class Particles>
+auto createBoundaryCondition( ForceSymmetric1dBCTag, ExecSpace exec_space,
+                              Particles particles,
+                              std::vector<BoundaryType> planes,
+                              const double value_top, const double value_bottom,
+                              const int dim, const double center,
+                              const double initial_guess = 0.5 )
+{
+    using memory_space = typename Particles::memory_space;
+    using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;
+    bc_index_type bc_indices = createBoundaryIndexSpace(
+        exec_space, particles, planes, initial_guess );
+    return BoundaryCondition<bc_index_type, ForceSymmetric1dBCTag>(
+        value_top, value_bottom, bc_indices, dim, center );
+}
 } // namespace CabanaPD
 
 #endif
