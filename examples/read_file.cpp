@@ -66,29 +66,50 @@ void read_particles( const std::string filename, ParticleType& particles )
     auto nofail = particles.sliceNoFail();
     auto damage = particles.sliceDamage();
 
+    // Using atomic memory for the count.
+    using CountView =
+        typename Kokkos::View<int, Kokkos::LayoutRight, memory_space,
+                              Kokkos::MemoryTraits<Kokkos::Atomic>>;
+    CountView count( "count" );
+
     using exec_space = typename memory_space::execution_space;
     Kokkos::parallel_for(
         "copy_to_particles", Kokkos::RangePolicy<exec_space>( 0, x.size() ),
         KOKKOS_LAMBDA( const int pid ) {
+            // Guard against duplicate points. This threaded loop should be
+            // faster than reading the data on the host.
+            for ( int p = 0; p < pid; p++ )
+            {
+                if ( ( Kokkos::abs( x( p ) - x( pid ) ) < 1e-14 ) &&
+                     ( Kokkos::abs( y( p ) - y( pid ) ) < 1e-14 ) )
+                    return;
+            }
+            const std::size_t c = count()++;
+
             // Set the particle position and volume.
-            pvol( pid ) = vol( pid );
-            px( pid, 0 ) = x( pid );
-            px( pid, 1 ) = y( pid );
+            pvol( c ) = vol( pid );
+            px( c, 0 ) = x( pid );
+            px( c, 1 ) = y( pid );
 
             // Initialize everything else to zero.
             // Currently psuedo-2d.
-            px( pid, 2 ) = 0.0;
+            px( c, 2 ) = 0.0;
             for ( int d = 0; d < 3; d++ )
             {
-                u( pid, d ) = 0.0;
-                v( pid, d ) = 0.0;
-                f( pid, d ) = 0.0;
+                u( c, d ) = 0.0;
+                v( c, d ) = 0.0;
+                f( c, d ) = 0.0;
             }
-            type( pid ) = 0;
-            nofail( pid ) = 0;
-            rho( pid ) = 1.0;
-            damage( pid ) = 0;
+            type( c ) = 0;
+            nofail( c ) = 0;
+            rho( c ) = 1.0;
+            damage( c ) = 0;
         } );
+
+    int final_count = 0;
+    Kokkos::deep_copy( final_count, count );
+    if ( final_count < static_cast<int>( x.size() ) )
+        particles.resize( final_count, 0 );
 }
 
 int main( int argc, char* argv[] )
@@ -102,9 +123,9 @@ int main( int argc, char* argv[] )
         using memory_space = typename exec_space::memory_space;
 
         // Time
-        double t_final = 1e-6;
-        double dt = 1e-9;
-        double output_frequency = 10;
+        double t_final = 1.0;
+        double dt = 1e-7;
+        double output_frequency = 100;
 
         // Material constants
         double E = 72e+9;                      // [Pa]
