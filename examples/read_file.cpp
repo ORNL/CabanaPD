@@ -123,7 +123,8 @@ int main( int argc, char* argv[] )
         using memory_space = typename exec_space::memory_space;
 
         // Time
-        double t_final = 1.0;
+        double t_final = 1e-1;
+        double t_ramp = 1e-3;
         double dt = 1e-7;
         double output_frequency = 100;
 
@@ -184,9 +185,9 @@ int main( int argc, char* argv[] )
         int bc_dim = 1;
         double center = particles->local_mesh_ext[bc_dim] / 2.0 +
                         particles->local_mesh_lo[bc_dim];
-        auto bc = createBoundaryCondition( CabanaPD::ForceSymmetric1dBCTag{},
-                                           exec_space{}, *particles, planes,
-                                           2e4, 0.0, bc_dim, center );
+        auto bc = createBoundaryCondition(
+            CabanaPD::ForceSymmetric1dBCTag{}, exec_space{}, *particles, planes,
+            2e4, 0.0, bc_dim, center, 0.0, t_ramp );
 
         auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
             inputs, particles, force_model, bc, prenotch );

@@ -106,9 +106,11 @@ int main( int argc, char* argv[] )
         CabanaPD::RegionBoundary plane2( low_x, high_x, high_y - dy,
                                          high_y + dy, low_z, high_z );
         std::vector<CabanaPD::RegionBoundary> planes = { plane1, plane2 };
-        auto bc =
-            createBoundaryCondition( CabanaPD::ForceSymmetric1dBCTag{},
-                                     exec_space{}, *particles, planes, b0 );
+        int bc_dim = 1;
+        double center = 0.0;
+        auto bc = createBoundaryCondition( CabanaPD::ForceSymmetric1dBCTag{},
+                                           exec_space{}, *particles, planes, b0,
+                                           bc_dim, center );
 
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {

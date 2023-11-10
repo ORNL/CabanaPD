@@ -398,12 +398,12 @@ class SolverFracture
         if ( force_bc )
         {
             auto f = particles->sliceForce();
-            boundary_condition.apply( exec_space(), f, x );
+            boundary_condition.apply( exec_space(), f, x, 0.0 );
         }
         else
         {
             auto u = particles->sliceDisplacement();
-            boundary_condition.apply( exec_space(), u, x );
+            boundary_condition.apply( exec_space(), u, x, 0.0 );
         }
         particles->output( 0, 0.0, output_reference );
         init_time += init_timer.seconds();
@@ -450,15 +450,16 @@ class SolverFracture
             // Add boundary condition.
             auto x = particles->sliceReferencePosition();
             // FIXME: this needs to be generalized to any field.
+            auto time = step * inputs->timestep;
             if ( force_bc )
             {
                 auto f = particles->sliceForce();
-                boundary_condition.apply( exec_space(), f, x );
+                boundary_condition.apply( exec_space(), f, x, time );
             }
             else
             {
                 auto u = particles->sliceDisplacement();
-                boundary_condition.apply( exec_space(), u, x );
+                boundary_condition.apply( exec_space(), u, x, time );
             }
 
             // Integrate - velocity Verlet second half.
