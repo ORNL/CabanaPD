@@ -32,40 +32,41 @@ int main( int argc, char* argv[] )
         CabanaPD::Inputs inputs( argv[1] );
 
         // Material constants
-        double E = inputs["elastic_modulus"]["value"];  
-        double nu = 1.0 / 3.0;                       
-        double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) ); 
-        double rho0 = inputs["density"]["value"];       
+        double E = inputs["elastic_modulus"]["value"];
+        double nu = 1.0 / 3.0;
+        double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) );
+        double rho0 = inputs["density"]["value"];
         double G0 = inputs["fracture_energy"]["value"];
         // double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
 
         // PD horizon
-        double delta = inputs["horizon"]["value"]; 
-        delta += 1e-10; 
+        double delta = inputs["horizon"]["value"];
+        delta += 1e-10;
 
         // Impactor velocity
-        double v0 = inputs["impactor_velocity"]["value"];   
+        double v0 = inputs["impactor_velocity"]["value"];
 
-        // FIXME: set halo width based on delta  
-        std::array<double, 3> low_corner = inputs["low_corner"];
-        std::array<double, 3> high_corner = inputs["high_corner"];
-        std::array<int, 3> num_cells = inputs["num_cells"];
+        // FIXME: set halo width based on delta
+        std::array<double, 3> low_corner = inputs["low_corner"]["value"];
+        std::array<double, 3> high_corner = inputs["high_corner"]["value"];
+        std::array<int, 3> num_cells = inputs["num_cells"]["value"];
         int m = std::floor(
             delta / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
-        int halo_width = m + 1; // Just to be safe.        
+        int halo_width = m + 1; // Just to be safe.
 
         // Prenotches
-        double height = inputs["system_size"]["value"][0];
-        double width = inputs["system_size"]["value"][1];
-        double thickness = inputs["system_size"][2];
+        std::array<double, 3> system_size = inputs["system_size"]["value"];
+        double height = system_size[0];
+        double width = system_size[1];
+        double thickness = system_size[2];
         double L_prenotch = height / 2.0;
         double y_prenotch1 = -width / 8.0;
         double y_prenotch2 = width / 8.0;
-        double low_x = inputs["low_corner"][0];
-        double low_z = inputs["low_corner"][2];
+        double low_x = low_corner[0];
+        double low_z = low_corner[2];
         Kokkos::Array<double, 3> p01 = { low_x, y_prenotch1, low_z };
         Kokkos::Array<double, 3> p02 = { low_x, y_prenotch2, low_z };
-        Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 }; 
+        Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
         Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
         Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { p01,
                                                                        p02 };

@@ -125,8 +125,8 @@ class SolverElastic
         init_timer.reset();
 
         num_steps = inputs["num_steps"];
-        output_frequency = inputs["output_frequency"];
-        output_reference = inputs["output_reference"];
+        output_frequency = inputs["output_frequency"]["value"];
+        output_reference = inputs["output_reference"]["value"];
 
         // Create integrator.
         // FIXME: hardcoded.

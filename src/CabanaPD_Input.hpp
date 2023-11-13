@@ -33,8 +33,8 @@ class Inputs
         for ( std::size_t d = 0; d < size.size(); d++ )
         {
             double s = size[d];
-            inputs["low_corner"][d] = -0.5 * s;
-            inputs["high_corner"][d] = 0.5 * s;
+            inputs["low_corner"]["value"][d] = -0.5 * s;
+            inputs["high_corner"]["value"][d] = 0.5 * s;
         }
         // Number of steps.
         double tf = inputs["final_time"]["value"];
