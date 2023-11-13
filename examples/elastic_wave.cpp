@@ -31,12 +31,18 @@ int main( int argc, char* argv[] )
 
         CabanaPD::Inputs inputs( argv[1] );
 
-        double K = 1.0;
-        double G = 0.5;
-        double delta = 0.075;
-        std::array<double, 3> low_corner = inputs["low_corner"];
-        std::array<double, 3> high_corner = inputs["high_corner"];
-        std::array<int, 3> num_cells = inputs["num_cells"];
+        double K = inputs["bulk_modulus"]["value"];
+        double G = inputs["shear_modulus"]["value"];
+        double rho0 = inputs["density"]["value"]; 
+
+        // PD horizon
+        double delta = inputs["horizon"]["value"]; 
+        delta += 1e-10; 
+
+        // FIXME: set halo width based on delta
+        std::array<double, 3> low_corner = inputs["low_corner"]["value"];
+        std::array<double, 3> high_corner = inputs["high_corner"]["value"];
+        std::array<int, 3> num_cells = inputs["num_cells"]["value"];
         int m = std::floor(
             delta / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
         int halo_width = m + 1; // Just to be safe.
@@ -79,7 +85,7 @@ int main( int argc, char* argv[] )
                 u( pid, d ) = a * std::exp( -arg ) * comp;
                 v( pid, d ) = 0.0;
             }
-            rho( pid ) = 100.0;
+            rho( pid ) = rho0;
         };
         particles->updateParticles( exec_space{}, init_functor );
 

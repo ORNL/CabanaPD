@@ -39,19 +39,20 @@ int main( int argc, char* argv[] )
         double G0 = inputs["fracture_energy"]["value"];
 
         // PD horizon
-        double delta = inputs["horizon"]["value"];  + 1e-10; 
+        double delta = inputs["horizon"]["value"]; 
+        delta += 1e-10; 
 
         // FIXME: set halo width based on delta
-        std::array<double, 3> low_corner = inputs["low_corner"];
-        std::array<double, 3> high_corner = inputs["high_corner"];
-        std::array<int, 3> num_cells = inputs["num_cells"];
+        std::array<double, 3> low_corner = inputs["low_corner"]["value"];
+        std::array<double, 3> high_corner = inputs["high_corner"]["value"];
+        std::array<int, 3> num_cells = inputs["num_cells"]["value"];
         int m = std::floor(
             delta / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
-        int halo_width = m + 1;
+        int halo_width = m + 1; // Just to be safe.
 
         // Prenotch
-        double height = inputs["system_size"][0];
-        double thickness = inputs["system_size"][2];
+        double height = inputs["system_size"]["value"][0];
+        double thickness = inputs["system_size"]["value"][2];
         double L_prenotch = height / 2.0;
         double y_prenotch1 = 0.0;
         Kokkos::Array<double, 3> p01 = { low_corner[0], y_prenotch1,
@@ -81,7 +82,8 @@ int main( int argc, char* argv[] )
 
         // Relying on uniform grid here
         double dy = particles->dx[1];
-        double b0 = inputs["traction"]["value"] / dy; 
+        double sigma0 = inputs["traction"]["value"]; 
+        double b0 = sigma0 / dy; 
 
         CabanaPD::RegionBoundary plane1(
             low_corner[0], high_corner[0], low_corner[1] - dy,

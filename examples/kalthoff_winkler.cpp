@@ -32,35 +32,44 @@ int main( int argc, char* argv[] )
         CabanaPD::Inputs inputs( argv[1] );
 
         // Material constants
-        double E = 191e+9;                           // [Pa]
-        double nu = 1.0 / 3.0;                       // unitless
-        double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) ); // [Pa]
-        double rho0 = 8000;                          // [kg/m^3]
-        double G0 = 42408;                           // [J/m^2]
+        double E = inputs["elastic_modulus"]["value"];  
+        double nu = 1.0 / 3.0;                       
+        double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) ); 
+        double rho0 = inputs["density"]["value"];       
+        double G0 = inputs["fracture_energy"]["value"];
         // double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
 
-        double v0 = 16;              // [m/sec] (Half impactor's velocity)
-        double L_prenotch = 0.05;    // [m] (50 mm)
-        double y_prenotch1 = -0.025; // [m] (-25 mm)
-        double y_prenotch2 = 0.025;  // [m] ( 25 mm)
-        double low_x = inputs["low_corner"][0];
-        double low_z = inputs["low_corner"][2];
-        Kokkos::Array<double, 3> p01 = { low_x, y_prenotch1, low_z };
-        Kokkos::Array<double, 3> p02 = { low_x, y_prenotch2, low_z };
-        Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
-        double thickness = inputs["system_size"][2];
-        Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-        Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { p01,
-                                                                       p02 };
-        CabanaPD::Prenotch<2> prenotch( v1, v2, notch_positions );
+        // PD horizon
+        double delta = inputs["horizon"]["value"]; 
+        delta += 1e-10; 
 
-        double delta = 0.0020000001;
+        // Impactor velocity
+        double v0 = inputs["impactor_velocity"]["value"];   
+
+        // FIXME: set halo width based on delta  
         std::array<double, 3> low_corner = inputs["low_corner"];
         std::array<double, 3> high_corner = inputs["high_corner"];
         std::array<int, 3> num_cells = inputs["num_cells"];
         int m = std::floor(
             delta / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
-        int halo_width = m + 1; // Just to be safe.
+        int halo_width = m + 1; // Just to be safe.        
+
+        // Prenotches
+        double height = inputs["system_size"]["value"][0];
+        double width = inputs["system_size"]["value"][1];
+        double thickness = inputs["system_size"][2];
+        double L_prenotch = height / 2.0;
+        double y_prenotch1 = -width / 8.0;
+        double y_prenotch2 = width / 8.0;
+        double low_x = inputs["low_corner"][0];
+        double low_z = inputs["low_corner"][2];
+        Kokkos::Array<double, 3> p01 = { low_x, y_prenotch1, low_z };
+        Kokkos::Array<double, 3> p02 = { low_x, y_prenotch2, low_z };
+        Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 }; 
+        Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
+        Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { p01,
+                                                                       p02 };
+        CabanaPD::Prenotch<2> prenotch( v1, v2, notch_positions );
 
         // Choose force model type.
         using model_type =
@@ -83,8 +92,6 @@ int main( int argc, char* argv[] )
         auto rho = particles->sliceDensity();
 
         double dx = particles->dx[0];
-
-        double height = inputs["system_size"][0];
         double x_bc = -0.5 * height;
         CabanaPD::RegionBoundary plane(
             x_bc - dx, x_bc + dx * 1.25, y_prenotch1 - dx * 0.25,
