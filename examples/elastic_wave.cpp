@@ -34,11 +34,11 @@ int main( int argc, char* argv[] )
         // Material constants
         double K = inputs["bulk_modulus"]["value"];
         double G = inputs["shear_modulus"]["value"];
-        double rho0 = inputs["density"]["value"]; 
+        double rho0 = inputs["density"]["value"];
 
         // PD horizon
-        double delta = inputs["horizon"]["value"]; 
-        delta += 1e-10; 
+        double delta = inputs["horizon"]["value"];
+        delta += 1e-10;
 
         // FIXME: set halo width based on delta
         std::array<double, 3> low_corner = inputs["low_corner"]["value"];
