@@ -31,6 +31,7 @@ int main( int argc, char* argv[] )
 
         CabanaPD::Inputs inputs( argv[1] );
 
+        // Material constants
         double K = inputs["bulk_modulus"]["value"];
         double G = inputs["shear_modulus"]["value"];
         double rho0 = inputs["density"]["value"]; 
