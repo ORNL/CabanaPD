@@ -30,13 +30,14 @@ class Inputs
 
         // Add additional derived inputs to json. System size.
         auto size = inputs["system_size"]["value"];
+        std::string size_unit = inputs["system_size"]["unit"];
         for ( std::size_t d = 0; d < size.size(); d++ )
         {
             double s = size[d];
             inputs["low_corner"]["value"][d] = -0.5 * s;
-            inputs["low_corner"]["unit"][d] =  inputs["system_size"]["unit"];
+            inputs["low_corner"]["unit"][d] = size_unit;
             inputs["high_corner"]["value"][d] = 0.5 * s;
-            inputs["high_corner"]["unit"][d] =  inputs["system_size"]["unit"];
+            inputs["high_corner"]["unit"][d] = size_unit;
         }
         // Number of steps.
         double tf = inputs["final_time"]["value"];
