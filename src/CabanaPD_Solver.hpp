@@ -527,50 +527,6 @@ auto createSolverFracture( InputsType inputs,
                                                prenotch );
 }
 
-/*
-template <class MemorySpace, class ForceModel>
-std::shared_ptr<SolverBase> createSolver( Inputs inputs,
-                                          Particles<MemorySpace> particles )
-{
-    std::string device_type = inputs.device_type;
-    if ( device_type.compare( "SERIAL" ) == 0 )
-    {
-#ifdef KOKKOS_ENABLE_SERIAL
-        return std::make_shared<Solver<
-            Kokkos::Device<Kokkos::Serial, Kokkos::HostSpace>, ForceModel>>(
-            inputs, particles );
-#endif
-    }
-    else if ( device_type.compare( "OPENMP" ) == 0 )
-    {
-#ifdef KOKKOS_ENABLE_OPENMP
-        return std::make_shared<Solver<
-            Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace>, ForceModel>>(
-            inputs, particles );
-#endif
-    }
-    else if ( device_type.compare( "CUDA" ) == 0 )
-    {
-#ifdef KOKKOS_ENABLE_CUDA
-        return std::make_shared<Solver<
-            Kokkos::Device<Kokkos::Cuda, Kokkos::CudaSpace>, ForceModel>>(
-            inputs, particles );
-#endif
-    }
-    else if ( device_type.compare( "HIP" ) == 0 )
-    {
-#ifdef KOKKOS_ENABLE_HIP
-        return std::make_shared<
-            Solver<Kokkos::Device<Kokkos::Experimental::HIP,
-                                  Kokkos::Experimental::HIPSpace>,
-                   ForceModel>>( inputs, particles );
-#endif
-    }
-
-    log_err( std::cout, "Unknown backend: ", device_type );
-    return nullptr;
-}
-*/
 } // namespace CabanaPD
 
 #endif

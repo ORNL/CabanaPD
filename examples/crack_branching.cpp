@@ -105,7 +105,6 @@ int main( int argc, char* argv[] )
         };
         particles->updateParticles( exec_space{}, init_functor );
 
-        // FIXME: use createSolver to switch backend at runtime.
         auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
             inputs, particles, force_model, bc, prenotch );
         cabana_pd->init_force();
