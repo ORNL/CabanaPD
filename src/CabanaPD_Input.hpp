@@ -76,6 +76,15 @@ class Inputs
     // Get a single input.
     auto operator[]( std::string label ) { return inputs[label]["value"]; }
 
+    // Get a single input.
+    std::string units( std::string label )
+    {
+        if ( inputs[label].contains( "units" ) )
+            return inputs[label]["units"];
+        else
+            return "";
+    }
+
     // Check a key exists.
     bool contains( std::string label ) { return inputs.contains( label ); }
 
