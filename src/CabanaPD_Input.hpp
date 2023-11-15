@@ -40,27 +40,27 @@ class Inputs
         double tf = inputs["final_time"]["value"];
         double dt = inputs["timestep"]["value"];
         int num_steps = tf / dt;
-        inputs["num_steps"] = num_steps;
+        inputs["num_steps"]["value"] = num_steps;
 
         // Output files.
         if ( !inputs.contains( "output_file" ) )
-            inputs["output_file"] = "cabanaPD.out";
+            inputs["output_file"]["value"] = "cabanaPD.out";
         if ( !inputs.contains( "error_file" ) )
-            inputs["error_file"] = "cabanaPD.err";
-        inputs["input_file"] = filename;
+            inputs["error_file"]["value"] = "cabanaPD.err";
+        inputs["input_file"]["value"] = filename;
 
         // Save inputs (including derived) to new file.
         std::string input_file = "cabanaPD.in.json";
         if ( !inputs.contains( "exported_input_file" ) )
-            inputs["exported_input_file"] = input_file;
+            inputs["exported_input_file"]["value"] = input_file;
         std::ofstream in( input_file );
         in << inputs;
 
         if ( !inputs.contains( "output_reference" ) )
-            inputs["output_reference"] = true;
+            inputs["output_reference"]["value"] = true;
 
         // Not yet a user option.
-        inputs["half_neigh"] = false;
+        inputs["half_neigh"]["value"] = false;
     }
     ~Inputs() {}
 
@@ -72,7 +72,7 @@ class Inputs
     }
 
     // Get a single input.
-    auto operator[]( std::string label ) { return inputs[label]; }
+    auto operator[]( std::string label ) { return inputs[label]["value"]; }
 
     // Check a key exists.
     bool contains( std::string label ) { return inputs.contains( label ); }

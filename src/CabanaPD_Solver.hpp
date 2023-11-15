@@ -124,7 +124,7 @@ class SolverElastic
         total_timer.reset();
         init_timer.reset();
 
-        num_steps = inputs["num_steps"];
+        num_steps = inputs["num_steps"]["value"];
         output_frequency = inputs["output_frequency"]["value"];
         output_reference = inputs["output_reference"]["value"];
 
@@ -150,8 +150,8 @@ class SolverElastic
         int max_neighbors =
             Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
 
-        force =
-            std::make_shared<force_type>( inputs["half_neigh"], force_model );
+        force = std::make_shared<force_type>( inputs["half_neigh"]["value"],
+                                              force_model );
 
         print = print_rank();
         if ( print )
@@ -160,9 +160,9 @@ class SolverElastic
                  ", Maximum local neighbors: ", max_neighbors );
             log( std::cout, "#Timestep/Total-steps Simulation-time" );
 
-            output_file = inputs["output_file"];
+            output_file = inputs["output_file"]["value"];
             std::ofstream out( output_file, std::ofstream::app );
-            error_file = inputs["error_file"];
+            error_file = inputs["error_file"]["value"];
             std::ofstream err( error_file, std::ofstream::app );
 
             auto time = std::chrono::system_clock::to_time_t(
