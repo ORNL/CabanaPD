@@ -80,7 +80,6 @@ int main( int argc, char* argv[] )
         auto rho = particles->sliceDensity();
         auto nofail = particles->sliceNoFail();
 
-        // Relying on uniform grid here
         double dy = particles->dx[1];
         double sigma0 = inputs["traction"]["value"];
         double b0 = sigma0 / dy;
