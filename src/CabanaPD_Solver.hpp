@@ -129,7 +129,6 @@ class SolverElastic
         output_reference = inputs["output_reference"]["value"];
 
         // Create integrator.
-        // FIXME: hardcoded.
         dt = inputs["timestep"]["value"];
         integrator = std::make_shared<integrator_type>( dt );
 
