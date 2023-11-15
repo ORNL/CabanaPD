@@ -32,30 +32,30 @@ int main( int argc, char* argv[] )
         CabanaPD::Inputs inputs( argv[1] );
 
         // Material constants
-        double E = inputs["elastic_modulus"]["value"];
+        double E = inputs["elastic_modulus"];
         double nu = 1.0 / 3.0;
         double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) );
-        double rho0 = inputs["density"]["value"];
-        double G0 = inputs["fracture_energy"]["value"];
+        double rho0 = inputs["density"];
+        double G0 = inputs["fracture_energy"];
         // double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
 
         // PD horizon
-        double delta = inputs["horizon"]["value"];
+        double delta = inputs["horizon"];
         delta += 1e-10;
 
         // Impactor velocity
-        double v0 = inputs["impactor_velocity"]["value"];
+        double v0 = inputs["impactor_velocity"];
 
         // FIXME: set halo width based on delta
-        std::array<double, 3> low_corner = inputs["low_corner"]["value"];
-        std::array<double, 3> high_corner = inputs["high_corner"]["value"];
-        std::array<int, 3> num_cells = inputs["num_cells"]["value"];
+        std::array<double, 3> low_corner = inputs["low_corner"];
+        std::array<double, 3> high_corner = inputs["high_corner"];
+        std::array<int, 3> num_cells = inputs["num_cells"];
         int m = std::floor(
             delta / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
         int halo_width = m + 1; // Just to be safe.
 
         // Prenotches
-        std::array<double, 3> system_size = inputs["system_size"]["value"];
+        std::array<double, 3> system_size = inputs["system_size"];
         double height = system_size[0];
         double width = system_size[1];
         double thickness = system_size[2];

@@ -124,12 +124,12 @@ class SolverElastic
         total_timer.reset();
         init_timer.reset();
 
-        num_steps = inputs["num_steps"]["value"];
-        output_frequency = inputs["output_frequency"]["value"];
-        output_reference = inputs["output_reference"]["value"];
+        num_steps = inputs["num_steps"];
+        output_frequency = inputs["output_frequency"];
+        output_reference = inputs["output_reference"];
 
         // Create integrator.
-        dt = inputs["timestep"]["value"];
+        dt = inputs["timestep"];
         integrator = std::make_shared<integrator_type>( dt );
 
         // Add ghosts from other MPI ranks.
@@ -149,8 +149,8 @@ class SolverElastic
         int max_neighbors =
             Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
 
-        force = std::make_shared<force_type>( inputs["half_neigh"]["value"],
-                                              force_model );
+        force =
+            std::make_shared<force_type>( inputs["half_neigh"], force_model );
 
         print = print_rank();
         if ( print )
@@ -159,9 +159,9 @@ class SolverElastic
                  ", Maximum local neighbors: ", max_neighbors );
             log( std::cout, "#Timestep/Total-steps Simulation-time" );
 
-            output_file = inputs["output_file"]["value"];
+            output_file = inputs["output_file"];
             std::ofstream out( output_file, std::ofstream::app );
-            error_file = inputs["error_file"]["value"];
+            error_file = inputs["error_file"];
             std::ofstream err( error_file, std::ofstream::app );
 
             auto time = std::chrono::system_clock::to_time_t(

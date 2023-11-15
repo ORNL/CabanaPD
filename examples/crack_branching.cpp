@@ -32,27 +32,27 @@ int main( int argc, char* argv[] )
         CabanaPD::Inputs inputs( argv[1] );
 
         // Material constants
-        double E = inputs["elastic_modulus"]["value"];
+        double E = inputs["elastic_modulus"];
         double nu = 0.25;
         double K = E / ( 3 * ( 1 - 2 * nu ) );
-        double rho0 = inputs["density"]["value"];
-        double G0 = inputs["fracture_energy"]["value"];
+        double rho0 = inputs["density"];
+        double G0 = inputs["fracture_energy"];
 
         // PD horizon
-        double delta = inputs["horizon"]["value"];
+        double delta = inputs["horizon"];
         delta += 1e-10;
 
         // FIXME: set halo width based on delta
-        std::array<double, 3> low_corner = inputs["low_corner"]["value"];
-        std::array<double, 3> high_corner = inputs["high_corner"]["value"];
-        std::array<int, 3> num_cells = inputs["num_cells"]["value"];
+        std::array<double, 3> low_corner = inputs["low_corner"];
+        std::array<double, 3> high_corner = inputs["high_corner"];
+        std::array<int, 3> num_cells = inputs["num_cells"];
         int m = std::floor(
             delta / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
         int halo_width = m + 1; // Just to be safe.
 
         // Prenotch
-        double height = inputs["system_size"]["value"][0];
-        double thickness = inputs["system_size"]["value"][2];
+        double height = inputs["system_size"][0];
+        double thickness = inputs["system_size"][2];
         double L_prenotch = height / 2.0;
         double y_prenotch1 = 0.0;
         Kokkos::Array<double, 3> p01 = { low_corner[0], y_prenotch1,
@@ -81,7 +81,7 @@ int main( int argc, char* argv[] )
         auto nofail = particles->sliceNoFail();
 
         double dy = particles->dx[1];
-        double sigma0 = inputs["traction"]["value"];
+        double sigma0 = inputs["traction"];
         double b0 = sigma0 / dy;
 
         CabanaPD::RegionBoundary plane1(
