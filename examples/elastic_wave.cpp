@@ -25,22 +25,26 @@ int main( int argc, char* argv[] )
     {
         Kokkos::ScopeGuard scope_guard( argc, argv );
 
-        // FIXME: change backend at compile time for now.
         using exec_space = Kokkos::DefaultExecutionSpace;
         using memory_space = typename exec_space::memory_space;
 
-        std::array<int, 3> num_cell = { 41, 41, 41 };
-        std::array<double, 3> low_corner = { -0.5, -0.5, -0.5 };
-        std::array<double, 3> high_corner = { 0.5, 0.5, 0.5 };
-        double t_final = 0.6;
-        double dt = 0.01;
-        int output_frequency = 5;
-        bool output_reference = true;
-        double K = 1.0;
-        double G = 0.5;
-        double delta = 0.075;
+        CabanaPD::Inputs inputs( argv[1] );
+
+        // Material constants
+        auto K = inputs["bulk_modulus"];
+        double G = inputs["shear_modulus"];
+        double rho0 = inputs["density"];
+
+        // PD horizon
+        double delta = inputs["horizon"];
+        delta += 1e-10;
+
+        // FIXME: set halo width based on delta
+        std::array<double, 3> low_corner = inputs["low_corner"];
+        std::array<double, 3> high_corner = inputs["high_corner"];
+        std::array<int, 3> num_cells = inputs["num_cells"];
         int m = std::floor(
-            delta / ( ( high_corner[0] - low_corner[0] ) / num_cell[0] ) );
+            delta / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
         int halo_width = m + 1; // Just to be safe.
 
         // Choose force model type.
@@ -51,16 +55,11 @@ int main( int argc, char* argv[] )
             CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::Elastic>;
         model_type force_model( delta, K, G );
 
-        CabanaPD::Inputs<3> inputs( num_cell, low_corner, high_corner, t_final,
-                                    dt, output_frequency, output_reference );
-        inputs.read_args( argc, argv );
-
         // Create particles from mesh.
         // Does not set displacements, velocities, etc.
         auto particles = std::make_shared<
             CabanaPD::Particles<memory_space, typename model_type::base_model>>(
-            exec_space(), inputs.low_corner, inputs.high_corner,
-            inputs.num_cells, halo_width );
+            exec_space(), low_corner, high_corner, num_cells, halo_width );
 
         // Define particle initialization.
         auto x = particles->sliceReferencePosition();
@@ -86,7 +85,7 @@ int main( int argc, char* argv[] )
                 u( pid, d ) = a * std::exp( -arg ) * comp;
                 v( pid, d ) = 0.0;
             }
-            rho( pid ) = 100.0;
+            rho( pid ) = rho0;
         };
         particles->updateParticles( exec_space{}, init_functor );
 
@@ -97,7 +96,7 @@ int main( int argc, char* argv[] )
 
         x = particles->sliceReferencePosition();
         u = particles->sliceDisplacement();
-        double num_cell_x = inputs.num_cells[0];
+        int num_cell_x = num_cells[0];
         auto profile = Kokkos::View<double* [2], memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "displacement_profile" ),
             num_cell_x );

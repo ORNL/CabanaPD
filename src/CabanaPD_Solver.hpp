@@ -112,8 +112,8 @@ class SolverElastic
     SolverElastic( input_type _inputs,
                    std::shared_ptr<particle_type> _particles,
                    force_model_type force_model )
-        : particles( _particles )
-        , inputs( std::make_shared<input_type>( _inputs ) )
+        : inputs( _inputs )
+        , particles( _particles )
     {
         force_time = 0;
         integrate_time = 0;
@@ -124,12 +124,13 @@ class SolverElastic
         total_timer.reset();
         init_timer.reset();
 
-        num_steps = inputs->num_steps;
-        output_frequency = inputs->output_frequency;
-        output_reference = inputs->output_reference;
+        num_steps = inputs["num_steps"];
+        output_frequency = inputs["output_frequency"];
+        output_reference = inputs["output_reference"];
 
         // Create integrator.
-        integrator = std::make_shared<integrator_type>( inputs->timestep );
+        dt = inputs["timestep"];
+        integrator = std::make_shared<integrator_type>( dt );
 
         // Add ghosts from other MPI ranks.
         comm = std::make_shared<comm_type>( *particles );
@@ -148,7 +149,8 @@ class SolverElastic
         int max_neighbors =
             Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
 
-        force = std::make_shared<force_type>( inputs->half_neigh, force_model );
+        force =
+            std::make_shared<force_type>( inputs["half_neigh"], force_model );
 
         print = print_rank();
         if ( print )
@@ -157,8 +159,10 @@ class SolverElastic
                  ", Maximum local neighbors: ", max_neighbors );
             log( std::cout, "#Timestep/Total-steps Simulation-time" );
 
-            std::ofstream out( inputs->output_file, std::ofstream::app );
-            std::ofstream err( inputs->error_file, std::ofstream::app );
+            output_file = inputs["output_file"];
+            std::ofstream out( output_file, std::ofstream::app );
+            error_file = inputs["error_file"];
+            std::ofstream err( error_file, std::ofstream::app );
 
             auto time = std::chrono::system_clock::to_time_t(
                 std::chrono::system_clock::now() );
@@ -238,8 +242,8 @@ class SolverElastic
                                         neigh_iter_tag() );
 
                 step_output( step, W );
-                particles->output( step / output_frequency,
-                                   step * inputs->timestep, output_reference );
+                particles->output( step / output_frequency, step * dt,
+                                   output_reference );
             }
             other_time += other_timer.seconds();
         }
@@ -251,7 +255,7 @@ class SolverElastic
     void init_output()
     {
         // Output after construction and initial forces.
-        std::ofstream out( inputs->output_file, std::ofstream::app );
+        std::ofstream out( output_file, std::ofstream::app );
         log( out, "Init-Time(s): ", init_time, "\n" );
         log( out, "#Timestep/Total-steps Simulation-time Total-strain-energy "
                   "Run-Time(s) Force-Time(s) Comm-Time(s) Int-Time(s) "
@@ -262,18 +266,18 @@ class SolverElastic
     {
         if ( print )
         {
-            std::ofstream out( inputs->output_file, std::ofstream::app );
+            std::ofstream out( output_file, std::ofstream::app );
             log( std::cout, step, "/", num_steps, " ", std::scientific,
-                 std::setprecision( 2 ), step * inputs->timestep );
+                 std::setprecision( 2 ), step * dt );
 
             total_time = total_timer.seconds();
             double rate = 1.0 * particles->n_global * output_frequency /
                           ( total_time - last_time );
             log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
-                 " ", std::scientific, std::setprecision( 2 ),
-                 step * inputs->timestep, " ", W, " ", std::fixed, total_time,
-                 " ", force_time, " ", comm_time, " ", integrate_time, " ",
-                 other_time, " ", std::scientific, rate );
+                 " ", std::scientific, std::setprecision( 2 ), step * dt, " ",
+                 W, " ", std::fixed, total_time, " ", force_time, " ",
+                 comm_time, " ", integrate_time, " ", other_time, " ",
+                 std::scientific, rate );
             last_time = total_time;
             out.close();
         }
@@ -283,7 +287,7 @@ class SolverElastic
     {
         if ( print )
         {
-            std::ofstream out( inputs->output_file, std::ofstream::app );
+            std::ofstream out( output_file, std::ofstream::app );
             total_time = total_timer.seconds();
             double steps_per_sec = 1.0 * num_steps / total_time;
             double p_steps_per_sec = particles->n_global * steps_per_sec;
@@ -307,14 +311,18 @@ class SolverElastic
     int num_steps;
     int output_frequency;
     bool output_reference;
+    double dt;
 
   protected:
+    input_type inputs;
     std::shared_ptr<particle_type> particles;
-    std::shared_ptr<input_type> inputs;
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
     std::shared_ptr<neighbor_type> neighbors;
+
+    std::string output_file;
+    std::string error_file;
 
     double total_time;
     double force_time;
@@ -451,8 +459,8 @@ class SolverFracture
                                         neigh_iter_tag() );
 
                 this->step_output( step, W );
-                particles->output( step / output_frequency,
-                                   step * inputs->timestep, output_reference );
+                particles->output( step / output_frequency, step * dt,
+                                   output_reference );
             }
             other_time += other_timer.seconds();
         }
@@ -461,6 +469,7 @@ class SolverFracture
         this->final_output();
     }
 
+    using base_type::dt;
     using base_type::num_steps;
     using base_type::output_frequency;
     using base_type::output_reference;
@@ -518,50 +527,6 @@ auto createSolverFracture( InputsType inputs,
                                                prenotch );
 }
 
-/*
-template <class MemorySpace, class ForceModel>
-std::shared_ptr<SolverBase> createSolver( Inputs inputs,
-                                          Particles<MemorySpace> particles )
-{
-    std::string device_type = inputs.device_type;
-    if ( device_type.compare( "SERIAL" ) == 0 )
-    {
-#ifdef KOKKOS_ENABLE_SERIAL
-        return std::make_shared<Solver<
-            Kokkos::Device<Kokkos::Serial, Kokkos::HostSpace>, ForceModel>>(
-            inputs, particles );
-#endif
-    }
-    else if ( device_type.compare( "OPENMP" ) == 0 )
-    {
-#ifdef KOKKOS_ENABLE_OPENMP
-        return std::make_shared<Solver<
-            Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace>, ForceModel>>(
-            inputs, particles );
-#endif
-    }
-    else if ( device_type.compare( "CUDA" ) == 0 )
-    {
-#ifdef KOKKOS_ENABLE_CUDA
-        return std::make_shared<Solver<
-            Kokkos::Device<Kokkos::Cuda, Kokkos::CudaSpace>, ForceModel>>(
-            inputs, particles );
-#endif
-    }
-    else if ( device_type.compare( "HIP" ) == 0 )
-    {
-#ifdef KOKKOS_ENABLE_HIP
-        return std::make_shared<
-            Solver<Kokkos::Device<Kokkos::Experimental::HIP,
-                                  Kokkos::Experimental::HIPSpace>,
-                   ForceModel>>( inputs, particles );
-#endif
-    }
-
-    log_err( std::cout, "Unknown backend: ", device_type );
-    return nullptr;
-}
-*/
 } // namespace CabanaPD
 
 #endif

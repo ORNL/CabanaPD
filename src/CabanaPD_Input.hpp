@@ -12,102 +12,85 @@
 #ifndef INPUTS_H
 #define INPUTS_H
 
+#include <fstream>
+#include <iostream>
 #include <string>
 
-#include <CabanaPD_Output.hpp>
+#include <nlohmann/json.hpp>
 
 namespace CabanaPD
 {
-template <int Dim = 3>
 class Inputs
 {
   public:
-    std::string output_file = "cabanaPD.out";
-    std::string error_file = "cabanaPD.err";
-    std::string device_type = "SERIAL";
-
-    std::array<int, Dim> num_cells;
-    std::array<double, Dim> low_corner;
-    std::array<double, Dim> high_corner;
-
-    std::size_t num_steps;
-    double final_time;
-    double timestep;
-    int output_frequency;
-    bool output_reference;
-
-    bool half_neigh = false;
-
-    Inputs( const std::array<int, Dim> nc, std::array<double, Dim> lc,
-            std::array<double, Dim> hc, const double t_f, const double dt,
-            const int of, const bool output_ref )
-        : num_cells( nc )
-        , low_corner( lc )
-        , high_corner( hc )
-        , final_time( t_f )
-        , timestep( dt )
-        , output_frequency( of )
-        , output_reference( output_ref )
+    Inputs( const std::string filename )
     {
-        num_steps = final_time / timestep;
-    }
-    ~Inputs(){};
+        // Get user inputs.
+        inputs = parse( filename );
 
-    void read_args( int argc, char* argv[] )
-    {
-        for ( int i = 1; i < argc; i++ )
+        // Add additional derived inputs to json. System size.
+        auto size = inputs["system_size"]["value"];
+        std::string size_unit = inputs["system_size"]["unit"];
+        for ( std::size_t d = 0; d < size.size(); d++ )
         {
-            // Help command.
-            if ( ( strcmp( argv[i], "-h" ) == 0 ) ||
-                 ( strcmp( argv[i], "--help" ) == 0 ) )
-            {
-                if ( print_rank() )
-                {
-                    log( std::cout, "CabanaPD\n", "Options:" );
-                    log( std::cout, "  -o [FILE] (OR)\n"
-                                    "  --output-file [FILE]:    Provide output "
-                                    "file name\n" );
-                    log(
-                        std::cout,
-                        "  -e [FILE] (OR)\n"
-                        "  --error-file [FILE]:    Provide error file name\n" );
-                    /* Not yet enabled.
-                    log(
-                        std::cout,
-                        "  --device-type [TYPE]:     Kokkos device type to run
-                    ", "with\n", "                                (SERIAL,
-                    PTHREAD, OPENMP, " "CUDA, HIP)" );
-                    */
-                }
-            }
-            // Output file names.
-            else if ( ( strcmp( argv[i], "-o" ) == 0 ) ||
-                      ( strcmp( argv[i], "--output-file" ) == 0 ) )
-            {
-                output_file = argv[i + 1];
-                ++i;
-            }
-            else if ( ( strcmp( argv[i], "-e" ) == 0 ) ||
-                      ( strcmp( argv[i], "--error-file" ) == 0 ) )
-            {
-                error_file = argv[i + 1];
-                ++i;
-            }
-
-            // Kokkos device type.
-            else if ( ( strcmp( argv[i], "--device-type" ) == 0 ) )
-            {
-                device_type = argv[i + 1];
-                ++i;
-            }
-
-            else if ( ( strstr( argv[i], "--kokkos-" ) == NULL ) )
-            {
-                log_err( std::cout,
-                         "Unknown command line argument: ", argv[i] );
-            }
+            double s = size[d];
+            inputs["low_corner"]["value"][d] = -0.5 * s;
+            inputs["low_corner"]["unit"][d] = size_unit;
+            inputs["high_corner"]["value"][d] = 0.5 * s;
+            inputs["high_corner"]["unit"][d] = size_unit;
         }
+        // Number of steps.
+        double tf = inputs["final_time"]["value"];
+        double dt = inputs["timestep"]["value"];
+        int num_steps = tf / dt;
+        inputs["num_steps"]["value"] = num_steps;
+
+        // Output files.
+        if ( !inputs.contains( "output_file" ) )
+            inputs["output_file"]["value"] = "cabanaPD.out";
+        if ( !inputs.contains( "error_file" ) )
+            inputs["error_file"]["value"] = "cabanaPD.err";
+        inputs["input_file"]["value"] = filename;
+
+        // Save inputs (including derived) to new file.
+        std::string input_file = "cabanaPD.in.json";
+        if ( !inputs.contains( "exported_input_file" ) )
+            inputs["exported_input_file"]["value"] = input_file;
+        std::ofstream in( input_file );
+        in << inputs;
+
+        if ( !inputs.contains( "output_reference" ) )
+            inputs["output_reference"]["value"] = true;
+
+        // Not yet a user option.
+        inputs["half_neigh"]["value"] = false;
     }
+    ~Inputs() {}
+
+    // Parse JSON file.
+    inline nlohmann::json parse( const std::string& filename )
+    {
+        std::ifstream stream( filename );
+        return nlohmann::json::parse( stream );
+    }
+
+    // Get a single input.
+    auto operator[]( std::string label ) { return inputs[label]["value"]; }
+
+    // Get a single input.
+    std::string units( std::string label )
+    {
+        if ( inputs[label].contains( "units" ) )
+            return inputs[label]["units"];
+        else
+            return "";
+    }
+
+    // Check a key exists.
+    bool contains( std::string label ) { return inputs.contains( label ); }
+
+  protected:
+    nlohmann::json inputs;
 };
 
 } // namespace CabanaPD
