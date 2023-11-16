@@ -84,11 +84,11 @@ int main( int argc, char* argv[] )
         double sigma0 = inputs["traction"];
         double b0 = sigma0 / dy;
 
-        CabanaPD::RegionBoundary plane1(
-            low_corner[0], high_corner[0], low_corner[1] - dy,
-            high_corner[1] + dy, low_corner[2], high_corner[2] );
+        CabanaPD::RegionBoundary plane1( low_corner[0], high_corner[0],
+                                         low_corner[1] - dy, low_corner[1] + dy,
+                                         low_corner[2], high_corner[2] );
         CabanaPD::RegionBoundary plane2(
-            low_corner[0], high_corner[0], low_corner[1] - dy,
+            low_corner[0], high_corner[0], high_corner[1] - dy,
             high_corner[1] + dy, low_corner[2], high_corner[2] );
         std::vector<CabanaPD::RegionBoundary> planes = { plane1, plane2 };
         auto bc =
