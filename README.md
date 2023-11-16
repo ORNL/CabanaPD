@@ -151,6 +151,12 @@ The third example is crack branching in a pre-notched soda-lime glass plate due 
 ./CabanaPD/build/install/bin/CrackBranching CabanaPD/examples/mechanics/inputs/crack_branching.json
 ```
 
+A similar case but with multiple random pre-notches can be run with:
+
+```
+./CabanaPD/build/install/bin/RandomCracks CabanaPD/examples/mechanics/inputs/random_cracks.json
+```
+
 The fourth example is a fragmenting cylinder due to internal pressure [4]. The example can be run with:
 
 ```
