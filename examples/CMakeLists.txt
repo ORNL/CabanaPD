@@ -7,4 +7,7 @@ target_link_libraries(KalthoffWinkler LINK_PUBLIC CabanaPD)
 add_executable(CrackBranching crack_branching.cpp)
 target_link_libraries(CrackBranching LINK_PUBLIC CabanaPD)
 
-install(TARGETS ElasticWave KalthoffWinkler CrackBranching DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(ThermalDeformation thermal_deformation.cpp)
+target_link_libraries(ThermalDeformation LINK_PUBLIC CabanaPD)
+
+install(TARGETS ElasticWave KalthoffWinkler CrackBranching ThermalDeformation DESTINATION ${CMAKE_INSTALL_BINDIR})

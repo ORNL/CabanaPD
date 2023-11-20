@@ -223,12 +223,13 @@ struct ForceModel<PMB, Elastic> : public BaseForceModel
 
     double c;
     double K;
+    double alpha;
 
     ForceModel(){};
-    ForceModel( const double delta, const double K )
+    ForceModel( const double delta, const double K, const double alpha )
         : base_type( delta )
     {
-        set_param( delta, K );
+        set_param( delta, K, alpha );
     }
 
     ForceModel( const ForceModel& model )
@@ -236,12 +237,14 @@ struct ForceModel<PMB, Elastic> : public BaseForceModel
     {
         c = model.c;
         K = model.K;
+        alpha = model.alpha;
     }
 
-    void set_param( const double _delta, const double _K )
+    void set_param( const double _delta, const double _K, const double _alpha )
     {
         delta = _delta;
         K = _K;
+        alpha = _alpha;
         c = 18.0 * K / ( 3.141592653589793 * delta * delta * delta * delta );
     }
 };
@@ -253,6 +256,7 @@ struct ForceModel<PMB, Fracture> : public ForceModel<PMB, Elastic>
     using base_model = PMB;
     using fracture_type = Fracture;
 
+    using base_type::alpha;
     using base_type::c;
     using base_type::delta;
     using base_type::K;
@@ -261,10 +265,11 @@ struct ForceModel<PMB, Fracture> : public ForceModel<PMB, Elastic>
     double bond_break_coeff;
 
     ForceModel() {}
-    ForceModel( const double delta, const double K, const double G0 )
-        : base_type( delta, K )
+    ForceModel( const double delta, const double K, const double alpha,
+                const double G0 )
+        : base_type( delta, K, alpha )
     {
-        set_param( delta, K, G0 );
+        set_param( delta, K, alpha, G0 );
     }
 
     ForceModel( const ForceModel& model )
@@ -275,9 +280,10 @@ struct ForceModel<PMB, Fracture> : public ForceModel<PMB, Elastic>
         bond_break_coeff = model.bond_break_coeff;
     }
 
-    void set_param( const double _delta, const double _K, const double _G0 )
+    void set_param( const double _delta, const double _K, const double _alpha,
+                    const double _G0 )
     {
-        base_type::set_param( _delta, _K );
+        base_type::set_param( _delta, _K, _alpha );
         G0 = _G0;
         s0 = sqrt( 5.0 * G0 / 9.0 / K / delta );
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
@@ -293,6 +299,7 @@ struct ForceModel<LinearPMB, Elastic> : public ForceModel<PMB, Elastic>
 
     using base_type::base_type;
 
+    using base_type::alpha;
     using base_type::c;
     using base_type::delta;
     using base_type::K;
@@ -307,6 +314,7 @@ struct ForceModel<LinearPMB, Fracture> : public ForceModel<PMB, Fracture>
 
     using base_type::base_type;
 
+    using base_type::alpha;
     using base_type::c;
     using base_type::delta;
     using base_type::K;
@@ -925,7 +933,9 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
                            ParallelType& neigh_op_tag ) const
     {
         auto c = _model.c;
+        auto alpha = _model.alpha;
         const auto vol = particles.sliceVolume();
+        const auto temp = particles.sliceTemperature();
 
         auto force_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -936,6 +946,16 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
             double xi, r, s;
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+
+            // Compute average temperature
+            // It should be:
+            //     double T_av = 0.5*( temp( i ) + temp( j ) ) - temp0;
+            // assume temp0 = 0 for now.
+            double T_av = 0.5 * ( temp( i ) + temp( j ) );
+
+            // Add thermal stretch
+            s -= alpha * T_av;
+
             const double coeff = c * s * vol( j );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
