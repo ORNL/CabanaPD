@@ -34,7 +34,7 @@ int main( int argc, char* argv[] )
         std::array<double, 3> high_corner = { 0.5, 0.3, 0.015 };
         double t_final = 0.0093;
         double dt = 7.5E-7;
-        int output_frequency = 5;
+        int output_frequency = 200;
         bool output_reference = true;
 
         double rho0 = 3980;                    // [kg/m^3]
@@ -45,7 +45,7 @@ int main( int argc, char* argv[] )
         double delta = 0.03;
 
         // Reference temperature
-        double temp0 = 0.0;
+        // double temp0 = 0.0;
 
         int m = std::floor(
             delta / ( ( high_corner[0] - low_corner[0] ) / num_cell[0] ) );
@@ -76,6 +76,7 @@ int main( int argc, char* argv[] )
         auto u = particles->sliceDisplacement();
         auto v = particles->sliceVelocity();
         auto rho = particles->sliceDensity();
+        auto temp = particles->sliceTemperature();
 
         /*
                 auto init_functor = KOKKOS_LAMBDA( const int pid )
@@ -102,6 +103,7 @@ int main( int argc, char* argv[] )
             */
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {
+            temp( pid ) = 5000 * x( pid, 1 );
             rho( pid ) = rho0;
         };
         particles->updateParticles( exec_space{}, init_functor );

@@ -950,7 +950,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
             // Compute average temperature
             // It should be:
             //     double T_av = 0.5*( temp( i ) + temp( j ) ) - temp0;
-            // assume temp0 = 0 for now.
+
+            // assume temp0 = 0 for now
             double T_av = 0.5 * ( temp( i ) + temp( j ) );
 
             // Add thermal stretch

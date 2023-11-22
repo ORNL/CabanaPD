@@ -63,6 +63,9 @@ int main( int argc, char* argv[] )
         CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
 
         // Choose force model type.
+        // using model_type =
+        //    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
+        // model_type force_model( delta, K, G0 );
         using model_type =
             CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
         model_type force_model( delta, K, G0 );
