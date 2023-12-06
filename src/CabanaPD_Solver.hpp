@@ -117,6 +117,7 @@ class SolverElastic
         , particles( _particles )
         , boundary_condition( bc )
     {
+        neighbor_time = 0;
         force_time = 0;
         integrate_time = 0;
         comm_time = 0;
@@ -138,6 +139,7 @@ class SolverElastic
         comm = std::make_shared<comm_type>( *particles );
 
         // Create the neighbor list.
+        neighbor_timer.reset();
         double mesh_min[3] = { particles->ghost_mesh_lo[0],
                                particles->ghost_mesh_lo[1],
                                particles->ghost_mesh_lo[2] };
@@ -148,6 +150,8 @@ class SolverElastic
         neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
                                                      force_model.delta, 1.0,
                                                      mesh_min, mesh_max );
+        neighbor_time += neighbor_timer.seconds();
+
         unsigned max_neighbors;
         unsigned max_local_neighbors =
             Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
@@ -310,14 +314,15 @@ class SolverElastic
             double p_steps_per_sec = particles->n_global * steps_per_sec;
             log( out, std::fixed, std::setprecision( 2 ),
                  "\n#Procs Particles | Time T_Force T_Comm T_Int T_Other "
-                 "T_Init |\n",
+                 "T_Init T_Neigh |\n",
                  comm->mpi_size, " ", particles->n_global, " | ", total_time,
                  " ", force_time, " ", comm_time, " ", integrate_time, " ",
                  other_time, " ", init_time, " | PERFORMANCE\n", std::fixed,
                  comm->mpi_size, " ", particles->n_global, " | ", 1.0, " ",
                  force_time / total_time, " ", comm_time / total_time, " ",
                  integrate_time / total_time, " ", other_time / total_time, " ",
-                 init_time / total_time, " | FRACTION\n\n",
+                 init_time / total_time, " ", neighbor_time / total_time,
+                 " | FRACTION\n\n",
                  "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
                  std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
                  p_steps_per_sec / comm->mpi_size );
@@ -349,12 +354,14 @@ class SolverElastic
     double other_time;
     double init_time;
     double last_time;
+    double neighbor_time;
     Kokkos::Timer total_timer;
     Kokkos::Timer init_timer;
     Kokkos::Timer force_timer;
     Kokkos::Timer comm_timer;
     Kokkos::Timer integrate_timer;
     Kokkos::Timer other_timer;
+    Kokkos::Timer neighbor_timer;
     bool print;
 };
 
