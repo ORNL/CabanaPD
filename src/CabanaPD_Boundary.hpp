@@ -155,15 +155,16 @@ struct BoundaryCondition
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& )
+    void apply( ExecSpace, ParticleType& particles, double t )
     {
-        auto user = _user_functor;
+        auto temp = particles.sliceTemperature();
+        auto x = particles.sliceReferencePosition();
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
-                user( pid );
+                temp( pid ) = 5000 * x( pid, 1 ) * t;
             } );
     }
 };

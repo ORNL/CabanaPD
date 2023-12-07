@@ -1035,8 +1035,11 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                            const int n_local, ParallelType& ) const
     {
         auto c = _model.c;
-        auto break_coeff = _model.bond_break_coeff;
+        auto alpha = _model.alpha;
+        // auto break_coeff = _model.bond_break_coeff;
+        auto break_coeff = _model.s0;
         const auto vol = particles.sliceVolume();
+        const auto temp = particles.sliceTemperature();
         const auto nofail = particles.sliceNoFail();
 
         auto force_full = KOKKOS_LAMBDA( const int i )
@@ -1059,9 +1062,15 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                 double rx, ry, rz;
                 getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
+                // assume temp0 = 0 for now
+                double T_av = 0.5 * ( temp( i ) + temp( j ) );
+
                 // Break if beyond critical stretch unless in no-fail zone.
-                if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
-                     !nofail( j ) )
+                if ( r * r >= ( 1.0 + s0 + alpha * T_av ) *
+                                  ( 1.0 + s0 + alpha * T_av ) * xi * xi &&
+                     !nofail( i ) && !nofail( j ) )
+                // if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
+                //      !nofail( j ) )
                 {
                     mu( i, n ) = 0;
                 }
