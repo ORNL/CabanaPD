@@ -238,7 +238,7 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles )
+    void apply( ExecSpace, ParticleType& particles, double )
     {
         auto f = particles.sliceForce();
         auto index_space = _index_space._view;
