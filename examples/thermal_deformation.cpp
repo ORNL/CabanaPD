@@ -76,34 +76,11 @@ int main( int argc, char* argv[] )
         auto u = particles->sliceDisplacement();
         auto v = particles->sliceVelocity();
         auto rho = particles->sliceDensity();
-        auto temp = particles->sliceTemperature();
+        // auto temp = particles->sliceTemperature();
 
-        /*
-                auto init_functor = KOKKOS_LAMBDA( const int pid )
-                {
-                    double a = 0.001;
-                    double r0 = 0.25;
-                    double l = 0.07;
-                    double norm = std::sqrt( x( pid, 0 ) * x( pid, 0 ) +
-                                             x( pid, 1 ) * x( pid, 1 ) +
-                                             x( pid, 2 ) * x( pid, 2 ) );
-                    double diff = norm - r0;
-                    double arg = diff * diff / l / l;
-                    for ( int d = 0; d < 3; d++ )
-                    {
-                        double comp = 0.0;
-                        if ( norm > 0.0 )
-                            comp = x( pid, d ) / norm;
-                        u( pid, d ) = a * std::exp( -arg ) * comp;
-                        v( pid, d ) = 0.0;
-                    }
-                    rho( pid ) = rho0;
-                };
-
-            */
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {
-            temp( pid ) = 5000 * x( pid, 1 );
+            //   temp( pid ) = 5000 * x( pid, 1 );
             rho( pid ) = rho0;
         };
         particles->updateParticles( exec_space{}, init_functor );
@@ -122,39 +99,6 @@ int main( int argc, char* argv[] )
         int mpi_rank;
         MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
         Kokkos::View<int*, memory_space> count( "c", 1 );
-        // double dx = particles->dx[0];
-
-        /*
-        auto measure_profile = KOKKOS_LAMBDA( const int pid )
-        {
-            if ( x( pid, 1 ) < dx / 2.0 && x( pid, 1 ) > -dx / 2.0 &&
-                 x( pid, 2 ) < dx / 2.0 && x( pid, 2 ) > -dx / 2.0 )
-            {
-                auto c = Kokkos::atomic_fetch_add( &count( 0 ), 1 );
-                profile( c, 0 ) = x( pid, 0 );
-                profile( c, 1 ) = u( pid, 0 );
-            }
-        };
-        */
-
-        /*
-         Kokkos::RangePolicy<exec_space> policy( 0, x.size() );
-         Kokkos::parallel_for( "displacement_profile", policy, measure_profile
-         ); auto count_host = Kokkos::create_mirror_view_and_copy(
-         Kokkos::HostSpace{}, count ); auto profile_host =
-             Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, profile
-         );
-         */
-        /*
-        std::fstream fout;
-        std::string file_name = "displacement_profile.txt";
-        fout.open( file_name, std::ios::app );
-        for ( int p = 0; p < count_host( 0 ); p++ )
-        {
-            fout << mpi_rank << " " << profile_host( p, 0 ) << " "
-                 << profile_host( p, 1 ) << std::endl;
-        }
-        */
     }
 
     MPI_Finalize();

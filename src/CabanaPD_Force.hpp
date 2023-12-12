@@ -1037,7 +1037,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
         auto c = _model.c;
         auto alpha = _model.alpha;
         // auto break_coeff = _model.bond_break_coeff;
-        auto break_coeff = _model.s0;
+        auto s0 = _model.s0;
         const auto vol = particles.sliceVolume();
         const auto temp = particles.sliceTemperature();
         const auto nofail = particles.sliceNoFail();
