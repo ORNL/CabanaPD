@@ -164,7 +164,10 @@ struct BoundaryCondition
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
+                // This is specifically for the thermal deformation problem
                 temp( pid ) = 5000 * x( pid, 1 ) * t;
+                std::cout << "1: temp(" << pid << ")=" << temp( pid )
+                          << std::endl;
             } );
     }
 };
@@ -205,7 +208,7 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     template <class ExecSpace, class ParticleType>
     void apply( ExecSpace, ParticleType& particles, double t )
     {
-        auto f = particles.sliceForce();
+        auto temp = particles.sliceTemperature();
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         auto value = _value;
@@ -238,7 +241,7 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles, double )
+    void apply( ExecSpace, ParticleType& particles, double t )
     {
         auto f = particles.sliceForce();
         auto index_space = _index_space._view;

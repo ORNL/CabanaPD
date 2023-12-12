@@ -74,13 +74,25 @@ int main( int argc, char* argv[] )
         // Define particle initialization.
         auto x = particles->sliceReferencePosition();
         auto u = particles->sliceDisplacement();
+        auto f = particles->sliceForce();
         auto v = particles->sliceVelocity();
         auto rho = particles->sliceDensity();
         // auto temp = particles->sliceTemperature();
 
+        // Domain to apply b.c.
+        CabanaPD::RegionBoundary domain1( low_corner[0], high_corner[0],
+                                          low_corner[1], high_corner[1],
+                                          low_corner[2], high_corner[2] );
+        std::vector<CabanaPD::RegionBoundary> domain = { domain1 };
+
+        double b0 = 0.0;
+        auto bc =
+            createBoundaryCondition( CabanaPD::ForceCrackBranchBCTag{},
+                                     exec_space{}, *particles, domain, b0 );
+
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {
-            //   temp( pid ) = 5000 * x( pid, 1 );
+            // temp( pid ) = 5000 * x( pid, 1 ) * t_final;
             rho( pid ) = rho0;
         };
         particles->updateParticles( exec_space{}, init_functor );
@@ -90,8 +102,6 @@ int main( int argc, char* argv[] )
         cabana_pd->init_force();
         cabana_pd->run();
 
-        x = particles->sliceReferencePosition();
-        u = particles->sliceDisplacement();
         double num_cell_x = inputs.num_cells[0];
         auto profile = Kokkos::View<double* [2], memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "displacement_profile" ),
