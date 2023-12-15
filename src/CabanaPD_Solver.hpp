@@ -121,7 +121,7 @@ class SolverElastic
         force_time = 0;
         integrate_time = 0;
         comm_time = 0;
-        other_time = 0;
+        energy_time = 0;
         last_time = 0;
         init_time = 0;
         total_timer.reset();
@@ -256,17 +256,19 @@ class SolverElastic
             integrate_time += integrate_timer.seconds();
 
             // Print output.
-            other_timer.reset();
             if ( step % output_frequency == 0 )
             {
+                energy_timer.reset();
                 auto W = computeEnergy( *force, *particles, *neighbors,
                                         neigh_iter_tag() );
+                energy_time += energy_timer.seconds();
 
+                output_timer.reset();
                 step_output( step, W );
                 particles->output( step / output_frequency, step * dt,
                                    output_reference );
+                output_time += output_timer.seconds();
             }
-            other_time += other_timer.seconds();
         }
 
         // Final output and timings.
@@ -279,8 +281,8 @@ class SolverElastic
         std::ofstream out( output_file, std::ofstream::app );
         log( out, "Init-Time(s): ", init_time, "\n" );
         log( out, "#Timestep/Total-steps Simulation-time Total-strain-energy "
-                  "Run-Time(s) Force-Time(s) Comm-Time(s) Int-Time(s) "
-                  "Other-Time(s) Particle*steps/s" );
+                  "Step-Time(s) Force-Time(s) Comm-Time(s) Integrate-Time(s) "
+                  "Energy-Time(s) Output-Time(s) Particle*steps/s" );
     }
 
     void step_output( const int step, const double W )
@@ -297,8 +299,8 @@ class SolverElastic
             log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
                  " ", std::scientific, std::setprecision( 2 ), step * dt, " ",
                  W, " ", std::fixed, total_time, " ", force_time, " ",
-                 comm_time, " ", integrate_time, " ", other_time, " ",
-                 std::scientific, rate );
+                 comm_time, " ", integrate_time, " ", energy_time, " ",
+                 output_time, " ", std::scientific, rate );
             last_time = total_time;
             out.close();
         }
@@ -313,15 +315,16 @@ class SolverElastic
             double steps_per_sec = 1.0 * num_steps / total_time;
             double p_steps_per_sec = particles->n_global * steps_per_sec;
             log( out, std::fixed, std::setprecision( 2 ),
-                 "\n#Procs Particles | Time T_Force T_Comm T_Int T_Other "
-                 "T_Init T_Neigh |\n",
+                 "\n#Procs Particles | Total Force Comm Integrate Energy "
+                 "Output Init Init_Neighbor |\n",
                  comm->mpi_size, " ", particles->n_global, " | ", total_time,
                  " ", force_time, " ", comm_time, " ", integrate_time, " ",
-                 other_time, " ", init_time, " | PERFORMANCE\n", std::fixed,
-                 comm->mpi_size, " ", particles->n_global, " | ", 1.0, " ",
-                 force_time / total_time, " ", comm_time / total_time, " ",
-                 integrate_time / total_time, " ", other_time / total_time, " ",
-                 init_time / total_time, " ", neighbor_time / total_time,
+                 energy_time, " ", output_time, " ", init_time,
+                 " | PERFORMANCE\n", std::fixed, comm->mpi_size, " ",
+                 particles->n_global, " | ", 1.0, " ", force_time / total_time,
+                 " ", comm_time / total_time, " ", integrate_time / total_time,
+                 " ", energy_time / total_time, " ", output_time / total_time,
+                 " ", init_time / total_time, " ", neighbor_time / total_time,
                  " | FRACTION\n\n",
                  "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
                  std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
@@ -351,7 +354,8 @@ class SolverElastic
     double force_time;
     double integrate_time;
     double comm_time;
-    double other_time;
+    double energy_time;
+    double output_time;
     double init_time;
     double last_time;
     double neighbor_time;
@@ -360,7 +364,8 @@ class SolverElastic
     Kokkos::Timer force_timer;
     Kokkos::Timer comm_timer;
     Kokkos::Timer integrate_timer;
-    Kokkos::Timer other_timer;
+    Kokkos::Timer energy_timer;
+    Kokkos::Timer output_timer;
     Kokkos::Timer neighbor_timer;
     bool print;
 };
@@ -477,17 +482,19 @@ class SolverFracture
             integrate_time += integrate_timer.seconds();
 
             // Print output.
-            other_timer.reset();
             if ( step % output_frequency == 0 )
             {
+                energy_timer.reset();
                 auto W = computeEnergy( *force, *particles, *neighbors, mu,
                                         neigh_iter_tag() );
+                energy_time += energy_timer.seconds();
 
+                output_timer.reset();
                 this->step_output( step, W );
                 particles->output( step / output_frequency, step * dt,
                                    output_reference );
+                output_time += output_timer.seconds();
             }
-            other_time += other_timer.seconds();
         }
 
         // Final output and timings.
@@ -512,18 +519,19 @@ class SolverFracture
     NeighborView mu;
 
     using base_type::comm_time;
+    using base_type::energy_time;
     using base_type::force_time;
     using base_type::init_time;
     using base_type::integrate_time;
-    using base_type::last_time;
-    using base_type::other_time;
+    using base_type::output_time;
     using base_type::total_time;
 
     using base_type::comm_timer;
+    using base_type::energy_timer;
     using base_type::force_timer;
     using base_type::init_timer;
     using base_type::integrate_timer;
-    using base_type::other_timer;
+    using base_type::output_timer;
     using base_type::total_timer;
 
     using base_type::print;
