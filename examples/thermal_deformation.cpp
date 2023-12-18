@@ -98,7 +98,7 @@ int main( int argc, char* argv[] )
         particles->updateParticles( exec_space{}, init_functor );
 
         auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
-            inputs, particles, force_model );
+            inputs, particles, force_model, bc );
         cabana_pd->init_force();
         cabana_pd->run();
 

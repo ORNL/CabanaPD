@@ -442,15 +442,15 @@ class Particles<MemorySpace, PMB, Dimension>
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
             n_local, getPosition( use_reference ), sliceStrainEnergy(),
-            sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage() );
+            sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage(),
+            sliceTemperature() );
 #else
 #ifdef Cabana_ENABLE_SILO
-        Cabana::Grid::Experimental::SiloParticleOutput::
-            writePartialRangeTimeStep(
-                "particles", local_grid->globalGrid(), output_step, output_time,
-                0, n_local, getPosition( use_reference ), sliceStrainEnergy(),
-                sliceForce(), sliceDisplacement(), sliceVelocity(),
-                sliceDamage() );
+        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
+            "particles", local_grid->globalGrid(), output_step, output_time, 0,
+            n_local, getPosition( use_reference ), sliceStrainEnergy(),
+            sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage(),
+            sliceTemperature() );
 #else
         log( std::cout, "No particle output enabled." );
 #endif
