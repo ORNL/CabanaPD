@@ -19,10 +19,6 @@
 
 namespace CabanaPD
 {
-// Empty boundary.
-struct ZeroBoundary
-{
-};
 
 // Define a plane or other rectilinear subset of the system as the boundary.
 struct RegionBoundary
@@ -55,6 +51,9 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
     using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
     index_view_type _view;
     index_view_type _count;
+
+    // Default for empty case.
+    BoundaryIndexSpace() {}
 
     template <class ExecSpace, class Particles>
     BoundaryIndexSpace( ExecSpace exec_space, Particles particles,
@@ -137,8 +136,26 @@ struct ForceCrackBranchBCTag
 {
 };
 
+struct ZeroBCTag
+{
+};
+
 template <class BCIndexSpace, class BCTag>
 struct BoundaryCondition;
+
+template <class BCIndexSpace>
+struct BoundaryCondition<BCIndexSpace, ZeroBCTag>
+{
+    template <class ExecSpace, class Particles>
+    void update( ExecSpace, Particles, RegionBoundary )
+    {
+    }
+
+    template <class ExecSpace, class ParticleType>
+    void apply( ExecSpace, ParticleType )
+    {
+    }
+};
 
 template <class BCIndexSpace>
 struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
@@ -260,6 +277,13 @@ auto createBoundaryCondition( BCTag, ExecSpace exec_space, Particles particles,
     bc_index_type bc_indices = createBoundaryIndexSpace<BoundaryType>(
         exec_space, particles, planes, initial_guess );
     return BoundaryCondition<bc_index_type, BCTag>( value, bc_indices );
+}
+
+template <class MemorySpace>
+auto createBoundaryCondition( ZeroBCTag )
+{
+    using bc_index_type = BoundaryIndexSpace<MemorySpace, RegionBoundary>;
+    return BoundaryCondition<bc_index_type, ZeroBCTag>();
 }
 
 } // namespace CabanaPD
