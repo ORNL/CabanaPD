@@ -97,9 +97,8 @@ int main( int argc, char* argv[] )
             x_bc - dx, x_bc + dx * 1.25, y_prenotch1 - dx * 0.25,
             y_prenotch2 + dx * 0.25, -thickness, thickness );
         std::vector<CabanaPD::RegionBoundary> planes = { plane };
-        auto bc =
-            createBoundaryCondition( CabanaPD::ForceValueBCTag{}, exec_space{},
-                                     *particles, planes, 0.0 );
+        auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
+                                           exec_space{}, *particles, planes );
 
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {
