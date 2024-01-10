@@ -66,7 +66,7 @@ jobs:
         with:
           repository: ECP-CoPA/Cabana
           # This version is post-release 0.6
-          ref: b46b5fbec4c18241bcf57ccdc84dbe857e5d489c
+          ref: f99c7db9d54c57373ada6b16132c20d89d1ebb8e
           path: cabana
       - name: Build Cabana
         working-directory: cabana
@@ -118,7 +118,7 @@ jobs:
       matrix:
         cxx: ['hipcc']
         cmake_build_type: ['Release']
-        kokkos_ver: ['3.6.01']
+        kokkos_ver: ['3.7.02']
     runs-on: ubuntu-20.04
     container: ghcr.io/ecp-copa/ci-containers/rocm:latest
     steps:
@@ -158,8 +158,8 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: ECP-CoPA/Cabana
-          # This version is post-release 0.5
-          ref: 31ba70d9e8f8e20f2e55e7e310905f950b21776f
+          # This version is post-release 0.6
+          ref: f99c7db9d54c57373ada6b16132c20d89d1ebb8e
           path: cabana
       - name: Build Cabana
         working-directory: cabana
@@ -172,7 +172,7 @@ jobs:
             -DCMAKE_CXX_FLAGS="-I${MPI_LOCATION}/include" \
             -DCMAKE_EXE_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
             -DCMAKE_SHARED_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
-            -DCMAKE_DISABLE_FIND_PACKAGE_HDF5=ON \
+            -DCabana_DISABLE_CAJITA_DEPRECATION_WARNINGS=ON \
             -DCabana_REQUIRE_MPI=ON
           cmake --build build --parallel 2
           cmake --install build
@@ -200,7 +200,6 @@ jobs:
     strategy:
       matrix:
         cmake_build_type: ['Release']
-        # 3.7 needed for kokkos_compiler_launcher
         kokkos_ver: ['3.7.02']
     runs-on: ubuntu-20.04
     container: ghcr.io/ecp-copa/ci-containers/cuda:12.2.0
@@ -241,8 +240,8 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: ECP-CoPA/Cabana
-          # This version is post-release 0.5
-          ref: 31ba70d9e8f8e20f2e55e7e310905f950b21776f
+          # This version is post-release 0.6
+          ref: f99c7db9d54c57373ada6b16132c20d89d1ebb8e
           path: cabana
       - name: Build Cabana
         working-directory: cabana
@@ -251,6 +250,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }} \
             -DCMAKE_INSTALL_PREFIX=$HOME/Cabana \
             -DCMAKE_PREFIX_PATH="$HOME/kokkos" \
+            -DCabana_DISABLE_CAJITA_DEPRECATION_WARNINGS=ON \
             -DCabana_REQUIRE_MPI=ON
           cmake --build build --parallel 2
           cmake --install build
