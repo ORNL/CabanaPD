@@ -148,8 +148,16 @@ class SolverElastic
         neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
                                                      force_model.delta, 1.0,
                                                      mesh_min, mesh_max );
-        int max_neighbors =
+        unsigned max_neighbors;
+        unsigned max_local_neighbors =
             Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
+        unsigned long long total_neighbors;
+        unsigned long long total_local_neighbors =
+            Cabana::NeighborList<neighbor_type>::totalNeighbor( *neighbors );
+        MPI_Reduce( &max_local_neighbors, &max_neighbors, 1, MPI_UNSIGNED,
+                    MPI_MAX, 0, MPI_COMM_WORLD );
+        MPI_Reduce( &total_local_neighbors, &total_neighbors, 1,
+                    MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD );
 
         force =
             std::make_shared<force_type>( inputs["half_neigh"], force_model );
@@ -158,7 +166,7 @@ class SolverElastic
         if ( print )
         {
             log( std::cout, "Local particles: ", particles->n_local,
-                 ", Maximum local neighbors: ", max_neighbors );
+                 ", Maximum neighbors: ", max_neighbors );
             log( std::cout, "#Timestep/Total-steps Simulation-time" );
 
             output_file = inputs["output_file"];
@@ -174,7 +182,8 @@ class SolverElastic
             log( out, "Local particles, Ghosted particles, Global particles\n",
                  particles->n_local, ", ", particles->n_ghost, ", ",
                  particles->n_global );
-            log( out, "Maximum local neighbors: ", max_neighbors, "\n" );
+            log( out, "Maximum neighbors: ", max_neighbors,
+                 ", Total neighbors: ", total_neighbors, "\n" );
             out.close();
         }
         init_time += init_timer.seconds();
