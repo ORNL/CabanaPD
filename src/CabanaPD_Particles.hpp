@@ -70,6 +70,7 @@
 #include <Cajita.hpp>
 
 #include <CabanaPD_Comm.hpp>
+#include <CabanaPD_Fields.hpp>
 #include <CabanaPD_Output.hpp>
 #include <CabanaPD_Types.hpp>
 
@@ -106,13 +107,16 @@ class Particles<MemorySpace, PMB, Dimension>
 
     // FIXME: add vector length.
     // FIXME: enable variable aosoa.
-    using aosoa_x_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_u_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_y_type = Cabana::AoSoA<vector_type, memory_space, 1>;
-    using aosoa_f_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_vol_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
     using aosoa_nofail_type = Cabana::AoSoA<int_type, memory_space, 1>;
     using aosoa_other_type = Cabana::AoSoA<other_types, memory_space>;
+    using plist_x_type =
+        Cabana::ParticleList<memory_space, 1,
+                             CabanaPD::Field::ReferencePosition>;
+    using plist_f_type =
+        Cabana::ParticleList<memory_space, 1, CabanaPD::Field::Force>;
 
     // Per type.
     int n_types = 1;
@@ -153,6 +157,8 @@ class Particles<MemorySpace, PMB, Dimension>
                std::array<double, dim> high_corner,
                const std::array<int, dim> num_cells, const int max_halo_width )
         : halo_width( max_halo_width )
+        , _plist_x( "positions" )
+        , _plist_f( "forces" )
     {
         createDomain( low_corner, high_corner, num_cells );
         createParticles( exec_space );
@@ -205,6 +211,8 @@ class Particles<MemorySpace, PMB, Dimension>
 
         int particles_per_cell = 1;
         int num_particles = particles_per_cell * owned_cells.size();
+
+        // Use default aosoa construction and resize.
         resize( num_particles, 0 );
 
         auto x = sliceReferencePosition();
@@ -275,7 +283,7 @@ class Particles<MemorySpace, PMB, Dimension>
             local_num_create );
         n_local = local_num_create;
         resize( n_local, 0 );
-        size = _aosoa_x.size();
+        size = _plist_x.size();
 
         // Not using Allreduce because global count is only used for printing.
         MPI_Reduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0,
@@ -293,11 +301,11 @@ class Particles<MemorySpace, PMB, Dimension>
 
     auto sliceReferencePosition()
     {
-        return Cabana::slice<0>( _aosoa_x, "reference_positions" );
+        return _plist_x.slice( CabanaPD::Field::ReferencePosition() );
     }
     auto sliceReferencePosition() const
     {
-        return Cabana::slice<0>( _aosoa_x, "reference_positions" );
+        return _plist_x.slice( CabanaPD::Field::ReferencePosition() );
     }
     auto sliceCurrentPosition()
     {
@@ -319,7 +327,7 @@ class Particles<MemorySpace, PMB, Dimension>
     {
         return Cabana::slice<0>( _aosoa_u, "displacements" );
     }
-    auto sliceForce() { return Cabana::slice<0>( _aosoa_f, "forces" ); }
+    auto sliceForce() { return _plist_f.slice( CabanaPD::Field::Force() ); }
     auto sliceForceAtomic()
     {
         auto f = sliceForce();
@@ -370,6 +378,9 @@ class Particles<MemorySpace, PMB, Dimension>
         return Cabana::slice<0>( _aosoa_nofail, "no_fail_region" );
     }
 
+    auto getForce() { return _plist_f; }
+    auto getReferencePosition() { return _plist_x; }
+
     void updateCurrentPosition()
     {
         // Not using slice function because this is called inside.
@@ -391,14 +402,14 @@ class Particles<MemorySpace, PMB, Dimension>
         n_local = new_local;
         n_ghost = new_ghost;
 
-        _aosoa_x.resize( new_local + new_ghost );
+        _plist_x.aosoa().resize( new_local + new_ghost );
         _aosoa_u.resize( new_local + new_ghost );
         _aosoa_y.resize( new_local + new_ghost );
         _aosoa_vol.resize( new_local + new_ghost );
-        _aosoa_f.resize( new_local );
+        _plist_f.aosoa().resize( new_local );
         _aosoa_other.resize( new_local );
         _aosoa_nofail.resize( new_local + new_ghost );
-        size = _aosoa_x.size();
+        size = _plist_x.size();
     };
 
     auto getPosition( const bool use_reference )
@@ -433,13 +444,14 @@ class Particles<MemorySpace, PMB, Dimension>
     friend class Comm<self_type, PMB>;
 
   protected:
-    aosoa_x_type _aosoa_x;
     aosoa_u_type _aosoa_u;
     aosoa_y_type _aosoa_y;
-    aosoa_f_type _aosoa_f;
     aosoa_vol_type _aosoa_vol;
     aosoa_nofail_type _aosoa_nofail;
     aosoa_other_type _aosoa_other;
+
+    plist_x_type _plist_x;
+    plist_f_type _plist_f;
 
 #ifdef Cabana_ENABLE_HDF5
     Cabana::Experimental::HDF5ParticleOutput::HDF5Config h5_config;

@@ -276,9 +276,8 @@ class Comm<ParticleType, PMB>
 
         // Only use this interface because we don't need to recommunicate
         // positions, volumes, or no-fail region.
-        Cabana::gather( *halo, particles._aosoa_x );
+        Cabana::gather( *halo, particles.getReferencePosition().aosoa() );
         Cabana::gather( *halo, particles._aosoa_vol );
-        Cabana::gather( *halo, particles._aosoa_nofail );
 
         gather_u = std::make_shared<gather_u_type>( *halo, particles._aosoa_u );
         gather_u->apply();

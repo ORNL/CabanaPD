@@ -91,9 +91,22 @@ int main( int argc, char* argv[] )
             low_corner[0], high_corner[0], high_corner[1] - dy,
             high_corner[1] + dy, low_corner[2], high_corner[2] );
         std::vector<CabanaPD::RegionBoundary> planes = { plane1, plane2 };
+        auto particles_f = particles->getForce();
+        auto particles_x = particles->getReferencePosition();
+        // Create a symmetric force BC in the y-direction.
+        auto bc_op = KOKKOS_LAMBDA( const int pid )
+        {
+            // Get a modifiable copy of force.
+            auto p_f = particles_f.getParticleView( pid );
+            // Get a copy of the position.
+            auto p_x = particles_x.getParticle( pid );
+            auto ypos =
+                Cabana::get( p_x, CabanaPD::Field::ReferencePosition(), 1 );
+            auto sign = std::abs( ypos ) / ypos;
+            Cabana::get( p_f, CabanaPD::Field::Force(), 1 ) += b0 * sign;
+        };
         auto bc =
-            createBoundaryCondition( CabanaPD::ForceCrackBranchBCTag{},
-                                     exec_space{}, *particles, planes, b0 );
+            createBoundaryCondition( bc_op, exec_space{}, *particles, planes );
 
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {
