@@ -122,6 +122,7 @@ class SolverElastic
         integrate_time = 0;
         comm_time = 0;
         energy_time = 0;
+        output_time = 0;
         last_time = 0;
         init_time = 0;
         total_timer.reset();
