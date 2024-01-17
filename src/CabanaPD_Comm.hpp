@@ -16,7 +16,7 @@
 
 #include "mpi.h"
 
-#include <Cajita.hpp>
+#include <Cabana_Grid.hpp>
 
 #include <CabanaPD_Types.hpp>
 
@@ -31,7 +31,7 @@ auto vectorToArray( std::vector<Scalar> vector )
     return array;
 }
 
-// Functor to determine which particles should be ghosted with Cajita grid.
+// Functor to determine which particles should be ghosted with grid.
 template <class MemorySpace, class LocalGridType>
 struct HaloIds
 {
@@ -73,7 +73,7 @@ struct HaloIds
         // Check within the halo width, within the local domain.
         _min_halo = minimum_halo_width;
 
-        auto topology = Cajita::getTopology( local_grid );
+        auto topology = Cabana::Grid::getTopology( local_grid );
         _device_topology = vectorToArray<topology_size>( topology );
 
         // Get the neighboring mesh bounds (only needed once unless load
@@ -88,9 +88,9 @@ struct HaloIds
     void neighborBounds( const LocalGridType& local_grid )
     {
         const auto& local_mesh =
-            Cajita::createLocalMesh<Kokkos::HostSpace>( local_grid );
+            Cabana::Grid::createLocalMesh<Kokkos::HostSpace>( local_grid );
 
-        Kokkos::Array<Cajita::IndexSpace<4>, topology_size> index_spaces;
+        Kokkos::Array<Cabana::Grid::IndexSpace<4>, topology_size> index_spaces;
 
         // Store all neighboring shared index space mesh bounds so we only have
         // to launch one kernel during the actual ghost search.
@@ -109,14 +109,14 @@ struct HaloIds
                         if ( neighbor_rank != -1 )
                         {
                             auto sis = local_grid.sharedIndexSpace(
-                                Cajita::Own(), Cajita::Cell(), i, j, k,
-                                _min_halo );
+                                Cabana::Grid::Own(), Cabana::Grid::Cell(), i, j,
+                                k, _min_halo );
                             auto min_ind = sis.min();
                             auto max_ind = sis.max();
-                            local_mesh.coordinates( Cajita::Node(),
+                            local_mesh.coordinates( Cabana::Grid::Node(),
                                                     min_ind.data(),
                                                     _min_coord[n].data() );
-                            local_mesh.coordinates( Cajita::Node(),
+                            local_mesh.coordinates( Cabana::Grid::Node(),
                                                     max_ind.data(),
                                                     _max_coord[n].data() );
                         }
@@ -258,7 +258,7 @@ class Comm<ParticleType, PMB>
         auto positions = particles.sliceReferencePosition();
         // Get all 26 neighbor ranks.
         auto halo_width = local_grid->haloCellWidth();
-        auto topology = Cajita::getTopology( *local_grid );
+        auto topology = Cabana::Grid::getTopology( *local_grid );
 
         // Determine which particles need to be ghosted to neighbors.
         // FIXME: set halo width based on cutoff distance.
