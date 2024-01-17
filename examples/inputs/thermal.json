@@ -1,0 +1,12 @@
+{
+    "num_cells"       : {"value": [100, 30, 3]},
+    "system_size"     : {"value": [1.0, 0.3, 0.03], "unit": ""},
+    "density"         : {"value": 3980.0,  "unit": ""},
+    "elastic_modulus" : {"value": 370e+9, "unit": ""},
+    "shear_modulus"   : {"value": 0.5, "unit": ""},
+    "horizon"         : {"value": 0.0375, "unit": ""},  
+    "final_time"      : {"value": 0.0093, "unit": ""},
+    "timestep"        : {"value": 7.5E-7,  "unit": ""},
+    "output_frequency": {"value": 200},
+    "output_reference": {"value": true}
+}
