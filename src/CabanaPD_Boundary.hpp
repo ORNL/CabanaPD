@@ -15,7 +15,6 @@
 #include <Kokkos_Core.hpp>
 
 #include <Cabana_Core.hpp>
-#include <Cajita.hpp>
 
 namespace CabanaPD
 {

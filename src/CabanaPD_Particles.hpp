@@ -67,7 +67,7 @@
 #include <Kokkos_Core.hpp>
 
 #include <Cabana_Core.hpp>
-#include <Cajita.hpp>
+#include <Cabana_Grid.hpp>
 
 #include <CabanaPD_Comm.hpp>
 #include <CabanaPD_Fields.hpp>
@@ -130,7 +130,8 @@ class Particles<MemorySpace, PMB, Dimension>
     std::array<double, dim> local_mesh_hi;
     std::array<double, dim> ghost_mesh_lo;
     std::array<double, dim> ghost_mesh_hi;
-    std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double, dim>>>
+    std::shared_ptr<
+        Cabana::Grid::LocalGrid<Cabana::Grid::UniformMesh<double, dim>>>
         local_grid;
     double dx[dim];
 
@@ -169,10 +170,10 @@ class Particles<MemorySpace, PMB, Dimension>
                        const std::array<int, dim> num_cells )
     {
         // Create the MPI partitions.
-        Cajita::DimBlockPartitioner<dim> partitioner;
+        Cabana::Grid::DimBlockPartitioner<dim> partitioner;
 
         // Create global mesh of MPI partitions.
-        auto global_mesh = Cajita::createUniformGlobalMesh(
+        auto global_mesh = Cabana::Grid::createUniformGlobalMesh(
             low_corner, high_corner, num_cells );
         for ( int d = 0; d < 3; d++ )
             dx[d] = global_mesh->cellSize( d );
@@ -184,20 +185,22 @@ class Particles<MemorySpace, PMB, Dimension>
             is_periodic[d] = false;
         }
         // Create the global grid.
-        auto global_grid = Cajita::createGlobalGrid(
+        auto global_grid = Cabana::Grid::createGlobalGrid(
             MPI_COMM_WORLD, global_mesh, is_periodic, partitioner );
 
         // Create a local mesh.
-        local_grid = Cajita::createLocalGrid( global_grid, halo_width );
-        auto local_mesh = Cajita::createLocalMesh<memory_space>( *local_grid );
+        local_grid = Cabana::Grid::createLocalGrid( global_grid, halo_width );
+        auto local_mesh =
+            Cabana::Grid::createLocalMesh<memory_space>( *local_grid );
 
         for ( int d = 0; d < dim; d++ )
         {
-            local_mesh_lo[d] = local_mesh.lowCorner( Cajita::Own(), d );
-            local_mesh_hi[d] = local_mesh.highCorner( Cajita::Own(), d );
-            ghost_mesh_lo[d] = local_mesh.lowCorner( Cajita::Ghost(), d );
-            ghost_mesh_hi[d] = local_mesh.highCorner( Cajita::Ghost(), d );
-            local_mesh_ext[d] = local_mesh.extent( Cajita::Own(), d );
+            local_mesh_lo[d] = local_mesh.lowCorner( Cabana::Grid::Own(), d );
+            local_mesh_hi[d] = local_mesh.highCorner( Cabana::Grid::Own(), d );
+            ghost_mesh_lo[d] = local_mesh.lowCorner( Cabana::Grid::Ghost(), d );
+            ghost_mesh_hi[d] =
+                local_mesh.highCorner( Cabana::Grid::Ghost(), d );
+            local_mesh_ext[d] = local_mesh.extent( Cabana::Grid::Own(), d );
         }
     }
 
@@ -205,9 +208,10 @@ class Particles<MemorySpace, PMB, Dimension>
     void createParticles( const ExecSpace& exec_space )
     {
         // Create a local mesh and owned space.
-        auto local_mesh = Cajita::createLocalMesh<memory_space>( *local_grid );
+        auto local_mesh =
+            Cabana::Grid::createLocalMesh<memory_space>( *local_grid );
         auto owned_cells = local_grid->indexSpace(
-            Cajita::Own(), Cajita::Cell(), Cajita::Local() );
+            Cabana::Grid::Own(), Cabana::Grid::Cell(), Cabana::Grid::Local() );
 
         int particles_per_cell = 1;
         int num_particles = particles_per_cell * owned_cells.size();
@@ -235,21 +239,23 @@ class Particles<MemorySpace, PMB, Dimension>
         int local_num_create = 0;
         Kokkos::parallel_reduce(
             "CabanaPD::Particles::init_particles_uniform",
-            Cajita::createExecutionPolicy( owned_cells, exec_space ),
+            Cabana::Grid::createExecutionPolicy( owned_cells, exec_space ),
             KOKKOS_LAMBDA( const int i, const int j, const int k,
                            int& create_count ) {
                 // Compute the owned local cell id.
-                int i_own = i - owned_cells.min( Cajita::Dim::I );
-                int j_own = j - owned_cells.min( Cajita::Dim::J );
-                int k_own = k - owned_cells.min( Cajita::Dim::K );
-                int pid = i_own + owned_cells.extent( Cajita::Dim::I ) *
-                                      ( j_own + k_own * owned_cells.extent(
-                                                            Cajita::Dim::J ) );
+                int i_own = i - owned_cells.min( Cabana::Grid::Dim::I );
+                int j_own = j - owned_cells.min( Cabana::Grid::Dim::J );
+                int k_own = k - owned_cells.min( Cabana::Grid::Dim::K );
+                int pid =
+                    i_own + owned_cells.extent( Cabana::Grid::Dim::I ) *
+                                ( j_own + k_own * owned_cells.extent(
+                                                      Cabana::Grid::Dim::J ) );
 
                 // Get the coordinates of the cell.
                 int node[3] = { i, j, k };
                 double cell_coord[3];
-                local_mesh.coordinates( Cajita::Cell(), node, cell_coord );
+                local_mesh.coordinates( Cabana::Grid::Cell(), node,
+                                        cell_coord );
 
                 // Set the particle position.
                 for ( int d = 0; d < 3; d++ )
@@ -267,7 +273,7 @@ class Particles<MemorySpace, PMB, Dimension>
 
                 // Get the volume of the cell.
                 int empty[3];
-                vol( pid ) = local_mesh.measure( Cajita::Cell(), empty );
+                vol( pid ) = local_mesh.measure( Cabana::Grid::Cell(), empty );
 
                 // Customize new particle.
                 // created( pid ) = create_functor( px, particle );
@@ -431,10 +437,12 @@ class Particles<MemorySpace, PMB, Dimension>
             sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage() );
 #else
 #ifdef Cabana_ENABLE_SILO
-        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
-            "particles", local_grid->globalGrid(), output_step, output_time, 0,
-            n_local, getPosition( use_reference ), sliceStrainEnergy(),
-            sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage() );
+        Cabana::Grid::Experimental::SiloParticleOutput::
+            writePartialRangeTimeStep(
+                "particles", local_grid->globalGrid(), output_step, output_time,
+                0, n_local, getPosition( use_reference ), sliceStrainEnergy(),
+                sliceForce(), sliceDisplacement(), sliceVelocity(),
+                sliceDamage() );
 #else
         log( std::cout, "No particle output enabled." );
 #endif
@@ -565,13 +573,14 @@ class Particles<MemorySpace, LPS, Dimension>
             sliceDilatation() );
 #else
 #ifdef Cabana_ENABLE_SILO
-        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
-            "particles", local_grid->globalGrid(), output_step, output_time, 0,
-            n_local, base_type::getPosition( use_reference ),
-            base_type::sliceStrainEnergy(), base_type::sliceForce(),
-            base_type::sliceDisplacement(), base_type::sliceVelocity(),
-            base_type::sliceDamage(), sliceWeightedVolume(),
-            sliceDilatation() );
+        Cabana::Grid::Experimental::SiloParticleOutput::
+            writePartialRangeTimeStep(
+                "particles", local_grid->globalGrid(), output_step, output_time,
+                0, n_local, base_type::getPosition( use_reference ),
+                base_type::sliceStrainEnergy(), base_type::sliceForce(),
+                base_type::sliceDisplacement(), base_type::sliceVelocity(),
+                base_type::sliceDamage(), sliceWeightedVolume(),
+                sliceDilatation() );
 #else
         log( std::cout, "No particle output enabled." );
 #endif
