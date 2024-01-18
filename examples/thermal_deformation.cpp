@@ -36,7 +36,7 @@ int main( int argc, char* argv[] )
         double K = E / ( 3 * ( 1 - 2 * nu ) ); // [Pa]
         double delta = inputs["horizon"];
 
-        double alpha = 7.5e-6; // [1/oC]
+        double alpha = inputs["thermal_coeff"]; // [1/oC]
         // Reference temperature
         // double temp0 = 0.0;
 
@@ -60,7 +60,20 @@ int main( int argc, char* argv[] )
         // Does not set displacements, velocities, etc.
         auto particles = std::make_shared<
             CabanaPD::Particles<memory_space, typename model_type::base_model>>(
-            exec_space(), low_corner, high_corner, num_cells, halo_width );
+            low_corner, high_corner, num_cells, halo_width );
+        // Do not create particles in the center.
+        double x_center = 0.0;
+        double y_center = -0.0005;
+        double radius = inputs["radius"];
+        auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
+        {
+            if ( ( ( x[0] - x_center ) * ( x[0] - x_center ) +
+                   ( x[1] - y_center ) * ( x[1] - y_center ) ) <
+                 radius * radius )
+                return false;
+            return true;
+        };
+        particles->createParticles( exec_space(), init_op );
 
         // Define particle initialization.
         auto x = particles->sliceReferencePosition();
