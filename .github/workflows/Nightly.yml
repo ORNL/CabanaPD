@@ -9,7 +9,6 @@ jobs:
     strategy:
       matrix:
         backend: ["OPENMP", "SERIAL"]
-        kokkos_ver: ["develop"]
         cmake_build_type: ['Release']
     runs-on: ubuntu-20.04
     container: ghcr.io/ecp-copa/ci-containers/ubuntu:latest
@@ -18,7 +17,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: kokkos/kokkos
-          ref: ${{ matrix.kokkos_ver }}
+          ref: develop
           path: kokkos
       - name: Build kokkos
         working-directory: kokkos
@@ -34,8 +33,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: ECP-CoPA/Cabana
-          # This version is post-release 0.5
-          ref: 31ba70d9e8f8e20f2e55e7e310905f950b21776f
+          ref: master
           path: cabana
       - name: Build Cabana
         working-directory: cabana
