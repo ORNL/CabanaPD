@@ -8,7 +8,7 @@ CabanaPD has the following dependencies:
 |Dependency | Version  | Required | Details|
 |---------- | -------  |--------  |------- |
 |CMake      | 3.11+    | Yes      | Build system
-|Cabana     | 31ba70d9 | Yes      | Performance portable particle algorithms
+|Cabana     | f99c7db9 | Yes      | Performance portable particle algorithms
 |GTest      | 1.10+    | No       | Unit test framework
 
 Cabana must be built with the following in order to work with CabanaPD:
@@ -30,10 +30,10 @@ spack install cabana@master+cajita+silo
 ```
 
 Alternatively, Kokkos can be built locally, followed by Cabana:
-https://github.com/ECP-copa/Cabana/wiki/Build-Instructions
+https://github.com/ECP-copa/Cabana/wiki/1-Build-Instructions
 
 Build instructions are available for both CPU and GPU. Note that Cabana must be
-compiled with Cajita and MPI.
+compiled with MPI and the Grid sub-package.
 
 ## Obtaining CabanaPD
 
