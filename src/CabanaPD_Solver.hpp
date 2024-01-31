@@ -402,6 +402,28 @@ class SolverFracture
     {
         init_timer.reset();
 
+        init_mu();
+
+        // Create prenotch.
+        prenotch.create( exec_space{}, mu, *particles, *neighbors );
+
+        init_time += init_timer.seconds();
+    }
+
+    SolverFracture( input_type _inputs,
+                    std::shared_ptr<particle_type> _particles,
+                    force_model_type force_model, bc_type bc )
+        : base_type( _inputs, _particles, force_model, bc )
+    {
+        init_timer.reset();
+
+        init_mu();
+
+        init_time += init_timer.seconds();
+    }
+
+    void init_mu()
+    {
         // Create View to track broken bonds.
         int max_neighbors =
             Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
@@ -409,10 +431,6 @@ class SolverFracture
             Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
             particles->n_local, max_neighbors );
         Kokkos::deep_copy( mu, 1 );
-
-        // Create prenotch.
-        prenotch.create( exec_space{}, mu, *particles, *neighbors );
-        init_time += init_timer.seconds();
     }
 
     void init_force()
