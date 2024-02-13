@@ -131,6 +131,10 @@ struct ForceUpdateBCTag
 {
 };
 
+struct TempBCTag
+{
+};
+
 struct ZeroBCTag
 {
 };
@@ -144,6 +148,37 @@ struct BoundaryCondition
     BoundaryCondition( BCIndexSpace bc_index_space, UserFunctor user )
         : _index_space( bc_index_space )
         , _user_functor( user )
+    {
+    }
+
+    template <class ExecSpace, class Particles>
+    void update( ExecSpace exec_space, Particles particles,
+                 RegionBoundary plane )
+    {
+        _index_space.update( exec_space, particles, plane );
+    }
+
+    template <class ExecSpace, class ParticleType>
+    void apply( ExecSpace, ParticleType& particles, double )
+    {
+        auto user = _user_functor;
+        auto index_space = _index_space._view;
+        Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
+        Kokkos::parallel_for(
+            "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
+                auto pid = index_space( b );
+                user( pid );
+            } );
+    }
+};
+
+template <class BCIndexSpace, class TempBCTag>
+struct BoundaryCondition
+{
+    BCIndexSpace _index_space;
+
+    BoundaryCondition( BCIndexSpace bc_index_space, UserFunctor user )
+        : _index_space( bc_index_space )
     {
     }
 
@@ -179,7 +214,7 @@ struct BoundaryCondition<BCIndexSpace, ZeroBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType )
+    void apply( ExecSpace, ParticleType, double )
     {
     }
 };
@@ -204,7 +239,7 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles, double t )
+    void apply( ExecSpace, ParticleType& particles, double )
     {
         auto temp = particles.sliceTemperature();
         auto index_space = _index_space._view;
@@ -239,7 +274,7 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles, double t )
+    void apply( ExecSpace, ParticleType& particles, double )
     {
         auto f = particles.sliceForce();
         auto index_space = _index_space._view;

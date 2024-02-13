@@ -249,8 +249,7 @@ class SolverElastic
             force_time += force_timer.seconds();
 
             // Add boundary condition.
-            boundary_condition.apply( exec_space(), *particles,
-                                      step * inputs->timestep );
+            boundary_condition.apply( exec_space(), *particles, step * dt );
 
             // Integrate - velocity Verlet second half.
             integrate_timer.reset();
@@ -494,8 +493,7 @@ class SolverFracture
             force_time += force_timer.seconds();
 
             // Add boundary condition.
-            boundary_condition.apply( exec_space{}, *particles,
-                                      step * inputs->timestep );
+            boundary_condition.apply( exec_space{}, *particles, step * dt );
 
             // Integrate - velocity Verlet second half.
             integrate_timer.reset();
