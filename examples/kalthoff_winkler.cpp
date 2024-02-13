@@ -36,7 +36,7 @@ int main( int argc, char* argv[] )
         double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) );
         double rho0 = inputs["density"];
         double G0 = inputs["fracture_energy"];
-        // double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
+        double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
 
         // PD horizon
         double delta = inputs["horizon"];
@@ -73,8 +73,8 @@ int main( int argc, char* argv[] )
 
         // Choose force model type.
         using model_type =
-             CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
-         model_type force_model( delta, K, G, G0 );
+            CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
+        model_type force_model( delta, K, G, G0 );
 
         // Create particles from mesh.
         // Does not set displacements, velocities, etc.

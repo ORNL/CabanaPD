@@ -159,7 +159,7 @@ struct BoundaryCondition
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles, double )
+    void apply( ExecSpace, ParticleType&, double )
     {
         auto user = _user_functor;
         auto index_space = _index_space._view;
@@ -172,13 +172,15 @@ struct BoundaryCondition
     }
 };
 
-template <class BCIndexSpace, class TempBCTag>
-struct BoundaryCondition
+template <class BCIndexSpace>
+struct BoundaryCondition<BCIndexSpace, TempBCTag>
 {
+    double _value;
     BCIndexSpace _index_space;
 
-    BoundaryCondition( BCIndexSpace bc_index_space, UserFunctor user )
-        : _index_space( bc_index_space )
+    BoundaryCondition( const double value, BCIndexSpace bc_index_space )
+        : _value( value )
+        , _index_space( bc_index_space )
     {
     }
 
@@ -194,13 +196,14 @@ struct BoundaryCondition
     {
         auto temp = particles.sliceTemperature();
         auto x = particles.sliceReferencePosition();
+        auto value = _value;
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
                 // This is specifically for the thermal deformation problem
-                temp( pid ) = 5000 * x( pid, 1 ) * t;
+                temp( pid ) = value * x( pid, 1 ) * t;
             } );
     }
 };
@@ -241,7 +244,7 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     template <class ExecSpace, class ParticleType>
     void apply( ExecSpace, ParticleType& particles, double )
     {
-        auto temp = particles.sliceTemperature();
+        auto f = particles.sliceForce();
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         auto value = _value;
@@ -294,7 +297,6 @@ template <class BoundaryType, class BCTag, class ExecSpace, class Particles>
 auto createBoundaryCondition( BCTag, const double value, ExecSpace exec_space,
                               Particles particles,
                               std::vector<BoundaryType> planes,
-                              const double value,
                               const double initial_guess = 1.1 )
 {
     using memory_space = typename Particles::memory_space;
