@@ -60,7 +60,7 @@ int main( int argc, char* argv[] )
         // Does not set displacements, velocities, etc.
         auto particles = std::make_shared<
             CabanaPD::Particles<memory_space, typename model_type::base_model>>(
-            low_corner, high_corner, num_cells, halo_width );
+            exec_space(), low_corner, high_corner, num_cells, halo_width );
         // Do not create particles in the center.
         double x_center = 0.0;
         double y_center = -0.0005;
