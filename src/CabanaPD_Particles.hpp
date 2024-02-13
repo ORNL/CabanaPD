@@ -446,11 +446,12 @@ class Particles<MemorySpace, PMB, Dimension>
             sliceTemperature() );
 #else
 #ifdef Cabana_ENABLE_SILO
-        Cajita::Experimental::SiloParticleOutput::writePartialRangeTimeStep(
-            "particles", local_grid->globalGrid(), output_step, output_time, 0,
-            n_local, getPosition( use_reference ), sliceStrainEnergy(),
-            sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage(),
-            sliceTemperature() );
+        Cabana::Grid::Experimental::SiloParticleOutput::
+            writePartialRangeTimeStep(
+                "particles", local_grid->globalGrid(), output_step, output_time,
+                0, n_local, getPosition( use_reference ), sliceStrainEnergy(),
+                sliceForce(), sliceDisplacement(), sliceVelocity(),
+                sliceDamage(), sliceTemperature() );
 #else
         log( std::cout, "No particle output enabled." );
 #endif
