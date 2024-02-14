@@ -91,6 +91,7 @@ int main( int argc, char* argv[] )
 
         auto bc = createBoundaryCondition( CabanaPD::TempBCTag{}, 5000.0,
                                            exec_space{}, *particles, domain );
+        bc.setCorner( low_corner[1] );
 
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {

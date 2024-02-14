@@ -177,12 +177,15 @@ struct BoundaryCondition<BCIndexSpace, TempBCTag>
 {
     double _value;
     BCIndexSpace _index_space;
+    double _low_corner = 0.0;
 
     BoundaryCondition( const double value, BCIndexSpace bc_index_space )
         : _value( value )
         , _index_space( bc_index_space )
     {
     }
+
+    void setCorner( const double low ) { _low_corner = low; }
 
     template <class ExecSpace, class Particles>
     void update( ExecSpace exec_space, Particles particles,
@@ -197,13 +200,14 @@ struct BoundaryCondition<BCIndexSpace, TempBCTag>
         auto temp = particles.sliceTemperature();
         auto x = particles.sliceReferencePosition();
         auto value = _value;
+        auto low_corner = _low_corner;
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
                 // This is specifically for the thermal deformation problem
-                temp( pid ) = value * x( pid, 1 ) * t;
+                temp( pid ) = value * ( x( pid, 1 ) - low_corner ) * t;
             } );
     }
 };
