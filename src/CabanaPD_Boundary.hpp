@@ -131,6 +131,10 @@ struct ForceUpdateBCTag
 {
 };
 
+struct TempBCTag
+{
+};
+
 struct ZeroBCTag
 {
 };
@@ -155,7 +159,7 @@ struct BoundaryCondition
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& )
+    void apply( ExecSpace, ParticleType&, double )
     {
         auto user = _user_functor;
         auto index_space = _index_space._view;
@@ -169,6 +173,46 @@ struct BoundaryCondition
 };
 
 template <class BCIndexSpace>
+struct BoundaryCondition<BCIndexSpace, TempBCTag>
+{
+    double _value;
+    BCIndexSpace _index_space;
+    double _low_corner = 0.0;
+
+    BoundaryCondition( const double value, BCIndexSpace bc_index_space )
+        : _value( value )
+        , _index_space( bc_index_space )
+    {
+    }
+
+    void setCorner( const double low ) { _low_corner = low; }
+
+    template <class ExecSpace, class Particles>
+    void update( ExecSpace exec_space, Particles particles,
+                 RegionBoundary plane )
+    {
+        _index_space.update( exec_space, particles, plane );
+    }
+
+    template <class ExecSpace, class ParticleType>
+    void apply( ExecSpace, ParticleType& particles, double t )
+    {
+        auto temp = particles.sliceTemperature();
+        auto x = particles.sliceReferencePosition();
+        auto value = _value;
+        auto low_corner = _low_corner;
+        auto index_space = _index_space._view;
+        Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
+        Kokkos::parallel_for(
+            "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
+                auto pid = index_space( b );
+                // This is specifically for the thermal deformation problem
+                temp( pid ) = value * ( x( pid, 1 ) - low_corner ) * t;
+            } );
+    }
+};
+
+template <class BCIndexSpace>
 struct BoundaryCondition<BCIndexSpace, ZeroBCTag>
 {
     template <class ExecSpace, class Particles>
@@ -177,7 +221,7 @@ struct BoundaryCondition<BCIndexSpace, ZeroBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType )
+    void apply( ExecSpace, ParticleType, double )
     {
     }
 };
@@ -202,7 +246,7 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles )
+    void apply( ExecSpace, ParticleType& particles, double )
     {
         auto f = particles.sliceForce();
         auto index_space = _index_space._view;
@@ -237,7 +281,7 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles )
+    void apply( ExecSpace, ParticleType& particles, double )
     {
         auto f = particles.sliceForce();
         auto index_space = _index_space._view;
@@ -257,7 +301,7 @@ template <class BoundaryType, class BCTag, class ExecSpace, class Particles>
 auto createBoundaryCondition( BCTag, const double value, ExecSpace exec_space,
                               Particles particles,
                               std::vector<BoundaryType> planes,
-                              const double initial_guess = 0.5 )
+                              const double initial_guess = 1.1 )
 {
     using memory_space = typename Particles::memory_space;
     using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;

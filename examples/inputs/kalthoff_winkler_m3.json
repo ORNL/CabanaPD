@@ -1,0 +1,13 @@
+{
+    "num_cells"         : {"value": [151, 301, 14]},
+    "system_size"       : {"value": [0.1, 0.2, 0.009], "unit": "m"},
+    "density"           : {"value": 8000,  "unit": "kg/m^3"},
+    "elastic_modulus"   : {"value": 191e+9, "unit": "Pa"},
+    "fracture_energy"   : {"value": 42408,   "unit": "J/m^2"},
+    "horizon"           : {"value": 0.002, "unit": "m"}, 
+    "impactor_velocity" : {"value": 16, "unit": "m/sec"}, 
+    "final_time"        : {"value": 70e-6, "unit": "s"},
+    "timestep"          : {"value": 0.133e-6,  "unit": "s"},
+    "output_frequency"  : {"value": 500},
+    "output_reference"  : {"value": true}
+}
