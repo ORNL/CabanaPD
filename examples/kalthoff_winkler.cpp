@@ -23,28 +23,34 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
 
     {
+        // ====================================================
+        //                  Setup Kokkos
+        // ====================================================
         Kokkos::ScopeGuard scope_guard( argc, argv );
 
         using exec_space = Kokkos::DefaultExecutionSpace;
         using memory_space = typename exec_space::memory_space;
 
+        // ====================================================
+        //                   Read inputs
+        // ====================================================
         CabanaPD::Inputs inputs( argv[1] );
 
-        // Material constants
+        // ====================================================
+        //                Material parameters
+        // ====================================================
+        double rho0 = inputs["density"];
         double E = inputs["elastic_modulus"];
         double nu = 1.0 / 3.0;
         double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) );
-        double rho0 = inputs["density"];
         double G0 = inputs["fracture_energy"];
         // double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
-
-        // PD horizon
         double delta = inputs["horizon"];
         delta += 1e-10;
 
-        // Impactor velocity
-        double v0 = inputs["impactor_velocity"];
-
+        // ====================================================
+        //                  Discretization
+        // ====================================================
         // FIXME: set halo width based on delta
         std::array<double, 3> low_corner = inputs["low_corner"];
         std::array<double, 3> high_corner = inputs["high_corner"];
@@ -53,7 +59,9 @@ int main( int argc, char* argv[] )
             delta / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
         int halo_width = m + 1; // Just to be safe.
 
-        // Prenotches
+        // ====================================================
+        //                   Pre-notches
+        // ====================================================
         std::array<double, 3> system_size = inputs["system_size"];
         double height = system_size[0];
         double width = system_size[1];
@@ -71,7 +79,9 @@ int main( int argc, char* argv[] )
                                                                        p02 };
         CabanaPD::Prenotch<2> prenotch( v1, v2, notch_positions );
 
-        // Choose force model type.
+        // ====================================================
+        //                    Force model
+        // ====================================================
         using model_type =
             CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
         model_type force_model( delta, K, G0 );
@@ -79,18 +89,17 @@ int main( int argc, char* argv[] )
         //     CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
         // model_type force_model( delta, K, G, G0 );
 
-        // Create particles from mesh.
+        // ====================================================
+        //                 Particle generation
+        // ====================================================
         // Does not set displacements, velocities, etc.
         auto particles = std::make_shared<
             CabanaPD::Particles<memory_space, typename model_type::base_model>>(
             exec_space(), low_corner, high_corner, num_cells, halo_width );
 
-        // Define particle initialization.
-        auto x = particles->sliceReferencePosition();
-        auto v = particles->sliceVelocity();
-        auto f = particles->sliceForce();
-        auto rho = particles->sliceDensity();
-
+        // ====================================================
+        //                Boundary conditions
+        // ====================================================
         double dx = particles->dx[0];
         double x_bc = -0.5 * height;
         CabanaPD::RegionBoundary plane(
@@ -100,16 +109,30 @@ int main( int argc, char* argv[] )
         auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
                                            exec_space{}, *particles, planes );
 
+        // ====================================================
+        //            Custom particle initialization
+        // ====================================================
+        auto rho = particles->sliceDensity();
+        auto x = particles->sliceReferencePosition();
+        auto v = particles->sliceVelocity();
+        auto f = particles->sliceForce();
+
+        double v0 = inputs["impactor_velocity"];
+
         auto init_functor = KOKKOS_LAMBDA( const int pid )
         {
+            // Density
             rho( pid ) = rho0;
-            // Set the x velocity inside the pre-notches.
+            // x velocity between the pre-notches
             if ( x( pid, 1 ) > y_prenotch1 && x( pid, 1 ) < y_prenotch2 &&
                  x( pid, 0 ) < -0.5 * height + dx )
                 v( pid, 0 ) = v0;
         };
         particles->updateParticles( exec_space{}, init_functor );
 
+        // ====================================================
+        //                   Simulation run
+        // ====================================================
         auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
             inputs, particles, force_model, bc, prenotch );
         cabana_pd->init_force();
