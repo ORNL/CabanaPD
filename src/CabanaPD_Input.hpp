@@ -14,10 +14,11 @@
 
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include <string>
 
 #include <nlohmann/json.hpp>
+
+#include <CabanaPD_Output.hpp>
 
 namespace CabanaPD
 {
@@ -165,12 +166,12 @@ class Inputs
         double dt = inputs["timestep"]["value"];
         if ( dt > dt_crit )
         {
-            std::ostringstream message;
-            message << "Timestep is too large (" << dt
-                    << "). With a safety factor of " << safety_factor
-                    << " timestep should be " << dt_crit;
-            throw std::runtime_error( message.str() );
+            log( std::cout, "WARNING: timestep (", dt,
+                 ") is larger than estimated stable timestep (", dt_crit,
+                 "), using safety factor of ", safety_factor, ".\n" );
         }
+        // Store in inputs
+        inputs["critical_timestep"]["value"] = dt_crit;
     }
 
     // Parse JSON file.
