@@ -38,13 +38,13 @@ class Inputs
             double low = -0.5 * s;
             double high = 0.5 * s;
             inputs["low_corner"]["value"][d] = low;
-            inputs["low_corner"]["unit"][d] = size_unit;
             inputs["high_corner"]["value"][d] = high;
-            inputs["high_corner"]["unit"][d] = size_unit;
 
             double nc = inputs["num_cells"]["value"][d];
             inputs["dx"]["value"][d] = ( high - low ) / nc;
         }
+        inputs["low_corner"]["unit"] = size_unit;
+        inputs["high_corner"]["unit"] = size_unit;
         inputs["dx"]["unit"] = size_unit;
 
         // Number of steps.
