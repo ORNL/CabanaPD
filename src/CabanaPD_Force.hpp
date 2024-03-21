@@ -633,7 +633,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                                  s * xi * xi * vol( j );
                 // Check if all bonds are broken (m=0) to avoid dividing by
                 // zero. Alternatively, one could check if this bond mu(i,n) is
-                // broken, beacuse m=0 only occurs when all bonds are broken.
+                // broken, because m=0 only occurs when all bonds are broken.
                 if ( m( i ) > 0 )
                     theta( i ) += 3.0 * theta_i / m( i );
             }
