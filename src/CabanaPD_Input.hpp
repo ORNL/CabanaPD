@@ -69,8 +69,8 @@ class Inputs
             if ( !inputs.contains( "elastic_modulus" ) )
                 throw std::runtime_error( "Must input either bulk_modulus or "
                                           "elastic_modulus." );
-            double nu = 0.25;
             double E = inputs["elastic_modulus"]["value"];
+            double nu = 0.25;
             double K = E / ( 3 * ( 1 - 2 * nu ) );
             inputs["bulk_modulus"]["value"] = K;
         }
