@@ -1,12 +1,13 @@
 {
-    "num_cells"       : {"value": [41, 41, 41]},
-    "system_size"     : {"value": [1.0, 1.0, 1.0], "unit": ""},
-    "density"         : {"value": 100.0,  "unit": ""},
-    "bulk_modulus"    : {"value": 1.0, "unit": ""},
-    "shear_modulus"   : {"value": 0.5, "unit": ""},
-    "horizon"         : {"value": 0.075, "unit": ""},  
-    "final_time"      : {"value": 0.6, "unit": ""},
-    "timestep"        : {"value": 0.01,  "unit": ""},
-    "output_frequency": {"value": 5},
-    "output_reference": {"value": true}
+    "num_cells"              : {"value": [41, 41, 41]},
+    "system_size"            : {"value": [1.0, 1.0, 1.0], "unit": ""},
+    "density"                : {"value": 100.0,  "unit": ""},
+    "bulk_modulus"           : {"value": 1.0, "unit": ""},
+    "shear_modulus"          : {"value": 0.5, "unit": ""},
+    "horizon"                : {"value": 0.075, "unit": ""},  
+    "final_time"             : {"value": 0.6, "unit": ""},
+    "timestep"               : {"value": 0.01,  "unit": ""},
+    "timestep_safety_factor" : {"value": 0.85},
+    "output_frequency"       : {"value": 5},
+    "output_reference"       : {"value": true}
 }
