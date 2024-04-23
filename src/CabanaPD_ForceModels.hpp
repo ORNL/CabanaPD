@@ -9,26 +9,25 @@
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef CABANAPD_HPP
-#define CABANAPD_HPP
+#ifndef FORCE_MODELS_H
+#define FORCE_MODELS_H
 
-#include <CabanaPD_Boundary.hpp>
-#include <CabanaPD_Comm.hpp>
-#include <CabanaPD_Fields.hpp>
-#include <CabanaPD_Force.hpp>
-#include <CabanaPD_ForceModels.hpp>
-#include <CabanaPD_Input.hpp>
-#include <CabanaPD_Integrate.hpp>
-#include <CabanaPD_Output.hpp>
-#include <CabanaPD_Particles.hpp>
-#include <CabanaPD_Prenotch.hpp>
-#include <CabanaPD_Solver.hpp>
-#include <CabanaPD_Types.hpp>
-#include <CabanaPD_config.hpp>
+namespace CabanaPD
+{
+struct BaseForceModel
+{
+    double delta;
 
-#include <force/CabanaPD_ForceModels_LPS.hpp>
-#include <force/CabanaPD_ForceModels_PMB.hpp>
-#include <force/CabanaPD_Force_LPS.hpp>
-#include <force/CabanaPD_Force_PMB.hpp>
+    BaseForceModel(){};
+    BaseForceModel( const double _delta )
+        : delta( _delta ){};
+
+    BaseForceModel( const BaseForceModel& model ) { delta = model.delta; }
+};
+
+template <typename ModelType, typename DamageType>
+struct ForceModel;
+
+} // namespace CabanaPD
 
 #endif

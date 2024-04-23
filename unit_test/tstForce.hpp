@@ -28,8 +28,13 @@
 #include <CabanaPD_config.hpp>
 
 #include <CabanaPD_Force.hpp>
+#include <CabanaPD_ForceModels.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Particles.hpp>
+#include <force/CabanaPD_ForceModels_LPS.hpp>
+#include <force/CabanaPD_ForceModels_PMB.hpp>
+#include <force/CabanaPD_Force_LPS.hpp>
+#include <force/CabanaPD_Force_PMB.hpp>
 
 namespace Test
 {

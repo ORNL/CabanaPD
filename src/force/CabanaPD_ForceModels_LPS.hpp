@@ -1,0 +1,146 @@
+/****************************************************************************
+ * Copyright (c) 2022-2023 by Oak Ridge National Laboratory                 *
+ * All rights reserved.                                                     *
+ *                                                                          *
+ * This file is part of CabanaPD. CabanaPD is distributed under a           *
+ * BSD 3-clause license. For the licensing terms see the LICENSE file in    *
+ * the top-level directory.                                                 *
+ *                                                                          *
+ * SPDX-License-Identifier: BSD-3-Clause                                    *
+ ****************************************************************************/
+
+#ifndef FORCE_MODELS_LPS_H
+#define FORCE_MODELS_LPS_H
+
+#include <CabanaPD_ForceModels.hpp>
+#include <CabanaPD_Types.hpp>
+
+namespace CabanaPD
+{
+template <>
+struct ForceModel<LPS, Elastic> : public BaseForceModel
+{
+    using base_type = BaseForceModel;
+    using base_model = LPS;
+    using fracture_type = Elastic;
+
+    using BaseForceModel::delta;
+
+    int influence_type;
+
+    double K;
+    double G;
+    double theta_coeff;
+    double s_coeff;
+
+    ForceModel(){};
+    ForceModel( const double _delta, const double _K, const double _G,
+                const int _influence = 0 )
+        : base_type( _delta )
+        , influence_type( _influence )
+    {
+        set_param( _delta, _K, _G );
+    }
+
+    void set_param( const double _delta, const double _K, const double _G )
+    {
+        delta = _delta;
+        K = _K;
+        G = _G;
+
+        theta_coeff = 3.0 * K - 5.0 * G;
+        s_coeff = 15.0 * G;
+    }
+
+    KOKKOS_INLINE_FUNCTION double influence_function( double xi ) const
+    {
+        if ( influence_type == 1 )
+            return 1.0 / xi;
+        else
+            return 1.0;
+    }
+};
+
+template <>
+struct ForceModel<LPS, Fracture> : public ForceModel<LPS, Elastic>
+{
+    using base_type = ForceModel<LPS, Elastic>;
+    using base_model = LPS;
+    using fracture_type = Fracture;
+
+    using base_type::delta;
+    using base_type::G;
+    using base_type::influence_type;
+    using base_type::K;
+    using base_type::s_coeff;
+    using base_type::theta_coeff;
+    double G0;
+    double s0;
+    double bond_break_coeff;
+
+    ForceModel() {}
+    ForceModel( const double _delta, const double _K, const double _G,
+                const double _G0, const int _influence = 0 )
+        : base_type( _delta, _K, _G, _influence )
+    {
+        set_param( _delta, _K, _G, _G0 );
+    }
+
+    void set_param( const double _delta, const double _K, const double _G,
+                    const double _G0 )
+    {
+        base_type::set_param( _delta, _K, _G );
+        G0 = _G0;
+        if ( influence_type == 1 )
+        {
+            s0 = sqrt( 5.0 * G0 / 9.0 / K / delta ); // 1/xi
+        }
+        else
+        {
+            s0 = sqrt( 8.0 * G0 / 15.0 / K / delta ); // 1
+        }
+        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+    }
+};
+
+template <>
+struct ForceModel<LinearLPS, Elastic> : public ForceModel<LPS, Elastic>
+{
+    using base_type = ForceModel<LPS, Elastic>;
+    using base_model = LPS;
+    using fracture_type = Elastic;
+
+    using base_type::base_type;
+
+    using base_type::delta;
+    using base_type::G;
+    using base_type::influence_type;
+    using base_type::K;
+    using base_type::s_coeff;
+    using base_type::theta_coeff;
+};
+
+template <>
+struct ForceModel<LinearLPS, Fracture> : public ForceModel<LPS, Fracture>
+{
+    using base_type = ForceModel<LPS, Fracture>;
+    using base_model = LPS;
+    using fracture_type = Fracture;
+
+    using base_type::base_type;
+
+    using base_type::delta;
+    using base_type::G;
+    using base_type::influence_type;
+    using base_type::K;
+    using base_type::s_coeff;
+    using base_type::theta_coeff;
+
+    using base_type::bond_break_coeff;
+    using base_type::G0;
+    using base_type::s0;
+};
+
+} // namespace CabanaPD
+
+#endif
