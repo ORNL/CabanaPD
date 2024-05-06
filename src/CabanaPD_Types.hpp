@@ -20,6 +20,12 @@ struct Elastic
 struct Fracture
 {
 };
+struct TemperatureDependent
+{
+};
+struct TemperatureIndependent
+{
+};
 
 struct PMB
 {
