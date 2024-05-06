@@ -8,3 +8,5 @@ add_executable(CrackBranching crack_branching.cpp)
 target_link_libraries(CrackBranching LINK_PUBLIC CabanaPD)
 
 install(TARGETS ElasticWave KalthoffWinkler CrackBranching DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+add_subdirectory(thermomechanics)
