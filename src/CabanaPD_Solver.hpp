@@ -201,7 +201,7 @@ class SolverElastic
         computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
 
         // Add boundary condition.
-        boundary_condition.apply( exec_space(), *particles );
+        boundary_condition.apply( exec_space(), *particles, 0.0 );
 
         particles->output( 0, 0.0, output_reference );
     }
@@ -231,7 +231,7 @@ class SolverElastic
             computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
 
             // Add boundary condition.
-            boundary_condition.apply( exec_space(), *particles );
+            boundary_condition.apply( exec_space(), *particles, step * dt );
 
             // Integrate - velocity Verlet second half.
             integrator->finalHalfStep( *particles );
@@ -430,7 +430,7 @@ class SolverFracture
         computeEnergy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
 
         // Add boundary condition.
-        boundary_condition.apply( exec_space(), *particles );
+        boundary_condition.apply( exec_space(), *particles, 0 );
 
         particles->output( 0, 0.0, output_reference );
     }
@@ -462,7 +462,7 @@ class SolverFracture
                           neigh_iter_tag{} );
 
             // Add boundary condition.
-            boundary_condition.apply( exec_space{}, *particles );
+            boundary_condition.apply( exec_space{}, *particles, step * dt );
 
             // Integrate - velocity Verlet second half.
             integrator->finalHalfStep( *particles );

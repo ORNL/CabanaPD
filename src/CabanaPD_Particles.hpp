@@ -101,9 +101,9 @@ class Particles<MemorySpace, PMB, Dimension>
     using scalar_type = Cabana::MemberTypes<double>;
     // no-fail.
     using int_type = Cabana::MemberTypes<int>;
-    // type, W, v, rho, damage.
+    // v, W, rho, damage, temperature, type.
     using other_types =
-        Cabana::MemberTypes<int, double, double[dim], double, double>;
+        Cabana::MemberTypes<double[dim], double, double, double, double, int>;
     // Potentially needed later: body force (b), ID.
 
     // FIXME: add vector length.
@@ -258,6 +258,7 @@ class Particles<MemorySpace, PMB, Dimension>
         auto y = sliceCurrentPosition();
         auto vol = sliceVolume();
         auto nofail = sliceNoFail();
+        auto temp = sliceTemperature();
 
         // Initialize particles.
         auto create_functor =
@@ -286,6 +287,7 @@ class Particles<MemorySpace, PMB, Dimension>
             type( pid ) = 0;
             nofail( pid ) = 0;
             rho( pid ) = 1.0;
+            temp( pid ) = 0.0;
 
             return create;
         };
@@ -354,8 +356,8 @@ class Particles<MemorySpace, PMB, Dimension>
     {
         return Cabana::slice<0>( _aosoa_vol, "volume" );
     }
-    auto sliceType() { return Cabana::slice<0>( _aosoa_other, "type" ); }
-    auto sliceType() const { return Cabana::slice<0>( _aosoa_other, "type" ); }
+    auto sliceType() { return Cabana::slice<5>( _aosoa_other, "type" ); }
+    auto sliceType() const { return Cabana::slice<5>( _aosoa_other, "type" ); }
     auto sliceStrainEnergy()
     {
         return Cabana::slice<1>( _aosoa_other, "strain_energy" );
@@ -366,21 +368,29 @@ class Particles<MemorySpace, PMB, Dimension>
     }
     auto sliceVelocity()
     {
-        return Cabana::slice<2>( _aosoa_other, "velocities" );
+        return Cabana::slice<0>( _aosoa_other, "velocities" );
     }
     auto sliceVelocity() const
     {
-        return Cabana::slice<2>( _aosoa_other, "velocities" );
+        return Cabana::slice<0>( _aosoa_other, "velocities" );
     }
-    auto sliceDensity() { return Cabana::slice<3>( _aosoa_other, "density" ); }
+    auto sliceDensity() { return Cabana::slice<2>( _aosoa_other, "density" ); }
     auto sliceDensity() const
     {
-        return Cabana::slice<3>( _aosoa_other, "density" );
+        return Cabana::slice<2>( _aosoa_other, "density" );
     }
-    auto sliceDamage() { return Cabana::slice<4>( _aosoa_other, "damage" ); }
+    auto sliceDamage() { return Cabana::slice<3>( _aosoa_other, "damage" ); }
     auto sliceDamage() const
     {
-        return Cabana::slice<4>( _aosoa_other, "damage" );
+        return Cabana::slice<3>( _aosoa_other, "damage" );
+    }
+    auto sliceTemperature()
+    {
+        return Cabana::slice<4>( _aosoa_other, "temperature" );
+    }
+    auto sliceTemperature() const
+    {
+        return Cabana::slice<4>( _aosoa_other, "temperature" );
     }
     auto sliceNoFail()
     {
@@ -447,7 +457,8 @@ class Particles<MemorySpace, PMB, Dimension>
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
             n_local, getPosition( use_reference ), sliceStrainEnergy(),
-            sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage() );
+            sliceForce(), sliceDisplacement(), sliceVelocity(), sliceDamage(),
+            sliceTemperature() );
 #else
 #ifdef Cabana_ENABLE_SILO
         Cabana::Grid::Experimental::SiloParticleOutput::
@@ -455,7 +466,7 @@ class Particles<MemorySpace, PMB, Dimension>
                 "particles", local_grid->globalGrid(), output_step, output_time,
                 0, n_local, getPosition( use_reference ), sliceStrainEnergy(),
                 sliceForce(), sliceDisplacement(), sliceVelocity(),
-                sliceDamage() );
+                sliceDamage(), sliceTemperature() );
 #else
         log( std::cout, "No particle output enabled." );
 #endif

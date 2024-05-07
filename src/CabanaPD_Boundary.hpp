@@ -167,7 +167,7 @@ struct BoundaryCondition
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& )
+    void apply( ExecSpace, ParticleType&, double )
     {
         _timer.start();
         auto user = _user_functor;
@@ -196,7 +196,7 @@ struct BoundaryCondition<BCIndexSpace, ZeroBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType )
+    void apply( ExecSpace, ParticleType, double )
     {
     }
 
@@ -226,7 +226,7 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles )
+    void apply( ExecSpace, ParticleType& particles, double )
     {
         _timer.start();
         auto f = particles.sliceForce();
@@ -268,7 +268,7 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles )
+    void apply( ExecSpace, ParticleType& particles, double )
     {
         _timer.start();
 
