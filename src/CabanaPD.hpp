@@ -12,6 +12,7 @@
 #ifndef CABANAPD_HPP
 #define CABANAPD_HPP
 
+#include <CabanaPD_BodyTerm.hpp>
 #include <CabanaPD_Boundary.hpp>
 #include <CabanaPD_Comm.hpp>
 #include <CabanaPD_Fields.hpp>
