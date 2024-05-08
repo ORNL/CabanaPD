@@ -18,21 +18,38 @@
 
 #include <CabanaPD.hpp>
 
+// Simulate thermally-induced deformation in a rectangular plate.
 void thermalDeformationExample( const std::string filename )
 {
+    // ====================================================
+    //                  Use default Kokkos spaces
+    // ====================================================
     using exec_space = Kokkos::DefaultExecutionSpace;
     using memory_space = typename exec_space::memory_space;
 
+    // ====================================================
+    //                   Read inputs
+    // ====================================================
     CabanaPD::Inputs inputs( filename );
-    double E = inputs["elastic_modulus"];
+
+    // ====================================================
+    //            Material and problem parameters
+    // ====================================================
+    // Material parameters
     double rho0 = inputs["density"];
-    double nu = 0.25; // unitless
+    double E = inputs["elastic_modulus"];
+    double nu = 0.25;
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double delta = inputs["horizon"];
-
     double alpha = inputs["thermal_coefficient"];
+
+    // Problem parameters
     double temp0 = inputs["reference_temperature"];
 
+    // ====================================================
+    //                  Discretization
+    // ====================================================
+    // FIXME: set halo width based on delta
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
@@ -40,36 +57,55 @@ void thermalDeformationExample( const std::string filename )
                         ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
     int halo_width = m + 1; // Just to be safe.
 
-    // Choose force model type.
+    // ====================================================
+    //                Force model type
+    // ====================================================
     using model_type = CabanaPD::PMB;
 
-    // Create particles from mesh.
+    // ====================================================
+    //                 Particle generation
+    // ====================================================
+    // Does not set displacements, velocities, etc.
     auto particles =
         std::make_shared<CabanaPD::Particles<memory_space, model_type>>(
             exec_space(), low_corner, high_corner, num_cells, halo_width );
 
-    auto temp = particles->sliceTemperature();
+    // ====================================================
+    //                   Imposed field
+    // ====================================================
     auto x = particles->sliceReferencePosition();
+    auto temp = particles->sliceTemperature();
     auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
-        temp( pid ) = 5000.0 * ( x( pid, 1 ) - ( -0.15 ) ) * t;
+        temp( pid ) = 5000.0 * ( x( pid, 1 ) - low_corner[1] ) * t;
     };
     auto body_term = CabanaPD::createBodyTerm( temp_func );
 
+    // ====================================================
+    //            Custom particle initialization
+    // ====================================================
     auto rho = particles->sliceDensity();
     auto init_functor = KOKKOS_LAMBDA( const int pid ) { rho( pid ) = rho0; };
     particles->updateParticles( exec_space{}, init_functor );
 
+    // ====================================================
+    //                    Force model
+    // ====================================================
     auto force_model =
         CabanaPD::createForceModel<model_type, CabanaPD::Elastic,
                                    CabanaPD::TemperatureDependent>(
             *particles, delta, K, alpha, temp0 );
+
+    // ====================================================
+    //                   Simulation run
+    // ====================================================
     auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
         inputs, particles, force_model, body_term );
     cabana_pd->init_force();
     cabana_pd->run();
 }
 
+// Initialize MPI+Kokkos.
 int main( int argc, char* argv[] )
 {
     MPI_Init( &argc, &argv );
