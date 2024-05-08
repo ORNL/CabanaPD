@@ -24,7 +24,7 @@ struct ForceModel<LPS, Elastic> : public BaseForceModel
     using base_model = LPS;
     using fracture_type = Elastic;
 
-    using BaseForceModel::delta;
+    using base_type::delta;
 
     int influence_type;
 
@@ -65,7 +65,7 @@ template <>
 struct ForceModel<LPS, Fracture> : public ForceModel<LPS, Elastic>
 {
     using base_type = ForceModel<LPS, Elastic>;
-    using base_model = LPS;
+    using base_model = typename base_type::base_model;
     using fracture_type = Fracture;
 
     using base_type::delta;
@@ -107,8 +107,8 @@ template <>
 struct ForceModel<LinearLPS, Elastic> : public ForceModel<LPS, Elastic>
 {
     using base_type = ForceModel<LPS, Elastic>;
-    using base_model = LPS;
-    using fracture_type = Elastic;
+    using base_model = typename base_type::base_model;
+    using fracture_type = typename base_type::fracture_type;
 
     using base_type::base_type;
 
@@ -124,8 +124,8 @@ template <>
 struct ForceModel<LinearLPS, Fracture> : public ForceModel<LPS, Fracture>
 {
     using base_type = ForceModel<LPS, Fracture>;
-    using base_model = LPS;
-    using fracture_type = Fracture;
+    using base_model = typename base_type::base_model;
+    using fracture_type = typename base_type::fracture_type;
 
     using base_type::base_type;
 
