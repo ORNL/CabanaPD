@@ -15,6 +15,7 @@
 #include <CabanaPD_BodyTerm.hpp>
 #include <CabanaPD_Boundary.hpp>
 #include <CabanaPD_Comm.hpp>
+#include <CabanaPD_DisplacementProfile.hpp>
 #include <CabanaPD_Fields.hpp>
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_ForceModels.hpp>
