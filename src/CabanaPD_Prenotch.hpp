@@ -202,6 +202,8 @@ struct Prenotch
     Kokkos::Array<double, 3> _v2;
     Kokkos::Array<Kokkos::Array<double, 3>, num_notch> _p0_list;
 
+    Timer _timer;
+
     Prenotch() {}
 
     Prenotch( Kokkos::Array<double, 3> v1, Kokkos::Array<double, 3> v2,
@@ -217,6 +219,8 @@ struct Prenotch
     void create( ExecSpace, NeighborView& mu, Particles& particles,
                  Neighbors& neighbors )
     {
+        _timer.start();
+
         auto x = particles.sliceReferencePosition();
         Kokkos::RangePolicy<ExecSpace> policy( 0, particles.n_local );
 
@@ -250,7 +254,9 @@ struct Prenotch
             };
             Kokkos::parallel_for( "CabanaPD::Prenotch", policy, notch_functor );
         }
+        _timer.stop();
     }
+    auto time() { return _timer.time(); };
 };
 
 } // namespace CabanaPD

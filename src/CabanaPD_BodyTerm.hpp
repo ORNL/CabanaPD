@@ -16,6 +16,8 @@
 
 #include <Cabana_Core.hpp>
 
+#include <CabanaPD_Timer.hpp>
+
 namespace CabanaPD
 {
 
@@ -23,6 +25,8 @@ template <class UserFunctor>
 struct BodyTerm
 {
     UserFunctor _user_functor;
+
+    Timer _timer;
 
     BodyTerm( UserFunctor user )
         : _user_functor( user )
@@ -34,12 +38,17 @@ struct BodyTerm
     template <class ExecSpace, class ParticleType>
     void apply( ExecSpace, ParticleType& particles, const double time )
     {
+        _timer.start();
         Kokkos::RangePolicy<ExecSpace> policy( 0, particles.n_local );
         auto user = _user_functor;
         Kokkos::parallel_for(
             "CabanaPD::BodyTerm::apply", policy,
             KOKKOS_LAMBDA( const int p ) { user( p, time ); } );
+        _timer.stop();
     }
+
+    auto time() { return _timer.time(); };
+    auto timeInit() { return 0.0; };
 };
 
 template <class UserFunctor>

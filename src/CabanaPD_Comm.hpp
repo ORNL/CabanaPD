@@ -18,6 +18,7 @@
 
 #include <Cabana_Grid.hpp>
 
+#include <CabanaPD_Timer.hpp>
 #include <CabanaPD_Types.hpp>
 
 namespace CabanaPD
@@ -251,6 +252,7 @@ class Comm<ParticleType, PMB>
     Comm( ParticleType& particles, int max_export_guess = 100 )
         : max_export( max_export_guess )
     {
+        _init_timer.start();
         auto local_grid = particles.local_grid;
         MPI_Comm_size( local_grid->globalGrid().comm(), &mpi_size );
         MPI_Comm_rank( local_grid->globalGrid().comm(), &mpi_rank );
@@ -281,6 +283,8 @@ class Comm<ParticleType, PMB>
 
         gather_u = std::make_shared<gather_u_type>( *halo, particles._aosoa_u );
         gather_u->apply();
+
+        _init_timer.stop();
     }
     ~Comm() {}
 
@@ -297,10 +301,22 @@ class Comm<ParticleType, PMB>
 
     // We assume here that the particle count has not changed and no resize
     // is necessary.
-    void gatherDisplacement() { gather_u->apply(); }
+    void gatherDisplacement()
+    {
+        _timer.start();
+        gather_u->apply();
+        _timer.stop();
+    }
     // No-op to make solvers simpler.
     void gatherDilatation() {}
     void gatherWeightedVolume() {}
+
+    auto timeInit() { return _init_timer.time(); };
+    auto time() { return _timer.time(); };
+
+  protected:
+    Timer _init_timer;
+    Timer _timer;
 };
 
 template <class ParticleType>
@@ -313,6 +329,9 @@ class Comm<ParticleType, LPS> : public Comm<ParticleType, PMB>
     using base_type::gather_u;
     using base_type::halo;
 
+    using base_type::_init_timer;
+    using base_type::_timer;
+
     using gather_m_type =
         Cabana::Gather<halo_type, typename ParticleType::aosoa_m_type>;
     using gather_theta_type =
@@ -323,14 +342,28 @@ class Comm<ParticleType, LPS> : public Comm<ParticleType, PMB>
     Comm( ParticleType& particles, int max_export_guess = 100 )
         : base_type( particles, max_export_guess )
     {
+        _init_timer.start();
+
         gather_m = std::make_shared<gather_m_type>( *halo, particles._aosoa_m );
         gather_theta = std::make_shared<gather_theta_type>(
             *halo, particles._aosoa_theta );
+
+        _init_timer.stop();
     }
     ~Comm() {}
 
-    void gatherDilatation() { gather_theta->apply(); }
-    void gatherWeightedVolume() { gather_m->apply(); }
+    void gatherDilatation()
+    {
+        _timer.start();
+        gather_theta->apply();
+        _timer.stop();
+    }
+    void gatherWeightedVolume()
+    {
+        _timer.start();
+        gather_m->apply();
+        _timer.stop();
+    }
 };
 
 } // namespace CabanaPD

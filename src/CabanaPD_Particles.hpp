@@ -72,6 +72,7 @@
 #include <CabanaPD_Comm.hpp>
 #include <CabanaPD_Fields.hpp>
 #include <CabanaPD_Output.hpp>
+#include <CabanaPD_Timer.hpp>
 #include <CabanaPD_Types.hpp>
 
 namespace CabanaPD
@@ -141,6 +142,7 @@ class Particles<MemorySpace, PMB, Dimension>
     // Default constructor.
     Particles()
     {
+        _init_timer.start();
         for ( int d = 0; d < dim; d++ )
         {
             global_mesh_ext[d] = 0.0;
@@ -150,6 +152,7 @@ class Particles<MemorySpace, PMB, Dimension>
             ghost_mesh_hi[d] = 0.0;
             local_mesh_ext[d] = 0.0;
         }
+        _init_timer.stop();
         resize( 0, 0 );
     }
 
@@ -185,6 +188,7 @@ class Particles<MemorySpace, PMB, Dimension>
                        std::array<double, dim> high_corner,
                        const std::array<int, dim> num_cells )
     {
+        _init_timer.start();
         // Create the MPI partitions.
         Cabana::Grid::DimBlockPartitioner<dim> partitioner;
 
@@ -218,6 +222,7 @@ class Particles<MemorySpace, PMB, Dimension>
                 local_mesh.highCorner( Cabana::Grid::Ghost(), d );
             local_mesh_ext[d] = local_mesh.extent( Cabana::Grid::Own(), d );
         }
+        _init_timer.stop();
     }
 
     template <class ExecSpace>
@@ -233,6 +238,7 @@ class Particles<MemorySpace, PMB, Dimension>
     template <class ExecSpace, class UserFunctor>
     void createParticles( const ExecSpace& exec_space, UserFunctor user_create )
     {
+        _init_timer.start();
         // Create a local mesh and owned space.
         auto owned_cells = local_grid->indexSpace(
             Cabana::Grid::Own(), Cabana::Grid::Cell(), Cabana::Grid::Local() );
@@ -292,15 +298,18 @@ class Particles<MemorySpace, PMB, Dimension>
         // Not using Allreduce because global count is only used for printing.
         MPI_Reduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0,
                     MPI_COMM_WORLD );
+        _init_timer.stop();
     }
 
     template <class ExecSpace, class FunctorType>
     void updateParticles( const ExecSpace, const FunctorType init_functor )
     {
+        _timer.start();
         Kokkos::RangePolicy<ExecSpace> policy( 0, n_local );
         Kokkos::parallel_for(
             "CabanaPD::Particles::update_particles", policy,
             KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
+        _timer.stop();
     }
 
     auto sliceReferencePosition()
@@ -387,6 +396,7 @@ class Particles<MemorySpace, PMB, Dimension>
 
     void updateCurrentPosition()
     {
+        _timer.start();
         // Not using slice function because this is called inside.
         auto y = Cabana::slice<0>( _aosoa_y, "current_positions" );
         auto x = sliceReferencePosition();
@@ -399,10 +409,12 @@ class Particles<MemorySpace, PMB, Dimension>
         };
         Kokkos::parallel_for( "CabanaPD::CalculateCurrentPositions", policy,
                               sum_x_u );
+        _timer.stop();
     }
 
     void resize( int new_local, int new_ghost )
     {
+        _timer.start();
         n_local = new_local;
         n_ghost = new_ghost;
 
@@ -414,6 +426,7 @@ class Particles<MemorySpace, PMB, Dimension>
         _aosoa_other.resize( new_local );
         _aosoa_nofail.resize( new_local + new_ghost );
         size = _plist_x.size();
+        _timer.stop();
     };
 
     auto getPosition( const bool use_reference )
@@ -428,6 +441,8 @@ class Particles<MemorySpace, PMB, Dimension>
                  [[maybe_unused]] const double output_time,
                  [[maybe_unused]] const bool use_reference = true )
     {
+        _output_timer.start();
+
 #ifdef Cabana_ENABLE_HDF5
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
@@ -445,7 +460,13 @@ class Particles<MemorySpace, PMB, Dimension>
         log( std::cout, "No particle output enabled." );
 #endif
 #endif
+
+        _output_timer.stop();
     }
+
+    auto timeInit() { return _init_timer.time(); };
+    auto timeOutput() { return _output_timer.time(); };
+    auto time() { return _timer.time(); };
 
     friend class Comm<self_type, PMB>;
 
@@ -462,6 +483,10 @@ class Particles<MemorySpace, PMB, Dimension>
 #ifdef Cabana_ENABLE_HDF5
     Cabana::Experimental::HDF5ParticleOutput::HDF5Config h5_config;
 #endif
+
+    Timer _init_timer;
+    Timer _output_timer;
+    Timer _timer;
 };
 
 template <class MemorySpace, int Dimension>
@@ -508,8 +533,10 @@ class Particles<MemorySpace, LPS, Dimension>
     Particles()
         : base_type()
     {
+        _init_timer.start();
         _aosoa_m = aosoa_m_type( "Particle Weighted Volumes", 0 );
         _aosoa_theta = aosoa_theta_type( "Particle Dilatations", 0 );
+        _init_timer.stop();
     }
 
     // Constructor which initializes particles on regular grid.
@@ -520,17 +547,21 @@ class Particles<MemorySpace, LPS, Dimension>
         : base_type( exec_space, low_corner, high_corner, num_cells,
                      max_halo_width )
     {
+        _init_timer.start();
         _aosoa_m = aosoa_m_type( "Particle Weighted Volumes", n_local );
         _aosoa_theta = aosoa_theta_type( "Particle Dilatations", n_local );
         init_lps();
+        _init_timer.stop();
     }
 
     template <class ExecSpace>
     void createParticles( const ExecSpace& exec_space )
     {
         base_type::createParticles( exec_space );
+        _init_timer.start();
         _aosoa_m.resize( 0 );
         _aosoa_theta.resize( 0 );
+        _init_timer.stop();
     }
 
     auto sliceDilatation()
@@ -553,14 +584,18 @@ class Particles<MemorySpace, LPS, Dimension>
     void resize( int new_local, int new_ghost )
     {
         base_type::resize( new_local, new_ghost );
+        _timer.start();
         _aosoa_theta.resize( new_local + new_ghost );
         _aosoa_m.resize( new_local + new_ghost );
+        _timer.stop();
     }
 
     void output( [[maybe_unused]] const int output_step,
                  [[maybe_unused]] const double output_time,
                  [[maybe_unused]] const bool use_reference = true )
     {
+        _output_timer.start();
+
 #ifdef Cabana_ENABLE_HDF5
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
@@ -583,6 +618,8 @@ class Particles<MemorySpace, LPS, Dimension>
         log( std::cout, "No particle output enabled." );
 #endif
 #endif
+
+        _output_timer.stop();
     }
 
     friend class Comm<self_type, PMB>;
@@ -603,6 +640,10 @@ class Particles<MemorySpace, LPS, Dimension>
 #ifdef Cabana_ENABLE_HDF5
     using base_type::h5_config;
 #endif
+
+    using base_type::_init_timer;
+    using base_type::_output_timer;
+    using base_type::_timer;
 };
 
 } // namespace CabanaPD
