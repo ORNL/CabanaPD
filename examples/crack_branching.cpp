@@ -22,7 +22,7 @@
 void crackBranchingExample( const std::string filename )
 {
     // ====================================================
-    //                  Use default Kokkos spaces
+    //             Use default Kokkos spaces
     // ====================================================
     using exec_space = Kokkos::DefaultExecutionSpace;
     using memory_space = typename exec_space::memory_space;
@@ -37,7 +37,7 @@ void crackBranchingExample( const std::string filename )
     // ====================================================
     double rho0 = inputs["density"];
     double E = inputs["elastic_modulus"];
-    double nu = 0.25;
+    double nu = 0.25; // Use bond-based model
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double G0 = inputs["fracture_energy"];
     double delta = inputs["horizon"];
