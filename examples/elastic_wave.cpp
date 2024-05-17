@@ -22,7 +22,7 @@
 void elasticWaveExample( const std::string filename )
 {
     // ====================================================
-    //                  Use default Kokkos spaces
+    //             Use default Kokkos spaces
     // ====================================================
     using exec_space = Kokkos::DefaultExecutionSpace;
     using memory_space = typename exec_space::memory_space;
@@ -55,9 +55,6 @@ void elasticWaveExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    // using model_type =
-    //    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic>;
-    // model_type force_model( delta, K );
     using model_type =
         CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::Elastic>;
     model_type force_model( delta, K, G );
@@ -86,6 +83,9 @@ void elasticWaveExample( const std::string filename )
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
+        // Density
+        rho( pid ) = rho0;
+
         // Initial conditions: displacements and velocities
         double a = 0.001;
         double r0 = 0.25;
@@ -103,8 +103,6 @@ void elasticWaveExample( const std::string filename )
             u( pid, d ) = a * std::exp( -arg ) * comp;
             v( pid, d ) = 0.0;
         }
-        // Density
-        rho( pid ) = rho0;
     };
     particles->updateParticles( exec_space{}, init_functor );
 

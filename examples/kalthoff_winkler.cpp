@@ -18,12 +18,12 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate the Kalthoff-Winkler experiment conditions for crack propagation in
-// a steel plate from an impactor.
+// Simulate the Kalthoff-Winkler experiment of crack propagation in
+// a pre-notched steel plate due to impact.
 void kalthoffWinklerExample( const std::string filename )
 {
     // ====================================================
-    //                  Use default Kokkos spaces
+    //             Use default Kokkos spaces
     // ====================================================
     using exec_space = Kokkos::DefaultExecutionSpace;
     using memory_space = typename exec_space::memory_space;
