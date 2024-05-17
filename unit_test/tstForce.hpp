@@ -378,7 +378,8 @@ computeReferenceForceX( QuadraticTag,
 // System creation.
 //---------------------------------------------------------------------------//
 template <class ModelType>
-CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model>
+CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
+                    typename ModelType::thermal_type>
 createParticles( ModelType, LinearTag, const double dx, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
@@ -388,7 +389,8 @@ createParticles( ModelType, LinearTag, const double dx, const double s0 )
 
     // Create particles based on the mesh.
     using ptype =
-        CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model>;
+        CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
+                            typename ModelType::thermal_type>;
     ptype particles( TEST_EXECSPACE{}, box_min, box_max, num_cells, 0 );
 
     auto x = particles.sliceReferencePosition();
@@ -407,7 +409,8 @@ createParticles( ModelType, LinearTag, const double dx, const double s0 )
 }
 
 template <class ModelType>
-CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model>
+CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
+                    typename ModelType::thermal_type>
 createParticles( ModelType, QuadraticTag, const double dx, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
@@ -417,7 +420,8 @@ createParticles( ModelType, QuadraticTag, const double dx, const double s0 )
 
     // Create particles based on the mesh.
     using ptype =
-        CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model>;
+        CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
+                            typename ModelType::thermal_type>;
     ptype particles( TEST_EXECSPACE{}, box_min, box_max, num_cells, 0 );
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();

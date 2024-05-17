@@ -12,6 +12,8 @@
 #ifndef FORCE_MODELS_H
 #define FORCE_MODELS_H
 
+#include <CabanaPD_Types.hpp>
+
 namespace CabanaPD
 {
 struct BaseForceModel
@@ -57,6 +59,8 @@ struct BaseTemperatureModel
         alpha = _alpha;
         temp0 = _temp0;
     }
+
+    void update( const TemperatureType _temp ) { temperature = _temp; }
 
     // Update stretch with temperature effects.
     KOKKOS_INLINE_FUNCTION

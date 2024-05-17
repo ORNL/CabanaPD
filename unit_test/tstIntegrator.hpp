@@ -43,8 +43,9 @@ void testIntegratorReversibility( int steps )
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
     std::array<int, 3> num_cells = { 10, 10, 10 };
 
-    CabanaPD::Particles<TEST_MEMSPACE, CabanaPD::PMB> particles(
-        exec_space(), box_min, box_max, num_cells, 0 );
+    CabanaPD::Particles<TEST_MEMSPACE, CabanaPD::PMB,
+                        CabanaPD::TemperatureIndependent>
+        particles( exec_space(), box_min, box_max, num_cells, 0 );
     auto x = particles.sliceReferencePosition();
     std::size_t num_particle = x.size();
 

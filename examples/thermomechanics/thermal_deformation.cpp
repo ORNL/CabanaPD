@@ -61,23 +61,25 @@ void thermalDeformationExample( const std::string filename )
     //                Force model type
     // ====================================================
     using model_type = CabanaPD::PMB;
+    using thermal_type = CabanaPD::TemperatureDependent;
 
     // ====================================================
     //                 Particle generation
     // ====================================================
     // Does not set displacements, velocities, etc.
-    auto particles =
-        std::make_shared<CabanaPD::Particles<memory_space, model_type>>(
-            exec_space(), low_corner, high_corner, num_cells, halo_width );
+    auto particles = std::make_shared<
+        CabanaPD::Particles<memory_space, model_type, thermal_type>>(
+        exec_space(), low_corner, high_corner, num_cells, halo_width );
 
     // ====================================================
     //                   Imposed field
     // ====================================================
     auto x = particles->sliceReferencePosition();
     auto temp = particles->sliceTemperature();
+    const double low_corner_y = low_corner[1];
     auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
-        temp( pid ) = 5000.0 * ( x( pid, 1 ) - low_corner[1] ) * t;
+        temp( pid ) = 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
     };
     auto body_term = CabanaPD::createBodyTerm( temp_func );
 
@@ -92,8 +94,7 @@ void thermalDeformationExample( const std::string filename )
     //                    Force model
     // ====================================================
     auto force_model =
-        CabanaPD::createForceModel<model_type, CabanaPD::Elastic,
-                                   CabanaPD::TemperatureDependent>(
+        CabanaPD::createForceModel<model_type, CabanaPD::Elastic, thermal_type>(
             *particles, delta, K, alpha, temp0 );
 
     // ====================================================

@@ -59,6 +59,7 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent>
     using base_type = ForceModel<PMB, Elastic>;
     using base_model = typename base_type::base_model;
     using fracture_type = Fracture;
+    using thermal_type = base_type::thermal_type;
 
     using base_type::c;
     using base_type::delta;
@@ -98,6 +99,7 @@ struct ForceModel<LinearPMB, Elastic, TemperatureIndependent>
     using base_type = ForceModel<PMB, Elastic>;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
+    using thermal_type = base_type::thermal_type;
 
     using base_type::base_type;
 
@@ -113,6 +115,7 @@ struct ForceModel<LinearPMB, Fracture, TemperatureIndependent>
     using base_type = ForceModel<PMB, Fracture>;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
+    using thermal_type = base_type::thermal_type;
 
     using base_type::base_type;
 
