@@ -107,8 +107,13 @@ ctest
 
 ## Examples
 
-Once built and installed, CabanaPD examples can be run. Timing and energy
-information is output to file and particle output is written to files (if enabled within Cabana) that can be visualized with Paraview and similar applications. The first example is an elastic wave propagating through a cube from an initial Gaussian radial displacement profile from [1]. Assuming the build paths above, the example can be run with:
+Once built and installed, CabanaPD `examples/` can be run. Timing and energy
+information is output to file and particle output is written to files (if enabled within Cabana) that can be visualized with Paraview and similar applications. 
+New examples can be created by using any of the current cases as a template. All inputs are specified in the example JSON files within the relevant `inputs/` subdirectory.
+
+### Mechanics
+Examples which only include mechanics and fracture are with `examples/mechanics`.
+The first example is an elastic wave propagating through a cube from an initial Gaussian radial displacement profile from [1]. Assuming the build paths above, the example can be run with:
 
 ```
 ./CabanaPD/build/install/bin/ElasticWave CabanaPD/examples/inputs/elastic_wave.json
@@ -129,7 +134,14 @@ run with:
 ./CabanaPD/build/install/bin/CrackBranching CabanaPD/examples/inputs/crack_branching.json
 ```
 
-New examples can be created by using any of the current cases as a template. All inputs are currently specified in the example source files themselves.
+### Thermomechanics
+Examples which demonstrate temperature-dependent mechanics and fracture are with `examples/thermomechanics`.
+
+The first example demonstrates a thermoelastic problem without fracture:
+
+```
+./CabanaPD/build/install/bin/ThermalDeformation CabanaPD/examples/thermomechanics/thermal_deformation.json
+```
 
 ## References
 
