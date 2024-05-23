@@ -111,7 +111,7 @@ Once built and installed, CabanaPD examples can be run. Timing and energy
 information is output to file and particle output is written to files (if enabled within Cabana) that can be visualized with Paraview and similar applications. The first example is an elastic wave propagating through a cube from an initial Gaussian radial displacement profile from [1]. Assuming the build paths above, the example can be run with:
 
 ```
-./CabanaPD/build/install/bin/ElasticWave
+./CabanaPD/build/install/bin/ElasticWave CabanaPD/examples/inputs/elastic_wave.json
 ```
 
 The second example is the Kalthoff-Winkler experiment [2], where an impactor
@@ -119,14 +119,14 @@ causes crack propagation at an angle from two pre-notches on a steel plate. The
 example can be run with:
 
 ```
-./CabanaPD/build/install/bin/KalthoffWinkler
+./CabanaPD/build/install/bin/KalthoffWinkler CabanaPD/examples/inputs/kalthoff_winkler.json
 ```
 
 The third example is crack branching in soda-lime glass [3]. The example can be
 run with:
 
 ```
-./CabanaPD/build/install/bin/CrackBranching
+./CabanaPD/build/install/bin/CrackBranching CabanaPD/examples/inputs/crack_branching.json
 ```
 
 New examples can be created by using any of the current cases as a template. All inputs are currently specified in the example source files themselves.
