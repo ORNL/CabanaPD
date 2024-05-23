@@ -118,40 +118,8 @@ void elasticWaveExample( const std::string filename )
     //                      Outputs
     // ====================================================
     // Output displacement along the x-axis
-    x = particles->sliceReferencePosition();
-    u = particles->sliceDisplacement();
-    int num_cell_x = num_cells[0];
-    auto profile = Kokkos::View<double* [2], memory_space>(
-        Kokkos::ViewAllocateWithoutInitializing( "displacement_profile" ),
-        num_cell_x );
-    int mpi_rank;
-    MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
-    Kokkos::View<int*, memory_space> count( "c", 1 );
-    double dx = particles->dx[0];
-    auto measure_profile = KOKKOS_LAMBDA( const int pid )
-    {
-        if ( x( pid, 1 ) < dx / 2.0 && x( pid, 1 ) > -dx / 2.0 &&
-             x( pid, 2 ) < dx / 2.0 && x( pid, 2 ) > -dx / 2.0 )
-        {
-            auto c = Kokkos::atomic_fetch_add( &count( 0 ), 1 );
-            profile( c, 0 ) = x( pid, 0 );
-            profile( c, 1 ) = u( pid, 0 );
-        }
-    };
-    Kokkos::RangePolicy<exec_space> policy( 0, x.size() );
-    Kokkos::parallel_for( "displacement_profile", policy, measure_profile );
-    auto count_host =
-        Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, count );
-    auto profile_host =
-        Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, profile );
-    std::fstream fout;
-    std::string file_name = "displacement_profile.txt";
-    fout.open( file_name, std::ios::app );
-    for ( int p = 0; p < count_host( 0 ); p++ )
-    {
-        fout << mpi_rank << " " << profile_host( p, 0 ) << " "
-             << profile_host( p, 1 ) << std::endl;
-    }
+    createDisplacementProfile( MPI_COMM_WORLD, num_cells[0], 0,
+                               "displacement_profile.txt", *particles );
 }
 
 // Initialize MPI+Kokkos.
