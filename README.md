@@ -113,6 +113,7 @@ New examples can be created by using any of the current cases as a template. All
 
 ### Mechanics
 Examples which only include mechanics and fracture are with `examples/mechanics`.
+
 The first example is an elastic wave propagating through a cube from an initial Gaussian radial displacement profile from [1]. Assuming the build paths above, the example can be run with:
 
 ```
@@ -137,7 +138,8 @@ run with:
 ### Thermomechanics
 Examples which demonstrate temperature-dependent mechanics and fracture are with `examples/thermomechanics`.
 
-The first example demonstrates a thermoelastic problem without fracture:
+The first example demonstrates a thermoelastic problem without fracture with a homogeneous plate
+under linear thermal loading [4]. The example can be run with:
 
 ```
 ./CabanaPD/build/install/bin/ThermalDeformation CabanaPD/examples/thermomechanics/thermal_deformation.json
@@ -156,6 +158,8 @@ Kunze, and L.W. Meyer, eds., Vol 1, DGM Informationsgesellschaft Verlag (1988)
 185-195.
 
 [3] F. Bobaru and G. Zhang, Why do cracks branch? A peridynamic investigation of dynamic brittle fracture, International Journal of Fracture 196 (2015): 59–98.
+
+[4] D. He, D. Huang, and D. Jiang, Modeling and studies of fracture in functionally graded materials under thermal shock loading using peridynamics, Theoretical and Applied Fracture Mechanics 111 (2021): 102852.
 
 ## Contributing
 
