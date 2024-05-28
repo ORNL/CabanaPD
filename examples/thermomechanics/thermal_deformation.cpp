@@ -22,7 +22,7 @@
 void thermalDeformationExample( const std::string filename )
 {
     // ====================================================
-    //                  Use default Kokkos spaces
+    //             Use default Kokkos spaces
     // ====================================================
     using exec_space = Kokkos::DefaultExecutionSpace;
     using memory_space = typename exec_space::memory_space;
@@ -101,7 +101,7 @@ void thermalDeformationExample( const std::string filename )
     // particles are correctly taken into account for lambda capture here.
     auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
-        temp( pid ) = 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
+        temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
     };
     auto body_term = CabanaPD::createBodyTerm( temp_func, false );
 
@@ -110,6 +110,17 @@ void thermalDeformationExample( const std::string filename )
     // ====================================================
     cabana_pd->init( body_term );
     cabana_pd->run( body_term );
+
+    // ====================================================
+    //                      Outputs
+    // ====================================================
+    // Output displacement along the x-axis
+    createDisplacementProfile( MPI_COMM_WORLD, num_cells[0], 0,
+                               "xdisplacement_profile.txt", *particles );
+
+    // Output displacement along the y-axis
+    createDisplacementProfile( MPI_COMM_WORLD, num_cells[1], 1,
+                               "ydisplacement_profile.txt", *particles );
 }
 
 // Initialize MPI+Kokkos.
