@@ -110,8 +110,8 @@ void crackBranchingExample( const std::string filename )
         auto sign = std::abs( ypos ) / ypos;
         Cabana::get( p_f, CabanaPD::Field::Force(), 1 ) += b0 * sign;
     };
-    auto bc =
-        createBoundaryCondition( bc_op, exec_space{}, *particles, planes );
+    auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, planes,
+                                       true );
 
     // ====================================================
     //            Custom particle initialization
@@ -137,9 +137,9 @@ void crackBranchingExample( const std::string filename )
     //                   Simulation run
     // ====================================================
     auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
-        inputs, particles, force_model, bc, prenotch );
-    cabana_pd->init_force();
-    cabana_pd->run();
+        inputs, particles, force_model, prenotch );
+    cabana_pd->init();
+    cabana_pd->run( bc );
 }
 
 // Initialize MPI+Kokkos.

@@ -72,18 +72,6 @@ void thermalDeformationExample( const std::string filename )
         exec_space(), low_corner, high_corner, num_cells, halo_width );
 
     // ====================================================
-    //                   Imposed field
-    // ====================================================
-    auto x = particles->sliceReferencePosition();
-    auto temp = particles->sliceTemperature();
-    const double low_corner_y = low_corner[1];
-    auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
-    {
-        temp( pid ) = 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
-    };
-    auto body_term = CabanaPD::createBodyTerm( temp_func );
-
-    // ====================================================
     //            Custom particle initialization
     // ====================================================
     auto rho = particles->sliceDensity();
@@ -98,12 +86,30 @@ void thermalDeformationExample( const std::string filename )
             *particles, delta, K, alpha, temp0 );
 
     // ====================================================
-    //                   Simulation run
+    //                   Create solver
     // ====================================================
     auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
-        inputs, particles, force_model, body_term );
-    cabana_pd->init_force();
-    cabana_pd->run();
+        inputs, particles, force_model );
+
+    // ====================================================
+    //                   Imposed field
+    // ====================================================
+    auto x = particles->sliceReferencePosition();
+    auto temp = particles->sliceTemperature();
+    const double low_corner_y = low_corner[1];
+    // This is purposely delayed until after solver init so that ghosted
+    // particles are correctly taken into account for lambda capture here.
+    auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
+    {
+        temp( pid ) = 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
+    };
+    auto body_term = CabanaPD::createBodyTerm( temp_func, false );
+
+    // ====================================================
+    //                   Simulation run
+    // ====================================================
+    cabana_pd->init( body_term );
+    cabana_pd->run( body_term );
 }
 
 // Initialize MPI+Kokkos.

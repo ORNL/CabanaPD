@@ -69,12 +69,6 @@ void elasticWaveExample( const std::string filename )
         exec_space(), low_corner, high_corner, num_cells, halo_width );
 
     // ====================================================
-    //                Boundary conditions
-    // ====================================================
-    auto bc = CabanaPD::createBoundaryCondition<memory_space>(
-        CabanaPD::ZeroBCTag{} );
-
-    // ====================================================
     //            Custom particle initialization
     // ====================================================
     auto rho = particles->sliceDensity();
@@ -111,8 +105,8 @@ void elasticWaveExample( const std::string filename )
     //                   Simulation run
     // ====================================================
     auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
-        inputs, particles, force_model, bc );
-    cabana_pd->init_force();
+        inputs, particles, force_model );
+    cabana_pd->init();
     cabana_pd->run();
 
     // ====================================================
