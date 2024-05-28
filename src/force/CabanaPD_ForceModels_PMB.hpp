@@ -168,16 +168,71 @@ struct ForceModel<PMB, Elastic, TemperatureDependent, TemperatureType>
     }
 };
 
-template <typename ModelType, typename DamageType, typename ThermalType,
-          typename ParticleType>
-auto createForceModel( ParticleType particles, const double delta,
+template <typename ParticleType>
+auto createForceModel( PMB, Elastic, ParticleType particles, const double delta,
                        const double K, const double alpha, const double temp0 )
 {
     auto temp = particles.sliceTemperature();
     using temp_type = decltype( temp );
-    return ForceModel<ModelType, DamageType, ThermalType, temp_type>(
+    return ForceModel<PMB, Elastic, TemperatureDependent, temp_type>(
         delta, K, temp, alpha, temp0 );
 }
+
+template <typename TemperatureType>
+struct ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>
+    : public ForceModel<PMB, Fracture, TemperatureIndependent>,
+      BaseTemperatureModel<TemperatureType>
+{
+    using base_type = ForceModel<PMB, Fracture, TemperatureIndependent>;
+    using base_temperature_type = BaseTemperatureModel<TemperatureType>;
+    using base_model = typename base_type::base_model;
+    using fracture_type = typename base_type::fracture_type;
+    using thermal_type = TemperatureDependent;
+
+    using base_type::c;
+    using base_type::delta;
+    using base_type::K;
+
+    using base_type::bond_break_coeff;
+    using base_type::G0;
+    using base_type::s0;
+
+    // Thermal parameters
+    using base_temperature_type::alpha;
+    using base_temperature_type::temp0;
+
+    // Explicitly use the temperature-dependent stretch.
+    using base_temperature_type::thermalStretch;
+
+    // ForceModel(){};
+    ForceModel( const double _delta, const double _K, const double _G0,
+                const TemperatureType _temp, const double _alpha,
+                const double _temp0 = 0.0 )
+        : base_type( _delta, _K, _G0 )
+        , base_temperature_type( _temp, _alpha, _temp0 )
+    {
+        set_param( _delta, _K, _G0, _alpha, _temp0 );
+    }
+
+    void set_param( const double _delta, const double _K, const double _G0,
+                    const double _alpha, const double _temp0 )
+    {
+        base_type::set_param( _delta, _K, _G0 );
+        base_temperature_type::set_param( _alpha, _temp0 );
+    }
+};
+
+template <typename ParticleType>
+auto createForceModel( PMB, Fracture, ParticleType particles,
+                       const double delta, const double K, const double G0,
+                       const double alpha, const double temp0 )
+{
+    auto temp = particles.sliceTemperature();
+    using temp_type = decltype( temp );
+    return ForceModel<PMB, Fracture, TemperatureDependent, temp_type>(
+        delta, K, G0, temp, alpha, temp0 );
+}
+
 } // namespace CabanaPD
 
 #endif
