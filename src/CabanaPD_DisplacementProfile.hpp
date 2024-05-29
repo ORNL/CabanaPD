@@ -42,30 +42,52 @@ void createOutputProfile( MPI_Comm comm, const int num_cell,
     Kokkos::View<int*, memory_space> count( "c", 1 );
 
     auto dims = getDim( profile_dim );
-    double dx1 = particles.dx[dims[0]];
-    double dx2 = particles.dx[dims[1]];
+    double dx1 = particles.dx[dims[0]] / 2.0;
+    double dx2 = particles.dx[dims[1]] / 2.0;
+    double center1 = particles.local_mesh_lo[dims[0]] +
+                     particles.global_mesh_ext[dims[0]] / 2.0;
+    double center2 = particles.local_mesh_lo[dims[1]] +
+                     particles.global_mesh_ext[dims[1]] / 2.0;
 
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
+    // Find points closest to the center line.
+    double center_min1;
+    double center_min2;
+    auto find_profile =
+        KOKKOS_LAMBDA( const int pid, double& min1, double& min2 )
+    {
+        if ( Kokkos::abs( x( pid, dims[0] ) - center1 ) < min1 )
+            min1 = x( pid, dims[0] );
+        if ( Kokkos::abs( x( pid, dims[1] ) - center2 ) < min2 )
+            min2 = x( pid, dims[1] );
+    };
+    Kokkos::RangePolicy<typename memory_space::execution_space> policy(
+        0, x.size() );
+    Kokkos::parallel_reduce( "displacement_profile", policy, find_profile,
+                             Kokkos::Min<double>( center_min1 ),
+                             Kokkos::Min<double>( center_min2 ) );
+
+    // Extract points along that line.
     auto measure_profile = KOKKOS_LAMBDA( const int pid )
     {
-        if ( x( pid, dims[0] ) < dx1 / 2.0 && x( pid, dims[0] ) > -dx1 / 2.0 &&
-             x( pid, dims[1] ) < dx2 / 2.0 && x( pid, dims[1] ) > -dx2 / 2.0 )
+        if ( x( pid, dims[0] ) - center_min1 < dx1 &&
+             x( pid, dims[0] ) - center_min1 > -dx1 &&
+             x( pid, dims[1] ) - center_min2 < dx2 &&
+             x( pid, dims[1] ) - center_min2 > -dx2 )
         {
             auto c = Kokkos::atomic_fetch_add( &count( 0 ), 1 );
             profile( c, 0 ) = x( pid, profile_dim );
             profile( c, 1 ) = user( pid );
         }
     };
-    Kokkos::RangePolicy<typename memory_space::execution_space> policy(
-        0, x.size() );
     Kokkos::parallel_for( "displacement_profile", policy, measure_profile );
     auto count_host =
         Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, count );
     auto profile_host =
         Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, profile );
-    std::fstream fout;
 
+    std::fstream fout;
     fout.open( file_name, std::ios::app );
     for ( int p = 0; p < count_host( 0 ); p++ )
     {
