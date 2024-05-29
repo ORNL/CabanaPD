@@ -76,6 +76,9 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
     bool _half_neigh;
     ForceModel<LPS, Elastic> _model;
 
+    Timer _timer;
+    Timer _energy_timer;
+
   public:
     using exec_space = ExecutionSpace;
 
@@ -90,6 +93,8 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
                                 const NeighListType& neigh_list,
                                 const ParallelType neigh_op_tag )
     {
+        _timer.start();
+
         auto n_local = particles.n_local;
         auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
@@ -111,13 +116,17 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
         Cabana::neighbor_parallel_for(
             policy, weighted_volume, neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPS::computeWeightedVolume" );
+
+        _timer.stop();
     }
 
     template <class ParticleType, class NeighListType, class ParallelType>
     void computeDilatation( ParticleType& particles,
                             const NeighListType& neigh_list,
-                            const ParallelType neigh_op_tag ) const
+                            const ParallelType neigh_op_tag )
     {
+        _timer.start();
+
         auto n_local = particles.n_local;
         const auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
@@ -141,6 +150,8 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
         Cabana::neighbor_parallel_for(
             policy, dilatation, neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPS::computeDilatation" );
+
+        _timer.stop();
     }
 
     template <class ForceType, class PosType, class ParticleType,
@@ -148,8 +159,10 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            const NeighListType& neigh_list, const int n_local,
-                           ParallelType& neigh_op_tag ) const
+                           ParallelType& neigh_op_tag )
     {
+        _timer.start();
+
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
         auto model = _model;
@@ -183,6 +196,8 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
         Cabana::neighbor_parallel_for(
             policy, force_full, neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPS::computeFull" );
+
+        _timer.stop();
     }
 
     template <class PosType, class WType, class ParticleType,
@@ -190,9 +205,10 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
                               const ParticleType& particles,
                               const NeighListType& neigh_list,
-                              const int n_local,
-                              ParallelType& neigh_op_tag ) const
+                              const int n_local, ParallelType& neigh_op_tag )
     {
+        _energy_timer.start();
+
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
         auto model = _model;
@@ -228,8 +244,12 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
             neigh_op_tag, strain_energy,
             "CabanaPD::ForceLPS::computeEnergyFull" );
 
+        _energy_timer.stop();
         return strain_energy;
     }
+
+    auto time() { return _timer.time(); };
+    auto timeEnergy() { return _energy_timer.time(); };
 };
 
 template <class ExecutionSpace>
@@ -240,6 +260,9 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
     using base_type = Force<ExecutionSpace, ForceModel<LPS, Elastic>>;
     using base_type::_half_neigh;
     ForceModel<LPS, Fracture> _model;
+
+    using base_type::_energy_timer;
+    using base_type::_timer;
 
   public:
     using exec_space = ExecutionSpace;
@@ -255,6 +278,8 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
                                 const NeighListType& neigh_list,
                                 const MuView& mu )
     {
+        _timer.start();
+
         auto n_local = particles.n_local;
         auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
@@ -287,13 +312,16 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::computeWeightedVolume",
                               policy, weighted_volume );
+
+        _timer.stop();
     }
 
     template <class ParticleType, class NeighListType, class MuView>
     void computeDilatation( ParticleType& particles,
-                            const NeighListType& neigh_list,
-                            const MuView& mu ) const
+                            const NeighListType& neigh_list, const MuView& mu )
     {
+        _timer.start();
+
         auto n_local = particles.n_local;
         const auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
@@ -331,6 +359,8 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::computeDilatation",
                               policy, dilatation );
+
+        _timer.stop();
     }
 
     template <class ForceType, class PosType, class ParticleType,
@@ -338,8 +368,10 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            const NeighListType& neigh_list, MuView& mu,
-                           const int n_local, ParallelType& ) const
+                           const int n_local, ParallelType& )
     {
+        _timer.start();
+
         auto break_coeff = _model.bond_break_coeff;
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
@@ -400,6 +432,8 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::computeFull", policy,
                               force_full );
+
+        _timer.stop();
     }
 
     template <class PosType, class WType, class DamageType, class ParticleType,
@@ -407,8 +441,10 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
                               DamageType& phi, const ParticleType& particles,
                               const NeighListType& neigh_list, MuView& mu,
-                              const int n_local, ParallelType& ) const
+                              const int n_local, ParallelType& )
     {
+        _energy_timer.start();
+
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
         auto model = _model;
@@ -457,6 +493,7 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
         Kokkos::parallel_reduce( "CabanaPD::ForceLPSDamage::computeEnergyFull",
                                  policy, energy_full, strain_energy );
 
+        _energy_timer.stop();
         return strain_energy;
     }
 };
@@ -469,6 +506,9 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
     using base_type = Force<ExecutionSpace, ForceModel<LPS, Elastic>>;
     using base_type::_half_neigh;
     ForceModel<LinearLPS, Elastic> _model;
+
+    using base_type::_energy_timer;
+    using base_type::_timer;
 
   public:
     using exec_space = ExecutionSpace;
@@ -484,8 +524,10 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            const NeighListType& neigh_list, const int n_local,
-                           ParallelType& neigh_op_tag ) const
+                           ParallelType& neigh_op_tag )
     {
+        _timer.start();
+
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
         auto model = _model;
@@ -525,6 +567,8 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
         Cabana::neighbor_parallel_for(
             policy, force_full, neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPS::computeFull" );
+
+        _timer.stop();
     }
 
     template <class PosType, class WType, class ParticleType,
@@ -532,9 +576,10 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
                               const ParticleType& particles,
                               const NeighListType& neigh_list,
-                              const int n_local,
-                              ParallelType& neigh_op_tag ) const
+                              const int n_local, ParallelType& neigh_op_tag )
     {
+        _energy_timer.start();
+
         auto theta_coeff = _model.theta_coeff;
         auto s_coeff = _model.s_coeff;
         auto model = _model;
@@ -572,6 +617,7 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
             neigh_op_tag, strain_energy,
             "CabanaPD::ForceLPS::computeEnergyFull" );
 
+        _energy_timer.stop();
         return strain_energy;
     }
 };

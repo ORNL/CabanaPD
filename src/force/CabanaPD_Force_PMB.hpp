@@ -76,6 +76,9 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
     bool _half_neigh;
     ForceModel<PMB, Elastic> _model;
 
+    Timer _timer;
+    Timer _energy_timer;
+
   public:
     using exec_space = ExecutionSpace;
 
@@ -87,12 +90,12 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
 
     template <class ParticleType, class NeighListType, class ParallelType>
     void computeWeightedVolume( ParticleType&, const NeighListType&,
-                                const ParallelType )
+                                const ParallelType ) const
     {
     }
     template <class ParticleType, class NeighListType, class ParallelType>
     void computeDilatation( ParticleType&, const NeighListType&,
-                            const ParallelType )
+                            const ParallelType ) const
     {
     }
 
@@ -101,8 +104,10 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            const NeighListType& neigh_list, const int n_local,
-                           ParallelType& neigh_op_tag ) const
+                           ParallelType& neigh_op_tag )
     {
+        _timer.start();
+
         auto c = _model.c;
         const auto vol = particles.sliceVolume();
 
@@ -129,6 +134,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
         Cabana::neighbor_parallel_for(
             policy, force_full, neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForcePMB::computeFull" );
+
+        _timer.stop();
     }
 
     template <class PosType, class WType, class ParticleType,
@@ -136,9 +143,10 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
                               const ParticleType& particles,
                               const NeighListType& neigh_list,
-                              const int n_local,
-                              ParallelType& neigh_op_tag ) const
+                              const int n_local, ParallelType& neigh_op_tag )
     {
+        _energy_timer.start();
+
         auto c = _model.c;
         const auto vol = particles.sliceVolume();
 
@@ -163,8 +171,12 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
             neigh_op_tag, strain_energy,
             "CabanaPD::ForcePMB::computeEnergyFull" );
 
+        _energy_timer.stop();
         return strain_energy;
     }
+
+    auto time() { return _timer.time(); };
+    auto timeEnergy() { return _energy_timer.time(); };
 };
 
 template <class ExecutionSpace>
@@ -175,6 +187,9 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
     using base_type = Force<ExecutionSpace, ForceModel<PMB, Elastic>>;
     using base_type::_half_neigh;
     ForceModel<PMB, Fracture> _model;
+
+    using base_type::_energy_timer;
+    using base_type::_timer;
 
   public:
     using exec_space = ExecutionSpace;
@@ -190,8 +205,10 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            const NeighListType& neigh_list, MuView& mu,
-                           const int n_local, ParallelType& ) const
+                           const int n_local, ParallelType& )
     {
+        _timer.start();
+
         auto c = _model.c;
         auto break_coeff = _model.bond_break_coeff;
         const auto vol = particles.sliceVolume();
@@ -242,6 +259,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Kokkos::parallel_for( "CabanaPD::ForcePMBDamage::computeFull", policy,
                               force_full );
+
+        _timer.stop();
     }
 
     template <class PosType, class WType, class DamageType, class ParticleType,
@@ -249,8 +268,10 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
                               DamageType& phi, const ParticleType& particles,
                               const NeighListType& neigh_list, MuView& mu,
-                              const int n_local, ParallelType& ) const
+                              const int n_local, ParallelType& )
     {
+        _energy_timer.start();
+
         auto c = _model.c;
         const auto vol = particles.sliceVolume();
 
@@ -287,6 +308,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
         Kokkos::parallel_reduce( "CabanaPD::ForcePMBDamage::computeEnergyFull",
                                  policy, energy_full, strain_energy );
 
+        _energy_timer.stop();
         return strain_energy;
     }
 };
@@ -299,6 +321,9 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
     using base_type = Force<ExecutionSpace, ForceModel<PMB, Elastic>>;
     using base_type::_half_neigh;
     ForceModel<LinearPMB, Elastic> _model;
+
+    using base_type::_energy_timer;
+    using base_type::_timer;
 
   public:
     using exec_space = ExecutionSpace;
@@ -314,8 +339,10 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            ParticleType& particles,
                            const NeighListType& neigh_list, const int n_local,
-                           ParallelType& neigh_op_tag ) const
+                           ParallelType& neigh_op_tag )
     {
+        _timer.start();
+
         auto c = _model.c;
         const auto vol = particles.sliceVolume();
 
@@ -345,15 +372,19 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
         Cabana::neighbor_parallel_for(
             policy, force_full, neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLinearPMB::computeFull" );
+
+        _timer.stop();
     }
 
     template <class PosType, class WType, class ParticleType,
               class NeighListType, class ParallelType>
-    double
-    computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                       ParticleType& particles, const NeighListType& neigh_list,
-                       const int n_local, ParallelType& neigh_op_tag ) const
+    double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
+                              ParticleType& particles,
+                              const NeighListType& neigh_list,
+                              const int n_local, ParallelType& neigh_op_tag )
     {
+        _energy_timer.start();
+
         auto c = _model.c;
         const auto vol = particles.sliceVolume();
 
@@ -378,6 +409,7 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic>>
             neigh_op_tag, strain_energy,
             "CabanaPD::ForceLinearPMB::computeEnergyFull" );
 
+        _energy_timer.stop();
         return strain_energy;
     }
 };

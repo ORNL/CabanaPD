@@ -63,6 +63,7 @@
 #include <Kokkos_Core.hpp>
 
 #include <CabanaPD_Particles.hpp>
+#include <CabanaPD_Timer.hpp>
 
 namespace CabanaPD
 {
@@ -72,6 +73,7 @@ class Integrator
     using exec_space = ExecutionSpace;
 
     double _dt, _half_dt;
+    Timer _timer;
 
   public:
     Integrator( double dt )
@@ -85,6 +87,8 @@ class Integrator
     template <class ParticlesType>
     void initialHalfStep( ParticlesType& p )
     {
+        _timer.start();
+
         auto u = p.sliceDisplacement();
         auto v = p.sliceVelocity();
         auto f = p.sliceForce();
@@ -105,11 +109,15 @@ class Integrator
         Kokkos::RangePolicy<exec_space> policy( 0, v.size() );
         Kokkos::parallel_for( "CabanaPD::Integrator::Initial", policy,
                               init_func );
+
+        _timer.stop();
     }
 
     template <class ParticlesType>
     void finalHalfStep( ParticlesType& p )
     {
+        _timer.start();
+
         auto v = p.sliceVelocity();
         auto f = p.sliceForce();
         auto rho = p.sliceDensity();
@@ -125,7 +133,12 @@ class Integrator
         Kokkos::RangePolicy<exec_space> policy( 0, v.size() );
         Kokkos::parallel_for( "CabanaPD::Integrator::Final", policy,
                               final_func );
+
+        _timer.stop();
     }
+
+    double timeInit() { return 0.0; };
+    auto time() { return _timer.time(); };
 };
 
 } // namespace CabanaPD

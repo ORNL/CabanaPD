@@ -133,7 +133,7 @@ class Force;
 ******************************************************************************/
 template <class ForceType, class ParticleType, class NeighListType,
           class ParallelType>
-void computeForce( const ForceType& force, ParticleType& particles,
+void computeForce( ForceType& force, ParticleType& particles,
                    const NeighListType& neigh_list,
                    const ParallelType& neigh_op_tag )
 {
@@ -163,7 +163,7 @@ void computeForce( const ForceType& force, ParticleType& particles,
 
 template <class ForceType, class ParticleType, class NeighListType,
           class ParallelType>
-double computeEnergy( const ForceType force, ParticleType& particles,
+double computeEnergy( ForceType& force, ParticleType& particles,
                       const NeighListType& neigh_list,
                       const ParallelType& neigh_op_tag )
 {
@@ -192,7 +192,7 @@ double computeEnergy( const ForceType force, ParticleType& particles,
 // Forces with bond breaking.
 template <class ForceType, class ParticleType, class NeighListType,
           class NeighborView, class ParallelType>
-void computeForce( const ForceType& force, ParticleType& particles,
+void computeForce( ForceType& force, ParticleType& particles,
                    const NeighListType& neigh_list, NeighborView& mu,
                    const ParallelType& neigh_op_tag )
 {
@@ -223,7 +223,7 @@ void computeForce( const ForceType& force, ParticleType& particles,
 // Energy and damage.
 template <class ForceType, class ParticleType, class NeighListType,
           class NeighborView, class ParallelType>
-double computeEnergy( const ForceType force, ParticleType& particles,
+double computeEnergy( ForceType& force, ParticleType& particles,
                       const NeighListType& neigh_list, NeighborView& mu,
                       const ParallelType& neigh_op_tag )
 {

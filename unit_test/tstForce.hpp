@@ -620,7 +620,7 @@ struct NoDamageTag
 };
 
 template <class ForceType, class ParticleType, class NeighborList>
-double computeEnergyAndForce( NoDamageTag, const ForceType force,
+double computeEnergyAndForce( NoDamageTag, ForceType force,
                               ParticleType& particles,
                               const NeighborList& neigh_list, const int )
 {
@@ -630,10 +630,9 @@ double computeEnergyAndForce( NoDamageTag, const ForceType force,
     return Phi;
 }
 template <class ForceType, class ParticleType, class NeighborList>
-double computeEnergyAndForce( DamageTag, const ForceType force,
-                              ParticleType& particles,
-                              const NeighborList& neigh_list,
-                              const int max_neighbors )
+double
+computeEnergyAndForce( DamageTag, ForceType force, ParticleType& particles,
+                       const NeighborList& neigh_list, const int max_neighbors )
 {
     Kokkos::View<int**, TEST_MEMSPACE> mu(
         Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
