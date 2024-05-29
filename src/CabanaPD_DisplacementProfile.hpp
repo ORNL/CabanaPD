@@ -44,9 +44,9 @@ void createOutputProfile( MPI_Comm comm, const int num_cell,
     auto dims = getDim( profile_dim );
     double dx1 = particles.dx[dims[0]] / 2.0;
     double dx2 = particles.dx[dims[1]] / 2.0;
-    double center1 = particles.local_mesh_lo[dims[0]] +
+    double center1 = particles.global_mesh_lo[dims[0]] +
                      particles.global_mesh_ext[dims[0]] / 2.0;
-    double center2 = particles.local_mesh_lo[dims[1]] +
+    double center2 = particles.global_mesh_lo[dims[1]] +
                      particles.global_mesh_ext[dims[1]] / 2.0;
 
     auto x = particles.sliceReferencePosition();
