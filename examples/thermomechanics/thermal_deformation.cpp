@@ -18,9 +18,8 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate the Kalthoff-Winkler experiment of crack propagation in
-// a pre-notched steel plate due to impact.
-void kalthoffWinklerExample( const std::string filename )
+// Simulate thermally-induced deformation in a rectangular plate.
+void thermalDeformationExample( const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
@@ -34,16 +33,18 @@ void kalthoffWinklerExample( const std::string filename )
     CabanaPD::Inputs inputs( filename );
 
     // ====================================================
-    //                Material parameters
+    //            Material and problem parameters
     // ====================================================
+    // Material parameters
     double rho0 = inputs["density"];
     double E = inputs["elastic_modulus"];
-    double nu = 1.0 / 3.0;
-    double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) );
-    double G0 = inputs["fracture_energy"];
-    // double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
+    double nu = 0.25;
+    double K = E / ( 3 * ( 1 - 2 * nu ) );
     double delta = inputs["horizon"];
-    delta += 1e-10;
+    double alpha = inputs["thermal_coefficient"];
+
+    // Problem parameters
+    double temp0 = inputs["reference_temperature"];
 
     // ====================================================
     //                  Discretization
@@ -57,80 +58,69 @@ void kalthoffWinklerExample( const std::string filename )
     int halo_width = m + 1; // Just to be safe.
 
     // ====================================================
-    //                   Pre-notches
+    //                Force model type
     // ====================================================
-    std::array<double, 3> system_size = inputs["system_size"];
-    double height = system_size[0];
-    double width = system_size[1];
-    double thickness = system_size[2];
-    double L_prenotch = height / 2.0;
-    double y_prenotch1 = -width / 8.0;
-    double y_prenotch2 = width / 8.0;
-    double low_x = low_corner[0];
-    double low_z = low_corner[2];
-    Kokkos::Array<double, 3> p01 = { low_x, y_prenotch1, low_z };
-    Kokkos::Array<double, 3> p02 = { low_x, y_prenotch2, low_z };
-    Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
-    Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-    Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { p01, p02 };
-    CabanaPD::Prenotch<2> prenotch( v1, v2, notch_positions );
-
-    // ====================================================
-    //                    Force model
-    // ====================================================
-    using model_type = CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
-    model_type force_model( delta, K, G0 );
-    // using model_type =
-    //     CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
-    // model_type force_model( delta, K, G, G0 );
+    using model_type = CabanaPD::PMB;
+    using thermal_type = CabanaPD::TemperatureDependent;
 
     // ====================================================
     //                 Particle generation
     // ====================================================
     // Does not set displacements, velocities, etc.
     auto particles = std::make_shared<
-        CabanaPD::Particles<memory_space, typename model_type::base_model>>(
+        CabanaPD::Particles<memory_space, model_type, thermal_type>>(
         exec_space(), low_corner, high_corner, num_cells, halo_width );
-
-    // ====================================================
-    //                Boundary conditions
-    // ====================================================
-    double dx = particles->dx[0];
-    double x_bc = -0.5 * height;
-    CabanaPD::RegionBoundary plane(
-        x_bc - dx, x_bc + dx * 1.25, y_prenotch1 - dx * 0.25,
-        y_prenotch2 + dx * 0.25, -thickness, thickness );
-    std::vector<CabanaPD::RegionBoundary> planes = { plane };
-    auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
-                                       exec_space{}, *particles, planes );
 
     // ====================================================
     //            Custom particle initialization
     // ====================================================
     auto rho = particles->sliceDensity();
-    auto x = particles->sliceReferencePosition();
-    auto v = particles->sliceVelocity();
-    auto f = particles->sliceForce();
-
-    double v0 = inputs["impactor_velocity"];
-    auto init_functor = KOKKOS_LAMBDA( const int pid )
-    {
-        // Density
-        rho( pid ) = rho0;
-        // x velocity between the pre-notches
-        if ( x( pid, 1 ) > y_prenotch1 && x( pid, 1 ) < y_prenotch2 &&
-             x( pid, 0 ) < -0.5 * height + dx )
-            v( pid, 0 ) = v0;
-    };
+    auto init_functor = KOKKOS_LAMBDA( const int pid ) { rho( pid ) = rho0; };
     particles->updateParticles( exec_space{}, init_functor );
+
+    // ====================================================
+    //                    Force model
+    // ====================================================
+    auto force_model =
+        CabanaPD::createForceModel<model_type, CabanaPD::Elastic, thermal_type>(
+            *particles, delta, K, alpha, temp0 );
+
+    // ====================================================
+    //                   Create solver
+    // ====================================================
+    auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
+        inputs, particles, force_model );
+
+    // ====================================================
+    //                   Imposed field
+    // ====================================================
+    auto x = particles->sliceReferencePosition();
+    auto temp = particles->sliceTemperature();
+    const double low_corner_y = low_corner[1];
+    // This is purposely delayed until after solver init so that ghosted
+    // particles are correctly taken into account for lambda capture here.
+    auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
+    {
+        temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
+    };
+    auto body_term = CabanaPD::createBodyTerm( temp_func, false );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
-        inputs, particles, force_model, bc, prenotch );
-    cabana_pd->init_force();
-    cabana_pd->run();
+    cabana_pd->init( body_term );
+    cabana_pd->run( body_term );
+
+    // ====================================================
+    //                      Outputs
+    // ====================================================
+    // Output displacement along the x-axis
+    createDisplacementProfile( MPI_COMM_WORLD, num_cells[0], 0,
+                               "xdisplacement_profile.txt", *particles );
+
+    // Output displacement along the y-axis
+    createDisplacementProfile( MPI_COMM_WORLD, num_cells[1], 1,
+                               "ydisplacement_profile.txt", *particles );
 }
 
 // Initialize MPI+Kokkos.
@@ -139,7 +129,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    kalthoffWinklerExample( argv[1] );
+    thermalDeformationExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();

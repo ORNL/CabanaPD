@@ -1,0 +1,3 @@
+add_executable(ThermalDeformation thermal_deformation.cpp)
+target_link_libraries(ThermalDeformation LINK_PUBLIC CabanaPD)
+install(TARGETS ThermalDeformation DESTINATION ${CMAKE_INSTALL_BINDIR})

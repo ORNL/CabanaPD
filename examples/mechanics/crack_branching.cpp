@@ -18,8 +18,8 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate elastic wave propagation from an initial displacement field.
-void elasticWaveExample( const std::string filename )
+// Simulate crack branching from an pre-crack.
+void crackBranchingExample( const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
@@ -36,8 +36,10 @@ void elasticWaveExample( const std::string filename )
     //                Material parameters
     // ====================================================
     double rho0 = inputs["density"];
-    auto K = inputs["bulk_modulus"];
-    double G = inputs["shear_modulus"];
+    double E = inputs["elastic_modulus"];
+    double nu = 0.25; // Use bond-based model
+    double K = E / ( 3 * ( 1 - 2 * nu ) );
+    double G0 = inputs["fracture_energy"];
     double delta = inputs["horizon"];
     delta += 1e-10;
 
@@ -53,73 +55,91 @@ void elasticWaveExample( const std::string filename )
     int halo_width = m + 1; // Just to be safe.
 
     // ====================================================
+    //                    Pre-notch
+    // ====================================================
+    double height = inputs["system_size"][0];
+    double thickness = inputs["system_size"][2];
+    double L_prenotch = height / 2.0;
+    double y_prenotch1 = 0.0;
+    Kokkos::Array<double, 3> p01 = { low_corner[0], y_prenotch1,
+                                     low_corner[2] };
+    Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
+    Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
+    Kokkos::Array<Kokkos::Array<double, 3>, 1> notch_positions = { p01 };
+    CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
+
+    // ====================================================
     //                    Force model
     // ====================================================
-    using model_type =
-        CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::Elastic>;
-    model_type force_model( delta, K, G );
+    using model_type = CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
+    model_type force_model( delta, K, G0 );
 
     // ====================================================
     //                 Particle generation
     // ====================================================
     // Does not set displacements, velocities, etc.
     auto particles = std::make_shared<
-        CabanaPD::Particles<memory_space, typename model_type::base_model>>(
+        CabanaPD::Particles<memory_space, typename model_type::base_model,
+                            typename model_type::thermal_type>>(
         exec_space(), low_corner, high_corner, num_cells, halo_width );
 
     // ====================================================
     //                Boundary conditions
     // ====================================================
-    auto bc = CabanaPD::createBoundaryCondition<memory_space>(
-        CabanaPD::ZeroBCTag{} );
+    double sigma0 = inputs["traction"];
+    double dy = particles->dx[1];
+    double b0 = sigma0 / dy;
+
+    CabanaPD::RegionBoundary plane1( low_corner[0], high_corner[0],
+                                     low_corner[1] - dy, low_corner[1] + dy,
+                                     low_corner[2], high_corner[2] );
+    CabanaPD::RegionBoundary plane2( low_corner[0], high_corner[0],
+                                     high_corner[1] - dy, high_corner[1] + dy,
+                                     low_corner[2], high_corner[2] );
+    std::vector<CabanaPD::RegionBoundary> planes = { plane1, plane2 };
+    auto particles_f = particles->getForce();
+    auto particles_x = particles->getReferencePosition();
+    // Create a symmetric force BC in the y-direction.
+    auto bc_op = KOKKOS_LAMBDA( const int pid )
+    {
+        // Get a modifiable copy of force.
+        auto p_f = particles_f.getParticleView( pid );
+        // Get a copy of the position.
+        auto p_x = particles_x.getParticle( pid );
+        auto ypos = Cabana::get( p_x, CabanaPD::Field::ReferencePosition(), 1 );
+        auto sign = std::abs( ypos ) / ypos;
+        Cabana::get( p_f, CabanaPD::Field::Force(), 1 ) += b0 * sign;
+    };
+    auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, planes,
+                                       true );
 
     // ====================================================
     //            Custom particle initialization
     // ====================================================
     auto rho = particles->sliceDensity();
     auto x = particles->sliceReferencePosition();
-    auto u = particles->sliceDisplacement();
     auto v = particles->sliceVelocity();
+    auto f = particles->sliceForce();
+    auto nofail = particles->sliceNoFail();
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
-
-        // Initial conditions: displacements and velocities
-        double a = 0.001;
-        double r0 = 0.25;
-        double l = 0.07;
-        double norm =
-            std::sqrt( x( pid, 0 ) * x( pid, 0 ) + x( pid, 1 ) * x( pid, 1 ) +
-                       x( pid, 2 ) * x( pid, 2 ) );
-        double diff = norm - r0;
-        double arg = diff * diff / l / l;
-        for ( int d = 0; d < 3; d++ )
-        {
-            double comp = 0.0;
-            if ( norm > 0.0 )
-                comp = x( pid, d ) / norm;
-            u( pid, d ) = a * std::exp( -arg ) * comp;
-            v( pid, d ) = 0.0;
-        }
+        // No-fail zone
+        if ( x( pid, 1 ) <= plane1.low_y + delta + 1e-10 ||
+             x( pid, 1 ) >= plane2.high_y - delta - 1e-10 )
+            nofail( pid ) = 1;
     };
     particles->updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
-        inputs, particles, force_model, bc );
-    cabana_pd->init_force();
-    cabana_pd->run();
-
-    // ====================================================
-    //                      Outputs
-    // ====================================================
-    // Output displacement along the x-axis
-    createDisplacementProfile( MPI_COMM_WORLD, num_cells[0], 0,
-                               "displacement_profile.txt", *particles );
+    auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
+        inputs, particles, force_model, prenotch );
+    cabana_pd->init();
+    cabana_pd->run( bc );
 }
 
 // Initialize MPI+Kokkos.
@@ -128,7 +148,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    elasticWaveExample( argv[1] );
+    crackBranchingExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();

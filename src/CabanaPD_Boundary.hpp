@@ -141,21 +141,21 @@ struct ForceUpdateBCTag
 {
 };
 
-struct ZeroBCTag
-{
-};
-
+// Custom boundary condition.
 template <class BCIndexSpace, class UserFunctor>
 struct BoundaryCondition
 {
     BCIndexSpace _index_space;
     UserFunctor _user_functor;
+    bool _force_update;
 
     Timer _timer;
 
-    BoundaryCondition( BCIndexSpace bc_index_space, UserFunctor user )
+    BoundaryCondition( BCIndexSpace bc_index_space, UserFunctor user,
+                       const bool force )
         : _index_space( bc_index_space )
         , _user_functor( user )
+        , _force_update( force )
     {
     }
 
@@ -167,7 +167,7 @@ struct BoundaryCondition
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& )
+    void apply( ExecSpace, ParticleType&, double )
     {
         _timer.start();
         auto user = _user_functor;
@@ -181,27 +181,10 @@ struct BoundaryCondition
         _timer.stop();
     }
 
+    auto forceUpdate() { return _force_update; }
+
     auto time() { return _timer.time(); };
     auto timeInit() { return _index_space.time(); };
-};
-
-template <class BCIndexSpace>
-struct BoundaryCondition<BCIndexSpace, ZeroBCTag>
-{
-    Timer _timer;
-
-    template <class ExecSpace, class Particles>
-    void update( ExecSpace, Particles, RegionBoundary )
-    {
-    }
-
-    template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType )
-    {
-    }
-
-    auto time() { return _timer.time(); };
-    auto timeInit() { return 0.0; };
 };
 
 template <class BCIndexSpace>
@@ -209,6 +192,7 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
 {
     double _value;
     BCIndexSpace _index_space;
+    const bool _force_update = true;
 
     Timer _timer;
 
@@ -226,7 +210,7 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles )
+    void apply( ExecSpace, ParticleType& particles, double )
     {
         _timer.start();
         auto f = particles.sliceForce();
@@ -242,6 +226,8 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
         _timer.stop();
     }
 
+    auto forceUpdate() { return _force_update; }
+
     auto time() { return _timer.time(); };
     auto timeInit() { return _index_space.time(); };
 };
@@ -251,6 +237,7 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
 {
     double _value;
     BCIndexSpace _index_space;
+    const bool _force_update = true;
 
     Timer _timer;
 
@@ -268,7 +255,7 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles )
+    void apply( ExecSpace, ParticleType& particles, double )
     {
         _timer.start();
 
@@ -285,6 +272,8 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
 
         _timer.stop();
     }
+
+    auto forceUpdate() { return _force_update; }
 
     auto time() { return _timer.time(); };
     auto timeInit() { return _index_space.time(); };
@@ -310,21 +299,15 @@ template <class UserFunctor, class BoundaryType, class ExecSpace,
 auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
                               Particles particles,
                               std::vector<BoundaryType> planes,
+                              const bool force_update,
                               const double initial_guess = 0.5 )
 {
     using memory_space = typename Particles::memory_space;
     using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;
     bc_index_type bc_indices = createBoundaryIndexSpace<BoundaryType>(
         exec_space, particles, planes, initial_guess );
-    return BoundaryCondition<bc_index_type, UserFunctor>( bc_indices,
-                                                          user_functor );
-}
-
-template <class MemorySpace>
-auto createBoundaryCondition( ZeroBCTag )
-{
-    using bc_index_type = BoundaryIndexSpace<MemorySpace, RegionBoundary>;
-    return BoundaryCondition<bc_index_type, ZeroBCTag>();
+    return BoundaryCondition<bc_index_type, UserFunctor>(
+        bc_indices, user_functor, force_update );
 }
 
 } // namespace CabanaPD

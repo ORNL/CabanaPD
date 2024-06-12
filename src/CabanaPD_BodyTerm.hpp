@@ -25,11 +25,13 @@ template <class UserFunctor>
 struct BodyTerm
 {
     UserFunctor _user_functor;
+    bool _force_update;
 
     Timer _timer;
 
-    BodyTerm( UserFunctor user )
+    BodyTerm( UserFunctor user, const bool force )
         : _user_functor( user )
+        , _force_update( force )
     {
     }
 
@@ -47,14 +49,16 @@ struct BodyTerm
         _timer.stop();
     }
 
+    auto forceUpdate() { return _force_update; }
+
     auto time() { return _timer.time(); };
     auto timeInit() { return 0.0; };
 };
 
 template <class UserFunctor>
-auto createBodyTerm( UserFunctor user_functor )
+auto createBodyTerm( UserFunctor user_functor, const bool force_update )
 {
-    return BodyTerm<UserFunctor>( user_functor );
+    return BodyTerm<UserFunctor>( user_functor, force_update );
 }
 
 } // namespace CabanaPD
