@@ -90,6 +90,13 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent>
         s0 = sqrt( 5.0 * G0 / 9.0 / K / delta );
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
+
+    KOKKOS_INLINE_FUNCTION
+    bool criticalStretch( const int, const int, const double r,
+                          const double xi ) const
+    {
+        return r * r >= bond_break_coeff * xi * xi;
+    }
 };
 
 template <>
@@ -193,13 +200,14 @@ struct ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>
     using base_type::delta;
     using base_type::K;
 
-    using base_type::bond_break_coeff;
+    // Does not use the base bond_break_coeff.
     using base_type::G0;
     using base_type::s0;
 
     // Thermal parameters
     using base_temperature_type::alpha;
     using base_temperature_type::temp0;
+    using base_temperature_type::temperature;
 
     // Explicitly use the temperature-dependent stretch.
     using base_temperature_type::thermalStretch;
@@ -219,6 +227,16 @@ struct ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>
     {
         base_type::set_param( _delta, _K, _G0 );
         base_temperature_type::set_param( _alpha, _temp0 );
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    bool criticalStretch( const int i, const int j, const double r,
+                          const double xi ) const
+    {
+        double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
+        double bond_break_coeff =
+            ( 1.0 + s0 + alpha * temp_avg ) * ( 1.0 + s0 + alpha * temp_avg );
+        return r * r >= bond_break_coeff * xi * xi;
     }
 };
 

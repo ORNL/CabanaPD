@@ -220,7 +220,6 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
         _timer.start();
 
         auto model = _model;
-        auto break_coeff = _model.bond_break_coeff;
         const auto vol = particles.sliceVolume();
         const auto nofail = particles.sliceNoFail();
 
@@ -247,7 +246,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
                 model.thermalStretch( s, i, j );
 
                 // Break if beyond critical stretch unless in no-fail zone.
-                if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
+                if ( model.criticalStretch( i, j, r, xi ) && !nofail( i ) &&
                      !nofail( j ) )
                 {
                     mu( i, n ) = 0;
