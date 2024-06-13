@@ -211,21 +211,19 @@ class SolverElastic
     void init( BoundaryType boundary_condition,
                const bool initial_output = true )
     {
+        // Add non-force boundary condition.
         if ( !boundary_condition.forceUpdate() )
-        {
-            // Add boundary condition.
             boundary_condition.apply( exec_space(), *particles, 0.0 );
 
-            // Communicate temperature.
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        TemperatureDependent>::value )
-                comm->gatherTemperature();
-        }
+        // Communicate temperature.
+        if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                    TemperatureDependent>::value )
+            comm->gatherTemperature();
 
         // Force init without particle output.
         init( false );
 
-        // Add boundary condition.
+        // Add force boundary condition.
         if ( boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space(), *particles, 0.0 );
 
@@ -248,14 +246,11 @@ class SolverElastic
 
             // Add non-force boundary condition.
             if ( !boundary_condition.forceUpdate() )
-            {
                 boundary_condition.apply( exec_space(), *particles, step * dt );
 
-                if constexpr ( std::is_same<
-                                   typename force_model_type::thermal_type,
-                                   TemperatureDependent>::value )
-                    comm->gatherTemperature();
-            }
+            if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                        TemperatureDependent>::value )
+                comm->gatherTemperature();
 
             // Update ghost particles.
             comm->gatherDisplacement();
@@ -516,19 +511,19 @@ class SolverFracture
     void init( BoundaryType boundary_condition,
                const bool initial_output = true )
     {
+        // Add non-force boundary condition.
         if ( !boundary_condition.forceUpdate() )
-        {
             boundary_condition.apply( exec_space(), *particles, 0.0 );
 
-            // Communicate temperature.
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        TemperatureDependent>::value )
-                comm->gatherTemperature();
-        }
+        // Communicate temperature.
+        if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                    TemperatureDependent>::value )
+            comm->gatherTemperature();
 
         // Force init without particle output.
         init( false );
 
+        // Add force boundary condition.
         if ( boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space(), *particles, 0.0 );
 
@@ -551,14 +546,11 @@ class SolverFracture
 
             // Add non-force boundary condition.
             if ( !boundary_condition.forceUpdate() )
-            {
                 boundary_condition.apply( exec_space(), *particles, step * dt );
 
-                if constexpr ( std::is_same<
-                                   typename force_model_type::thermal_type,
-                                   TemperatureDependent>::value )
-                    comm->gatherTemperature();
-            }
+            if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                        TemperatureDependent>::value )
+                comm->gatherTemperature();
 
             // Update ghost particles.
             comm->gatherDisplacement();
