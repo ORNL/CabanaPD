@@ -62,6 +62,7 @@
 
 #include <cmath>
 
+#include <CabanaPD_ForceModels.hpp>
 #include <CabanaPD_Particles.hpp>
 
 namespace CabanaPD
@@ -127,6 +128,36 @@ getLinearizedDistance( const PosType& x, const PosType& u, const int i,
 // Forward declaration.
 template <class ExecutionSpace, class ForceType>
 class Force;
+
+template <class ExecutionSpace>
+class Force<ExecutionSpace, BaseForceModel>
+{
+  protected:
+    bool _half_neigh;
+
+    Timer _timer;
+    Timer _energy_timer;
+
+  public:
+    Force( const bool half_neigh )
+        : _half_neigh( half_neigh )
+    {
+    }
+
+    template <class ParticleType, class NeighListType, class ParallelType>
+    void computeWeightedVolume( ParticleType&, const NeighListType&,
+                                const ParallelType ) const
+    {
+    }
+    template <class ParticleType, class NeighListType, class ParallelType>
+    void computeDilatation( ParticleType&, const NeighListType&,
+                            const ParallelType ) const
+    {
+    }
+
+    auto time() { return _timer.time(); };
+    auto timeEnergy() { return _energy_timer.time(); };
+};
 
 /******************************************************************************
   Force free functions.
