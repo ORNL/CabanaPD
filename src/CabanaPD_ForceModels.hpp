@@ -12,6 +12,7 @@
 #ifndef FORCE_MODELS_H
 #define FORCE_MODELS_H
 
+#include <CabanaPD_Constants.hpp>
 #include <CabanaPD_Types.hpp>
 
 namespace CabanaPD
@@ -68,6 +69,45 @@ struct BaseTemperatureModel
     {
         double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
         s -= alpha * temp_avg;
+    }
+};
+
+// This class stores temperature parameters needed for heat transfer, but not
+// the temperature itself (stored instead in the static temperature class
+// above).
+struct BaseDynamicTemperatureModel
+{
+    double delta;
+
+    double thermal_coeff;
+    double kappa;
+    double cp;
+    bool constant_conductivity;
+
+    BaseDynamicTemperatureModel( const double _delta, const double _kappa,
+                                 const double _cp,
+                                 const bool _constant_conductivity = true )
+    {
+        set_param( _delta, _kappa, _cp, _constant_conductivity );
+    }
+
+    void set_param( const double _delta, const double _kappa, const double _cp,
+                    const bool _constant_conductivity )
+    {
+        delta = _delta;
+        kappa = _kappa;
+        cp = _cp;
+        const double d3 = _delta * _delta * _delta;
+        thermal_coeff = 9.0 / 2.0 * _kappa / pi / d3;
+        constant_conductivity = _constant_conductivity;
+    }
+
+    KOKKOS_INLINE_FUNCTION double conductivity_function( double r ) const
+    {
+        if ( constant_conductivity )
+            return thermal_coeff;
+        else
+            return 4.0 * thermal_coeff * ( 1.0 - r / delta );
     }
 };
 
