@@ -252,6 +252,137 @@ auto createForceModel( PMB, Fracture, ParticleType particles,
         delta, K, G0, temp, alpha, temp0 );
 }
 
+template <typename TemperatureType>
+struct ForceModel<PMB, Elastic, DynamicTemperature, TemperatureType>
+    : public ForceModel<PMB, Elastic, TemperatureDependent, TemperatureType>
+{
+    using base_type =
+        ForceModel<PMB, Elastic, TemperatureDependent, TemperatureType>;
+    using base_model = PMB;
+    using fracture_type = Elastic;
+    using thermal_type = DynamicTemperature;
+
+    using base_type::c;
+    using base_type::delta;
+    using base_type::K;
+
+    // Thermal parameters
+    using base_type::alpha;
+    using base_type::temp0;
+    double thermal_coeff;
+    double kappa;
+    double cp;
+
+    // Explicitly use the temperature-dependent stretch.
+    using base_type::thermalStretch;
+
+    // ForceModel(){};
+    ForceModel( const double _delta, const double _K,
+                const TemperatureType _temp, const double _kappa,
+                const double _cp, const double _alpha,
+                const double _temp0 = 0.0 )
+        : base_type( _delta, _K, _temp, _alpha, _temp0 )
+    {
+        set_param( _delta, _K, _kappa, _cp, _alpha, _temp0 );
+    }
+
+    void set_param( const double _delta, const double _K, const double _kappa,
+                    const double _cp, const double _alpha, const double _temp0 )
+    {
+        base_type::set_param( _delta, _K, _alpha, _temp0 );
+
+        kappa = _kappa;
+        cp = _cp;
+        const double d3 = _delta * _delta * _delta;
+        thermal_coeff = 18.0 * _kappa / pi / d3;
+    }
+};
+
+template <typename ParticleType>
+auto createForceModel( PMB, Elastic, ParticleType particles, const double delta,
+                       const double K, const double kappa, const double cp,
+                       const double alpha, const double temp0 )
+{
+    auto temp = particles.sliceTemperature();
+    using temp_type = decltype( temp );
+    return ForceModel<PMB, Elastic, DynamicTemperature, temp_type>(
+        delta, K, temp, kappa, cp, alpha, temp0 );
+}
+
+template <typename TemperatureType>
+struct ForceModel<PMB, Fracture, DynamicTemperature, TemperatureType>
+    : public ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>
+{
+    using base_type =
+        ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>;
+    using base_model = typename base_type::base_model;
+    using fracture_type = typename base_type::fracture_type;
+    using thermal_type = DynamicTemperature;
+
+    using base_type::c;
+    using base_type::delta;
+    using base_type::K;
+
+    // Does not use the base bond_break_coeff.
+    using base_type::G0;
+    using base_type::s0;
+    double thermal_coeff;
+    double kappa;
+    double cp;
+
+    // Thermal parameters
+    using base_type::alpha;
+    using base_type::temp0;
+    using base_type::temperature;
+
+    // Explicitly use the temperature-dependent stretch.
+    using base_type::thermalStretch;
+
+    // ForceModel(){};
+    ForceModel( const double _delta, const double _K, const double _G0,
+                const TemperatureType _temp, const double _kappa,
+                const double _cp, const double _alpha,
+                const double _temp0 = 0.0 )
+        : base_type( _delta, _K, _G0, _temp, _alpha, _temp0 )
+    {
+        set_param( _delta, _K, _G0, _kappa, _cp, _alpha, _temp0 );
+    }
+
+    void set_param( const double _delta, const double _K, const double _G0,
+                    const double _kappa, const double _cp, const double _alpha,
+                    const double _temp0 )
+    {
+        base_type::set_param( _delta, _K, _G0, _alpha, _temp0 );
+
+        kappa = _kappa;
+        cp = _cp;
+        const double d3 = _delta * _delta * _delta;
+        thermal_coeff = 18.0 * _kappa / pi / d3;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    bool criticalStretch( const int i, const int j, const double r,
+                          const double xi ) const
+    {
+        double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
+        double bond_break_coeff =
+            ( 1.0 + s0 + alpha * temp_avg ) * ( 1.0 + s0 + alpha * temp_avg );
+        return r * r >= bond_break_coeff * xi * xi;
+    }
+};
+
+template <typename ParticleType>
+auto createForceModel( PMB, Fracture, ParticleType particles,
+                       const double delta, const double K, const double G0,
+                       const double kappa, const double cp, const double alpha,
+                       const double temp0 )
+{
+    auto temp = particles.sliceTemperature();
+    using temp_type = decltype( temp );
+    return ForceModel<PMB, Fracture, DynamicTemperature, temp_type>(
+        delta, K, G0, temp, kappa, cp, alpha, temp0 );
+}
+
 } // namespace CabanaPD
 
 #endif
