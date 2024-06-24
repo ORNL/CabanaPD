@@ -47,8 +47,8 @@ void thermalCrackExample( const std::string filename )
 
     // Problem parameters
     double temp0 = inputs["reference_temperature"];
-    double temp_w = inputs["water_temperature"];
-    double t_ramp = inputs["pulse_ramping_time"];
+    double temp_w = inputs["background_temperature"];
+    double t_ramp = inputs["surface_temperature_ramp_time"];
 
     // ====================================================
     //                  Discretization
