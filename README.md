@@ -128,7 +128,7 @@ example can be run with:
 ./CabanaPD/build/install/bin/KalthoffWinkler CabanaPD/examples/inputs/kalthoff_winkler.json
 ```
 
-The third example is crack branching in soda-lime glass [3]. The example can be
+The third example is crack branching in a pre-notched soda-lime glass plate due to traction loading [3]. The example can be
 run with:
 
 ```
@@ -138,11 +138,16 @@ run with:
 ### Thermomechanics
 Examples which demonstrate temperature-dependent mechanics and fracture are with `examples/thermomechanics`.
 
-The first example demonstrates a thermoelastic problem without fracture with a homogeneous plate
-under linear thermal loading [4]. The example can be run with:
+The first example is thermoelastic deformation in a homogeneous plate due to linear thermal loading [4]. The example can be run with:
 
 ```
 ./CabanaPD/build/install/bin/ThermalDeformation CabanaPD/examples/thermomechanics/thermal_deformation.json
+```
+
+The second example is crack initiation and propagation in an alumina ceramic plate due to a thermal shock caused by water quenching [5]. The example can be run with:
+
+```
+./CabanaPD/build/install/bin/ThermalCrack CabanaPD/examples/thermomechanics/thermal_crack.json
 ```
 
 ## References
@@ -160,6 +165,8 @@ Kunze, and L.W. Meyer, eds., Vol 1, DGM Informationsgesellschaft Verlag (1988)
 [3] F. Bobaru and G. Zhang, Why do cracks branch? A peridynamic investigation of dynamic brittle fracture, International Journal of Fracture 196 (2015): 59–98.
 
 [4] D. He, D. Huang, and D. Jiang, Modeling and studies of fracture in functionally graded materials under thermal shock loading using peridynamics, Theoretical and Applied Fracture Mechanics 111 (2021): 102852.
+
+[5] C.P. Jiang, X.F. Wu, J. Li, F. Song, Y.F. Shao, X.H. Xu, and P. Yan, A study of the mechanism of formation and numerical simulations of crack patterns in ceramics subjected to thermal shock, Acta Materialia 60 (2012): 4540–4550.
 
 ## Contributing
 
