@@ -132,6 +132,10 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
+
+    // Define empty pre-notch
+    CabanaPD::Prenotch<0> prenotch;
+
     auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
         inputs, particles, force_model, prenotch );
     cabana_pd->init();
