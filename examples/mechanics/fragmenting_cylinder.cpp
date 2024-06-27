@@ -19,7 +19,7 @@
 #include <CabanaPD.hpp>
 
 // Simulate an expanding cylinder resulting in fragmentation
-void kalthoffWinklerExample( const std::string filename )
+void fragmentingCylinderExample( const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
@@ -36,12 +36,9 @@ void kalthoffWinklerExample( const std::string filename )
     //                Material parameters
     // ====================================================
     double rho0 = inputs["density"];
-    // double E = inputs["elastic_modulus"];
-    // double nu = 1.0 / 3.0;
-    // double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) );
     double K = inputs["bulk_modulus"];
+    double G = inputs["shear_modulus"]; // Only for LPS.
     double G0 = inputs["fracture_energy"];
-    // double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
     double delta = inputs["horizon"];
     delta += 1e-10;
 
@@ -55,29 +52,6 @@ void kalthoffWinklerExample( const std::string filename )
     int m = std::floor( delta /
                         ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
     int halo_width = m + 1; // Just to be safe.
-
-    // ====================================================
-    //                   Pre-notches
-    // ====================================================
-
-    std::array<double, 3> system_size = inputs["system_size"];
-
-    /*
-    double height = system_size[0];
-    double width = system_size[1];
-    double thickness = system_size[2];
-    double L_prenotch = height / 2.0;
-    double y_prenotch1 = -width / 8.0;
-    double y_prenotch2 = width / 8.0;
-    double low_x = low_corner[0];
-    double low_z = low_corner[2];
-    Kokkos::Array<double, 3> p01 = { low_x, y_prenotch1, low_z };
-    Kokkos::Array<double, 3> p02 = { low_x, y_prenotch2, low_z };
-    Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
-    Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-    Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { p01, p02 };
-    CabanaPD::Prenotch<2> prenotch( v1, v2, notch_positions );
-    */
 
     // ====================================================
     //                    Force model
@@ -101,12 +75,11 @@ void kalthoffWinklerExample( const std::string filename )
     //                Boundary conditions
     // ====================================================
 
+    std::array<double, 3> system_size = inputs["system_size"];
     double length = system_size[0];
     double width = system_size[1];
     double height = system_size[2];
 
-    // double dx = particles->dx[0];
-    double x_bc = -0.5 * height;
     CabanaPD::RegionBoundary plane( -0.5 * length, 0.5 * length, -0.5 * width,
                                     0.5 * width, -0.5 * height, 0.5 * height );
     std::vector<CabanaPD::RegionBoundary> planes = { plane };
@@ -116,29 +89,18 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     //            Custom particle initialization
     // ====================================================
-
-    // Create particles from mesh.
-    // Does not set displacements, velocities, etc.
-    auto particles = std::make_shared<
-        CabanaPD::Particles<memory_space, typename model_type::base_model>>(
-        exec_space(), low_corner, high_corner, num_cells, halo_width );
-
+    double x_center = 0.5 * ( low_corner[0] + high_corner[0] );
+    double y_center = 0.5 * ( low_corner[1] + high_corner[1] );
     double Rout = inputs["cylinder_outer_radius"];
     double Rin = inputs["cylinder_inner_radius"];
 
     // Do not create particles outside given cylindrical region
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
     {
-        double x_center = 0.5 * ( low_corner[0] + high_corner[0] );
-        double y_center = 0.5 * ( low_corner[1] + high_corner[1] );
         double rsq = ( x[0] - x_center ) * ( x[0] - x_center ) +
                      ( x[1] - y_center ) * ( x[1] - y_center );
-        if rsq
-            *rsq<Rin * Rin || rsq * rsq> Rout* Rout
-                // if ( ( ( x[0] - x_center ) * ( x[0] - x_center ) +
-                //         ( x[1] - y_center ) * ( x[1] - y_center ) ) <
-                //         radius * radius )
-                return false;
+        if ( rsq < Rin * Rin || rsq > Rout * Rout )
+            return false;
         return true;
     };
     particles->createParticles( exec_space(), init_op );
@@ -148,21 +110,16 @@ void kalthoffWinklerExample( const std::string filename )
     auto v = particles->sliceVelocity();
     auto f = particles->sliceForce();
 
-    // double v0 = inputs["impactor_velocity"];
     double vrmax = inputs["max_radial_initial_velocity"];
     double vzmax = inputs["max_vertical_initial_velocity"];
-    double height = inputs["system_size"][2];
     double zmin = low_corner[2];
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
-        // x velocity between the pre-notches
-        // if ( x( pid, 1 ) > y_prenotch1 && x( pid, 1 ) < y_prenotch2 &&
-        //     x( pid, 0 ) < -0.5 * height + dx )
-        // v( pid, 0 ) = v0;
-        double zfactor = ( x( pid, 2 ) + zmin ) / height - 1;
+        // Velocity
+        double zfactor = ( x( pid, 2 ) - zmin ) / ( 0.5 * height ) - 1;
         double vr = vrmax * ( 1 - 0.5 * zfactor * zfactor );
         v( pid, 0 ) =
             vr * Kokkos::cos( Kokkos::atan2( x( pid, 1 ), x( pid, 0 ) ) );
@@ -187,7 +144,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    kalthoffWinklerExample( argv[1] );
+    fragmentingCylinderExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();
