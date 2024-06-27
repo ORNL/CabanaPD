@@ -128,11 +128,16 @@ example can be run with:
 ./CabanaPD/build/install/bin/KalthoffWinkler CabanaPD/examples/inputs/kalthoff_winkler.json
 ```
 
-The third example is crack branching in a pre-notched soda-lime glass plate due to traction loading [3]. The example can be
-run with:
+The third example is crack branching in a pre-notched soda-lime glass plate due to traction loading [3]. The example can be run with:
 
 ```
-./CabanaPD/build/install/bin/CrackBranching CabanaPD/examples/inputs/crack_branching.json
+./CabanaPD/build/install/bin/CrackBranching CabanaPD/examples/mechanics/inputs/crack_branching.json
+```
+
+The fourth example is a fragmenting cylinder due to internal pressure [6]. The example can be run with:
+
+```
+./CabanaPD/build/install/bin/FragmentingCylinder CabanaPD/examples/mechanics/inputs/fragmenting_cylinder.json
 ```
 
 ### Thermomechanics
@@ -167,6 +172,8 @@ Kunze, and L.W. Meyer, eds., Vol 1, DGM Informationsgesellschaft Verlag (1988)
 [4] D. He, D. Huang, and D. Jiang, Modeling and studies of fracture in functionally graded materials under thermal shock loading using peridynamics, Theoretical and Applied Fracture Mechanics 111 (2021): 102852.
 
 [5] C.P. Jiang, X.F. Wu, J. Li, F. Song, Y.F. Shao, X.H. Xu, and P. Yan, A study of the mechanism of formation and numerical simulations of crack patterns in ceramics subjected to thermal shock, Acta Materialia 60 (2012): 4540–4550.
+
+[6] D.J. Littlewood, M.L. Parks, J.T. Foster, J.A. Mitchell, and P. Diehl, The peridigm meshfree peridynamics code, Journal of Peridynamics and Nonlocal Modeling 6 (2024): 118–148.  
 
 ## Contributing
 
