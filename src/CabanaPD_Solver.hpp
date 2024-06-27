@@ -211,21 +211,19 @@ class SolverElastic
     void init( BoundaryType boundary_condition,
                const bool initial_output = true )
     {
+        // Add non-force boundary condition.
         if ( !boundary_condition.forceUpdate() )
-        {
-            // Add boundary condition.
             boundary_condition.apply( exec_space(), *particles, 0.0 );
 
-            // Communicate temperature.
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        TemperatureDependent>::value )
-                comm->gatherTemperature();
-        }
+        // Communicate temperature.
+        if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                    TemperatureDependent>::value )
+            comm->gatherTemperature();
 
         // Force init without particle output.
         init( false );
 
-        // Add boundary condition.
+        // Add force boundary condition.
         if ( boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space(), *particles, 0.0 );
 
@@ -248,14 +246,11 @@ class SolverElastic
 
             // Add non-force boundary condition.
             if ( !boundary_condition.forceUpdate() )
-            {
                 boundary_condition.apply( exec_space(), *particles, step * dt );
 
-                if constexpr ( std::is_same<
-                                   typename force_model_type::thermal_type,
-                                   TemperatureDependent>::value )
-                    comm->gatherTemperature();
-            }
+            if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                        TemperatureDependent>::value )
+                comm->gatherTemperature();
 
             // Update ghost particles.
             comm->gatherDisplacement();
@@ -442,7 +437,7 @@ class SolverElastic
 };
 
 template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel, class PrenotchType>
+          class ForceModel>
 class SolverFracture
     : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>
 {
@@ -459,12 +454,12 @@ class SolverFracture
     using force_model_type = ForceModel;
     using force_type = typename base_type::force_type;
     using neigh_iter_tag = Cabana::SerialOpTag;
-    using prenotch_type = PrenotchType;
     using input_type = typename base_type::input_type;
 
+    template <typename PrenotchType>
     SolverFracture( input_type _inputs,
                     std::shared_ptr<particle_type> _particles,
-                    force_model_type force_model, prenotch_type prenotch )
+                    force_model_type force_model, PrenotchType prenotch )
         : base_type( _inputs, _particles, force_model )
     {
         init_mu();
@@ -516,12 +511,19 @@ class SolverFracture
     void init( BoundaryType boundary_condition,
                const bool initial_output = true )
     {
+        // Add non-force boundary condition.
         if ( !boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space(), *particles, 0.0 );
+
+        // Communicate temperature.
+        if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                    TemperatureDependent>::value )
+            comm->gatherTemperature();
 
         // Force init without particle output.
         init( false );
 
+        // Add force boundary condition.
         if ( boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space(), *particles, 0.0 );
 
@@ -544,7 +546,11 @@ class SolverFracture
 
             // Add non-force boundary condition.
             if ( !boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space{}, *particles, step * dt );
+                boundary_condition.apply( exec_space(), *particles, step * dt );
+
+            if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                        TemperatureDependent>::value )
+                comm->gatherTemperature();
 
             // Update ghost particles.
             comm->gatherDisplacement();
@@ -567,25 +573,30 @@ class SolverFracture
             // Integrate - velocity Verlet second half.
             integrator->finalHalfStep( *particles );
 
-            // Print output.
-            if ( step % output_frequency == 0 )
-            {
-                auto W = computeEnergy( *force, *particles, *neighbors, mu,
-                                        neigh_iter_tag() );
-
-                particles->output( step / output_frequency, step * dt,
-                                   output_reference );
-                _step_timer.stop();
-                this->step_output( step, W );
-            }
-            else
-            {
-                _step_timer.stop();
-            }
+            output( step );
         }
 
         // Final output and timings.
         this->final_output();
+    }
+
+    void output( const int step )
+    {
+        // Print output.
+        if ( step % output_frequency == 0 )
+        {
+            auto W = computeEnergy( *force, *particles, *neighbors, mu,
+                                    neigh_iter_tag() );
+
+            particles->output( step / output_frequency, step * dt,
+                               output_reference );
+            _step_timer.stop();
+            this->step_output( step, W );
+        }
+        else
+        {
+            _step_timer.stop();
+        }
     }
 
     using base_type::dt;
@@ -622,13 +633,24 @@ auto createSolverElastic( InputsType inputs,
 }
 
 template <class MemorySpace, class InputsType, class ParticleType,
+          class ForceModel>
+auto createSolverFracture( InputsType inputs,
+                           std::shared_ptr<ParticleType> particles,
+                           ForceModel model )
+{
+    return std::make_shared<
+        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModel>>(
+        inputs, particles, model );
+}
+
+template <class MemorySpace, class InputsType, class ParticleType,
           class ForceModel, class PrenotchType>
 auto createSolverFracture( InputsType inputs,
                            std::shared_ptr<ParticleType> particles,
                            ForceModel model, PrenotchType prenotch )
 {
-    return std::make_shared<SolverFracture<
-        MemorySpace, InputsType, ParticleType, ForceModel, PrenotchType>>(
+    return std::make_shared<
+        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModel>>(
         inputs, particles, model, prenotch );
 }
 

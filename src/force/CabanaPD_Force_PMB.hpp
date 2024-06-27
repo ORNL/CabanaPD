@@ -63,6 +63,7 @@
 #include <cmath>
 
 #include <CabanaPD_Force.hpp>
+#include <CabanaPD_ForceModels.hpp>
 #include <CabanaPD_Particles.hpp>
 #include <CabanaPD_Types.hpp>
 #include <force/CabanaPD_ForceModels_PMB.hpp>
@@ -71,33 +72,24 @@ namespace CabanaPD
 {
 template <class ExecutionSpace, class... ModelParams>
 class Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
+    : public Force<ExecutionSpace, BaseForceModel>
 {
   public:
     using exec_space = ExecutionSpace;
     using model_type = ForceModel<PMB, Elastic, ModelParams...>;
+    using base_type = Force<exec_space, BaseForceModel>;
 
   protected:
-    bool _half_neigh;
+    using base_type::_half_neigh;
     model_type _model;
 
-    Timer _timer;
-    Timer _energy_timer;
+    using base_type::_energy_timer;
+    using base_type::_timer;
 
   public:
     Force( const bool half_neigh, const model_type model )
-        : _half_neigh( half_neigh )
+        : base_type( half_neigh )
         , _model( model )
-    {
-    }
-
-    template <class ParticleType, class NeighListType, class ParallelType>
-    void computeWeightedVolume( ParticleType&, const NeighListType&,
-                                const ParallelType ) const
-    {
-    }
-    template <class ParticleType, class NeighListType, class ParallelType>
-    void computeDilatation( ParticleType&, const NeighListType&,
-                            const ParallelType ) const
     {
     }
 
@@ -181,22 +173,19 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
         _energy_timer.stop();
         return strain_energy;
     }
-
-    auto time() { return _timer.time(); };
-    auto timeEnergy() { return _energy_timer.time(); };
 };
 
 template <class ExecutionSpace, class... ModelParams>
 class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
-    : public Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
+    : public Force<ExecutionSpace, BaseForceModel>
 {
   public:
     using exec_space = ExecutionSpace;
-    using model_type = ForceModel<PMB, Fracture>;
+    using model_type = ForceModel<PMB, Fracture, ModelParams...>;
 
   protected:
-    using base_type =
-        Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>;
+    using base_model_type = typename model_type::base_type;
+    using base_type = Force<ExecutionSpace, BaseForceModel>;
     using base_type::_half_neigh;
     model_type _model;
 
@@ -205,7 +194,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
 
   public:
     Force( const bool half_neigh, const model_type model )
-        : base_type( half_neigh, model )
+        : base_type( half_neigh )
         , _model( model )
     {
     }
@@ -220,7 +209,6 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
         _timer.start();
 
         auto model = _model;
-        auto break_coeff = _model.bond_break_coeff;
         const auto vol = particles.sliceVolume();
         const auto nofail = particles.sliceNoFail();
 
@@ -247,7 +235,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
                 model.thermalStretch( s, i, j );
 
                 // Break if beyond critical stretch unless in no-fail zone.
-                if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
+                if ( model.criticalStretch( i, j, r, xi ) && !nofail( i ) &&
                      !nofail( j ) )
                 {
                     mu( i, n ) = 0;
@@ -329,14 +317,14 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
 
 template <class ExecutionSpace, class... ModelParams>
 class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic, ModelParams...>>
-    : public Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
+    : public Force<ExecutionSpace, BaseForceModel>
 {
   public:
     using exec_space = ExecutionSpace;
-    using model_type = ForceModel<LinearPMB, Elastic>;
+    using model_type = ForceModel<LinearPMB, Elastic, TemperatureIndependent>;
 
   protected:
-    using base_type = Force<ExecutionSpace, ForceModel<PMB, Elastic>>;
+    using base_type = Force<ExecutionSpace, BaseForceModel>;
     using base_type::_half_neigh;
     model_type _model;
 
@@ -345,7 +333,7 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic, ModelParams...>>
 
   public:
     Force( const bool half_neigh, const model_type model )
-        : base_type( half_neigh, model )
+        : base_type( half_neigh )
         , _model( model )
     {
     }
