@@ -14,5 +14,5 @@
     "timestep"                       : {"value": 1.0e-8, "unit": "s"},
     "timestep_safety_factor"         : {"value": 0.85},
     "output_frequency"               : {"value": 10},
-    "output_reference"               : {"value": true}
+    "output_reference"               : {"value": false}
 }
