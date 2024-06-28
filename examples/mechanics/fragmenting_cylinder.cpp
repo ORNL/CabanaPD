@@ -114,10 +114,31 @@ void fragmentingCylinderExample( const std::string filename )
     double vzmax = inputs["max_vertical_initial_velocity"];
     double zmin = low_corner[2];
 
+    double dx = particles->dx[0];
+    double dy = particles->dx[1];
+    double dz = particles->dx[2];
+
+    // Use time to seed random number generator
+    std::srand( std::time( nullptr ) );
+
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
+        // Perturb particle positions
+        double factor = 0.5;
+        x( pid, 0 ) =
+            x( pid, 0 ) *
+            ( 1 + ( -1 + 2 * ( (double)std::rand() / ( RAND_MAX ) ) ) *
+                      ( factor * dx ) );
+        x( pid, 1 ) =
+            x( pid, 1 ) *
+            ( 1 + ( -1 + 2 * ( (double)std::rand() / ( RAND_MAX ) ) ) *
+                      ( factor * dy ) );
+        x( pid, 2 ) =
+            x( pid, 2 ) *
+            ( 1 + ( -1 + 2 * ( (double)std::rand() / ( RAND_MAX ) ) ) *
+                      ( factor * dy ) );
         // Velocity
         double zfactor = ( x( pid, 2 ) - zmin ) / ( 0.5 * height ) - 1;
         double vr = vrmax * ( 1 - 0.5 * zfactor * zfactor );

@@ -1,18 +1,18 @@
 {
-    "num_cells"                      : {"value": [269, 269, 537]},
+    "num_cells"                      : {"value": [101, 101, 201]},
     "system_size"                    : {"value": [0.05, 0.05, 0.1], "unit": "m"},
     "density"                        : {"value": 7800, "unit": "kg/m^3"},
     "bulk_modulus"                   : {"value": 130e+9, "unit": "Pa"},
     "shear_modulus"                  : {"value": 78e+9, "unit": "Pa"},
     "fracture_energy"                : {"value": 1.88e+6, "unit": "J/m^2"},
-    "horizon"                        : {"value": 5.58e-4, "unit": "m"}, 
+    "horizon"                        : {"value": 0.0015, "unit": "m"}, 
     "cylinder_outer_radius"          : {"value": 0.025, "unit": "m"},
     "cylinder_inner_radius"          : {"value": 0.02, "unit": "m"},
     "max_radial_initial_velocity"    : {"value": 200, "unit": "m/s"}, 
     "max_vertical_initial_velocity"  : {"value": 50, "unit": "m/s"}, 
     "final_time"                     : {"value": 4.0e-4, "unit": "s"},
-    "timestep"                       : {"value": 1.0e-8, "unit": "s"},
+    "timestep"                       : {"value": 7.5e-8, "unit": "s"},
     "timestep_safety_factor"         : {"value": 0.85},
-    "output_frequency"               : {"value": 10},
+    "output_frequency"               : {"value": 100},
     "output_reference"               : {"value": false}
 }
