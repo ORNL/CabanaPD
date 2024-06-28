@@ -127,6 +127,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
 
     // Simulation total domain.
     std::array<double, dim> global_mesh_ext;
+    std::array<double, dim> global_mesh_lo;
+    std::array<double, dim> global_mesh_hi;
 
     // Simulation sub domain (single MPI rank).
     std::array<double, dim> local_mesh_ext;
@@ -203,6 +205,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
         std::array<bool, dim> is_periodic;
         for ( int d = 0; d < dim; d++ )
         {
+            global_mesh_lo[d] = global_mesh->lowCorner( d );
+            global_mesh_hi[d] = global_mesh->highCorner( d );
             global_mesh_ext[d] = global_mesh->extent( d );
             is_periodic[d] = false;
         }
@@ -521,6 +525,8 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, Dimension>
 
     // Simulation total domain.
     using base_type::global_mesh_ext;
+    using base_type::global_mesh_hi;
+    using base_type::global_mesh_lo;
 
     // Simulation sub domain (single MPI rank).
     using base_type::ghost_mesh_hi;
