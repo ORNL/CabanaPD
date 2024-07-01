@@ -50,14 +50,13 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
 
         auto model = _model;
         const auto vol = particles.sliceVolume();
+        const auto rho = particles.sliceDensity();
 
         auto temp_func = KOKKOS_LAMBDA( const int i, const int j )
         {
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
-            const auto vol = particles.sliceVolume();
-            const auto rho = particles.sliceDensity();
             const double k = model.thermal_coeff * ( 1 - r / model.delta );
             const double coeff = k * dt / rho( i ) / model.cp;
             temp( i ) += coeff * ( temp( j ) - temp( i ) ) / r / r * vol( j );
