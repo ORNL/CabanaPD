@@ -72,7 +72,7 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
     }
 };
 
-// Forces with bond breaking.
+// Heat transfer free function.
 template <class HeatTransferType, class ParticleType, class NeighListType,
           class ParallelType>
 void computeHeatTransfer( HeatTransferType& heat_transfer,
@@ -86,7 +86,7 @@ void computeHeatTransfer( HeatTransferType& heat_transfer,
     auto temp = particles.sliceTemperature();
     auto temp_a = particles.sliceTemperatureAtomic();
 
-    // Forces only atomic if using team threading.
+    // Temperature only needs to be atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
         heat_transfer.computeHeatTransferFull(
             temp_a, x, u, particles, neigh_list, n_local, neigh_op_tag, dt );
