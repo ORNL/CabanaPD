@@ -48,7 +48,8 @@ struct ForceModel<PMB, Elastic, TemperatureIndependent> : public BaseForceModel
     {
         delta = _delta;
         K = _K;
-        c = 18.0 * K / ( 3.141592653589793 * delta * delta * delta * delta );
+        // FIXME: Kokkos::numbers::pi_v<double> when minimum 4.0 is required.
+        c = 18.0 * K / ( M_PI * delta * delta * delta * delta );
     }
 };
 
@@ -293,7 +294,8 @@ struct ForceModel<PMB, Elastic, DynamicTemperature, TemperatureType>
         kappa = _kappa;
         cp = _cp;
         const double d3 = _delta * _delta * _delta;
-        thermal_coeff = 18.0 * _kappa / Kokkos::numbers::pi_v<double> / d3;
+        // FIXME: Kokkos::numbers::pi_v<double> when minimum 4.0 is required.
+        thermal_coeff = 18.0 * _kappa / M_PI / d3;
     }
 };
 
@@ -356,7 +358,8 @@ struct ForceModel<PMB, Fracture, DynamicTemperature, TemperatureType>
         kappa = _kappa;
         cp = _cp;
         const double d3 = _delta * _delta * _delta;
-        thermal_coeff = 18.0 * _kappa / Kokkos::numbers::pi_v<double> / d3;
+        // FIXME: Kokkos::numbers::pi_v<double> when minimum 4.0 is required.
+        thermal_coeff = 18.0 * _kappa / M_PI / d3;
     }
 
     KOKKOS_INLINE_FUNCTION
