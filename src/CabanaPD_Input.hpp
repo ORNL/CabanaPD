@@ -125,8 +125,8 @@ class Inputs
         double K = inputs["bulk_modulus"]["value"];
         double delta = inputs["horizon"]["value"];
         // FIXME: this is copied from the forces
-        double c =
-            18.0 * K / ( 3.141592653589793 * delta * delta * delta * delta );
+        // FIXME: Kokkos::numbers::pi_v<double> when minimum 4.0 is required.
+        double c = 18.0 * K / ( M_PI * delta * delta * delta * delta );
 
         for ( int i = -( m + 1 ); i < m + 2; i++ )
         {
