@@ -14,7 +14,7 @@
 
 namespace CabanaPD
 {
-// Fracture types.
+// Mechanics types.
 struct Elastic
 {
 };

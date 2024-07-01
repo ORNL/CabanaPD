@@ -137,7 +137,7 @@ class SolverElastic
                                     TemperatureDependent>::value )
             force_model.update( particles->sliceTemperature() );
 
-        // Define heat transfer if being used.
+        // Create heat transfer if needed.
         if constexpr ( std::is_same<typename force_model_type::thermal_type,
                                     DynamicTemperature>::value )
             heat_transfer = std::make_shared<heat_transfer_type>(
