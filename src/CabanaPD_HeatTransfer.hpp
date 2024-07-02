@@ -26,12 +26,10 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
     using base_type = Force<ExecutionSpace, BaseForceModel>;
     using base_type::_half_neigh;
     using base_type::_timer;
+    Timer _euler_timer = base_type::_energy_timer;
     ModelType _model;
 
   public:
-    HeatTransfer()
-        : base_type( false ){};
-
     HeatTransfer( const bool half_neigh, const ModelType model )
         : base_type( half_neigh )
         , _model( model )
@@ -41,25 +39,26 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
     template <class TemperatureType, class PosType, class ParticleType,
               class NeighListType, class ParallelType>
     void
-    computeHeatTransferFull( TemperatureType& temp, const PosType& x,
+    computeHeatTransferFull( TemperatureType& prev_temp, const PosType& x,
                              const PosType& u, const ParticleType& particles,
                              const NeighListType& neigh_list, const int n_local,
-                             ParallelType& neigh_op_tag, const double dt )
+                             ParallelType& neigh_op_tag )
     {
         _timer.start();
 
         auto model = _model;
         const auto vol = particles.sliceVolume();
-        const auto rho = particles.sliceDensity();
+        const auto temp = particles.sliceTemperature();
 
         auto temp_func = KOKKOS_LAMBDA( const int i, const int j )
         {
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
-            const double k = model.thermal_coeff * ( 1 - r / model.delta );
-            const double coeff = k * dt / rho( i ) / model.cp;
-            temp( i ) += coeff * ( temp( j ) - temp( i ) ) / r / r * vol( j );
+            const double coeff = model.thermal_coeff *
+                                 model.conductivity_function( r ) / model.cp;
+            prev_temp( i ) +=
+                coeff * ( temp( j ) - temp( i ) ) / r / r * vol( j );
         };
 
         Kokkos::RangePolicy<ExecutionSpace> policy( 0, n_local );
@@ -68,6 +67,24 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
             neigh_op_tag, "CabanaPD::HeatTransfer::computeFull" );
 
         _timer.stop();
+    }
+
+    template <class ParticleType>
+    void stepEuler( const ParticleType& particles, const double dt )
+    {
+        _euler_timer.start();
+        const auto rho = particles.sliceDensity();
+        const auto prev_temp = particles.slicePreviousTemperature();
+        auto temp = particles.sliceTemperature();
+        auto n_local = particles.n_local;
+        auto euler_func = KOKKOS_LAMBDA( const int i )
+        {
+            temp( i ) += dt / rho( i ) * prev_temp( i );
+        };
+        Kokkos::RangePolicy<ExecutionSpace> policy( 0, n_local );
+        Kokkos::parallel_for( "CabanaPD::HeatTransfer::Euler", policy,
+                              euler_func );
+        _euler_timer.stop();
     }
 };
 
@@ -82,16 +99,22 @@ void computeHeatTransfer( HeatTransferType& heat_transfer,
     auto n_local = particles.n_local;
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
-    auto temp = particles.sliceTemperature();
-    auto temp_a = particles.sliceTemperatureAtomic();
+    auto temp = particles.slicePreviousTemperature();
+    auto temp_a = particles.slicePreviousTemperatureAtomic();
+
+    // Reset previous temperature.
+    Cabana::deep_copy( temp, 0.0 );
 
     // Temperature only needs to be atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
         heat_transfer.computeHeatTransferFull(
-            temp_a, x, u, particles, neigh_list, n_local, neigh_op_tag, dt );
+            temp_a, x, u, particles, neigh_list, n_local, neigh_op_tag );
     else
         heat_transfer.computeHeatTransferFull(
-            temp, x, u, particles, neigh_list, n_local, neigh_op_tag, dt );
+            temp, x, u, particles, neigh_list, n_local, neigh_op_tag );
+    Kokkos::fence();
+
+    heat_transfer.stepEuler( particles, dt );
     Kokkos::fence();
 }
 
