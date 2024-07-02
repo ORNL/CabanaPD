@@ -269,6 +269,7 @@ struct ForceModel<PMB, Elastic, DynamicTemperature, TemperatureType>
     // Thermal parameters
     using base_type::alpha;
     using base_type::temp0;
+    using base_type::temperature;
     double thermal_coeff;
     double kappa;
     double cp;
@@ -326,14 +327,14 @@ struct ForceModel<PMB, Fracture, DynamicTemperature, TemperatureType>
     // Does not use the base bond_break_coeff.
     using base_type::G0;
     using base_type::s0;
-    double thermal_coeff;
-    double kappa;
-    double cp;
 
     // Thermal parameters
     using base_type::alpha;
     using base_type::temp0;
     using base_type::temperature;
+    double thermal_coeff;
+    double kappa;
+    double cp;
 
     // Explicitly use the temperature-dependent stretch.
     using base_type::thermalStretch;
