@@ -675,8 +675,8 @@ class Particles<MemorySpace, PMB, TemperatureDependent, Dimension>
 
     // These are split since weighted volume only needs to be communicated once
     // and dilatation only needs to be communicated for LPS.
-    using scalar_type = typename base_type::scalar_type;
-    using aosoa_temp_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
+    using temp_types = Cabana::MemberTypes<double, double>;
+    using aosoa_temp_type = Cabana::AoSoA<temp_types, memory_space, 1>;
 
     // Per type.
     using base_type::n_types;
@@ -731,7 +731,15 @@ class Particles<MemorySpace, PMB, TemperatureDependent, Dimension>
     {
         return Cabana::slice<0>( _aosoa_temp, "temperature" );
     }
-    auto sliceTemperatureAtomic()
+    auto slicePreviousTemperature()
+    {
+        return Cabana::slice<1>( _aosoa_temp, "previous_temperature" );
+    }
+    auto slicePreviousTemperature() const
+    {
+        return Cabana::slice<1>( _aosoa_temp, "previous_temperature" );
+    }
+    auto slicePreviousTemperatureAtomic()
     {
         auto temp = sliceTemperature();
         using slice_type = decltype( temp );
