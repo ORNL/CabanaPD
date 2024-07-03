@@ -90,13 +90,14 @@ void crackBranchingExample( const std::string filename )
     double dy = particles->dx[1];
     double b0 = sigma0 / dy;
 
-    CabanaPD::RegionBoundary plane1( low_corner[0], high_corner[0],
-                                     low_corner[1] - dy, low_corner[1] + dy,
-                                     low_corner[2], high_corner[2] );
-    CabanaPD::RegionBoundary plane2( low_corner[0], high_corner[0],
-                                     high_corner[1] - dy, high_corner[1] + dy,
-                                     low_corner[2], high_corner[2] );
-    std::vector<CabanaPD::RegionBoundary> planes = { plane1, plane2 };
+    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane1(
+        low_corner[0], high_corner[0], low_corner[1] - dy, low_corner[1] + dy,
+        low_corner[2], high_corner[2] );
+    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane2(
+        low_corner[0], high_corner[0], high_corner[1] - dy, high_corner[1] + dy,
+        low_corner[2], high_corner[2] );
+    std::vector<CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>> planes = {
+        plane1, plane2 };
     auto particles_f = particles->getForce();
     auto particles_x = particles->getReferencePosition();
     // Create a symmetric force BC in the y-direction.
