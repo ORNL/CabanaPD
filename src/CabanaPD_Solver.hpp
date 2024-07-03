@@ -580,6 +580,46 @@ class SolverFracture
         this->final_output();
     }
 
+    void run()
+    {
+        this->init_output( 0.0 );
+
+        // Main timestep loop.
+        for ( int step = 1; step <= num_steps; step++ )
+        {
+            _step_timer.start();
+
+            // Integrate - velocity Verlet first half.
+            integrator->initialHalfStep( *particles );
+
+            if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                        TemperatureDependent>::value )
+                comm->gatherTemperature();
+
+            // Update ghost particles.
+            comm->gatherDisplacement();
+
+            // Compute/communicate LPS weighted volume (does nothing for PMB).
+            force->computeWeightedVolume( *particles, *neighbors, mu );
+            comm->gatherWeightedVolume();
+            // Compute/communicate LPS dilatation (does nothing for PMB).
+            force->computeDilatation( *particles, *neighbors, mu );
+            comm->gatherDilatation();
+
+            // Compute internal forces.
+            computeForce( *force, *particles, *neighbors, mu,
+                          neigh_iter_tag{} );
+
+            // Integrate - velocity Verlet second half.
+            integrator->finalHalfStep( *particles );
+
+            output( step );
+        }
+
+        // Final output and timings.
+        this->final_output();
+    }
+
     void output( const int step )
     {
         // Print output.
