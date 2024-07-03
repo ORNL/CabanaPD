@@ -99,6 +99,7 @@ class SolverElastic
     using memory_space = MemorySpace;
     using exec_space = typename memory_space::execution_space;
 
+    // Core module types - required for all problems.
     using particle_type = ParticleType;
     using integrator_type = Integrator<exec_space>;
     using force_model_type = ForceModel;
@@ -111,7 +112,7 @@ class SolverElastic
     using neigh_iter_tag = Cabana::SerialOpTag;
     using input_type = InputType;
 
-    // Optional modules.
+    // Optional module types.
     using heat_transfer_type = HeatTransfer<exec_space, force_model_type>;
 
     SolverElastic( input_type _inputs,
@@ -445,19 +446,21 @@ class SolverElastic
     double dt;
 
   protected:
+    // Core modules.
     input_type inputs;
     std::shared_ptr<particle_type> particles;
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
     std::shared_ptr<neighbor_type> neighbors;
-    // Optional.
+    // Optional modules.
     std::shared_ptr<heat_transfer_type> heat_transfer;
 
+    // Output files.
     std::string output_file;
     std::string error_file;
 
-    // Combined from many class timers.
+    // Note: init_time is combined from many class timers.
     double _init_time;
     Timer _init_timer;
     Timer _neighbor_timer;
