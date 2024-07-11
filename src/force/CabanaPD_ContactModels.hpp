@@ -28,7 +28,6 @@ struct ContactModel
     double delta;
     double Rc;
 
-    ContactModel(){};
     // PD horizon
     // Contact radius
     ContactModel( const double _delta, const double _Rc )
@@ -51,18 +50,10 @@ struct NormalRepulsionModel : public ContactModel
     double c;
     double K;
 
-    NormalRepulsionModel(){};
     NormalRepulsionModel( const double delta, const double Rc, const double _K )
         : ContactModel( delta, Rc )
         , K( _K )
     {
-        set_param( delta, Rc, K );
-    }
-
-    void set_param( const double _delta, const double _Rc, const double _K )
-    {
-        delta = _delta;
-        Rc = _Rc;
         K = _K;
         // This could inherit from PMB (same c)
         c = 18.0 * K / ( pi * delta * delta * delta * delta );

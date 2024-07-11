@@ -40,12 +40,6 @@ struct HertzianModel : public ContactModel
                    const double _E, const double _e )
         : ContactModel( 1.0, _Rc )
     {
-        set_param( _radius, _nu, _E, _e );
-    }
-
-    void set_param( const double _radius, const double _nu, const double _E,
-                    const double _e )
-    {
         nu = _nu;
         radius = _radius;
         Rs = 0.5 * radius;
