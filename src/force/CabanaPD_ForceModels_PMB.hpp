@@ -31,24 +31,10 @@ struct ForceModel<PMB, Elastic, TemperatureIndependent> : public BaseForceModel
     double c;
     double K;
 
-    ForceModel(){};
-    ForceModel( const double delta, const double K )
+    ForceModel( const double delta, const double _K )
         : base_type( delta )
+        , K( _K )
     {
-        set_param( delta, K );
-    }
-
-    ForceModel( const ForceModel& model )
-        : base_type( model )
-    {
-        c = model.c;
-        K = model.K;
-    }
-
-    void set_param( const double _delta, const double _K )
-    {
-        delta = _delta;
-        K = _K;
         c = 18.0 * K / ( pi * delta * delta * delta * delta );
     }
 };
@@ -69,25 +55,10 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent>
     double s0;
     double bond_break_coeff;
 
-    ForceModel() {}
-    ForceModel( const double delta, const double K, const double G0 )
+    ForceModel( const double delta, const double K, const double _G0 )
         : base_type( delta, K )
+        , G0( _G0 )
     {
-        set_param( delta, K, G0 );
-    }
-
-    ForceModel( const ForceModel& model )
-        : base_type( model )
-    {
-        G0 = model.G0;
-        s0 = model.s0;
-        bond_break_coeff = model.bond_break_coeff;
-    }
-
-    void set_param( const double _delta, const double _K, const double _G0 )
-    {
-        base_type::set_param( _delta, _K );
-        G0 = _G0;
         s0 = sqrt( 5.0 * G0 / 9.0 / K / delta );
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
@@ -165,14 +136,6 @@ struct ForceModel<PMB, Elastic, TemperatureDependent, TemperatureType>
         : base_type( _delta, _K )
         , base_temperature_type( _temp, _alpha, _temp0 )
     {
-        set_param( _delta, _K, _alpha, _temp0 );
-    }
-
-    void set_param( const double _delta, const double _K, const double _alpha,
-                    const double _temp0 )
-    {
-        base_type::set_param( _delta, _K );
-        base_temperature_type::set_param( _alpha, _temp0 );
     }
 };
 
@@ -220,14 +183,6 @@ struct ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>
         : base_type( _delta, _K, _G0 )
         , base_temperature_type( _temp, _alpha, _temp0 )
     {
-        set_param( _delta, _K, _G0, _alpha, _temp0 );
-    }
-
-    void set_param( const double _delta, const double _K, const double _G0,
-                    const double _alpha, const double _temp0 )
-    {
-        base_type::set_param( _delta, _K, _G0 );
-        base_temperature_type::set_param( _alpha, _temp0 );
     }
 
     KOKKOS_INLINE_FUNCTION

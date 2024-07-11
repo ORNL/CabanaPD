@@ -34,21 +34,13 @@ struct ForceModel<LPS, Elastic> : public BaseForceModel
     double theta_coeff;
     double s_coeff;
 
-    ForceModel(){};
     ForceModel( const double _delta, const double _K, const double _G,
                 const int _influence = 0 )
         : base_type( _delta )
         , influence_type( _influence )
+        , K( _K )
+        , G( _G )
     {
-        set_param( _delta, _K, _G );
-    }
-
-    void set_param( const double _delta, const double _K, const double _G )
-    {
-        delta = _delta;
-        K = _K;
-        G = _G;
-
         theta_coeff = 3.0 * K - 5.0 * G;
         s_coeff = 15.0 * G;
     }
@@ -80,19 +72,11 @@ struct ForceModel<LPS, Fracture> : public ForceModel<LPS, Elastic>
     double s0;
     double bond_break_coeff;
 
-    ForceModel() {}
     ForceModel( const double _delta, const double _K, const double _G,
                 const double _G0, const int _influence = 0 )
         : base_type( _delta, _K, _G, _influence )
+        , G0( _G0 )
     {
-        set_param( _delta, _K, _G, _G0 );
-    }
-
-    void set_param( const double _delta, const double _K, const double _G,
-                    const double _G0 )
-    {
-        base_type::set_param( _delta, _K, _G );
-        G0 = _G0;
         if ( influence_type == 1 )
         {
             s0 = sqrt( 5.0 * G0 / 9.0 / K / delta ); // 1/xi
