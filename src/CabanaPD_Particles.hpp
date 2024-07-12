@@ -559,13 +559,14 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, Dimension>
         _init_timer.stop();
     }
 
-    template <class ExecSpace>
-    void createParticles( const ExecSpace& exec_space )
+    template <typename... Args>
+    void createParticles( Args&&... args )
     {
-        base_type::createParticles( exec_space );
+        // Forward arguments to standard or custom particle creation.
+        base_type::createParticles( std::forward<Args>( args )... );
         _init_timer.start();
-        _aosoa_m.resize( 0 );
-        _aosoa_theta.resize( 0 );
+        _aosoa_m.resize( n_local );
+        _aosoa_theta.resize( n_local );
         _init_timer.stop();
     }
 
@@ -711,11 +712,12 @@ class Particles<MemorySpace, PMB, TemperatureDependent, Dimension>
         init_temp();
     }
 
-    template <class ExecSpace>
-    void createParticles( const ExecSpace& exec_space )
+    template <typename... Args>
+    void createParticles( Args&&... args )
     {
-        base_type::createParticles( exec_space );
-        _aosoa_temp.resize( 0 );
+        // Forward arguments to standard or custom particle creation.
+        base_type::createParticles( std::forward<Args>( args )... );
+        _aosoa_temp.resize( n_local );
     }
 
     auto sliceTemperature()
