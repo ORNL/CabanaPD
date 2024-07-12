@@ -191,16 +191,14 @@ class SolverElastic
 
     void init( const bool initial_output = true )
     {
-        // Compute/communicate LPS weighted volume (does nothing for PMB).
+        // Compute and communicate weighted volume for LPS (does nothing for
+        // PMB). Only computed once.
         force->computeWeightedVolume( *particles, *neighbors,
                                       neigh_iter_tag{} );
         comm->gatherWeightedVolume();
-        // Compute/communicate LPS dilatation (does nothing for PMB).
-        force->computeDilatation( *particles, *neighbors, neigh_iter_tag{} );
-        comm->gatherDilatation();
 
-        // Compute initial forces.
-        computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
+        // Compute initial internal forces and energy.
+        updateForce();
         computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
 
         if ( initial_output )
@@ -255,14 +253,8 @@ class SolverElastic
             // Update ghost particles.
             comm->gatherDisplacement();
 
-            // Do not need to recompute LPS weighted volume here without damage.
-            // Compute/communicate LPS dilatation (does nothing for PMB).
-            force->computeDilatation( *particles, *neighbors,
-                                      neigh_iter_tag{} );
-            comm->gatherDilatation();
-
             // Compute internal forces.
-            computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
+            updateForce();
 
             // Add force boundary condition.
             if ( boundary_condition.forceUpdate() )
@@ -293,14 +285,8 @@ class SolverElastic
             // Update ghost particles.
             comm->gatherDisplacement();
 
-            // Do not need to recompute LPS weighted volume here without damage.
-            // Compute/communicate LPS dilatation (does nothing for PMB).
-            force->computeDilatation( *particles, *neighbors,
-                                      neigh_iter_tag{} );
-            comm->gatherDilatation();
-
             // Compute internal forces.
-            computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
+            updateForce();
 
             if constexpr ( std::is_same<typename force_model_type::thermal_type,
                                         TemperatureDependent>::value )
@@ -314,6 +300,18 @@ class SolverElastic
 
         // Final output and timings.
         final_output();
+    }
+
+    // Compute and communicate fields needed for force computation and update
+    // forces.
+    void updateForce()
+    {
+        // Compute and communicate dilatation for LPS (does nothing for PMB).
+        force->computeDilatation( *particles, *neighbors, neigh_iter_tag{} );
+        comm->gatherDilatation();
+
+        // Compute internal forces.
+        computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
     }
 
     void output( const int step )
@@ -492,15 +490,8 @@ class SolverFracture
 
     void init( const bool initial_output = true )
     {
-        // Compute/communicate weighted volume for LPS (does nothing for PMB).
-        force->computeWeightedVolume( *particles, *neighbors, mu );
-        comm->gatherWeightedVolume();
-        // Compute/communicate dilatation for LPS (does nothing for PMB).
-        force->computeDilatation( *particles, *neighbors, mu );
-        comm->gatherDilatation();
-
-        // Compute initial forces.
-        computeForce( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
+        // Compute initial internal forces and energy.
+        updateForce();
         computeEnergy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
 
         if ( initial_output )
@@ -555,16 +546,8 @@ class SolverFracture
             // Update ghost particles.
             comm->gatherDisplacement();
 
-            // Compute/communicate LPS weighted volume (does nothing for PMB).
-            force->computeWeightedVolume( *particles, *neighbors, mu );
-            comm->gatherWeightedVolume();
-            // Compute/communicate LPS dilatation (does nothing for PMB).
-            force->computeDilatation( *particles, *neighbors, mu );
-            comm->gatherDilatation();
-
             // Compute internal forces.
-            computeForce( *force, *particles, *neighbors, mu,
-                          neigh_iter_tag{} );
+            updateForce();
 
             // Add force boundary condition.
             if ( boundary_condition.forceUpdate() )
@@ -578,6 +561,55 @@ class SolverFracture
 
         // Final output and timings.
         this->final_output();
+    }
+
+    void run()
+    {
+        this->init_output( 0.0 );
+
+        // Main timestep loop.
+        for ( int step = 1; step <= num_steps; step++ )
+        {
+            _step_timer.start();
+
+            // Integrate - velocity Verlet first half.
+            integrator->initialHalfStep( *particles );
+
+            if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                        TemperatureDependent>::value )
+                comm->gatherTemperature();
+
+            // Update ghost particles.
+            comm->gatherDisplacement();
+
+            // Compute internal forces.
+            updateForce();
+
+            // Integrate - velocity Verlet second half.
+            integrator->finalHalfStep( *particles );
+
+            output( step );
+        }
+
+        // Final output and timings.
+        this->final_output();
+    }
+
+    // Compute and communicate fields needed for force computation and update
+    // forces.
+    void updateForce()
+    {
+        // Compute and communicate weighted volume for LPS (does nothing for
+        // PMB).
+        force->computeWeightedVolume( *particles, *neighbors, mu );
+        comm->gatherWeightedVolume();
+
+        // Compute and communicate dilatation for LPS (does nothing for PMB).
+        force->computeDilatation( *particles, *neighbors, mu );
+        comm->gatherDilatation();
+
+        // Compute internal forces.
+        computeForce( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
     }
 
     void output( const int step )
