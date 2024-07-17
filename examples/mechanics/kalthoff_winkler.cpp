@@ -76,22 +76,25 @@ void kalthoffWinklerExample( const std::string filename )
     CabanaPD::Prenotch<2> prenotch( v1, v2, notch_positions );
 
     // ====================================================
-    //                    Force model
+    //                    Force model options
     // ====================================================
-    using model_type = CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
-    model_type force_model( delta, K, G0 );
-    // using model_type =
-    //     CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
-    // model_type force_model( delta, K, G, G0 );
+    using model_type = CabanaPD::PMB;
+    using thermal_type = CabanaPD::TemperatureIndependent;
 
     // ====================================================
     //                 Particle generation
     // ====================================================
     // Does not set displacements, velocities, etc.
     auto particles = std::make_shared<
-        CabanaPD::Particles<memory_space, typename model_type::base_model,
-                            typename model_type::thermal_type>>(
+        CabanaPD::Particles<memory_space, model_type, thermal_type>>(
         exec_space(), low_corner, high_corner, num_cells, halo_width );
+
+    std::array<double, 2> same_d = { delta, delta };
+    std::array<double, 2> fake_K = { K, K * 1.2 };
+    std::array<double, 2> fake_G0 = { G0, G0 * 1.8 };
+    auto force_model =
+        createForceModel( model_type{}, CabanaPD::Fracture{}, thermal_type{},
+                          *particles, same_d, fake_K, fake_G0 );
 
     // ====================================================
     //                Boundary conditions
@@ -111,6 +114,7 @@ void kalthoffWinklerExample( const std::string filename )
     auto x = particles->sliceReferencePosition();
     auto v = particles->sliceVelocity();
     auto f = particles->sliceForce();
+    auto type = particles->sliceType();
 
     double v0 = inputs["impactor_velocity"];
     auto init_functor = KOKKOS_LAMBDA( const int pid )
@@ -121,6 +125,8 @@ void kalthoffWinklerExample( const std::string filename )
         if ( x( pid, 1 ) > y_prenotch1 && x( pid, 1 ) < y_prenotch2 &&
              x( pid, 0 ) < -0.5 * height + dx )
             v( pid, 0 ) = v0;
+        if ( x( pid, 1 ) > 0.0 )
+            type( pid ) = 1;
     };
     particles->updateParticles( exec_space{}, init_functor );
 
