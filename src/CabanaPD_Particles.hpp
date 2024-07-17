@@ -101,12 +101,11 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     using vector_type = Cabana::MemberTypes<double[dim]>;
     // volume, dilatation, weighted_volume.
     using scalar_type = Cabana::MemberTypes<double>;
-    // no-fail.
+    // no-fail, type.
     using int_type = Cabana::MemberTypes<int>;
-    // v, W, rho, damage,  type.
+    // v, W, rho, damage.
     using other_types =
-        Cabana::MemberTypes<double[dim], double, double, double, int>;
-    // Potentially needed later: body force (b), ID.
+        Cabana::MemberTypes<double[dim], double, double, double>;
 
     // FIXME: add vector length.
     // FIXME: enable variable aosoa.
@@ -114,6 +113,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     using aosoa_y_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_vol_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
     using aosoa_nofail_type = Cabana::AoSoA<int_type, memory_space, 1>;
+    using aosoa_species_type = Cabana::AoSoA<int_type, memory_space, 1>;
     using aosoa_other_type = Cabana::AoSoA<other_types, memory_space>;
     // Using grid here for the particle init.
     using plist_x_type =
@@ -356,8 +356,11 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     {
         return Cabana::slice<0>( _aosoa_vol, "volume" );
     }
-    auto sliceType() { return Cabana::slice<4>( _aosoa_other, "type" ); }
-    auto sliceType() const { return Cabana::slice<4>( _aosoa_other, "type" ); }
+    auto sliceType() { return Cabana::slice<0>( _aosoa_species, "type" ); }
+    auto sliceType() const
+    {
+        return Cabana::slice<0>( _aosoa_species, "type" );
+    }
     auto sliceStrainEnergy()
     {
         return Cabana::slice<1>( _aosoa_other, "strain_energy" );
@@ -427,6 +430,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
         _plist_f.aosoa().resize( new_local );
         _aosoa_other.resize( new_local );
         _aosoa_nofail.resize( new_local + new_ghost );
+        _aosoa_species.resize( new_local + new_ghost );
         size = _plist_x.size();
         _timer.stop();
     };
@@ -457,7 +461,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
                 "particles", local_grid->globalGrid(), output_step, output_time,
                 0, n_local, getPosition( use_reference ), sliceStrainEnergy(),
                 sliceForce(), sliceDisplacement(), sliceVelocity(),
-                sliceDamage() );
+                sliceDamage(), sliceType() );
 #else
         log( std::cout, "No particle output enabled." );
 #endif
@@ -470,14 +474,17 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     auto timeOutput() { return _output_timer.time(); };
     auto time() { return _timer.time(); };
 
-    friend class Comm<self_type, PMB, TemperatureIndependent>;
-    friend class Comm<self_type, PMB, TemperatureDependent>;
+    friend class Comm<self_type, PMB, SingleSpecies, TemperatureIndependent>;
+    friend class Comm<self_type, PMB, SingleSpecies, TemperatureDependent>;
+    friend class Comm<self_type, PMB, MultiSpecies, TemperatureIndependent>;
+    friend class Comm<self_type, PMB, MultiSpecies, TemperatureDependent>;
 
   protected:
     aosoa_u_type _aosoa_u;
     aosoa_y_type _aosoa_y;
     aosoa_vol_type _aosoa_vol;
     aosoa_nofail_type _aosoa_nofail;
+    aosoa_species_type _aosoa_species;
     aosoa_other_type _aosoa_other;
 
     plist_x_type _plist_x;
@@ -619,7 +626,7 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, Dimension>
                 base_type::sliceStrainEnergy(), base_type::sliceForce(),
                 base_type::sliceDisplacement(), base_type::sliceVelocity(),
                 base_type::sliceDamage(), sliceWeightedVolume(),
-                sliceDilatation() );
+                sliceDilatation(), base_type::sliceType() );
 #else
         log( std::cout, "No particle output enabled." );
 #endif
@@ -628,8 +635,10 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, Dimension>
         _output_timer.stop();
     }
 
-    friend class Comm<self_type, PMB, TemperatureIndependent>;
-    friend class Comm<self_type, LPS, TemperatureIndependent>;
+    friend class Comm<self_type, PMB, SingleSpecies, TemperatureIndependent>;
+    friend class Comm<self_type, LPS, SingleSpecies, TemperatureIndependent>;
+    friend class Comm<self_type, PMB, MultiSpecies, TemperatureIndependent>;
+    friend class Comm<self_type, LPS, MultiSpecies, TemperatureIndependent>;
 
   protected:
     void init_lps()
@@ -761,10 +770,10 @@ class Particles<MemorySpace, PMB, TemperatureDependent, Dimension>
 #endif
     }
 
-    friend class Comm<self_type, PMB, TemperatureIndependent>;
-    friend class Comm<self_type, LPS, TemperatureIndependent>;
-    friend class Comm<self_type, PMB, TemperatureDependent>;
-    friend class Comm<self_type, LPS, TemperatureDependent>;
+    friend class Comm<self_type, PMB, SingleSpecies, TemperatureIndependent>;
+    friend class Comm<self_type, PMB, SingleSpecies, TemperatureDependent>;
+    friend class Comm<self_type, PMB, MultiSpecies, TemperatureIndependent>;
+    friend class Comm<self_type, PMB, MultiSpecies, TemperatureDependent>;
 
   protected:
     void init_temp()

@@ -17,10 +17,12 @@
 
 namespace CabanaPD
 {
+
 template <>
-struct ForceModel<LPS, Elastic> : public BaseForceModel
+struct ForceModel<LPS, Elastic> : public BaseForceModel<>
 {
-    using base_type = BaseForceModel;
+    using base_type = BaseForceModel<>;
+    using species_type = SingleSpecies;
     using base_model = LPS;
     using fracture_type = Elastic;
     using thermal_type = TemperatureIndependent;
@@ -58,6 +60,7 @@ template <>
 struct ForceModel<LPS, Fracture> : public ForceModel<LPS, Elastic>
 {
     using base_type = ForceModel<LPS, Elastic>;
+    using species_type = SingleSpecies;
     using base_model = typename base_type::base_model;
     using fracture_type = Fracture;
     using thermal_type = base_type::thermal_type;
@@ -93,6 +96,7 @@ template <>
 struct ForceModel<LinearLPS, Elastic> : public ForceModel<LPS, Elastic>
 {
     using base_type = ForceModel<LPS, Elastic>;
+    using species_type = SingleSpecies;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = base_type::thermal_type;
@@ -111,6 +115,7 @@ template <>
 struct ForceModel<LinearLPS, Fracture> : public ForceModel<LPS, Fracture>
 {
     using base_type = ForceModel<LPS, Fracture>;
+    using species_type = SingleSpecies;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = base_type::thermal_type;

@@ -20,6 +20,14 @@ struct Elastic
 struct Fracture
 {
 };
+
+struct SingleSpecies
+{
+};
+struct MultiSpecies
+{
+};
+
 struct TemperatureDependent
 {
 };
