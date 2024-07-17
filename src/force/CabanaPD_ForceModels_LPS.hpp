@@ -17,10 +17,13 @@
 
 namespace CabanaPD
 {
+
+// FIXME: DO NOT MERGE
 template <>
-struct ForceModel<LPS, Elastic> : public BaseForceModel
+struct ForceModel<LPS, Elastic> : public BaseForceModel<Kokkos::HostSpace>
 {
-    using base_type = BaseForceModel;
+    using base_type = BaseForceModel<Kokkos::HostSpace>;
+    using species_type = SingleSpecies;
     using base_model = LPS;
     using fracture_type = Elastic;
     using thermal_type = TemperatureIndependent;
@@ -58,6 +61,7 @@ template <>
 struct ForceModel<LPS, Fracture> : public ForceModel<LPS, Elastic>
 {
     using base_type = ForceModel<LPS, Elastic>;
+    using species_type = SingleSpecies;
     using base_model = typename base_type::base_model;
     using fracture_type = Fracture;
     using thermal_type = base_type::thermal_type;
@@ -79,11 +83,11 @@ struct ForceModel<LPS, Fracture> : public ForceModel<LPS, Elastic>
     {
         if ( influence_type == 1 )
         {
-            s0 = sqrt( 5.0 * G0 / 9.0 / K / delta ); // 1/xi
+            s0 = sqrt( 5.0 * G0 / 9.0 / K / delta( 0 ) ); // 1/xi
         }
         else
         {
-            s0 = sqrt( 8.0 * G0 / 15.0 / K / delta ); // 1
+            s0 = sqrt( 8.0 * G0 / 15.0 / K / delta( 0 ) ); // 1
         }
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
@@ -93,6 +97,7 @@ template <>
 struct ForceModel<LinearLPS, Elastic> : public ForceModel<LPS, Elastic>
 {
     using base_type = ForceModel<LPS, Elastic>;
+    using species_type = SingleSpecies;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = base_type::thermal_type;
@@ -111,6 +116,7 @@ template <>
 struct ForceModel<LinearLPS, Fracture> : public ForceModel<LPS, Fracture>
 {
     using base_type = ForceModel<LPS, Fracture>;
+    using species_type = SingleSpecies;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = base_type::thermal_type;

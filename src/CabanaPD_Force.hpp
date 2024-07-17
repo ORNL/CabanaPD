@@ -129,8 +129,7 @@ getLinearizedDistance( const PosType& x, const PosType& u, const int i,
 template <class ExecutionSpace, class ForceType>
 class Force;
 
-template <class ExecutionSpace>
-class Force<ExecutionSpace, BaseForceModel>
+class ForceBase
 {
   protected:
     bool _half_neigh;
@@ -139,7 +138,7 @@ class Force<ExecutionSpace, BaseForceModel>
     Timer _energy_timer;
 
   public:
-    Force( const bool half_neigh )
+    ForceBase( const bool half_neigh )
         : _half_neigh( half_neigh )
     {
     }
