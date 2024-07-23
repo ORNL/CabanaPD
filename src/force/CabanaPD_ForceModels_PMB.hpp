@@ -85,7 +85,7 @@ struct ForceModel<PMB, Elastic, TemperatureIndependent, ParticleType>
         , type( _type )
     {
         setParameters( _K );
-    };
+    }
 
     template <typename ArrayType>
     void setParameters( const ArrayType& _K )
@@ -244,7 +244,7 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent, ParticleType>
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto criticalStretch( const int type_i )
+    auto criticalStretch( const int type_i ) const
     {
         return sqrt( 5.0 * G0( type_i ) / 9.0 / K( type_i ) / delta( type_i ) );
     }
