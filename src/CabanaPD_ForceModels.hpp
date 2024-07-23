@@ -66,7 +66,7 @@ struct BaseForceModel
         , num_types( _delta.size() )
     {
         max_delta = 0;
-        auto init_func = KOKKOS_LAMBDA( const int i, double& max )
+        auto init_func = KOKKOS_CLASS_LAMBDA( const int i, double& max )
         {
             delta( i ) = _delta[i];
             if ( delta( i ) > max )
