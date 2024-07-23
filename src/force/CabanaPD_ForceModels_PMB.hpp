@@ -92,7 +92,7 @@ struct ForceModel<PMB, Elastic, TemperatureIndependent, ParticleType>
     void setParameters( const ArrayType& _K )
     {
         // Initialize self interaction parameters.
-        auto init_self_func = KOKKOS_LAMBDA( const int i )
+        auto init_self_func = KOKKOS_CLASS_LAMBDA( const int i )
         {
             K( i ) = _K[i];
             c( i, i ) = micromodulus( i );
@@ -103,7 +103,7 @@ struct ForceModel<PMB, Elastic, TemperatureIndependent, ParticleType>
         Kokkos::fence();
 
         // Initialize cross-terms.
-        auto init_cross_func = KOKKOS_LAMBDA( const int i )
+        auto init_cross_func = KOKKOS_CLASS_LAMBDA( const int i )
         {
             for ( std::size_t j = i; j < num_types; j++ )
                 c( i, j ) = ( micromodulus( i ) + micromodulus( j ) ) / 2.0;
@@ -218,7 +218,7 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent, ParticleType>
     void setParameters( const ArrayType& _G0 )
     {
         // Initialize self interaction parameters.
-        auto init_self_func = KOKKOS_LAMBDA( const int i )
+        auto init_self_func = KOKKOS_CLASS_LAMBDA( const int i )
         {
             G0( i ) = _G0[i];
             s0( i, i ) = criticalStretch( i );
@@ -231,7 +231,7 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent, ParticleType>
         Kokkos::fence();
 
         // Initialize cross-terms.
-        auto init_cross_func = KOKKOS_LAMBDA( const int i )
+        auto init_cross_func = KOKKOS_CLASS_LAMBDA( const int i )
         {
             for ( std::size_t j = i; j < num_types; j++ )
             {
