@@ -104,26 +104,29 @@ void fragmentingCylinderExample( const std::string filename )
     double vzmax = inputs["max_vertical_velocity"];
     double zmin = low_corner[2];
 
-    double dx = particles->dx[0];
-    double dy = particles->dx[1];
-    double dz = particles->dx[2];
-
+    auto dx = particles->dx;
     double height = inputs["system_size"][2];
     double factor = inputs["grid_perturbation_factor"];
 
+    using pool_type = Kokkos::Random_XorShift64_Pool<exec_space>;
+    using random_type = Kokkos::Random_XorShift64<exec_space>;
+    pool_type pool;
+    int seed = 456854;
+    pool.init( seed, particles->n_local );
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
 
         // Perturb particle positions
-        double random_number_x = ( (double)rand() / ( RAND_MAX ) );
-        double random_number_y = ( (double)rand() / ( RAND_MAX ) );
-        double random_number_z = ( (double)rand() / ( RAND_MAX ) );
-
-        x( pid, 0 ) = x( pid, 0 ) + ( 2 * random_number_x - 1.0 ) * factor * dx;
-        x( pid, 1 ) = x( pid, 1 ) + ( 2 * random_number_y - 1.0 ) * factor * dy;
-        x( pid, 2 ) = x( pid, 2 ) + ( 2 * random_number_z - 1.0 ) * factor * dz;
+        auto gen = pool.get_state();
+        for ( std::size_t d = 0; d < 3; d++ )
+        {
+            auto rand =
+                Kokkos::rand<random_type, double>::draw( gen, 0.0, 1.0 );
+            x( pid, d ) += ( 2.0 * rand - 1.0 ) * factor * dx[d];
+        }
+        pool.free_state( gen );
 
         // Velocity
         double zfactor = ( ( x( pid, 2 ) - zmin ) / ( 0.5 * height ) ) - 1;

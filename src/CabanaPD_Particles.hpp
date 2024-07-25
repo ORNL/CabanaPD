@@ -137,7 +137,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     std::shared_ptr<
         Cabana::Grid::LocalGrid<Cabana::Grid::UniformMesh<double, dim>>>
         local_grid;
-    double dx[dim];
+    Kokkos::Array<double, dim> dx;
 
     int halo_width;
 
