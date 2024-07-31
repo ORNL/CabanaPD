@@ -19,7 +19,7 @@
 #include <CabanaPD.hpp>
 
 // Simulate thermally-induced deformation in a rectangular plate.
-void thermalDeformationExample( const std::string filename )
+void thermalDeformationHeatTransferExample( const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
@@ -42,6 +42,8 @@ void thermalDeformationExample( const std::string filename )
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double delta = inputs["horizon"];
     double alpha = inputs["thermal_expansion_coeff"];
+    double kappa = inputs["thermal_conductivity"];
+    double cp = inputs["specific_heat_capacity"];
 
     // Problem parameters
     double temp0 = inputs["reference_temperature"];
@@ -61,14 +63,15 @@ void thermalDeformationExample( const std::string filename )
     //                Force model type
     // ====================================================
     using model_type = CabanaPD::PMB;
-    using thermal_type = CabanaPD::TemperatureDependent;
+    using thermal_type = CabanaPD::DynamicTemperature;
 
     // ====================================================
     //                 Particle generation
     // ====================================================
     // Does not set displacements, velocities, etc.
     auto particles =
-        CabanaPD::createParticles<memory_space, model_type, thermal_type>(
+        std::make_shared<CabanaPD::Particles<memory_space, model_type,
+                                             typename thermal_type::base_type>>(
             exec_space(), low_corner, high_corner, num_cells, halo_width );
 
     // ====================================================
@@ -81,8 +84,11 @@ void thermalDeformationExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
+    // const double kappa = 1.0;
+    // const double cp = 1.0;
     auto force_model = CabanaPD::createForceModel(
-        model_type{}, CabanaPD::Elastic{}, *particles, delta, K, alpha, temp0 );
+        model_type{}, CabanaPD::Elastic{}, *particles, delta, K, kappa, cp,
+        alpha, temp0 );
 
     // ====================================================
     //                   Create solver
@@ -91,8 +97,67 @@ void thermalDeformationExample( const std::string filename )
         inputs, particles, force_model );
 
     // ====================================================
-    //                   Imposed field
+    //                   Boundary condition
     // ====================================================
+    // EXAMPLE 1: Temperature profile imposed over entire domain
+    using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
+    /*
+        plane_type plane( low_corner[0], high_corner[0],
+                                        low_corner[1], high_corner[1],
+                                        low_corner[2], high_corner[2] );
+
+        std::vector<plane_type> planes = { plane };
+    */
+
+    // EXAMPLE 2: Temperature profile imposed on top, bottom, left, and right
+    // surfaces
+    double dx = particles->dx[0];
+    double dy = particles->dx[1];
+    // Top surface
+    plane_type plane1( low_corner[0], high_corner[0], high_corner[1] - dy,
+                       high_corner[1] + dy, low_corner[2], high_corner[2] );
+
+    // Bottom surface
+    plane_type plane2( low_corner[0], high_corner[0], low_corner[1] - dy,
+                       low_corner[1] + dy, low_corner[2], high_corner[2] );
+
+    // Left surface
+    plane_type plane3( low_corner[0] - dx, low_corner[0] + dx, low_corner[1],
+                       high_corner[1], low_corner[2], high_corner[2] );
+
+    // Right surface
+    plane_type plane4( high_corner[0] - dx, high_corner[0] + dx, low_corner[1],
+                       high_corner[1], low_corner[2], high_corner[2] );
+
+    std::vector<plane_type> planes = { plane1, plane2, plane3, plane4 };
+
+    /*
+        // EXAMPLE 3: Temperature profile imposed on top, bottom, left, and
+       right
+        // nonlocal boundaries (width delta) Top surface
+        plane_type plane1(
+            low_corner[0], high_corner[0], high_corner[1] - delta,
+            high_corner[1] + delta, low_corner[2], high_corner[2] );
+
+        // Bottom surface
+        plane_type plane2(
+            low_corner[0], high_corner[0], low_corner[1] - delta,
+            low_corner[1] + delta, low_corner[2], high_corner[2] );
+
+        // Left surface
+        plane_type plane3(
+            low_corner[0] - delta, low_corner[0] + delta, low_corner[1],
+            high_corner[1], low_corner[2], high_corner[2] );
+
+        // Right surface
+        plane_type plane4(
+            high_corner[0] - delta, high_corner[0] + delta, low_corner[1],
+            high_corner[1], low_corner[2], high_corner[2] );
+
+        std::vector<plane_type> planes = { plane1, plane2, plane3,
+                                                         plane4 };
+    */
+
     auto x = particles->sliceReferencePosition();
     auto temp = particles->sliceTemperature();
     const double low_corner_y = low_corner[1];
@@ -102,13 +167,14 @@ void thermalDeformationExample( const std::string filename )
     {
         temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
     };
-    auto body_term = CabanaPD::createBodyTerm( temp_func, false );
+    auto bc = CabanaPD::createBoundaryCondition(
+        temp_func, exec_space{}, *particles, planes, false, 1.0 );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init( body_term );
-    cabana_pd->run( body_term );
+    cabana_pd->init( bc );
+    cabana_pd->run( bc );
 
     // ====================================================
     //                      Outputs
@@ -140,7 +206,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    thermalDeformationExample( argv[1] );
+    thermalDeformationHeatTransferExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();
