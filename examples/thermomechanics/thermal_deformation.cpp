@@ -99,6 +99,12 @@ void thermalDeformationExample( const std::string filename )
     // ====================================================
     //                   Imposed field
     // ====================================================
+    double dy = particles->dx[1];
+    CabanaPD::RegionBoundary plane( low_corner[0], high_corner[0],
+                                    high_corner[1] - dy, high_corner[1] + dy,
+                                    low_corner[2], high_corner[2] );
+    std::vector<CabanaPD::RegionBoundary> planes = { plane };
+
     auto x = particles->sliceReferencePosition();
     auto temp = particles->sliceTemperature();
     const double low_corner_y = low_corner[1];
