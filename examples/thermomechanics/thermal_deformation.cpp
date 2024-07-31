@@ -42,6 +42,8 @@ void thermalDeformationExample( const std::string filename )
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double delta = inputs["horizon"];
     double alpha = inputs["thermal_coefficient"];
+    double kappa = inputs["thermal_conductivity"];
+    double cp = inputs["specific_heat_capacity"];
 
     // Problem parameters
     double temp0 = inputs["reference_temperature"];
@@ -82,8 +84,8 @@ void thermalDeformationExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    const double kappa = 1.0;
-    const double cp = 1.0;
+    // const double kappa = 1.0;
+    // const double cp = 1.0;
     auto force_model = CabanaPD::createForceModel(
         model_type{}, CabanaPD::Elastic{}, *particles, delta, K, kappa, cp,
         alpha, temp0 );
