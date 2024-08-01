@@ -110,6 +110,8 @@ void thermalDeformationHeatTransferExample( const std::string filename )
                                     low_corner[2], high_corner[2] );
 
     auto x = particles->sliceReferencePosition();
+    // Need to reslice to include ghosted particles on the boundary.
+    temp = particles->sliceTemperature();
     const double low_corner_y = low_corner[1];
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
