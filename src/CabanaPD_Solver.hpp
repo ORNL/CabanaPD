@@ -152,15 +152,8 @@ class SolverElastic
 
         _init_timer.start();
         unsigned max_neighbors;
-        unsigned max_local_neighbors =
-            Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
         unsigned long long total_neighbors;
-        unsigned long long total_local_neighbors =
-            Cabana::NeighborList<neighbor_type>::totalNeighbor( *neighbors );
-        MPI_Reduce( &max_local_neighbors, &max_neighbors, 1, MPI_UNSIGNED,
-                    MPI_MAX, 0, MPI_COMM_WORLD );
-        MPI_Reduce( &total_local_neighbors, &total_neighbors, 1,
-                    MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD );
+        getNeighborStatistics( max_neighbors, total_neighbors );
 
         print = print_rank();
         if ( print )
@@ -187,6 +180,27 @@ class SolverElastic
             out.close();
         }
         _init_timer.stop();
+    }
+
+    void getNeighborStatistics( unsigned& max_neighbors,
+                                unsigned long long& total_neighbors )
+    {
+        auto neigh = *neighbors;
+        auto neigh_stats = KOKKOS_LAMBDA( const int, unsigned& max_n,
+                                          unsigned long long& total_n )
+        {
+            max_n = Cabana::NeighborList<neighbor_type>::maxNeighbor( neigh );
+            total_n =
+                Cabana::NeighborList<neighbor_type>::totalNeighbor( neigh );
+        };
+        Kokkos::RangePolicy<exec_space> policy( 0, 1 );
+        Kokkos::parallel_reduce( policy, neigh_stats, max_neighbors,
+                                 total_neighbors );
+        Kokkos::fence();
+        MPI_Reduce( MPI_IN_PLACE, &max_neighbors, 1, MPI_UNSIGNED, MPI_MAX, 0,
+                    MPI_COMM_WORLD );
+        MPI_Reduce( MPI_IN_PLACE, &total_neighbors, 1, MPI_UNSIGNED_LONG_LONG,
+                    MPI_SUM, 0, MPI_COMM_WORLD );
     }
 
     void init( const bool initial_output = true )
