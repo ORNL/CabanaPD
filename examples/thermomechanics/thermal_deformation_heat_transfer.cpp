@@ -78,14 +78,19 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     //            Custom particle initialization
     // ====================================================
     auto rho = particles->sliceDensity();
-    auto init_functor = KOKKOS_LAMBDA( const int pid ) { rho( pid ) = rho0; };
+    auto temp = particles->sliceTemperature();
+    auto init_functor = KOKKOS_LAMBDA( const int pid )
+    {
+        // Density
+        rho( pid ) = rho0;
+        // Temperature
+        temp( pid ) = temp0;
+    };
     particles->updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                    Force model
     // ====================================================
-    // const double kappa = 1.0;
-    // const double cp = 1.0;
     auto force_model = CabanaPD::createForceModel(
         model_type{}, CabanaPD::Elastic{}, *particles, delta, K, kappa, cp,
         alpha, temp0 );
@@ -105,7 +110,6 @@ void thermalDeformationHeatTransferExample( const std::string filename )
                                     low_corner[2], high_corner[2] );
 
     auto x = particles->sliceReferencePosition();
-    auto temp = particles->sliceTemperature();
     const double low_corner_y = low_corner[1];
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
