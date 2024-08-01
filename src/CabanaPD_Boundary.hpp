@@ -167,7 +167,7 @@ struct BoundaryCondition
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType&, double )
+    void apply( ExecSpace, ParticleType&, double time )
     {
         _timer.start();
         auto user = _user_functor;
@@ -176,7 +176,7 @@ struct BoundaryCondition
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
-                user( pid );
+                user( pid, time );
             } );
         _timer.stop();
     }
