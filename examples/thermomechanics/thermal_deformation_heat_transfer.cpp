@@ -113,7 +113,8 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     {
         temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
     };
-    auto bc = CabanaPD::createBoundaryCondition( temp_func, plane, false );
+    auto bc = CabanaPD::createBoundaryCondition( temp_func, exec_space{},
+                                                 *particles, plane, false );
 
     // ====================================================
     //                   Simulation run
