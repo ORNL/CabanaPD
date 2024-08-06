@@ -269,20 +269,20 @@ class SolverElastic
             // Integrate - velocity Verlet first half.
             integrator->initialHalfStep( *particles );
 
-            // Add non-force boundary condition.
-            if ( !boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space(), *particles, step * dt );
+            // Update ghost particles.
+            comm->gatherDisplacement();
 
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        TemperatureDependent>::value )
-                comm->gatherTemperature();
             if constexpr ( std::is_same<typename force_model_type::thermal_type,
                                         DynamicTemperature>::value )
                 computeHeatTransfer( *heat_transfer, *particles, *neighbors,
                                      neigh_iter_tag{}, dt );
+            if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                        TemperatureDependent>::value )
+                comm->gatherTemperature();
 
-            // Update ghost particles.
-            comm->gatherDisplacement();
+            // Add non-force boundary condition.
+            if ( !boundary_condition.forceUpdate() )
+                boundary_condition.apply( exec_space(), *particles, step * dt );
 
             // Compute internal forces.
             updateForce();
