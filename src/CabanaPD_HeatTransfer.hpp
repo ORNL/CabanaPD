@@ -56,9 +56,9 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
             getDistance( x, u, i, j, xi, r, s );
 
             const double coeff = model.thermal_coeff *
-                                 model.conductivity_function( r ) / model.cp;
+                                 model.conductivity_function( xi ) / model.cp;
             prev_temp( i ) +=
-                coeff * ( temp( j ) - temp( i ) ) / r / r * vol( j );
+                coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
         };
 
         Kokkos::RangePolicy<ExecutionSpace> policy( 0, n_local );
