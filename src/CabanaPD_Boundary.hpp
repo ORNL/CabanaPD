@@ -27,6 +27,9 @@ struct RectangularPrism
 struct Cylinder
 {
 };
+struct Custom
+{
+};
 
 // Forward declaration.
 template <class GeometryType>
@@ -109,6 +112,7 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
     // Default for empty case.
     BoundaryIndexSpace() {}
 
+    // Construct from region (search for boundary particles).
     template <class ExecSpace, class Particles>
     BoundaryIndexSpace( ExecSpace exec_space, Particles particles,
                         std::vector<RegionBoundary<GeometryType>> planes,
@@ -174,6 +178,19 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
     auto time() { return _timer.time(); };
 };
 
+template <class MemorySpace>
+struct BoundaryIndexSpace<MemorySpace, Custom>
+{
+    using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
+    index_view_type _view;
+
+    // Construct from a View of boundary particles.
+    BoundaryIndexSpace( index_view_type input_view )
+        : _view( input_view )
+    {
+    }
+};
+
 template <class ExecSpace, class Particles, class BoundaryType>
 auto createBoundaryIndexSpace( ExecSpace exec_space, Particles particles,
                                std::vector<BoundaryType> planes,
@@ -182,6 +199,13 @@ auto createBoundaryIndexSpace( ExecSpace exec_space, Particles particles,
     using memory_space = typename Particles::memory_space;
     return BoundaryIndexSpace<memory_space, BoundaryType>(
         exec_space, particles, planes, initial_guess );
+}
+
+template <class BoundaryParticles>
+auto createBoundaryIndexSpace( BoundaryParticles particles )
+{
+    using memory_space = typename BoundaryParticles::memory_space;
+    return BoundaryIndexSpace<memory_space, Custom>( particles );
 }
 
 struct ForceValueBCTag
@@ -357,6 +381,30 @@ auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
         bc_indices, user_functor, force_update );
 }
 
+// Custom index space cases
+template <class BCTag, class ExecSpace, class BoundaryParticles>
+auto createBoundaryCondition( BCTag, const double value,
+                              BoundaryParticles particles )
+{
+    using memory_space = typename BoundaryParticles::memory_space;
+    using bc_index_type = BoundaryIndexSpace<memory_space, Custom>;
+    bc_index_type bc_indices = createBoundaryIndexSpace( particles );
+    return BoundaryCondition<bc_index_type, BCTag>( value, bc_indices );
+}
+
+template <class UserFunctor, class BoundaryParticles>
+auto createBoundaryCondition( UserFunctor user_functor,
+                              BoundaryParticles particles,
+                              const bool force_update )
+{
+    using memory_space = typename BoundaryParticles::memory_space;
+    using bc_index_type = BoundaryIndexSpace<memory_space, Custom>;
+    bc_index_type bc_indices = createBoundaryIndexSpace( particles );
+    return BoundaryCondition<bc_index_type, UserFunctor>(
+        bc_indices, user_functor, force_update );
+}
+
+// Wrappers for single plane cases.
 template <class BoundaryType, class BCTag, class ExecSpace, class Particles>
 auto createBoundaryCondition( BCTag tag, const double value,
                               ExecSpace exec_space, Particles particles,
