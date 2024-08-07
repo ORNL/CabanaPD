@@ -114,12 +114,12 @@ void thermalDeformationExample( const std::string filename )
     //                      Outputs
     // ====================================================
     // Output displacement along the x-axis
-    createDisplacementProfile( MPI_COMM_WORLD, num_cells[0], 0,
-                               "xdisplacement_profile.txt", *particles );
+    createDisplacementProfile( MPI_COMM_WORLD, "xdisplacement_profile.txt",
+                               *particles, num_cells[0], 0 );
 
     // Output displacement along the y-axis
-    createDisplacementProfile( MPI_COMM_WORLD, num_cells[1], 1,
-                               "ydisplacement_profile.txt", *particles );
+    createDisplacementProfile( MPI_COMM_WORLD, "ydisplacement_profile.txt",
+                               *particles, num_cells[1], 1 );
 }
 
 // Initialize MPI+Kokkos.
