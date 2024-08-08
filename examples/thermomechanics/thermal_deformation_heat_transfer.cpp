@@ -104,9 +104,6 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // ====================================================
     //                   Boundary condition
     // ====================================================
-    double dx = particles->dx[0];
-    double dy = particles->dx[1];
-
     // EXAMPLE 1: Temperature profile imposed over entire domain
     /*
     CabanaPD::RegionBoundary plane( low_corner[0], high_corner[0],
@@ -119,6 +116,8 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // EXAMPLE 2: Temperature profile imposed on top, bottom, left, and right
     // surfaces
     /*
+    double dx = particles->dx[0];
+    double dy = particles->dx[1];
     // Top surface
     CabanaPD::RegionBoundary plane1( low_corner[0], high_corner[0],
                                     high_corner[1] - dy, high_corner[1] + dy,
