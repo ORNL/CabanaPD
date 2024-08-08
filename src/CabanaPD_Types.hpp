@@ -40,5 +40,9 @@ struct LinearLPS
 {
 };
 
+struct DynamicCriticalStretch
+{
+};
+
 } // namespace CabanaPD
 #endif
