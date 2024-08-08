@@ -116,7 +116,7 @@ void elasticWaveExample( const std::string filename )
     // ====================================================
     //                      Outputs
     // ====================================================
-    // Output displacement along the x-axis
+    // Output x-displacement along the x-axis
     createDisplacementProfile( MPI_COMM_WORLD, "displacement_profile.txt",
                                *particles, num_cells[0], 0 );
 }
