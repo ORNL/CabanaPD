@@ -75,24 +75,28 @@ void createOutputProfile( MPI_Comm comm, const int num_cell,
 }
 
 template <typename ParticleType>
-void createDisplacementProfile( MPI_Comm comm, const int num_cell,
-                                const int profile_dim, std::string file_name,
-                                ParticleType particles )
+void createDisplacementProfile( MPI_Comm comm, std::string file_name,
+                                ParticleType particles, const int num_cell,
+                                const int profile_dim,
+                                int displacement_dim = -1 )
 {
+    if ( displacement_dim == -1 )
+        displacement_dim = profile_dim;
+
     auto u = particles.sliceDisplacement();
     auto value = KOKKOS_LAMBDA( const int pid )
     {
-        return u( pid, profile_dim );
+        return u( pid, displacement_dim );
     };
     createOutputProfile( comm, num_cell, profile_dim, file_name, particles,
                          value );
 }
 
 template <typename ParticleType>
-void createDisplacementMagnitudeProfile( MPI_Comm comm, const int num_cell,
-                                         const int profile_dim,
-                                         std::string file_name,
-                                         ParticleType particles )
+void createDisplacementMagnitudeProfile( MPI_Comm comm, std::string file_name,
+                                         ParticleType particles,
+                                         const int num_cell,
+                                         const int profile_dim )
 {
     auto u = particles.sliceDisplacement();
     auto magnitude = KOKKOS_LAMBDA( const int pid )
