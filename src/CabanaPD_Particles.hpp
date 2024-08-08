@@ -71,6 +71,7 @@
 
 #include <CabanaPD_Comm.hpp>
 #include <CabanaPD_Fields.hpp>
+#include <CabanaPD_Input.hpp>
 #include <CabanaPD_Output.hpp>
 #include <CabanaPD_Timer.hpp>
 #include <CabanaPD_Types.hpp>
@@ -779,6 +780,54 @@ class Particles<MemorySpace, PMB, TemperatureDependent, Dimension>
     using base_type::h5_config;
 #endif
 };
+
+template <typename MemorySpace, typename ModelType, typename ExecSpace>
+auto createParticles( ExecSpace exec_space, CabanaPD::Inputs inputs )
+{
+    std::array<double, 3> low_corner = inputs["low_corner"];
+    std::array<double, 3> high_corner = inputs["high_corner"];
+    std::array<int, 3> num_cells = inputs["num_cells"];
+    double delta = inputs["horizon"];
+    int m = std::floor( delta /
+                        ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
+    int halo_width = m + 1; // Just to be safe.
+
+    return std::make_shared<
+        CabanaPD::Particles<MemorySpace, typename ModelType::base_model,
+                            typename ModelType::thermal_type>>(
+        exec_space, low_corner, high_corner, num_cells, halo_width );
+}
+
+template <typename MemorySpace, typename ModelType, typename ExecSpace,
+          std::size_t Dim>
+auto createParticles( const ExecSpace& exec_space,
+                      std::array<double, Dim> low_corner,
+                      std::array<double, Dim> high_corner,
+                      const std::array<int, Dim> num_cells,
+                      const int max_halo_width )
+{
+    return std::make_shared<
+        CabanaPD::Particles<MemorySpace, typename ModelType::base_model,
+                            typename ModelType::thermal_type>>(
+        exec_space, low_corner, high_corner, num_cells, max_halo_width );
+}
+
+template <typename MemorySpace, typename ModelType, typename ThermalType,
+          typename ExecSpace, std::size_t Dim>
+auto createParticles( const ExecSpace& exec_space,
+                      std::array<double, Dim> low_corner,
+                      std::array<double, Dim> high_corner,
+                      const std::array<int, Dim> num_cells,
+                      const int max_halo_width,
+                      typename std::enable_if<
+                          (std::is_same_v<ThermalType, TemperatureDependent> ||
+                           std::is_same_v<ThermalType, TemperatureIndependent>),
+                          int>::type* = 0 )
+{
+    return std::make_shared<
+        CabanaPD::Particles<MemorySpace, ModelType, ThermalType>>(
+        exec_space, low_corner, high_corner, num_cells, max_halo_width );
+}
 
 } // namespace CabanaPD
 

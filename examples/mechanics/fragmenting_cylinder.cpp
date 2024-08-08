@@ -69,10 +69,7 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     //                 Particle generation
     // ====================================================
-    // Does not set displacements, velocities, etc.
-    auto particles = std::make_shared<
-        CabanaPD::Particles<memory_space, typename model_type::base_model,
-                            typename model_type::thermal_type>>(
+    auto particles = CabanaPD::createParticles<memory_space, model_type>(
         exec_space(), low_corner, high_corner, num_cells, halo_width );
 
     // ====================================================
@@ -142,12 +139,8 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
-
-    // Define empty pre-notch
-    CabanaPD::Prenotch<0> prenotch;
-
     auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
-        inputs, particles, force_model, prenotch );
+        inputs, particles, force_model );
     cabana_pd->init();
     cabana_pd->run();
 }
