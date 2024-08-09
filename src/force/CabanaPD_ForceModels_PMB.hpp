@@ -21,10 +21,10 @@ namespace CabanaPD
 
 template <>
 struct ForceModel<PMB, Elastic, TemperatureIndependent>
-    : public BaseForceModel<>
+    : public BaseForceModel<SingleSpecies>
 {
-    using base_type = BaseForceModel<>;
-    using species_type = typename base_type::species_type;
+    using base_type = BaseForceModel<SingleSpecies>;
+    using species_type = SingleSpecies;
     using base_model = PMB;
     using fracture_type = Elastic;
     using thermal_type = TemperatureIndependent;
@@ -327,12 +327,13 @@ struct ForceModel<LinearPMB, Fracture, TemperatureIndependent, ModelParams...>
 template <typename TemperatureType>
 struct ForceModel<PMB, Elastic, TemperatureDependent, TemperatureType>
     : public ForceModel<PMB, Elastic, TemperatureIndependent>,
-      BaseTemperatureModel<TemperatureType>
+      BaseTemperatureModel<TemperatureType, SingleSpecies>
 {
     using memory_space = typename TemperatureType::memory_space;
     using base_type = ForceModel<PMB, Elastic, TemperatureIndependent>;
     using species_type = typename base_type::species_type;
-    using base_temperature_type = BaseTemperatureModel<TemperatureType>;
+    using base_temperature_type =
+        BaseTemperatureModel<TemperatureType, SingleSpecies>;
     using base_model = PMB;
     using fracture_type = Elastic;
     using thermal_type = TemperatureDependent;
@@ -348,11 +349,48 @@ struct ForceModel<PMB, Elastic, TemperatureDependent, TemperatureType>
     // Explicitly use the temperature-dependent stretch.
     using base_temperature_type::thermalStretch;
 
-    // ForceModel(){};
     ForceModel( const double _delta, const double _K,
                 const TemperatureType _temp, const double _alpha,
                 const double _temp0 = 0.0 )
         : base_type( _delta, _K )
+        , base_temperature_type( _temp, _alpha, _temp0 )
+    {
+    }
+};
+
+template <typename TemperatureType, typename ParticleType>
+struct ForceModel<PMB, Elastic, TemperatureDependent, TemperatureType,
+                  ParticleType>
+    : public ForceModel<PMB, Elastic, TemperatureIndependent, ParticleType>,
+      BaseTemperatureModel<TemperatureType, ParticleType>
+{
+    using memory_space = typename TemperatureType::memory_space;
+    using base_type =
+        ForceModel<PMB, Elastic, TemperatureIndependent, ParticleType>;
+    using species_type = typename base_type::species_type;
+    using base_temperature_type =
+        BaseTemperatureModel<TemperatureType, ParticleType>;
+    using base_model = PMB;
+    using fracture_type = Elastic;
+    using thermal_type = TemperatureDependent;
+
+    using base_type::c;
+    using base_type::delta;
+    using base_type::K;
+    using base_type::type;
+
+    // Thermal parameters
+    using base_temperature_type::alpha;
+    using base_temperature_type::temp0;
+
+    // Explicitly use the temperature-dependent stretch.
+    using base_temperature_type::thermalStretch;
+
+    template <typename ArrayType>
+    ForceModel( const ArrayType _delta, const ArrayType _K,
+                const TemperatureType& _temp, const ArrayType _alpha,
+                const ArrayType _temp0, ParticleType& _type )
+        : base_type( _delta, _K, _type )
         , base_temperature_type( _temp, _alpha, _temp0 )
     {
     }
@@ -372,12 +410,13 @@ auto createForceModel( PMB, Elastic, TemperatureDependent,
 template <typename TemperatureType>
 struct ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>
     : public ForceModel<PMB, Fracture, TemperatureIndependent>,
-      BaseTemperatureModel<TemperatureType>
+      BaseTemperatureModel<TemperatureType, SingleSpecies>
 {
     using memory_space = typename TemperatureType::memory_space;
     using base_type = ForceModel<PMB, Fracture, TemperatureIndependent>;
     using species_type = typename base_type::species_type;
-    using base_temperature_type = BaseTemperatureModel<TemperatureType>;
+    using base_temperature_type =
+        BaseTemperatureModel<TemperatureType, SingleSpecies>;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = TemperatureDependent;
@@ -398,7 +437,6 @@ struct ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>
     // Explicitly use the temperature-dependent stretch.
     using base_temperature_type::thermalStretch;
 
-    // ForceModel(){};
     ForceModel( const double _delta, const double _K, const double _G0,
                 const TemperatureType _temp, const double _alpha,
                 const double _temp0 = 0.0 )
@@ -414,6 +452,60 @@ struct ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>
         double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
         double bond_break_coeff =
             ( 1.0 + s0 + alpha * temp_avg ) * ( 1.0 + s0 + alpha * temp_avg );
+        return r * r >= bond_break_coeff * xi * xi;
+    }
+};
+
+template <typename TemperatureType, typename ParticleType>
+struct ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType,
+                  ParticleType>
+    : public ForceModel<PMB, Fracture, TemperatureIndependent, ParticleType>,
+      BaseTemperatureModel<TemperatureType, ParticleType>
+{
+    using memory_space = typename TemperatureType::memory_space;
+    using base_type =
+        ForceModel<PMB, Fracture, TemperatureIndependent, ParticleType>;
+    using species_type = typename base_type::species_type;
+    using base_temperature_type =
+        BaseTemperatureModel<TemperatureType, ParticleType>;
+    using base_model = typename base_type::base_model;
+    using fracture_type = typename base_type::fracture_type;
+    using thermal_type = TemperatureDependent;
+
+    using base_type::c;
+    using base_type::delta;
+    using base_type::K;
+    using base_type::type;
+
+    // Does not use the base bond_break_coeff.
+    using base_type::G0;
+    using base_type::s0;
+
+    // Thermal parameters
+    using base_temperature_type::alpha;
+    using base_temperature_type::temp0;
+    using base_temperature_type::temperature;
+
+    // Explicitly use the temperature-dependent stretch.
+    using base_temperature_type::thermalStretch;
+
+    template <typename ArrayType>
+    ForceModel( const ArrayType _delta, const ArrayType _K, const ArrayType _G0,
+                const TemperatureType _temp, const ArrayType _alpha,
+                const ArrayType _temp0, ParticleType& _type )
+        : base_type( _delta, _K, _G0, _type )
+        , base_temperature_type( _temp, _alpha, _temp0 )
+    {
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    bool criticalStretch( const int i, const int j, const double r,
+                          const double xi ) const
+    {
+        double temp_avg =
+            0.5 * ( temperature( i ) + temperature( j ) ) - temp0( type( i ) );
+        double bond_break_coeff = ( 1.0 + s0 + alpha( type( i ) ) * temp_avg ) *
+                                  ( 1.0 + s0 + alpha( type( i ) ) * temp_avg );
         return r * r >= bond_break_coeff * xi * xi;
     }
 };

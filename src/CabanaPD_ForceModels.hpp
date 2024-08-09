@@ -17,11 +17,11 @@
 namespace CabanaPD
 {
 
-template <typename... MemorySpace>
+template <typename MemorySpace>
 struct BaseForceModel;
 
 template <>
-struct BaseForceModel<>
+struct BaseForceModel<SingleSpecies>
 {
     using species_type = SingleSpecies;
     double delta;
@@ -38,14 +38,13 @@ struct BaseForceModel<>
     void thermalStretch( double&, const int, const int ) const {}
 };
 
-template <typename... MemorySpace>
+template <typename MemorySpace>
 struct BaseForceModel
 {
     using species_type = MultiSpecies;
 
     // Only allow one memory space.
-    using memory_space =
-        typename std::tuple_element<0, std::tuple<MemorySpace...>>::type;
+    using memory_space = MemorySpace;
     using view_type_1d = Kokkos::View<double*, memory_space>;
     view_type_1d delta;
     double max_delta;
@@ -86,8 +85,11 @@ struct BaseForceModel
     void thermalStretch( double&, const int, const int ) const {}
 };
 
+template <typename TemperatureType, typename SpeciesType>
+struct BaseTemperatureModel;
+
 template <typename TemperatureType>
-struct BaseTemperatureModel
+struct BaseTemperatureModel<TemperatureType, SingleSpecies>
 {
     using species_type = SingleSpecies;
     using memory_space = typename TemperatureType::memory_space;
@@ -112,6 +114,53 @@ struct BaseTemperatureModel
     {
         double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
         s -= alpha * temp_avg;
+    }
+};
+
+template <typename TemperatureType, typename ParticleType>
+struct BaseTemperatureModel
+{
+    using species_type = MultiSpecies;
+    using memory_space = typename TemperatureType::memory_space;
+    using view_type_1d = Kokkos::View<double*, memory_space>;
+    view_type_1d alpha;
+    view_type_1d temp0;
+
+    // Particle fields
+    TemperatureType temperature;
+    ParticleType type;
+
+    template <typename ArrayType>
+    BaseTemperatureModel( const TemperatureType& _temp, const ArrayType _alpha,
+                          const ArrayType _temp0, const ParticleType& _type )
+        : alpha( view_type_1d( "delta", _alpha.size() ) )
+        , temp0( view_type_1d( "delta", _temp0.size() ) )
+        , temperature( _temp )
+        , type( _type )
+    {
+        auto init_func = KOKKOS_CLASS_LAMBDA( const int i )
+        {
+            alpha( i ) = _alpha[i];
+            temp0( i ) = _temp0[i];
+        };
+        using exec_space = typename memory_space::execution_space;
+        Kokkos::RangePolicy<exec_space> policy( 0, alpha.size() );
+        Kokkos::parallel_for( "CabanaPD::Model::Init", policy, init_func );
+    }
+
+    void update( const TemperatureType& _temp, const ParticleType& _type )
+    {
+        temperature = _temp;
+        type = _type;
+    }
+
+    // Update stretch with temperature effects.
+    KOKKOS_INLINE_FUNCTION
+    void thermalStretch( double& s, const int i, const int j ) const
+    {
+        double temp_avg =
+            0.5 * ( temperature( i ) + temperature( j ) ) - temp0( type( i ) );
+        s -= alpha( type( i ) ) * temp_avg;
     }
 };
 
