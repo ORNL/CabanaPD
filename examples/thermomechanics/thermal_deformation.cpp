@@ -41,7 +41,7 @@ void thermalDeformationExample( const std::string filename )
     double nu = 0.25;
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double delta = inputs["horizon"];
-    double alpha = inputs["thermal_coefficient"];
+    double alpha = inputs["thermal_expansion_coeff"];
 
     // Problem parameters
     double temp0 = inputs["reference_temperature"];
