@@ -74,6 +74,7 @@
 #include <CabanaPD_Boundary.hpp>
 #include <CabanaPD_Comm.hpp>
 #include <CabanaPD_Force.hpp>
+#include <CabanaPD_HeatTransfer.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Integrate.hpp>
 #include <CabanaPD_Output.hpp>
@@ -98,17 +99,21 @@ class SolverElastic
     using memory_space = MemorySpace;
     using exec_space = typename memory_space::execution_space;
 
+    // Core module types - required for all problems.
     using particle_type = ParticleType;
     using integrator_type = Integrator<exec_space>;
     using force_model_type = ForceModel;
     using force_type = Force<exec_space, force_model_type>;
     using comm_type = Comm<particle_type, typename force_model_type::base_model,
-                           typename force_model_type::thermal_type>;
+                           typename particle_type::thermal_type>;
     using neighbor_type =
         Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
                            Cabana::VerletLayout2D, Cabana::TeamOpTag>;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using input_type = InputType;
+
+    // Optional module types.
+    using heat_transfer_type = HeatTransfer<exec_space, force_model_type>;
 
     SolverElastic( input_type _inputs,
                    std::shared_ptr<particle_type> _particles,
@@ -132,6 +137,12 @@ class SolverElastic
         if constexpr ( std::is_same<typename force_model_type::thermal_type,
                                     TemperatureDependent>::value )
             force_model.update( particles->sliceTemperature() );
+
+        // Create heat transfer if needed.
+        if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                    DynamicTemperature>::value )
+            heat_transfer = std::make_shared<heat_transfer_type>(
+                inputs["half_neigh"], force_model );
 
         force =
             std::make_shared<force_type>( inputs["half_neigh"], force_model );
@@ -256,16 +267,20 @@ class SolverElastic
             // Integrate - velocity Verlet first half.
             integrator->initialHalfStep( *particles );
 
-            // Add non-force boundary condition.
-            if ( !boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space(), *particles, step * dt );
+            // Update ghost particles.
+            comm->gatherDisplacement();
 
+            if constexpr ( std::is_same<typename force_model_type::thermal_type,
+                                        DynamicTemperature>::value )
+                computeHeatTransfer( *heat_transfer, *particles, *neighbors,
+                                     neigh_iter_tag{}, dt );
             if constexpr ( std::is_same<typename force_model_type::thermal_type,
                                         TemperatureDependent>::value )
                 comm->gatherTemperature();
 
-            // Update ghost particles.
-            comm->gatherDisplacement();
+            // Add non-force boundary condition.
+            if ( !boundary_condition.forceUpdate() )
+                boundary_condition.apply( exec_space(), *particles, step * dt );
 
             // Compute internal forces.
             updateForce();
@@ -429,17 +444,21 @@ class SolverElastic
     double dt;
 
   protected:
+    // Core modules.
     input_type inputs;
     std::shared_ptr<particle_type> particles;
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
     std::shared_ptr<neighbor_type> neighbors;
+    // Optional modules.
+    std::shared_ptr<heat_transfer_type> heat_transfer;
 
+    // Output files.
     std::string output_file;
     std::string error_file;
 
-    // Combined from many class timers.
+    // Note: init_time is combined from many class timers.
     double _init_time;
     Timer _init_timer;
     Timer _neighbor_timer;

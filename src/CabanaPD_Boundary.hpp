@@ -167,7 +167,7 @@ struct BoundaryCondition
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType&, double )
+    void apply( ExecSpace, ParticleType&, double time )
     {
         _timer.start();
         auto user = _user_functor;
@@ -176,7 +176,7 @@ struct BoundaryCondition
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
-                user( pid );
+                user( pid, time );
             } );
         _timer.stop();
     }
@@ -308,6 +308,29 @@ auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
         exec_space, particles, planes, initial_guess );
     return BoundaryCondition<bc_index_type, UserFunctor>(
         bc_indices, user_functor, force_update );
+}
+
+template <class BoundaryType, class BCTag, class ExecSpace, class Particles>
+auto createBoundaryCondition( BCTag tag, const double value,
+                              ExecSpace exec_space, Particles particles,
+                              BoundaryType plane,
+                              const double initial_guess = 0.5 )
+{
+    std::vector<BoundaryType> plane_vec = { plane };
+    return createBoundaryCondition( tag, value, exec_space, particles,
+                                    plane_vec, initial_guess );
+}
+
+template <class UserFunctor, class BoundaryType, class ExecSpace,
+          class Particles>
+auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
+                              Particles particles, BoundaryType plane,
+                              const bool force_update,
+                              const double initial_guess = 0.5 )
+{
+    std::vector<BoundaryType> plane_vec = { plane };
+    return createBoundaryCondition( user_functor, exec_space, particles,
+                                    plane_vec, force_update, initial_guess );
 }
 
 } // namespace CabanaPD
