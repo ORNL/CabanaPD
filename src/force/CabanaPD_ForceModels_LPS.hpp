@@ -19,9 +19,9 @@ namespace CabanaPD
 {
 
 template <>
-struct ForceModel<LPS, Elastic> : public BaseForceModel<>
+struct ForceModel<LPS, Elastic> : public BaseForceModel<SingleSpecies>
 {
-    using base_type = BaseForceModel<>;
+    using base_type = BaseForceModel<SingleSpecies>;
     using species_type = SingleSpecies;
     using base_model = LPS;
     using fracture_type = Elastic;
