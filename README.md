@@ -105,6 +105,21 @@ cd CabanaPD/build
 ctest
 ```
 
+## Features
+
+CabanaPD currently includes the following:
+  - Force models
+    - Bond-based (pairwise): prototype microelastic brittle (PMB)
+    - State-based (many-body): linear peridynamic solid (LPS)
+ - Mechanical response:
+   - Elastic (no failure)
+   - Brittle fracture
+ - Thermomechanics (bond-based only)
+ - Time integration
+   - Velocity Verlet
+ - Pre-crack creation
+ - Particle boundary conditions
+
 ## Examples
 
 Once built and installed, CabanaPD `examples/` can be run. Timing and energy
