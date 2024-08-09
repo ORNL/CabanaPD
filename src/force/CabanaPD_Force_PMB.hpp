@@ -72,12 +72,12 @@ namespace CabanaPD
 {
 template <class ExecutionSpace, class... ModelParams>
 class Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
-    : public Force<ExecutionSpace, BaseForceModel>
+    : public ForceBase
 {
   public:
     using exec_space = ExecutionSpace;
     using model_type = ForceModel<PMB, Elastic, ModelParams...>;
-    using base_type = Force<exec_space, BaseForceModel>;
+    using base_type = ForceBase;
 
   protected:
     using base_type::_half_neigh;
@@ -117,7 +117,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
 
             model.thermalStretch( s, i, j );
 
-            const double coeff = model.c * s * vol( j );
+            const double coeff = model.micromodulus( i, j ) * s * vol( j );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -158,7 +158,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
 
             // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
             // the integrand (pairwise potential).
-            double w = 0.25 * model.c * s * s * xi * vol( j );
+            double w =
+                0.25 * model.micromodulus( i, j ) * s * s * xi * vol( j );
             W( i ) += w;
             Phi += w * vol( i );
         };
@@ -177,7 +178,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
 
 template <class ExecutionSpace, class... ModelParams>
 class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
-    : public Force<ExecutionSpace, BaseForceModel>
+    : public ForceBase
 {
   public:
     using exec_space = ExecutionSpace;
@@ -185,7 +186,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
 
   protected:
     using base_model_type = typename model_type::base_type;
-    using base_type = Force<ExecutionSpace, BaseForceModel>;
+    using base_type = ForceBase;
     using base_type::_half_neigh;
     model_type _model;
 
@@ -243,7 +244,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
                 // Else if statement is only for performance.
                 else if ( mu( i, n ) > 0 )
                 {
-                    const double coeff = model.c * s * vol( j );
+                    const double coeff =
+                        model.micromodulus( i, j ) * s * vol( j );
                     double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;
                     fy_i = muij * coeff * ry / r;
@@ -295,7 +297,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
 
                 // 0.25 factor is due to 1/2 from outside the integral and 1/2
                 // from the integrand (pairwise potential).
-                double w = mu( i, n ) * 0.25 * model.c * s * s * xi * vol( j );
+                double w = mu( i, n ) * 0.25 * model.micromodulus( i, j ) * s *
+                           s * xi * vol( j );
                 W( i ) += w;
 
                 phi_i += mu( i, n ) * vol( j );
@@ -317,14 +320,14 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
 
 template <class ExecutionSpace, class... ModelParams>
 class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic, ModelParams...>>
-    : public Force<ExecutionSpace, BaseForceModel>
+    : public ForceBase
 {
   public:
     using exec_space = ExecutionSpace;
-    using model_type = ForceModel<LinearPMB, Elastic, TemperatureIndependent>;
+    using model_type = ForceModel<LinearPMB, Elastic, ModelParams...>;
 
   protected:
-    using base_type = Force<ExecutionSpace, BaseForceModel>;
+    using base_type = ForceBase;
     using base_type::_half_neigh;
     model_type _model;
 
