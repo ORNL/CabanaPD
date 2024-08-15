@@ -74,15 +74,18 @@ struct RegionBoundary<Cylinder>
     double radius_out;
     double low_z;
     double high_z;
-    double x_center = 0.0;
-    double y_center = 0.0;
+    double x_center;
+    double y_center;
 
     RegionBoundary( const double _radius_in, const double _radius_out,
-                    const double _low_z, const double _high_z )
+                    const double _low_z, const double _high_z,
+                    double _x_center = 0.0, double _y_center = 0.0 )
         : radius_in( _radius_in )
         , radius_out( _radius_out )
         , low_z( _low_z )
-        , high_z( _high_z ){};
+        , high_z( _high_z )
+        , x_center( _x_center )
+        , y_center( _y_center ){};
 
     template <class PositionType>
     KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
