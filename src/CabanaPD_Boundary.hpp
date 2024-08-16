@@ -31,9 +31,25 @@ struct Custom
 {
 };
 
-// Forward declaration.
-template <class GeometryType>
-struct RegionBoundary;
+// User-specifed custom boundary. Must use the signature:
+//    bool operator()(PositionType&, const int)
+template <typename UserFunctor>
+struct RegionBoundary
+{
+    UserFunctor _user_functor;
+
+    RegionBoundary( UserFunctor user )
+        : _user_functor( user )
+    {
+    }
+
+    template <class PositionType>
+    KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
+                                        const int pid ) const
+    {
+        return user( x, pid );
+    }
+};
 
 // Define a subset of the system as the boundary with a rectangular prism.
 template <>
