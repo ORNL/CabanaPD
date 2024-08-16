@@ -21,8 +21,39 @@
 namespace CabanaPD
 {
 
-// Define a plane or other rectilinear subset of the system as the boundary.
+struct RectangularPrism
+{
+};
+struct Cylinder
+{
+};
+struct Custom
+{
+};
+
+// User-specifed custom boundary. Must use the signature:
+//    bool operator()(PositionType&, const int)
+template <typename UserFunctor>
 struct RegionBoundary
+{
+    UserFunctor _user_functor;
+
+    RegionBoundary( UserFunctor user )
+        : _user_functor( user )
+    {
+    }
+
+    template <class PositionType>
+    KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
+                                        const int pid ) const
+    {
+        return user( x, pid );
+    }
+};
+
+// Define a subset of the system as the boundary with a rectangular prism.
+template <>
+struct RegionBoundary<RectangularPrism>
 {
     double low_x;
     double high_x;
@@ -40,14 +71,56 @@ struct RegionBoundary
         , high_y( _high_y )
         , low_z( _low_z )
         , high_z( _high_z ){};
+
+    template <class PositionType>
+    KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
+                                        const int pid ) const
+    {
+        return ( x( pid, 0 ) >= low_x && x( pid, 0 ) <= high_x &&
+                 x( pid, 1 ) >= low_y && x( pid, 1 ) <= high_y &&
+                 x( pid, 2 ) >= low_z && x( pid, 2 ) <= high_z );
+    }
+};
+
+// Define a subset of the system as the boundary with a cylinder.
+template <>
+struct RegionBoundary<Cylinder>
+{
+    double radius_in;
+    double radius_out;
+    double low_z;
+    double high_z;
+    double x_center;
+    double y_center;
+
+    RegionBoundary( const double _radius_in, const double _radius_out,
+                    const double _low_z, const double _high_z,
+                    double _x_center = 0.0, double _y_center = 0.0 )
+        : radius_in( _radius_in )
+        , radius_out( _radius_out )
+        , low_z( _low_z )
+        , high_z( _high_z )
+        , x_center( _x_center )
+        , y_center( _y_center ){};
+
+    template <class PositionType>
+    KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
+                                        const int pid ) const
+    {
+        double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center ) +
+                     ( x( pid, 1 ) - y_center ) * ( x( pid, 1 ) - y_center );
+        return ( rsq >= radius_in * radius_in &&
+                 rsq <= radius_out * radius_out && x( pid, 2 ) >= low_z &&
+                 x( pid, 2 ) <= high_z );
+    }
 };
 
 template <class MemorySpace, class BoundaryType>
 struct BoundaryIndexSpace;
 
 // FIXME: fails for some cases if initial guess is not sufficient.
-template <class MemorySpace>
-struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
+template <class MemorySpace, class GeometryType>
+struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
 {
     using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
     index_view_type _view;
@@ -58,9 +131,10 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
     // Default for empty case.
     BoundaryIndexSpace() {}
 
+    // Construct from region (search for boundary particles).
     template <class ExecSpace, class Particles>
     BoundaryIndexSpace( ExecSpace exec_space, Particles particles,
-                        std::vector<RegionBoundary> planes,
+                        std::vector<RegionBoundary<GeometryType>> planes,
                         const double initial_guess )
     {
         _timer.start();
@@ -85,7 +159,8 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
     }
 
     template <class ExecSpace, class Particles>
-    void update( ExecSpace, Particles particles, RegionBoundary plane )
+    void update( ExecSpace, Particles particles,
+                 RegionBoundary<GeometryType> region )
     {
         auto count_host =
             Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, _count );
@@ -97,9 +172,7 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
         Kokkos::RangePolicy<ExecSpace> policy( 0, particles.n_local );
         auto index_functor = KOKKOS_LAMBDA( const std::size_t pid )
         {
-            if ( x( pid, 0 ) >= plane.low_x && x( pid, 0 ) <= plane.high_x &&
-                 x( pid, 1 ) >= plane.low_y && x( pid, 1 ) <= plane.high_y &&
-                 x( pid, 2 ) >= plane.low_z && x( pid, 2 ) <= plane.high_z )
+            if ( region.inside( x, pid ) )
             {
                 // Resize after count if needed.
                 auto c = Kokkos::atomic_fetch_add( &count( 0 ), 1 );
@@ -124,14 +197,34 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary>
     auto time() { return _timer.time(); };
 };
 
-template <class BoundaryType, class ExecSpace, class Particles>
+template <class MemorySpace>
+struct BoundaryIndexSpace<MemorySpace, Custom>
+{
+    using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
+    index_view_type _view;
+
+    // Construct from a View of boundary particles.
+    BoundaryIndexSpace( index_view_type input_view )
+        : _view( input_view )
+    {
+    }
+};
+
+template <class ExecSpace, class Particles, class BoundaryType>
 auto createBoundaryIndexSpace( ExecSpace exec_space, Particles particles,
-                               std::vector<RegionBoundary> planes,
+                               std::vector<BoundaryType> planes,
                                const double initial_guess )
 {
     using memory_space = typename Particles::memory_space;
     return BoundaryIndexSpace<memory_space, BoundaryType>(
         exec_space, particles, planes, initial_guess );
+}
+
+template <class BoundaryParticles>
+auto createBoundaryIndexSpace( BoundaryParticles particles )
+{
+    using memory_space = typename BoundaryParticles::memory_space;
+    return BoundaryIndexSpace<memory_space, Custom>( particles );
 }
 
 struct ForceValueBCTag
@@ -159,15 +252,14 @@ struct BoundaryCondition
     {
     }
 
-    template <class ExecSpace, class Particles>
-    void update( ExecSpace exec_space, Particles particles,
-                 RegionBoundary plane )
+    template <class ExecSpace, class Particles, class BoundaryType>
+    void update( ExecSpace exec_space, Particles particles, BoundaryType plane )
     {
         _index_space.update( exec_space, particles, plane );
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType&, double )
+    void apply( ExecSpace, ParticleType&, double time )
     {
         _timer.start();
         auto user = _user_functor;
@@ -176,7 +268,7 @@ struct BoundaryCondition
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
-                user( pid );
+                user( pid, time );
             } );
         _timer.stop();
     }
@@ -202,9 +294,8 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     {
     }
 
-    template <class ExecSpace, class Particles>
-    void update( ExecSpace exec_space, Particles particles,
-                 RegionBoundary plane )
+    template <class ExecSpace, class Particles, class BoundaryType>
+    void update( ExecSpace exec_space, Particles particles, BoundaryType plane )
     {
         _index_space.update( exec_space, particles, plane );
     }
@@ -247,9 +338,8 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     {
     }
 
-    template <class ExecSpace, class Particles>
-    void update( ExecSpace exec_space, Particles particles,
-                 RegionBoundary plane )
+    template <class ExecSpace, class Particles, class BoundaryType>
+    void update( ExecSpace exec_space, Particles particles, BoundaryType plane )
     {
         _index_space.update( exec_space, particles, plane );
     }
@@ -288,7 +378,7 @@ auto createBoundaryCondition( BCTag, const double value, ExecSpace exec_space,
 {
     using memory_space = typename Particles::memory_space;
     using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;
-    bc_index_type bc_indices = createBoundaryIndexSpace<BoundaryType>(
+    bc_index_type bc_indices = createBoundaryIndexSpace(
         exec_space, particles, planes, initial_guess );
     return BoundaryCondition<bc_index_type, BCTag>( value, bc_indices );
 }
@@ -304,10 +394,57 @@ auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
 {
     using memory_space = typename Particles::memory_space;
     using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;
-    bc_index_type bc_indices = createBoundaryIndexSpace<BoundaryType>(
+    bc_index_type bc_indices = createBoundaryIndexSpace(
         exec_space, particles, planes, initial_guess );
     return BoundaryCondition<bc_index_type, UserFunctor>(
         bc_indices, user_functor, force_update );
+}
+
+// Custom index space cases
+template <class BCTag, class ExecSpace, class BoundaryParticles>
+auto createBoundaryCondition( BCTag, const double value,
+                              BoundaryParticles particles )
+{
+    using memory_space = typename BoundaryParticles::memory_space;
+    using bc_index_type = BoundaryIndexSpace<memory_space, Custom>;
+    bc_index_type bc_indices = createBoundaryIndexSpace( particles );
+    return BoundaryCondition<bc_index_type, BCTag>( value, bc_indices );
+}
+
+template <class UserFunctor, class BoundaryParticles>
+auto createBoundaryCondition( UserFunctor user_functor,
+                              BoundaryParticles particles,
+                              const bool force_update )
+{
+    using memory_space = typename BoundaryParticles::memory_space;
+    using bc_index_type = BoundaryIndexSpace<memory_space, Custom>;
+    bc_index_type bc_indices = createBoundaryIndexSpace( particles );
+    return BoundaryCondition<bc_index_type, UserFunctor>(
+        bc_indices, user_functor, force_update );
+}
+
+// Wrappers for single plane cases.
+template <class BoundaryType, class BCTag, class ExecSpace, class Particles>
+auto createBoundaryCondition( BCTag tag, const double value,
+                              ExecSpace exec_space, Particles particles,
+                              BoundaryType plane,
+                              const double initial_guess = 0.5 )
+{
+    std::vector<BoundaryType> plane_vec = { plane };
+    return createBoundaryCondition( tag, value, exec_space, particles,
+                                    plane_vec, initial_guess );
+}
+
+template <class UserFunctor, class BoundaryType, class ExecSpace,
+          class Particles>
+auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
+                              Particles particles, BoundaryType plane,
+                              const bool force_update,
+                              const double initial_guess = 0.5 )
+{
+    std::vector<BoundaryType> plane_vec = { plane };
+    return createBoundaryCondition( user_functor, exec_space, particles,
+                                    plane_vec, force_update, initial_guess );
 }
 
 } // namespace CabanaPD
