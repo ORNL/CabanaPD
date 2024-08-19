@@ -23,10 +23,10 @@ struct Fracture
 };
 
 // Thermal types.
-struct TemperatureDependent
+struct TemperatureIndependent
 {
 };
-struct TemperatureIndependent
+struct TemperatureDependent
 {
 };
 struct DynamicTemperature : public TemperatureDependent

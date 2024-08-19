@@ -55,8 +55,8 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
-            const double coeff = model.thermal_coeff *
-                                 model.conductivity_function( xi ) / model.cp;
+            const double coeff =
+                model.thermal_coeff * model.conductivity_function( xi );
             prev_temp( i ) +=
                 coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
         };
@@ -73,13 +73,14 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
     void stepEuler( const ParticleType& particles, const double dt )
     {
         _euler_timer.start();
+        auto model = _model;
         const auto rho = particles.sliceDensity();
         const auto prev_temp = particles.slicePreviousTemperature();
         auto temp = particles.sliceTemperature();
         auto n_local = particles.n_local;
         auto euler_func = KOKKOS_LAMBDA( const int i )
         {
-            temp( i ) += dt / rho( i ) * prev_temp( i );
+            temp( i ) += dt / rho( i ) / model.cp * prev_temp( i );
         };
         Kokkos::RangePolicy<ExecutionSpace> policy( 0, n_local );
         Kokkos::parallel_for( "CabanaPD::HeatTransfer::Euler", policy,
