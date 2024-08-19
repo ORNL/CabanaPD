@@ -99,8 +99,8 @@ void kalthoffWinklerExample( const std::string filename )
     double dx = particles->dx[0];
     double x_bc = -0.5 * height;
     CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane(
-        x_bc - dx, x_bc + dx * 1.25, y_prenotch1 - dx * 0.25,
-        y_prenotch2 + dx * 0.25, -thickness, thickness );
+        x_bc - dx, x_bc + dx, y_prenotch1 - 0.25 * dx, y_prenotch2 + 0.25 * dx,
+        -thickness, thickness );
     auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
                                        exec_space{}, *particles, plane );
 
