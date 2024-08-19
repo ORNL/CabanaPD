@@ -105,13 +105,13 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     //                   Boundary condition
     // ====================================================
     // EXAMPLE 1: Temperature profile imposed over entire domain
+    using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
     /*
-        // EXAMPLE 1: Temperature profile imposed over entire domain
-        CabanaPD::RegionBoundary plane( low_corner[0], high_corner[0],
+        plane_type plane( low_corner[0], high_corner[0],
                                         low_corner[1], high_corner[1],
                                         low_corner[2], high_corner[2] );
 
-        std::vector<CabanaPD::RegionBoundary> planes = { plane };
+        std::vector<plane_type> planes = { plane };
     */
 
     // EXAMPLE 2: Temperature profile imposed on top, bottom, left, and right
@@ -119,52 +119,47 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     double dx = particles->dx[0];
     double dy = particles->dx[1];
     // Top surface
-    CabanaPD::RegionBoundary plane1( low_corner[0], high_corner[0],
-                                     high_corner[1] - dy, high_corner[1] + dy,
-                                     low_corner[2], high_corner[2] );
+    plane_type plane1( low_corner[0], high_corner[0], high_corner[1] - dy,
+                       high_corner[1] + dy, low_corner[2], high_corner[2] );
 
     // Bottom surface
-    CabanaPD::RegionBoundary plane2( low_corner[0], high_corner[0],
-                                     low_corner[1] - dy, low_corner[1] + dy,
-                                     low_corner[2], high_corner[2] );
+    plane_type plane2( low_corner[0], high_corner[0], low_corner[1] - dy,
+                       low_corner[1] + dy, low_corner[2], high_corner[2] );
 
     // Left surface
-    CabanaPD::RegionBoundary plane3( low_corner[0] - dx, low_corner[0] + dx,
-                                     low_corner[1], high_corner[1],
-                                     low_corner[2], high_corner[2] );
+    plane_type plane3( low_corner[0] - dx, low_corner[0] + dx, low_corner[1],
+                       high_corner[1], low_corner[2], high_corner[2] );
 
     // Right surface
-    CabanaPD::RegionBoundary plane4( high_corner[0] - dx, high_corner[0] + dx,
-                                     low_corner[1], high_corner[1],
-                                     low_corner[2], high_corner[2] );
+    plane_type plane4( high_corner[0] - dx, high_corner[0] + dx, low_corner[1],
+                       high_corner[1], low_corner[2], high_corner[2] );
 
-    std::vector<CabanaPD::RegionBoundary> planes = { plane1, plane2, plane3,
-                                                     plane4 };
+    std::vector<plane_type> planes = { plane1, plane2, plane3, plane4 };
 
     /*
         // EXAMPLE 3: Temperature profile imposed on top, bottom, left, and
        right
         // nonlocal boundaries (width delta) Top surface
-        CabanaPD::RegionBoundary plane1(
+        plane_type plane1(
             low_corner[0], high_corner[0], high_corner[1] - delta,
             high_corner[1] + delta, low_corner[2], high_corner[2] );
 
         // Bottom surface
-        CabanaPD::RegionBoundary plane2(
+        plane_type plane2(
             low_corner[0], high_corner[0], low_corner[1] - delta,
             low_corner[1] + delta, low_corner[2], high_corner[2] );
 
         // Left surface
-        CabanaPD::RegionBoundary plane3(
+        plane_type plane3(
             low_corner[0] - delta, low_corner[0] + delta, low_corner[1],
             high_corner[1], low_corner[2], high_corner[2] );
 
         // Right surface
-        CabanaPD::RegionBoundary plane4(
+        plane_type plane4(
             high_corner[0] - delta, high_corner[0] + delta, low_corner[1],
             high_corner[1], low_corner[2], high_corner[2] );
 
-        std::vector<CabanaPD::RegionBoundary> planes = { plane1, plane2, plane3,
+        std::vector<plane_type> planes = { plane1, plane2, plane3,
                                                          plane4 };
     */
 
