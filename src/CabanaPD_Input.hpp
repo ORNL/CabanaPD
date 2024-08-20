@@ -18,6 +18,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <CabanaPD_Constants.hpp>
 #include <CabanaPD_Output.hpp>
 
 namespace CabanaPD
@@ -125,8 +126,7 @@ class Inputs
         double K = inputs["bulk_modulus"]["value"];
         double delta = inputs["horizon"]["value"];
         // FIXME: this is copied from the forces
-        double c =
-            18.0 * K / ( 3.141592653589793 * delta * delta * delta * delta );
+        double c = 18.0 * K / ( pi * delta * delta * delta * delta );
 
         for ( int i = -( m + 1 ); i < m + 2; i++ )
         {

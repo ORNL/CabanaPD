@@ -9,29 +9,16 @@
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef CABANAPD_HPP
-#define CABANAPD_HPP
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
 
-#include <CabanaPD_BodyTerm.hpp>
-#include <CabanaPD_Boundary.hpp>
-#include <CabanaPD_Comm.hpp>
-#include <CabanaPD_Constants.hpp>
-#include <CabanaPD_DisplacementProfile.hpp>
-#include <CabanaPD_Fields.hpp>
-#include <CabanaPD_Force.hpp>
-#include <CabanaPD_ForceModels.hpp>
-#include <CabanaPD_Input.hpp>
-#include <CabanaPD_Integrate.hpp>
-#include <CabanaPD_Output.hpp>
-#include <CabanaPD_Particles.hpp>
-#include <CabanaPD_Prenotch.hpp>
-#include <CabanaPD_Solver.hpp>
-#include <CabanaPD_Types.hpp>
-#include <CabanaPD_config.hpp>
+#include "mpi.h"
 
-#include <force/CabanaPD_ForceModels_LPS.hpp>
-#include <force/CabanaPD_ForceModels_PMB.hpp>
-#include <force/CabanaPD_Force_LPS.hpp>
-#include <force/CabanaPD_Force_PMB.hpp>
+namespace CabanaPD
+{
 
+// FIXME: Kokkos::numbers::pi_v<double> when minimum 4.0 is required.
+constexpr double pi = M_PI;
+
+} // namespace CabanaPD
 #endif

@@ -12,6 +12,7 @@
 #ifndef FORCE_MODELS_PMB_H
 #define FORCE_MODELS_PMB_H
 
+#include <CabanaPD_Constants.hpp>
 #include <CabanaPD_ForceModels.hpp>
 #include <CabanaPD_Types.hpp>
 
@@ -48,7 +49,7 @@ struct ForceModel<PMB, Elastic, TemperatureIndependent> : public BaseForceModel
     {
         delta = _delta;
         K = _K;
-        c = 18.0 * K / ( 3.141592653589793 * delta * delta * delta * delta );
+        c = 18.0 * K / ( pi * delta * delta * delta * delta );
     }
 };
 
