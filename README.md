@@ -119,6 +119,7 @@ CabanaPD currently includes the following:
    - Velocity Verlet
  - Pre-crack creation
  - Particle boundary conditions
+ - Grid-based particle generation supporting custom geometry
 
 ## Examples
 
