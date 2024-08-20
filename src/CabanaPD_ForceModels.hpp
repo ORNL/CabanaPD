@@ -64,12 +64,19 @@ struct BaseForceModel
         : delta( view_type_1d( "delta", _delta.size() ) )
         , num_types( _delta.size() )
     {
+        setParameters( _delta );
+    }
+
+    template <typename ArrayType>
+    void setParameters( const ArrayType& _delta )
+    {
         max_delta = 0;
-        auto init_func = KOKKOS_CLASS_LAMBDA( const int i, double& max )
+        auto delta_copy = delta;
+        auto init_func = KOKKOS_LAMBDA( const int i, double& max )
         {
-            delta( i ) = _delta[i];
-            if ( delta( i ) > max )
-                max = delta( i );
+            delta_copy( i ) = _delta[i];
+            if ( delta_copy( i ) > max )
+                max = delta_copy( i );
         };
         using exec_space = typename memory_space::execution_space;
         Kokkos::RangePolicy<exec_space> policy( 0, num_types );
@@ -99,7 +106,6 @@ struct BaseTemperatureModel<TemperatureType, SingleSpecies>
     // Temperature field
     TemperatureType temperature;
 
-    BaseTemperatureModel(){};
     BaseTemperatureModel( const TemperatureType _temp, const double _alpha,
                           const double _temp0 )
         : alpha( _alpha )
@@ -131,17 +137,25 @@ struct BaseTemperatureModel
     ParticleType type;
 
     template <typename ArrayType>
-    BaseTemperatureModel( const TemperatureType& _temp, const ArrayType _alpha,
-                          const ArrayType _temp0, const ParticleType& _type )
+    BaseTemperatureModel( const TemperatureType& _temp, const ArrayType& _alpha,
+                          const ArrayType& _temp0, const ParticleType& _type )
         : alpha( view_type_1d( "delta", _alpha.size() ) )
         , temp0( view_type_1d( "delta", _temp0.size() ) )
         , temperature( _temp )
         , type( _type )
     {
-        auto init_func = KOKKOS_CLASS_LAMBDA( const int i )
+        setParameters( _alpha, _temp0 );
+    }
+
+    template <typename ArrayType>
+    void setParameters( const ArrayType& _alpha, const ArrayType& _temp0 )
+    {
+        auto alpha_copy = alpha;
+        auto temp0_copy = temp0;
+        auto init_func = KOKKOS_LAMBDA( const int i )
         {
-            alpha( i ) = _alpha[i];
-            temp0( i ) = _temp0[i];
+            alpha_copy( i ) = _alpha[i];
+            temp0_copy( i ) = _temp0[i];
         };
         using exec_space = typename memory_space::execution_space;
         Kokkos::RangePolicy<exec_space> policy( 0, alpha.size() );

@@ -91,25 +91,30 @@ struct ForceModel<PMB, Elastic, TemperatureIndependent, ParticleType>
     template <typename ArrayType>
     void setParameters( const ArrayType& _K )
     {
-        // Initialize self interaction parameters.
-        auto init_self_func = KOKKOS_CLASS_LAMBDA( const int i )
+        // Initialize per-type variables.
+        auto K_copy = K;
+        auto init_self_func = KOKKOS_LAMBDA( const int i )
         {
-            K( i ) = _K[i];
-            c( i, i ) = micromodulus( i );
+            K_copy( i ) = _K[i];
         };
         using exec_space = typename memory_space::execution_space;
         Kokkos::RangePolicy<exec_space> policy( 0, num_types );
-        Kokkos::parallel_for( "CabanaPD::Model::Init", policy, init_self_func );
+        Kokkos::parallel_for( "CabanaPD::Model::Copy", policy, init_self_func );
         Kokkos::fence();
 
-        // Initialize cross-terms.
-        auto init_cross_func = KOKKOS_CLASS_LAMBDA( const int i )
+        // Initialize model parameters.
+        Kokkos::parallel_for( "CabanaPD::Model::Init", policy, *this );
+    }
+
+    KOKKOS_INLINE_FUNCTION void operator()( const int i ) const
+    {
+        c( i, i ) = micromodulus( i );
+        for ( std::size_t j = i; j < num_types; j++ )
         {
-            for ( std::size_t j = i; j < num_types; j++ )
-                c( i, j ) = ( micromodulus( i ) + micromodulus( j ) ) / 2.0;
-        };
-        Kokkos::parallel_for( "CabanaPD::Model::Init", policy,
-                              init_cross_func );
+            c( i, j ) = ( micromodulus( i ) + micromodulus( j ) ) / 2.0;
+            // Set symmetric cross-terms.
+            c( j, i ) = c( i, j );
+        }
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -217,13 +222,11 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent, ParticleType>
     template <typename ArrayType>
     void setParameters( const ArrayType& _G0 )
     {
-        // Initialize self interaction parameters.
-        auto init_self_func = KOKKOS_CLASS_LAMBDA( const int i )
+        // Initialize per-type variables.
+        auto G0_copy = G0;
+        auto init_self_func = KOKKOS_LAMBDA( const int i )
         {
-            G0( i ) = _G0[i];
-            s0( i, i ) = criticalStretch( i );
-            bond_break_coeff( i, i ) =
-                ( 1.0 + s0( i, i ) ) * ( 1.0 + s0( i, i ) );
+            G0_copy( i ) = _G0[i];
         };
         using exec_space = typename memory_space::execution_space;
         Kokkos::RangePolicy<exec_space> policy( 0, num_types );
@@ -231,17 +234,23 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent, ParticleType>
         Kokkos::fence();
 
         // Initialize cross-terms.
-        auto init_cross_func = KOKKOS_CLASS_LAMBDA( const int i )
+        Kokkos::parallel_for( "CabanaPD::Model::Init", policy, *this );
+    }
+
+    KOKKOS_INLINE_FUNCTION void operator()( const int i ) const
+    {
+        s0( i, i ) = criticalStretch( i );
+        bond_break_coeff( i, i ) = ( 1.0 + s0( i, i ) ) * ( 1.0 + s0( i, i ) );
+
+        for ( std::size_t j = i; j < num_types; j++ )
         {
-            for ( std::size_t j = i; j < num_types; j++ )
-            {
-                s0( i, j ) = criticalStretch( i, j );
-                bond_break_coeff( i, j ) =
-                    ( 1.0 + s0( i, j ) ) * ( 1.0 + s0( i, j ) );
-            }
-        };
-        Kokkos::parallel_for( "CabanaPD::Model::Init", policy,
-                              init_cross_func );
+            s0( i, j ) = criticalStretch( i, j );
+            bond_break_coeff( i, j ) =
+                ( 1.0 + s0( i, j ) ) * ( 1.0 + s0( i, j ) );
+            // Set symmetric cross-terms.
+            s0( j, i ) = s0( i, j );
+            bond_break_coeff( j, i ) = bond_break_coeff( i, j );
+        }
     }
 
     KOKKOS_INLINE_FUNCTION
