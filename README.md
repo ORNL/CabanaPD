@@ -115,6 +115,7 @@ CabanaPD currently includes the following:
    - Elastic (no failure)
    - Brittle fracture
  - Thermomechanics (bond-based only)
+   - Optional heat transfer (elastic only)
  - Time integration
    - Velocity Verlet
  - Pre-crack creation
