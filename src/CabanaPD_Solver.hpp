@@ -103,6 +103,7 @@ class SolverElastic
     using force_model_type = ForceModel;
     using force_type = Force<exec_space, force_model_type>;
     using comm_type = Comm<particle_type, typename force_model_type::base_model,
+                           typename force_model_type::species_type,
                            typename force_model_type::thermal_type>;
     using neighbor_type =
         Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
@@ -128,7 +129,10 @@ class SolverElastic
         // Add ghosts from other MPI ranks.
         comm = std::make_shared<comm_type>( *particles );
 
-        // Update temperature ghost size if needed.
+        // Update optional property ghost sizes if needed.
+        if constexpr ( std::is_same<typename force_model_type::species_type,
+                                    MultiSpecies>::value )
+            force_model.update( particles->sliceType() );
         if constexpr ( std::is_same<typename force_model_type::thermal_type,
                                     TemperatureDependent>::value )
             force_model.update( particles->sliceTemperature() );
@@ -146,8 +150,8 @@ class SolverElastic
                                particles->ghost_mesh_hi[2] };
         auto x = particles->sliceReferencePosition();
         neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
-                                                     force_model.delta, 1.0,
-                                                     mesh_min, mesh_max );
+                                                     force_model.maxHorizon(),
+                                                     1.0, mesh_min, mesh_max );
         _neighbor_timer.stop();
 
         _init_timer.start();
@@ -229,7 +233,10 @@ class SolverElastic
         if ( !boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space(), *particles, 0.0 );
 
-        // Communicate temperature.
+        // Communicate optional properties.
+        if constexpr ( std::is_same<typename force_model_type::species_type,
+                                    MultiSpecies>::value )
+            comm->gatherSpecies();
         if constexpr ( std::is_same<typename force_model_type::thermal_type,
                                     TemperatureDependent>::value )
             comm->gatherTemperature();
@@ -269,6 +276,11 @@ class SolverElastic
             // Update ghost particles.
             comm->gatherDisplacement();
 
+            // Communicate optional type.
+            if constexpr ( std::is_same<typename force_model_type::species_type,
+                                        MultiSpecies>::value )
+                comm->gatherSpecies();
+
             // Compute internal forces.
             updateForce();
 
@@ -300,6 +312,11 @@ class SolverElastic
 
             // Update ghost particles.
             comm->gatherDisplacement();
+
+            // Communicate optional properties.
+            if constexpr ( std::is_same<typename force_model_type::species_type,
+                                        MultiSpecies>::value )
+                comm->gatherSpecies();
 
             // Compute internal forces.
             updateForce();
@@ -522,7 +539,10 @@ class SolverFracture
         if ( !boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space(), *particles, 0.0 );
 
-        // Communicate temperature.
+        // Communicate optional properties.
+        if constexpr ( std::is_same<typename force_model_type::species_type,
+                                    MultiSpecies>::value )
+            comm->gatherSpecies();
         if constexpr ( std::is_same<typename force_model_type::thermal_type,
                                     TemperatureDependent>::value )
             comm->gatherTemperature();
@@ -562,6 +582,11 @@ class SolverFracture
             // Update ghost particles.
             comm->gatherDisplacement();
 
+            // Communicate optional type.
+            if constexpr ( std::is_same<typename force_model_type::species_type,
+                                        MultiSpecies>::value )
+                comm->gatherSpecies();
+
             // Compute internal forces.
             updateForce();
 
@@ -597,6 +622,10 @@ class SolverFracture
 
             // Update ghost particles.
             comm->gatherDisplacement();
+            // Communicate optional properties.
+            if constexpr ( std::is_same<typename force_model_type::species_type,
+                                        MultiSpecies>::value )
+                comm->gatherSpecies();
 
             // Compute internal forces.
             updateForce();

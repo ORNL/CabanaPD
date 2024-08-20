@@ -69,21 +69,25 @@
 
 namespace CabanaPD
 {
-template <class ExecutionSpace>
-class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
+template <class ExecutionSpace, class... ModelParams>
+class Force<ExecutionSpace, ForceModel<LPS, Elastic, ModelParams...>>
+    : public ForceBase
 {
-  protected:
-    bool _half_neigh;
-    ForceModel<LPS, Elastic> _model;
-
-    Timer _timer;
-    Timer _energy_timer;
-
   public:
     using exec_space = ExecutionSpace;
+    using model_type = ForceModel<LPS, Elastic, ModelParams...>;
+    using base_type = ForceBase;
 
+  protected:
+    using base_type::_half_neigh;
+    model_type _model;
+
+    using base_type::_energy_timer;
+    using base_type::_timer;
+
+  public:
     Force( const bool half_neigh, const ForceModel<LPS, Elastic> model )
-        : _half_neigh( half_neigh )
+        : base_type( half_neigh )
         , _model( model )
     {
     }
@@ -247,9 +251,6 @@ class Force<ExecutionSpace, ForceModel<LPS, Elastic>>
         _energy_timer.stop();
         return strain_energy;
     }
-
-    auto time() { return _timer.time(); };
-    auto timeEnergy() { return _energy_timer.time(); };
 };
 
 template <class ExecutionSpace>
@@ -498,22 +499,25 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
     }
 };
 
-template <class ExecutionSpace>
-class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic>>
-    : public Force<ExecutionSpace, ForceModel<LPS, Elastic>>
+template <class ExecutionSpace, class... ModelParams>
+class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic, ModelParams...>>
+    : public Force<ExecutionSpace, ForceModel<LPS, Elastic, ModelParams...>>
 {
+  public:
+    using exec_space = ExecutionSpace;
+    using model_type = ForceModel<LPS, Elastic, ModelParams...>;
+    using base_type =
+        Force<ExecutionSpace, ForceModel<LPS, Elastic, ModelParams...>>;
+
   protected:
-    using base_type = Force<ExecutionSpace, ForceModel<LPS, Elastic>>;
     using base_type::_half_neigh;
-    ForceModel<LinearLPS, Elastic> _model;
+    model_type _model;
 
     using base_type::_energy_timer;
     using base_type::_timer;
 
   public:
-    using exec_space = ExecutionSpace;
-
-    Force( const bool half_neigh, const ForceModel<LinearLPS, Elastic> model )
+    Force( const bool half_neigh, const model_type model )
         : base_type( half_neigh, model )
         , _model( model )
     {
