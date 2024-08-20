@@ -731,15 +731,15 @@ class Particles<MemorySpace, PMB, TemperatureDependent, Dimension>
     {
         return Cabana::slice<0>( _aosoa_temp, "temperature" );
     }
-    auto slicePreviousTemperature()
+    auto sliceTemperatureConduction()
     {
-        return Cabana::slice<1>( _aosoa_temp, "previous_temperature" );
+        return Cabana::slice<1>( _aosoa_temp, "temperature_conduction" );
     }
-    auto slicePreviousTemperature() const
+    auto sliceTemperatureConduction() const
     {
-        return Cabana::slice<1>( _aosoa_temp, "previous_temperature" );
+        return Cabana::slice<1>( _aosoa_temp, "temperature_conduction" );
     }
-    auto slicePreviousTemperatureAtomic()
+    auto sliceTemperatureConductionAtomic()
     {
         auto temp = sliceTemperature();
         using slice_type = decltype( temp );
