@@ -44,7 +44,6 @@ void elasticWaveExample( const std::string filename )
     // ====================================================
     //                  Discretization
     // ====================================================
-    // FIXME: set halo width based on delta
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
@@ -62,10 +61,7 @@ void elasticWaveExample( const std::string filename )
     // ====================================================
     //                 Particle generation
     // ====================================================
-    // Does not set displacements, velocities, etc.
-    auto particles = std::make_shared<
-        CabanaPD::Particles<memory_space, typename model_type::base_model,
-                            typename model_type::thermal_type>>(
+    auto particles = CabanaPD::createParticles<memory_space, model_type>(
         exec_space(), low_corner, high_corner, num_cells, halo_width );
 
     // ====================================================
