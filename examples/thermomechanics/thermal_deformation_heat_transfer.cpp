@@ -134,8 +134,8 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     plane_type plane4( high_corner[0] - dx, high_corner[0] + dx, low_corner[1],
                        high_corner[1], low_corner[2], high_corner[2] );
 
-    std::vector<plane_type> planes = { plane1, plane2, plane3, plane4 };
-
+    // std::vector<plane_type> planes = { plane1, plane2, plane3, plane4 };
+    std::vector<plane_type> planes = { plane1, plane2 };
     /*
         // EXAMPLE 3: Temperature profile imposed on top, bottom, left, and
        right
