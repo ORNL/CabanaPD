@@ -135,7 +135,8 @@ void thermalDeformationHeatTransferExample( const std::string filename )
                        high_corner[1], low_corner[2], high_corner[2] );
 
     // std::vector<plane_type> planes = { plane1, plane2, plane3, plane4 };
-    std::vector<plane_type> planes = { plane1, plane2 };
+    // std::vector<plane_type> planes = { plane1, plane2 };
+    std::vector<plane_type> planes = { plane3, plane4 };
     /*
         // EXAMPLE 3: Temperature profile imposed on top, bottom, left, and
        right
@@ -171,7 +172,8 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // particles are correctly taken into account for lambda capture here.
     auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
-        temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
+        // temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
+        temp( pid ) = 0.0;
     };
     auto bc = CabanaPD::createBoundaryCondition(
         temp_func, exec_space{}, *particles, planes, false, 1.0 );
