@@ -9,7 +9,7 @@
     "reference_temperature"   : {"value": 100.0, "unit": "oC"},
     "horizon"                 : {"value": 0.0075, "unit": "m"},  
     "final_time"              : {"value": 8, "unit": "s"},
-    "timestep"                : {"value": 0.0233, "unit": "s"},
-    "output_frequency"        : {"value": 100},
+    "timestep"                : {"value": 5.1e-8, "unit": "s"},
+    "output_frequency"        : {"value": 1},
     "output_reference"        : {"value": true}
 }
