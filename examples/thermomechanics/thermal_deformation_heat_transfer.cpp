@@ -187,6 +187,17 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // ====================================================
     //                      Outputs
     // ====================================================
+
+    // Output temperature along the x-axis
+    auto temp_output = particles->sliceTemperature();
+    auto value = KOKKOS_LAMBDA( const int pid ) { return temp_output( pid ); };
+
+    int profile_dim = 0;
+    std::string file_name = "temperature_xaxis_profile.txt";
+    createOutputProfile( MPI_COMM_WORLD, num_cells[0], profile_dim, file_name,
+                         *particles, value );
+
+    /*
     // Output y-displacement along the x-axis
     createDisplacementProfile( MPI_COMM_WORLD,
                                "ydisplacement_xaxis_profile.txt", *particles,
@@ -206,6 +217,8 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     createDisplacementMagnitudeProfile(
         MPI_COMM_WORLD, "displacement_magnitude_yaxis_profile.txt", *particles,
         num_cells[1], 1 );
+
+    */
 }
 
 // Initialize MPI+Kokkos.
