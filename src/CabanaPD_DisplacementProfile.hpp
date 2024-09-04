@@ -46,7 +46,6 @@ void createOutputProfile( MPI_Comm comm, const int num_cell,
     double dx2 = particles.dx[dims[1]];
 
     auto x = particles.sliceReferencePosition();
-    auto u = particles.sliceDisplacement();
     auto measure_profile = KOKKOS_LAMBDA( const int pid )
     {
         if ( x( pid, dims[0] ) < dx1 / 2.0 && x( pid, dims[0] ) > -dx1 / 2.0 &&
