@@ -59,8 +59,7 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
-            const double coeff =
-                model.thermal_coeff * model.conductivity_function( xi );
+            const double coeff = model.conductivity_function( xi );
             conduction( i ) +=
                 coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
         };
