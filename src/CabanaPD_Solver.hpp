@@ -141,9 +141,11 @@ class SolverElastic
         // Create heat transfer if needed.
         if constexpr ( std::is_same<typename force_model_type::thermal_type,
                                     DynamicTemperature>::value )
+        {
+            thermal_subcycle_steps = inputs["thermal_subcycle_steps"];
             heat_transfer = std::make_shared<heat_transfer_type>(
                 inputs["half_neigh"], force_model );
-
+        }
         force =
             std::make_shared<force_type>( inputs["half_neigh"], force_model );
 
@@ -274,8 +276,11 @@ class SolverElastic
 
             if constexpr ( std::is_same<typename force_model_type::thermal_type,
                                         DynamicTemperature>::value )
-                computeHeatTransfer( *heat_transfer, *particles, *neighbors,
-                                     neigh_iter_tag{}, dt );
+            {
+                if ( step % thermal_subcycle_steps == 0 )
+                    computeHeatTransfer( *heat_transfer, *particles, *neighbors,
+                                         neigh_iter_tag{}, dt );
+            }
             if constexpr ( std::is_same<typename force_model_type::thermal_type,
                                         TemperatureDependent>::value )
                 comm->gatherTemperature();
@@ -444,6 +449,7 @@ class SolverElastic
     int output_frequency;
     bool output_reference;
     double dt;
+    int thermal_subcycle_steps;
 
   protected:
     // Core modules.
