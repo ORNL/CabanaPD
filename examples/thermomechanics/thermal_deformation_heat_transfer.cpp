@@ -118,24 +118,36 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // surfaces
     double dx = particles->dx[0];
     double dy = particles->dx[1];
-    // Top surface
-    plane_type plane1( low_corner[0], high_corner[0], high_corner[1] - dy,
+    double dz = particles->dx[2];
+
+    // Left surface: x-direction
+    plane_type plane1( low_corner[0] - dx, low_corner[0] + dx, low_corner[1],
+                       high_corner[1], low_corner[2], high_corner[2] );
+
+    // Right surface: x-direction
+    plane_type plane2( high_corner[0] - dx, high_corner[0] + dx, low_corner[1],
+                       high_corner[1], low_corner[2], high_corner[2] );
+
+    // Top surface: y-direction
+    plane_type plane3( low_corner[0], high_corner[0], high_corner[1] - dy,
                        high_corner[1] + dy, low_corner[2], high_corner[2] );
 
-    // Bottom surface
-    plane_type plane2( low_corner[0], high_corner[0], low_corner[1] - dy,
+    // Bottom surface: y-direction
+    plane_type plane4( low_corner[0], high_corner[0], low_corner[1] - dy,
                        low_corner[1] + dy, low_corner[2], high_corner[2] );
 
-    // Left surface
-    plane_type plane3( low_corner[0] - dx, low_corner[0] + dx, low_corner[1],
-                       high_corner[1], low_corner[2], high_corner[2] );
+    // Front surface: z-direction
+    plane_type plane5( low_corner[0], high_corner[0], low_corner[1],
+                       high_corner[1], low_corner[2] - dz, low_corner[2] + dz );
 
-    // Right surface
-    plane_type plane4( high_corner[0] - dx, high_corner[0] + dx, low_corner[1],
-                       high_corner[1], low_corner[2], high_corner[2] );
+    // Back surface: z-direction
+    plane_type plane6( low_corner[0], high_corner[0], low_corner[1],
+                       high_corner[1], high_corner[2] - dz,
+                       high_corner[2] + dz );
 
     // std::vector<plane_type> planes = { plane1, plane2, plane3, plane4 };
-    // std::vector<plane_type> planes = { plane1, plane2 };
+    // std::vector<plane_type> planes = { plane1, plane2, plane3, plane4,
+    // plane5, plane6 }; std::vector<plane_type> planes = { plane1, plane2 };
     std::vector<plane_type> planes = { plane3, plane4 };
     /*
         // EXAMPLE 3: Temperature profile imposed on top, bottom, left, and
