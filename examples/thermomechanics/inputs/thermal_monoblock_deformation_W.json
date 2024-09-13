@@ -1,0 +1,17 @@
+{
+    "num_cells"               : {"value": [51, 51, 21]},
+    "system_size"             : {"value": [0.028, 0.028, 0.012], "unit": "m"},
+    "cylindrical_hole"        : {"value": [0.0, -0.0005, 0.0085], "unit": "m"},
+    "density"                 : {"value": 19300,  "unit": "kg/m^3"},
+    "elastic_modulus"         : {"value": 400e+9, "unit": "Pa"},
+    "thermal_expansion_coeff" : {"value": 4.4E-6, "unit": "oC^{-1}"},
+    "thermal_conductivity"    : {"value": 146, "unit": "W/(m.K)"},
+    "specific_heat_capacity"  : {"value": 134, "unit": "J/(kg.K)"},
+    "reference_temperature"   : {"value": 150.0, "unit": "oC"},
+    "horizon"                 : {"value": 0.0017, "unit": "m"},  
+    "final_time"              : {"value": 1, "unit": "s"},
+    "timestep"                : {"value": 0.0014,  "unit": "s"},
+    "thermal_subcycle_steps"  : {"value": 1},
+    "output_frequency"        : {"value": 10},
+    "output_reference"        : {"value": true}
+}

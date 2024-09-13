@@ -1,0 +1,16 @@
+{
+    "num_cells"             : {"value": [251, 51, 5]},
+    "system_size"           : {"value": [0.05, 0.01, 0.001], "unit": "m"},
+    "density"               : {"value": 3980, "unit": "kg/m^3"},
+    "elastic_modulus"       : {"value": 370e+9, "unit": "Pa"},
+    "fracture_energy"       : {"value": 24.32, "unit": "J/m^2"},
+    "thermal_coefficient"   : {"value": 7.5E-6, "unit": "oC^{-1}"},
+    "reference_temperature" : {"value": 300.0, "unit": "oC"},
+    "water_temperature"     : {"value": 20.0, "unit": "oC"},
+    "pulse_ramping_time"    : {"value": 0.001, "unit": "s"},
+    "horizon"               : {"value": 6.0e-4, "unit": "m"},  
+    "final_time"            : {"value": 0.002, "unit": "s"},
+    "timestep"              : {"value": 3E-8, "unit": "s"},
+    "output_frequency"      : {"value": 500},
+    "output_reference"      : {"value": false}
+}
