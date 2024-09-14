@@ -119,6 +119,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // ====================================================
     //                   Boundary condition
     // ====================================================
+
     // EXAMPLE 1: Temperature profile imposed over entire domain
     using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
     /*
@@ -207,11 +208,27 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     auto bc = CabanaPD::createBoundaryCondition(
         temp_func, exec_space{}, *particles, planes, false, 1.0 );
 
+    // Boundary condition on cooling channel
+    using cylinder_type = CabanaPD::RegionBoundary<CabanaPD::Cylinder>;
+    cylinder_type cylinder1( radius - dx, radius + dx, low_corner[2],
+                             high_corner[2], x_center, y_center );
+
+    auto temp_func2 = KOKKOS_LAMBDA( const int pid, const double t )
+    {
+        temp( pid ) = temp0;
+    };
+
+    auto bc2 = CabanaPD::createBoundaryCondition(
+        temp_func2, exec_space{}, *particles, cylinder1, false, 1.0 );
+
     // ====================================================
     //                   Simulation run
     // ====================================================
     cabana_pd->init( bc );
     cabana_pd->run( bc );
+
+    // cabana_pd->init( bc2 );
+    // cabana_pd->run( bc2 );
 
     // ====================================================
     //                      Outputs
