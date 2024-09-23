@@ -15,10 +15,17 @@
 namespace CabanaPD
 {
 // Mechanics types.
-struct Elastic
+struct NoFracture
 {
 };
 struct Fracture
+{
+};
+
+struct Elastic
+{
+};
+struct Plastic
 {
 };
 
@@ -27,6 +34,7 @@ struct TemperatureIndependent
 {
     using base_type = TemperatureIndependent;
 };
+
 struct TemperatureDependent
 {
     using base_type = TemperatureDependent;

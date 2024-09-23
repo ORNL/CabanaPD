@@ -93,7 +93,7 @@ class SolverBase
 
 template <class MemorySpace, class InputType, class ParticleType,
           class ForceModel>
-class SolverElastic
+class SolverNoFracture
 {
   public:
     using memory_space = MemorySpace;
@@ -115,9 +115,9 @@ class SolverElastic
     // Optional module types.
     using heat_transfer_type = HeatTransfer<exec_space, force_model_type>;
 
-    SolverElastic( input_type _inputs,
-                   std::shared_ptr<particle_type> _particles,
-                   force_model_type force_model )
+    SolverNoFracture( input_type _inputs,
+                      std::shared_ptr<particle_type> _particles,
+                      force_model_type force_model )
         : inputs( _inputs )
         , particles( _particles )
         , _init_time( 0.0 )
@@ -479,11 +479,11 @@ class SolverElastic
 template <class MemorySpace, class InputType, class ParticleType,
           class ForceModel>
 class SolverFracture
-    : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>
+    : public SolverNoFracture<MemorySpace, InputType, ParticleType, ForceModel>
 {
   public:
     using base_type =
-        SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>;
+        SolverNoFracture<MemorySpace, InputType, ParticleType, ForceModel>;
     using exec_space = typename base_type::exec_space;
     using memory_space = typename base_type::memory_space;
 
@@ -697,12 +697,12 @@ class SolverFracture
 
 template <class MemorySpace, class InputsType, class ParticleType,
           class ForceModel>
-auto createSolverElastic( InputsType inputs,
-                          std::shared_ptr<ParticleType> particles,
-                          ForceModel model )
+auto createSolverNoFracture( InputsType inputs,
+                             std::shared_ptr<ParticleType> particles,
+                             ForceModel model )
 {
     return std::make_shared<
-        SolverElastic<MemorySpace, InputsType, ParticleType, ForceModel>>(
+        SolverNoFracture<MemorySpace, InputsType, ParticleType, ForceModel>>(
         inputs, particles, model );
 }
 
