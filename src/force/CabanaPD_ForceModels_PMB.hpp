@@ -101,6 +101,42 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent>
 };
 
 template <>
+struct ForceModel<PMB, Fracture, TemperatureIndependent, Plastic>
+    : public ForceModel<PMB, Fracture, TemperatureIndependent>
+{
+    using base_type = ForceModel<PMB, Fracture>;
+    using base_model = typename base_type::base_model;
+    using fracture_type = Fracture;
+    using thermal_type = base_type::thermal_type;
+
+    // Purposely not using the (static) base class bond_break_coeff
+    using base_type::c;
+    using base_type::delta;
+    using base_type::G0;
+    using base_type::K;
+    using base_type::s0;
+    double alpha = 0.25;
+
+    ForceModel() {}
+    ForceModel( const double delta, const double K, const double G0 )
+        : base_type( delta, K, G0 )
+    {
+    }
+
+    using base_type::minLocalStretch;
+
+    // Use the dynamic s0 from the minLocalStretch function, reused through the
+    // neighbor loop.
+    KOKKOS_INLINE_FUNCTION
+    bool criticalStretch( const int, const int, const double r, const double xi,
+                          const double s0_i ) const
+    {
+        double bond_break_coeff = ( 1.0 + s0_i ) * ( 1.0 + s0_i );
+        return r * r >= bond_break_coeff * xi * xi;
+    }
+};
+
+template <>
 struct ForceModel<LinearPMB, Elastic, TemperatureIndependent>
     : public ForceModel<PMB, Elastic, TemperatureIndependent>
 {
