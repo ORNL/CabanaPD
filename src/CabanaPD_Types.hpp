@@ -36,6 +36,9 @@ struct is_fracture<Fracture> : public std::true_type
 struct Elastic
 {
 };
+struct ElasticPerfectlyPlastic
+{
+};
 
 // Contact and DEM (contact without PD) tags.
 struct NoContact

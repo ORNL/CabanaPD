@@ -67,7 +67,8 @@ void crackBranchingExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type = CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
+    using model_type =
+        CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::ElasticPerfectlyPlastic>;
     model_type force_model( delta, K, G0 );
 
     // ====================================================
