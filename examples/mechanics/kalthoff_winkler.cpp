@@ -92,17 +92,6 @@ void kalthoffWinklerExample( const std::string filename )
         exec_space(), low_corner, high_corner, num_cells, halo_width );
 
     // ====================================================
-    //                Boundary conditions
-    // ====================================================
-    double dx = particles->dx[0];
-    double x_bc = -0.5 * height;
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane(
-        x_bc - dx, x_bc + dx, y_prenotch1 - 0.25 * dx, y_prenotch2 + 0.25 * dx,
-        -thickness, thickness );
-    auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
-                                       exec_space{}, *particles, plane );
-
-    // ====================================================
     //            Custom particle initialization
     // ====================================================
     auto rho = particles->sliceDensity();
@@ -110,6 +99,7 @@ void kalthoffWinklerExample( const std::string filename )
     auto v = particles->sliceVelocity();
     auto f = particles->sliceForce();
 
+    double dx = particles->dx[0];
     double v0 = inputs["impactor_velocity"];
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
@@ -127,6 +117,17 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
         inputs, particles, force_model, prenotch );
+
+    // ====================================================
+    //                Boundary conditions
+    // ====================================================
+    // Create BC last to ensure ghost particles are included.
+    double x_bc = -0.5 * height;
+    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane(
+        x_bc - dx, x_bc + dx, y_prenotch1 - 0.25 * dx, y_prenotch2 + 0.25 * dx,
+        -thickness, thickness );
+    auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
+                                       exec_space{}, *particles, plane );
 
     // ====================================================
     //                   Simulation run

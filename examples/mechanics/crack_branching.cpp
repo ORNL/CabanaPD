@@ -78,12 +78,9 @@ void crackBranchingExample( const std::string filename )
         exec_space{}, inputs );
 
     // ====================================================
-    //                Boundary conditions
+    //                Boundary conditions planes
     // ====================================================
-    double sigma0 = inputs["traction"];
     double dy = particles->dx[1];
-    double b0 = sigma0 / dy;
-
     CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane1(
         low_corner[0], high_corner[0], low_corner[1] - dy, low_corner[1] + dy,
         low_corner[2], high_corner[2] );
@@ -92,21 +89,6 @@ void crackBranchingExample( const std::string filename )
         low_corner[2], high_corner[2] );
     std::vector<CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>> planes = {
         plane1, plane2 };
-    auto particles_f = particles->getForce();
-    auto particles_x = particles->getReferencePosition();
-    // Create a symmetric force BC in the y-direction.
-    auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
-    {
-        // Get a modifiable copy of force.
-        auto p_f = particles_f.getParticleView( pid );
-        // Get a copy of the position.
-        auto p_x = particles_x.getParticle( pid );
-        auto ypos = Cabana::get( p_x, CabanaPD::Field::ReferencePosition(), 1 );
-        auto sign = std::abs( ypos ) / ypos;
-        Cabana::get( p_f, CabanaPD::Field::Force(), 1 ) += b0 * sign;
-    };
-    auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, planes,
-                                       true );
 
     // ====================================================
     //            Custom particle initialization
@@ -133,6 +115,24 @@ void crackBranchingExample( const std::string filename )
     // ====================================================
     auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
         inputs, particles, force_model, prenotch );
+
+    // ====================================================
+    //                Boundary conditions
+    // ====================================================
+    // Create BC last to ensure ghost particles are included.
+    double sigma0 = inputs["traction"];
+    double b0 = sigma0 / dy;
+    f = particles->sliceForce();
+    x = particles->sliceReferencePosition();
+    // Create a symmetric force BC in the y-direction.
+    auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
+    {
+        auto ypos = x( pid, 1 );
+        auto sign = std::abs( ypos ) / ypos;
+        f( pid, 1 ) += b0 * sign;
+    };
+    auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, planes,
+                                       true );
 
     // ====================================================
     //                   Simulation run
