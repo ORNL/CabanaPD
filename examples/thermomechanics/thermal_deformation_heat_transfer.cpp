@@ -104,21 +104,11 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // ====================================================
     //                   Boundary condition
     // ====================================================
-    // EXAMPLE 1: Temperature profile imposed over entire domain
-    using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
-    /*
-        plane_type plane( low_corner[0], high_corner[0],
-                                        low_corner[1], high_corner[1],
-                                        low_corner[2], high_corner[2] );
-
-        std::vector<plane_type> planes = { plane };
-    */
-
-    // EXAMPLE 2: Temperature profile imposed on top, bottom, left, and right
-    // surfaces
+    // Temperature profile imposed on top, bottom, left, and right surfaces
     double dx = particles->dx[0];
     double dy = particles->dx[1];
     double dz = particles->dx[2];
+    using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
 
     // Left surface: x-direction
     plane_type plane1( low_corner[0] - dx, low_corner[0] + dx, low_corner[1],
@@ -145,48 +135,18 @@ void thermalDeformationHeatTransferExample( const std::string filename )
                        high_corner[1], high_corner[2] - dz,
                        high_corner[2] + dz );
 
-    // std::vector<plane_type> planes = { plane1, plane2, plane3, plane4 };
-    // std::vector<plane_type> planes = { plane1, plane2, plane3, plane4,
-    // plane5, plane6 }; std::vector<plane_type> planes = { plane1, plane2 };
-    std::vector<plane_type> planes = { plane3, plane4 };
-    /*
-        // EXAMPLE 3: Temperature profile imposed on top, bottom, left, and
-       right
-        // nonlocal boundaries (width delta) Top surface
-        plane_type plane1(
-            low_corner[0], high_corner[0], high_corner[1] - delta,
-            high_corner[1] + delta, low_corner[2], high_corner[2] );
+    std::vector<plane_type> planes = { plane1, plane2, plane3,
+                                       plane4, plane5, plane6 };
 
-        // Bottom surface
-        plane_type plane2(
-            low_corner[0], high_corner[0], low_corner[1] - delta,
-            low_corner[1] + delta, low_corner[2], high_corner[2] );
-
-        // Left surface
-        plane_type plane3(
-            low_corner[0] - delta, low_corner[0] + delta, low_corner[1],
-            high_corner[1], low_corner[2], high_corner[2] );
-
-        // Right surface
-        plane_type plane4(
-            high_corner[0] - delta, high_corner[0] + delta, low_corner[1],
-            high_corner[1], low_corner[2], high_corner[2] );
-
-        std::vector<plane_type> planes = { plane1, plane2, plane3,
-                                                         plane4 };
-    */
-
-    auto x = particles->sliceReferencePosition();
-    const double low_corner_y = low_corner[1];
+    temp = particles->sliceTemperature();
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
-    auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
+    auto temp_bc = KOKKOS_LAMBDA( const int pid, const double )
     {
-        // temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
         temp( pid ) = 0.0;
     };
     auto bc = CabanaPD::createBoundaryCondition(
-        temp_func, exec_space{}, *particles, planes, false, 1.0 );
+        temp_bc, exec_space{}, *particles, planes, false, 1.0 );
 
     // ====================================================
     //                   Simulation run
@@ -207,7 +167,6 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     createOutputProfile( MPI_COMM_WORLD, num_cells[1], profile_dim, file_name,
                          *particles, value );
 
-    /*
     // Output y-displacement along the x-axis
     createDisplacementProfile( MPI_COMM_WORLD,
                                "ydisplacement_xaxis_profile.txt", *particles,
@@ -227,8 +186,6 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     createDisplacementMagnitudeProfile(
         MPI_COMM_WORLD, "displacement_magnitude_yaxis_profile.txt", *particles,
         num_cells[1], 1 );
-
-    */
 }
 
 // Initialize MPI+Kokkos.

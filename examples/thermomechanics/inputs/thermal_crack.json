@@ -11,6 +11,7 @@
     "horizon"                       : {"value": 3.0e-4, "unit": "m"},  
     "final_time"                    : {"value": 7.5e-4, "unit": "s"},
     "timestep"                      : {"value": 7.5E-9, "unit": "s"},
+    "thermal_subcycle_steps"        : {"value": 100},
     "output_frequency"              : {"value": 200},
     "output_reference"              : {"value": true}
 }
