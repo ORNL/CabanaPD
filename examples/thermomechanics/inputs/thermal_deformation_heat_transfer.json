@@ -1,5 +1,5 @@
 {
-    "num_cells"               : {"value": [40, 40, 40]},
+    "num_cells"               : {"value": [49, 49, 49]},
     "system_size"             : {"value": [0.1, 0.1, 0.1], "unit": "m"},
     "density"                 : {"value": 8915,  "unit": "kg/m^3"},
     "elastic_modulus"         : {"value": 115e+9, "unit": "Pa"},
@@ -7,10 +7,10 @@
     "thermal_conductivity"    : {"value": 387, "unit": "W/(m.K)"},
     "specific_heat_capacity"  : {"value": 385, "unit": "J/(kg.K)"},
     "reference_temperature"   : {"value": 100.0, "unit": "oC"},
-    "horizon"                 : {"value": 0.0075, "unit": "m"},  
+    "horizon"                 : {"value": 0.00615, "unit": "m"},  
     "final_time"              : {"value": 8, "unit": "s"},
-    "timestep"                : {"value": 5.1e-8, "unit": "s"},
-    "thermal_subcycle_steps": {"value": 100},
-    "output_frequency"        : {"value": 1},
+    "timestep"                : {"value": 4.2e-07, "unit": "s"},
+    "thermal_subcycle_steps"  : {"value": 5e+4},
+    "output_frequency"        : {"value": 10},
     "output_reference"        : {"value": true}
 }
