@@ -299,8 +299,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
         size = _plist_x.size();
 
         // Not using Allreduce because global count is only used for printing.
-        MPI_Reduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0,
-                    MPI_COMM_WORLD );
+        auto n_local_mpi = static_cast<unsigned long long int>( n_local );
+        MPI_Reduce( &n_local_mpi, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM,
+                    0, MPI_COMM_WORLD );
         _init_timer.stop();
     }
 
