@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.11)
 project(CabanaPD LANGUAGES CXX C)
-set(PROJECT_VERSION "0.2.0-dev")
+set(PROJECT_VERSION "0.3.0")
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 14)
