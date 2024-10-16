@@ -276,15 +276,15 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     }
 
     template <class ModelType, class ExecSpace>
-    Particles( MemorySpace, ModelType, TemperatureIndependent,
-               CabanaPD::Inputs inputs, BaseOutput, ExecSpace exec_space )
+    Particles( MemorySpace, ModelType, TemperatureIndependent, BaseOutput,
+               CabanaPD::Inputs inputs, ExecSpace exec_space )
         : _plist_x( "positions" )
         , _plist_f( "forces" )
     {
         create( inputs, exec_space );
     }
     template <class ModelType, class ExecSpace>
-    Particles( MemorySpace, ModelType, CabanaPD::Inputs inputs, BaseOutput,
+    Particles( MemorySpace, ModelType, BaseOutput, CabanaPD::Inputs inputs,
                ExecSpace exec_space )
         : _plist_x( "positions" )
         , _plist_f( "forces" )
@@ -598,6 +598,12 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         return Cabana::slice<0>( _aosoa_u, "displacements" );
     }
     auto sliceForce() { return _plist_f.slice( CabanaPD::Field::Force() ); }
+
+    auto sliceForce() const
+    {
+        return _plist_f.slice( CabanaPD::Field::Force() );
+    }
+
     auto sliceForceAtomic()
     {
         auto f = sliceForce();
@@ -1057,7 +1063,7 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
     {
         _aosoa_u_neigh = aosoa_u_neigh_type( "Particle Contact Fields",
                                              base_type::localOffset() );
-        init_output();
+        init();
     }
 
     template <typename... Args>
@@ -1093,7 +1099,7 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
     friend class Comm<self_type, State, TemperatureDependent>;
 
   protected:
-    void init_output()
+    void init()
     {
         auto u_neigh = sliceDisplacementNeighborBuild();
         Cabana::deep_copy( u_neigh, 0.0 );
@@ -1142,13 +1148,35 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
 
     using base_type::halo_width;
 
+    // Constructor forwarding.
+    template <typename... Args>
+    Particles( MemorySpace space, ModelType model, ThermalType thermal,
+               EnergyOutput, Args&&... args )
+        : base_type( space, model, thermal, BaseOutput{},
+                     std::forward<Args>( args )... )
+    {
+        _aosoa_output = aosoa_output_type( "Particle Output Fields",
+                                           base_type::localOffset() );
+        init();
+    }
+
+    template <typename... Args>
+    Particles( MemorySpace space, ModelType model, EnergyOutput,
+               Args&&... args )
+        : base_type( space, model, std::forward<Args>( args )... )
+    {
+        _aosoa_output = aosoa_output_type( "Particle Output Fields",
+                                           base_type::localOffset() );
+        init();
+    }
+
     template <typename... Args>
     Particles( Args&&... args )
         : base_type( std::forward<Args>( args )... )
     {
         _aosoa_output = aosoa_output_type( "Particle Output Fields",
                                            base_type::localOffset() );
-        init_output();
+        init();
     }
 
     template <typename... Args>
@@ -1195,7 +1223,7 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
     friend class Comm<self_type, State, TemperatureDependent>;
 
   protected:
-    void init_output()
+    void init()
     {
         auto energy = sliceStrainEnergy();
         Cabana::deep_copy( energy, 0.0 );
@@ -1204,6 +1232,102 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
     }
 
     aosoa_output_type _aosoa_output;
+};
+
+template <class MemorySpace, class ModelType, class ThermalType, int Dimension>
+class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
+                Dimension>
+    : public Particles<MemorySpace, ModelType, ThermalType, EnergyOutput,
+                       Dimension>
+{
+  public:
+    using self_type = Particles<MemorySpace, ModelType, ThermalType,
+                                EnergyStressOutput, Dimension>;
+    using base_type =
+        Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>;
+    using thermal_type = typename base_type::thermal_type;
+    using output_type = EnergyStressOutput;
+    using memory_space = typename base_type::memory_space;
+    using base_type::dim;
+
+    using output_types = Cabana::MemberTypes<double[dim][dim]>;
+    using aosoa_stress_type = Cabana::AoSoA<output_types, memory_space, 1>;
+
+    // Per type.
+    using base_type::n_types;
+
+    // Simulation total domain.
+    using base_type::global_mesh_ext;
+
+    // Simulation sub domain (single MPI rank).
+    using base_type::ghost_mesh_hi;
+    using base_type::ghost_mesh_lo;
+    using base_type::local_mesh_ext;
+    using base_type::local_mesh_hi;
+    using base_type::local_mesh_lo;
+
+    using base_type::dx;
+    using base_type::local_grid;
+
+    using base_type::halo_width;
+
+    // Constructor forwarding.
+    template <typename... Args>
+    Particles( MemorySpace space, ModelType model, ThermalType thermal,
+               EnergyStressOutput, Args&&... args )
+        : base_type( space, model, thermal, EnergyOutput{},
+                     std::forward<Args>( args )... )
+    {
+        _aosoa_stress = aosoa_stress_type( "Particle Output Fields",
+                                           base_type::localOffset() );
+        init();
+    }
+
+    template <typename... Args>
+    Particles( MemorySpace space, ModelType model, EnergyStressOutput,
+               Args&&... args )
+        : base_type( space, model, EnergyOutput{},
+                     std::forward<Args>( args )... )
+    {
+        _aosoa_stress = aosoa_stress_type( "Particle Output Fields",
+                                           base_type::localOffset() );
+        init();
+    }
+
+    auto sliceStress() { return Cabana::slice<0>( _aosoa_stress, "stress" ); }
+    auto sliceStress() const
+    {
+        return Cabana::slice<0>( _aosoa_stress, "stress" );
+    }
+
+    void resize( int new_local, int new_ghost )
+    {
+        base_type::resize( new_local, new_ghost );
+        _aosoa_stress.resize( new_local + new_ghost );
+    }
+
+    template <typename... OtherFields>
+    void output( const int output_step, const double output_time,
+                 const bool use_reference, OtherFields&&... other )
+    {
+        base_type::output( output_step, output_time, use_reference,
+                           sliceStress(),
+                           std::forward<OtherFields>( other )... );
+    }
+
+    friend class Comm<self_type, Pair, TemperatureIndependent>;
+    friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Pair, TemperatureDependent>;
+    friend class Comm<self_type, State, TemperatureDependent>;
+
+  protected:
+    void init()
+    {
+        auto stress = sliceStress();
+        Cabana::deep_copy( stress, 0.0 );
+    }
+
+    aosoa_stress_type _aosoa_stress;
 };
 
 /******************************************************************************
@@ -1261,6 +1385,17 @@ Particles( MemorySpace, ModelType, OutputType, std::array<double, Dim>,
     -> Particles<MemorySpace, typename ModelType::base_model,
                  TemperatureIndependent, OutputType>;
 
+template <typename MemorySpace, typename ModelType, typename OutputType,
+          typename ExecSpace, std::size_t Dim>
+Particles( MemorySpace, ModelType, OutputType, std::array<double, Dim>,
+           std::array<double, Dim>, const std::array<int, Dim>, const int,
+           const ExecSpace, const bool = false,
+           typename std::enable_if<(is_output<OutputType>::value &&
+                                    Kokkos::is_execution_space_v<ExecSpace>),
+                                   int>::type* = 0 )
+    -> Particles<MemorySpace, typename ModelType::base_model,
+                 TemperatureIndependent, OutputType>;
+
 template <typename MemorySpace, typename ModelType, typename ExecSpace,
           std::size_t Dim>
 Particles( MemorySpace, ModelType, std::array<double, Dim>,
@@ -1296,7 +1431,8 @@ template <typename MemorySpace, typename ModelType, typename ThermalType,
 Particles( MemorySpace, ModelType, ThermalType, std::array<double, Dim>,
            std::array<double, Dim>, const std::array<int, Dim>, const int,
            const ExecSpace, const bool = false,
-           typename std::enable_if<(Kokkos::is_execution_space_v<ExecSpace>),
+           typename std::enable_if<(is_temperature<ThermalType>::value &&
+                                    Kokkos::is_execution_space_v<ExecSpace>),
                                    int>::type* = 0 )
     -> Particles<MemorySpace, typename ModelType::base_model,
                  typename ThermalType::base_type, EnergyOutput>;

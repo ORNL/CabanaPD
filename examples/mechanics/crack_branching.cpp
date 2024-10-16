@@ -73,7 +73,8 @@ void crackBranchingExample( const std::string filename )
     //                 Particle generation
     // ====================================================
     // Note that individual inputs can be passed instead (see other examples).
-    CabanaPD::Particles particles( memory_space{}, model_type{}, inputs,
+    CabanaPD::Particles particles( memory_space{}, model_type{},
+                                   CabanaPD::EnergyStressOutput{}, inputs,
                                    exec_space{} );
 
     // ====================================================
