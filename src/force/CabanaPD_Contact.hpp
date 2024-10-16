@@ -139,7 +139,7 @@ class Force<MemorySpace, NormalRepulsionModel>
 
             double xi, r, s;
             double rx, ry, rz;
-            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+            getDistance( x, u, i, j, xi, r, s, rx, ry, rz );
 
             if ( r < model.radius )
             {
