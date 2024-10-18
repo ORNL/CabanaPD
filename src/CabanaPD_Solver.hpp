@@ -134,13 +134,13 @@ class SolverElastic
         comm = std::make_shared<comm_type>( *particles );
 
         // Update temperature ghost size if needed.
-        if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                    TemperatureDependent>::value )
+        if constexpr ( is_temperature_dependent<
+                           typename force_model_type::thermal_type>::value )
             force_model.update( particles->sliceTemperature() );
 
         // Create heat transfer if needed.
-        if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                    DynamicTemperature>::value )
+        if constexpr ( is_heat_transfer<
+                           typename force_model_type::thermal_type>::value )
         {
             thermal_subcycle_steps = inputs["thermal_subcycle_steps"];
             heat_transfer = std::make_shared<heat_transfer_type>(
@@ -243,8 +243,8 @@ class SolverElastic
             boundary_condition.apply( exec_space(), *particles, 0.0 );
 
         // Communicate temperature.
-        if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                    TemperatureDependent>::value )
+        if constexpr ( is_temperature_dependent<
+                           typename force_model_type::thermal_type>::value )
             comm->gatherTemperature();
 
         // Force init without particle output.
@@ -274,15 +274,15 @@ class SolverElastic
             // Update ghost particles.
             comm->gatherDisplacement();
 
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        DynamicTemperature>::value )
+            if constexpr ( is_heat_transfer<
+                               typename force_model_type::thermal_type>::value )
             {
                 if ( step % thermal_subcycle_steps == 0 )
                     computeHeatTransfer( *heat_transfer, *particles, *neighbors,
                                          neigh_iter_tag{}, dt );
             }
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        TemperatureDependent>::value )
+            if constexpr ( is_temperature_dependent<
+                               typename force_model_type::thermal_type>::value )
                 comm->gatherTemperature();
 
             // Add non-force boundary condition.
@@ -324,8 +324,8 @@ class SolverElastic
             // Compute internal forces.
             updateForce();
 
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        TemperatureDependent>::value )
+            if constexpr ( is_temperature_dependent<
+                               typename force_model_type::thermal_type>::value )
                 comm->gatherTemperature();
 
             // Integrate - velocity Verlet second half.
@@ -548,8 +548,8 @@ class SolverFracture
             boundary_condition.apply( exec_space(), *particles, 0.0 );
 
         // Communicate temperature.
-        if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                    TemperatureDependent>::value )
+        if constexpr ( is_temperature_dependent<
+                           typename force_model_type::thermal_type>::value )
             comm->gatherTemperature();
 
         // Force init without particle output.
@@ -580,8 +580,8 @@ class SolverFracture
             if ( !boundary_condition.forceUpdate() )
                 boundary_condition.apply( exec_space(), *particles, step * dt );
 
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        TemperatureDependent>::value )
+            if constexpr ( is_temperature_dependent<
+                               typename force_model_type::thermal_type>::value )
                 comm->gatherTemperature();
 
             // Update ghost particles.
@@ -616,8 +616,8 @@ class SolverFracture
             // Integrate - velocity Verlet first half.
             integrator->initialHalfStep( *particles );
 
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        TemperatureDependent>::value )
+            if constexpr ( is_temperature_dependent<
+                               typename force_model_type::thermal_type>::value )
                 comm->gatherTemperature();
 
             // Update ghost particles.
