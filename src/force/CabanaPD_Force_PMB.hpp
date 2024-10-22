@@ -243,7 +243,20 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
                 // Else if statement is only for performance.
                 else if ( mu( i, n ) > 0 )
                 {
-                    const double coeff = model.c * s * vol( j );
+                    const double s_Y = 0.0014;
+                    // const double coeff = model.c * s * vol( j );
+
+                    double coeff = 0;
+
+                    if ( s < s_Y )
+                    {
+                        coeff = model.c * s * vol( j );
+                    }
+                    else
+                    {
+                        coeff = model.c * s_Y * vol( j );
+                    }
+
                     double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;
                     fy_i = muij * coeff * ry / r;
@@ -295,7 +308,21 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
 
                 // 0.25 factor is due to 1/2 from outside the integral and 1/2
                 // from the integrand (pairwise potential).
-                double w = mu( i, n ) * 0.25 * model.c * s * s * xi * vol( j );
+                // double w = mu( i, n ) * 0.25 * model.c * s * s * xi * vol( j
+                // );
+
+                const double s_Y = 0.0014;
+
+                if ( s < s_Y )
+                {
+                    w = mu( i, n ) * 0.25 * model.c * s * s * xi * vol( j );
+                }
+                else
+                {
+                    w = mu( i, n ) * 0.25 * model.c * s_Y * ( 2 * s - s_Y ) *
+                        xi * vol( j );
+                }
+
                 W( i ) += w;
 
                 phi_i += mu( i, n ) * vol( j );
