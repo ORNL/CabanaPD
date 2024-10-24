@@ -57,7 +57,7 @@ void createOutputProfile( MPI_Comm comm, const int num_cell,
         }
     };
     Kokkos::RangePolicy<typename memory_space::execution_space> policy(
-        0, x.size() );
+        0, particles.n_local );
     Kokkos::parallel_for( "displacement_profile", policy, measure_profile );
     auto count_host =
         Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, count );
