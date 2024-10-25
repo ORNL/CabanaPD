@@ -102,7 +102,7 @@ struct BaseDynamicTemperatureModel
         constant_conductivity = _constant_conductivity;
     }
 
-    KOKKOS_INLINE_FUNCTION double conductivity_function( double r ) const
+    KOKKOS_INLINE_FUNCTION double microconductivity_function( double r ) const
     {
         if ( constant_conductivity )
             return thermal_coeff;

@@ -59,7 +59,7 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
-            const double coeff = model.conductivity_function( xi );
+            const double coeff = model.microconductivity_function( xi );
             conduction( i ) +=
                 coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
         };
@@ -73,7 +73,7 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
     }
 
     template <class ParticleType>
-    void stepEuler( const ParticleType& particles, const double dt )
+    void forwardEuler( const ParticleType& particles, const double dt )
     {
         _euler_timer.start();
         auto model = _model;
@@ -86,7 +86,7 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
             temp( i ) += dt / rho( i ) / model.cp * conduction( i );
         };
         Kokkos::RangePolicy<ExecutionSpace> policy( 0, n_local );
-        Kokkos::parallel_for( "CabanaPD::HeatTransfer::Euler", policy,
+        Kokkos::parallel_for( "CabanaPD::HeatTransfer::forwardEuler", policy,
                               euler_func );
         _euler_timer.stop();
     }
@@ -118,7 +118,7 @@ void computeHeatTransfer( HeatTransferType& heat_transfer,
             conduction, x, u, particles, neigh_list, n_local, neigh_op_tag );
     Kokkos::fence();
 
-    heat_transfer.stepEuler( particles, dt );
+    heat_transfer.forwardEuler( particles, dt );
     Kokkos::fence();
 }
 
