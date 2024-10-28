@@ -80,6 +80,7 @@ void crackBranchingExample( const std::string filename )
     // ====================================================
     //                Boundary conditions planes
     // ====================================================
+    /*
     double dy = particles->dx[1];
     CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane1(
         low_corner[0], high_corner[0], low_corner[1] - dy, low_corner[1] + dy,
@@ -89,14 +90,24 @@ void crackBranchingExample( const std::string filename )
         low_corner[2], high_corner[2] );
     std::vector<CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>> planes = {
         plane1, plane2 };
+    */
+
+    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane(
+        low_corner[0], high_corner[0], low_corner[1], high_corner[1],
+        low_corner[2], high_corner[2] );
+    std::vector<CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>> planes = {
+        plane };
 
     // ====================================================
     //            Custom particle initialization
     // ====================================================
 
+    // Geometrical parameters
     double L = inputs["system_size"][1];
     double W = L / 1.25;
     double a = 0.45 * W;
+
+    double dy = particles->dx[1];
 
     // Remove particles from original geometry
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
@@ -151,13 +162,36 @@ void crackBranchingExample( const std::string filename )
     auto f = particles->sliceForce();
     auto nofail = particles->sliceNoFail();
 
+    // Pin radius
+    double R = 4e-3;
+    // Pin center (top)
+    double x_pin = low_corner[0] + 0.25 * W;
+    double y_pin = 0.37 * W;
+    // Pin velocity
+    double v0 = inputs["pin_velocity"];
+
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
         // No-fail zone
+        /*
         if ( x( pid, 1 ) <= plane1.low_y + delta + 1e-10 ||
              x( pid, 1 ) >= plane2.high_y - delta - 1e-10 )
+            nofail( pid ) = 1;
+            */
+        auto xpos = x( pid, 0 );
+        auto ypos = x( pid, 1 );
+        auto sign = std::abs( ypos ) / ypos;
+        // pins' y velocity
+        if ( ( xpos - x_pin ) * ( xpos - x_pin ) +
+                 ( std::abs( ypos ) - y_pin ) * ( std::abs( ypos ) - y_pin ) <
+             R * R )
+            v( pid, 1 ) = sign * v0;
+        // No-fail zone
+        if ( ( xpos - x_pin ) * ( xpos - x_pin ) +
+                 ( std::abs( ypos ) - y_pin ) * ( std::abs( ypos ) - y_pin ) <
+             ( 2 * R ) * ( 2 * R ) )
             nofail( pid ) = 1;
     };
     particles->updateParticles( exec_space{}, init_functor );
@@ -171,17 +205,31 @@ void crackBranchingExample( const std::string filename )
     // ====================================================
     //                Boundary conditions
     // ====================================================
+
+    /*
+    // Pin radius
+    double R = 4e-3;
+    // Pin center (top)
+    double x_pin = low_corner[0] + 0.25 * W;
+    double y_pin = 0.37*W;
+    */
+
     // Create BC last to ensure ghost particles are included.
-    double sigma0 = inputs["traction"];
-    double b0 = sigma0 / dy;
+    // double sigma0 = inputs["traction"];
+    // double b0 = sigma0 / dy;
     f = particles->sliceForce();
     x = particles->sliceReferencePosition();
     // Create a symmetric force BC in the y-direction.
     auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
     {
+        auto xpos = x( pid, 0 );
         auto ypos = x( pid, 1 );
         auto sign = std::abs( ypos ) / ypos;
-        f( pid, 1 ) += b0 * sign;
+        if ( ( xpos - x_pin ) * ( xpos - x_pin ) +
+                 ( std::abs( ypos ) - y_pin ) * ( std::abs( ypos ) - y_pin ) <
+             R * R )
+            // f( pid, 1 ) += b0 * sign;
+            f( pid, 1 ) = 0;
     };
     auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, planes,
                                        true );

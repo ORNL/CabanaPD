@@ -243,7 +243,20 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
                 // Else if statement is only for performance.
                 else if ( mu( i, n ) > 0 )
                 {
-                    const double coeff = model.c * s * vol( j );
+                    const double s_Y = 0.0014;
+                    // const double coeff = model.c * s * vol( j );
+
+                    double coeff = 0;
+
+                    if ( s < s_Y )
+                    {
+                        coeff = model.c * s * vol( j );
+                    }
+                    else
+                    {
+                        coeff = model.c * s_Y * vol( j );
+                    }
+
                     double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;
                     fy_i = muij * coeff * ry / r;
