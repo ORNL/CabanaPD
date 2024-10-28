@@ -78,35 +78,22 @@ void crackBranchingExample( const std::string filename )
         exec_space{}, inputs );
 
     // ====================================================
-    //                Boundary conditions planes
+    //    Custom particle generation and initialization
     // ====================================================
-    /*
-    double dy = particles->dx[1];
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane1(
-        low_corner[0], high_corner[0], low_corner[1] - dy, low_corner[1] + dy,
-        low_corner[2], high_corner[2] );
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane2(
-        low_corner[0], high_corner[0], high_corner[1] - dy, high_corner[1] + dy,
-        low_corner[2], high_corner[2] );
-    std::vector<CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>> planes = {
-        plane1, plane2 };
-    */
 
+    // Rectangular prism containing the full specimen: original geometry
     CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane(
         low_corner[0], high_corner[0], low_corner[1], high_corner[1],
         low_corner[2], high_corner[2] );
     std::vector<CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>> planes = {
         plane };
 
-    // ====================================================
-    //            Custom particle initialization
-    // ====================================================
-
-    // Geometrical parameters
+    // Geometric parameters of specimen
     double L = inputs["system_size"][1];
     double W = L / 1.25;
     double a = 0.45 * W;
 
+    // Grid spacing in y-direction
     double dy = particles->dx[1];
 
     // Remove particles from original geometry
@@ -116,8 +103,8 @@ void crackBranchingExample( const std::string filename )
         if ( x[0] < low_corner[1] + 0.25 * W + a && abs( x[1] ) < 0.5 * dy )
         {
             return false;
-            // Thick rectangle
         }
+        // Thick rectangle
         else if ( x[0] < low_corner[1] + 0.25 * W && abs( x[1] ) < 25e-4 )
         {
             return false;
@@ -126,35 +113,9 @@ void crackBranchingExample( const std::string filename )
         {
             return true;
         }
-
-        // Thick pre-notch
-        // if ( x[0] < low_corner[1] + 0.25*width && abs(x[1]) < 2.6e-3)
-        //     return false;
-        // return true;
     };
 
     particles->createParticles( exec_space(), init_op );
-
-    /*
-
-        double x_center = 0.5 * ( low_corner[0] + high_corner[0] );
-        double y_center = 0.5 * ( low_corner[1] + high_corner[1] );
-        double Rout = inputs["cylinder_outer_radius"];
-        double Rin = inputs["cylinder_inner_radius"];
-
-        // Do not create particles outside given cylindrical region
-        auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
-        {
-            double rsq = ( x[0] - x_center ) * ( x[0] - x_center ) +
-                         ( x[1] - y_center ) * ( x[1] - y_center );
-            if ( rsq < Rin * Rin || rsq > Rout * Rout )
-                return false;
-            return true;
-        };
-        particles->createParticles( exec_space(), init_op );
-
-
-    */
 
     auto rho = particles->sliceDensity();
     auto x = particles->sliceReferencePosition();
@@ -164,34 +125,30 @@ void crackBranchingExample( const std::string filename )
 
     // Pin radius
     double R = 4e-3;
-    // Pin center (top)
+    // Pin center coordinates (top)
     double x_pin = low_corner[0] + 0.25 * W;
     double y_pin = 0.37 * W;
-    // Pin velocity
+    // Pin velocity magnitude
     double v0 = inputs["pin_velocity"];
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
-        // No-fail zone
-        /*
-        if ( x( pid, 1 ) <= plane1.low_y + delta + 1e-10 ||
-             x( pid, 1 ) >= plane2.high_y - delta - 1e-10 )
-            nofail( pid ) = 1;
-            */
+
         auto xpos = x( pid, 0 );
         auto ypos = x( pid, 1 );
+        auto distsq =
+            ( xpos - x_pin ) * ( xpos - x_pin ) +
+            ( std::abs( ypos ) - y_pin ) * ( std::abs( ypos ) - y_pin );
         auto sign = std::abs( ypos ) / ypos;
-        // pins' y velocity
-        if ( ( xpos - x_pin ) * ( xpos - x_pin ) +
-                 ( std::abs( ypos ) - y_pin ) * ( std::abs( ypos ) - y_pin ) <
-             R * R )
+
+        // pins' y-velocity
+        if ( distsq < R * R )
             v( pid, 1 ) = sign * v0;
+
         // No-fail zone
-        if ( ( xpos - x_pin ) * ( xpos - x_pin ) +
-                 ( std::abs( ypos ) - y_pin ) * ( std::abs( ypos ) - y_pin ) <
-             ( 2 * R ) * ( 2 * R ) )
+        if ( distsq < ( 2 * R ) * ( 2 * R ) )
             nofail( pid ) = 1;
     };
     particles->updateParticles( exec_space{}, init_functor );
@@ -206,17 +163,7 @@ void crackBranchingExample( const std::string filename )
     //                Boundary conditions
     // ====================================================
 
-    /*
-    // Pin radius
-    double R = 4e-3;
-    // Pin center (top)
-    double x_pin = low_corner[0] + 0.25 * W;
-    double y_pin = 0.37*W;
-    */
-
     // Create BC last to ensure ghost particles are included.
-    // double sigma0 = inputs["traction"];
-    // double b0 = sigma0 / dy;
     f = particles->sliceForce();
     x = particles->sliceReferencePosition();
     // Create a symmetric force BC in the y-direction.
@@ -225,10 +172,10 @@ void crackBranchingExample( const std::string filename )
         auto xpos = x( pid, 0 );
         auto ypos = x( pid, 1 );
         auto sign = std::abs( ypos ) / ypos;
+
         if ( ( xpos - x_pin ) * ( xpos - x_pin ) +
                  ( std::abs( ypos ) - y_pin ) * ( std::abs( ypos ) - y_pin ) <
              R * R )
-            // f( pid, 1 ) += b0 * sign;
             f( pid, 1 ) = 0;
     };
     auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, planes,
