@@ -71,10 +71,9 @@ struct ForceModel<PMB, Elastic, TemperatureIndependent, ParticleType>
 
     using base_type::delta;
     using base_type::num_types;
-    using view_type_1d = typename base_type::view_type_1d;
     using view_type_2d = typename base_type::view_type_2d;
     view_type_2d c;
-    view_type_1d K;
+    view_type_2d K;
     ParticleType type;
 
     template <typename ArrayType>
@@ -82,7 +81,7 @@ struct ForceModel<PMB, Elastic, TemperatureIndependent, ParticleType>
                 ParticleType _type )
         : base_type( delta )
         , c( view_type_2d( "micromodulus", num_types, num_types ) )
-        , K( view_type_1d( "bulk_modulus", num_types ) )
+        , K( view_type_2d( "bulk_modulus", num_types, num_types ) )
         , type( _type )
     {
         setParameters( _K );
@@ -93,22 +92,39 @@ struct ForceModel<PMB, Elastic, TemperatureIndependent, ParticleType>
     {
         // Initialize per-type variables.
         auto K_copy = K;
+        auto num_types_copy = num_types;
         auto init_self_func = KOKKOS_LAMBDA( const int i )
         {
-            K_copy( i ) = _K[i];
+            // Diagonal first.
+            if ( i < num_types_copy )
+            {
+                K_copy( i, i ) = _K[i];
+            }
+            else
+            {
+            }
         };
+        // 00 01 02    0 5 4    0 2
+        // 10 11 12      1 3      1
+        // 20 21 22        2
         using exec_space = typename memory_space::execution_space;
-        Kokkos::RangePolicy<exec_space> policy( 0, num_types );
+        // This could be number of types (averaging for cross terms)
+        // or number of types and cross terms
+        Kokkos::RangePolicy<Kokkos::Serial> policy( 0, _K.size() );
         Kokkos::parallel_for( "CabanaPD::Model::Copy", policy, init_self_func );
         Kokkos::fence();
 
         // Initialize model parameters.
-        Kokkos::parallel_for( "CabanaPD::Model::Init", policy, *this );
+        if ( _K.size() == num_types )
+            Kokkos::parallel_for( "CabanaPD::Model::Init", policy, *this );
+        else // if (_K.size() == (num_types) * )
+            Kokkos::parallel_for( "CabanaPD::Model::Init", policy, *this );
     }
 
     KOKKOS_INLINE_FUNCTION void operator()( const int i ) const
     {
-        c( i, i ) = micromodulus( i );
+        if ()
+            c( i, i ) = micromodulus( i );
         for ( std::size_t j = i; j < num_types; j++ )
         {
             c( i, j ) = ( micromodulus( i ) + micromodulus( j ) ) / 2.0;

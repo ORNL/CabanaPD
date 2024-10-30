@@ -43,7 +43,6 @@ struct BaseForceModel
 {
     using species_type = MultiSpecies;
 
-    // Only allow one memory space.
     using memory_space = MemorySpace;
     using view_type_1d = Kokkos::View<double*, memory_space>;
     view_type_1d delta;
