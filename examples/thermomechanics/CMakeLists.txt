@@ -4,4 +4,7 @@ target_link_libraries(ThermalDeformation LINK_PUBLIC CabanaPD)
 add_executable(ThermalCrack thermal_crack.cpp)
 target_link_libraries(ThermalCrack LINK_PUBLIC CabanaPD)
 
-install(TARGETS ThermalDeformation ThermalCrack DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(ThermalDeformationHeatTransfer thermal_deformation_heat_transfer.cpp)
+target_link_libraries(ThermalDeformationHeatTransfer LINK_PUBLIC CabanaPD)
+
+install(TARGETS ThermalDeformation ThermalCrack ThermalDeformationHeatTransfer DESTINATION ${CMAKE_INSTALL_BINDIR})
