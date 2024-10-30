@@ -39,6 +39,9 @@ struct LPS
 struct LinearLPS
 {
 };
+struct Correspondence
+{
+};
 
 } // namespace CabanaPD
 #endif

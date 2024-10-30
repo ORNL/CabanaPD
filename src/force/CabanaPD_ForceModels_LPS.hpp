@@ -18,27 +18,24 @@
 namespace CabanaPD
 {
 template <>
-struct ForceModel<LPS, Elastic> : public BaseForceModel
+struct ForceModel<LPS, Elastic> : public BaseInfluenceForceModel
 {
-    using base_type = BaseForceModel;
+    using base_type = BaseInfluenceForceModel;
     using base_model = LPS;
     using fracture_type = Elastic;
     using thermal_type = TemperatureIndependent;
 
     using base_type::delta;
-
-    int influence_type;
+    using base_type::influence_type;
 
     double K;
     double G;
     double theta_coeff;
     double s_coeff;
 
-    ForceModel(){};
     ForceModel( const double _delta, const double _K, const double _G,
                 const int _influence = 0 )
-        : base_type( _delta )
-        , influence_type( _influence )
+        : base_type( _delta, _influence )
     {
         set_param( _delta, _K, _G );
     }
@@ -51,14 +48,6 @@ struct ForceModel<LPS, Elastic> : public BaseForceModel
 
         theta_coeff = 3.0 * K - 5.0 * G;
         s_coeff = 15.0 * G;
-    }
-
-    KOKKOS_INLINE_FUNCTION double influence_function( double xi ) const
-    {
-        if ( influence_type == 1 )
-            return 1.0 / xi;
-        else
-            return 1.0;
     }
 };
 
@@ -80,7 +69,6 @@ struct ForceModel<LPS, Fracture> : public ForceModel<LPS, Elastic>
     double s0;
     double bond_break_coeff;
 
-    ForceModel() {}
     ForceModel( const double _delta, const double _K, const double _G,
                 const double _G0, const int _influence = 0 )
         : base_type( _delta, _K, _G, _influence )
