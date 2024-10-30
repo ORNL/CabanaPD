@@ -111,32 +111,35 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
 
     // Left surface: x-direction
-    plane_type plane1( low_corner[0] - dx, low_corner[0] + dx, low_corner[1],
-                       high_corner[1], low_corner[2], high_corner[2] );
+    // plane_type plane1( low_corner[0] - dx, low_corner[0] + dx, low_corner[1],
+    //                   high_corner[1], low_corner[2], high_corner[2] );
 
     // Right surface: x-direction
-    plane_type plane2( high_corner[0] - dx, high_corner[0] + dx, low_corner[1],
-                       high_corner[1], low_corner[2], high_corner[2] );
+    // plane_type plane2( high_corner[0] - dx, high_corner[0] + dx,
+    // low_corner[1],
+    //                   high_corner[1], low_corner[2], high_corner[2] );
 
     // Top surface: y-direction
-    plane_type plane3( low_corner[0], high_corner[0], high_corner[1] - dy,
+    plane_type plane1( low_corner[0], high_corner[0], high_corner[1] - dy,
                        high_corner[1] + dy, low_corner[2], high_corner[2] );
 
     // Bottom surface: y-direction
-    plane_type plane4( low_corner[0], high_corner[0], low_corner[1] - dy,
+    plane_type plane2( low_corner[0], high_corner[0], low_corner[1] - dy,
                        low_corner[1] + dy, low_corner[2], high_corner[2] );
 
     // Front surface: z-direction
-    plane_type plane5( low_corner[0], high_corner[0], low_corner[1],
-                       high_corner[1], low_corner[2] - dz, low_corner[2] + dz );
+    // plane_type plane5( low_corner[0], high_corner[0], low_corner[1],
+    //                   high_corner[1], low_corner[2] - dz, low_corner[2] + dz
+    //                   );
 
     // Back surface: z-direction
-    plane_type plane6( low_corner[0], high_corner[0], low_corner[1],
-                       high_corner[1], high_corner[2] - dz,
-                       high_corner[2] + dz );
+    // plane_type plane6( low_corner[0], high_corner[0], low_corner[1],
+    //                   high_corner[1], high_corner[2] - dz,
+    //                   high_corner[2] + dz );
 
-    std::vector<plane_type> planes = { plane1, plane2, plane3,
-                                       plane4, plane5, plane6 };
+    // std::vector<plane_type> planes = { plane1, plane2, plane3,
+    //                                    plane4, plane5, plane6 };
+    std::vector<plane_type> planes = { plane1, plane2 };
 
     temp = particles->sliceTemperature();
     // This is purposely delayed until after solver init so that ghosted
@@ -167,25 +170,27 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     createOutputProfile( MPI_COMM_WORLD, num_cells[1], profile_dim, file_name,
                          *particles, value );
 
-    // Output y-displacement along the x-axis
-    createDisplacementProfile( MPI_COMM_WORLD,
-                               "ydisplacement_xaxis_profile.txt", *particles,
-                               num_cells[0], 0, 1 );
+    /*
+        // Output y-displacement along the x-axis
+        createDisplacementProfile( MPI_COMM_WORLD,
+                                   "ydisplacement_xaxis_profile.txt",
+       *particles, num_cells[0], 0, 1 );
 
-    // Output y-displacement along the y-axis
-    createDisplacementProfile( MPI_COMM_WORLD,
-                               "ydisplacement_yaxis_profile.txt", *particles,
-                               num_cells[1], 1, 1 );
+        // Output y-displacement along the y-axis
+        createDisplacementProfile( MPI_COMM_WORLD,
+                                   "ydisplacement_yaxis_profile.txt",
+       *particles, num_cells[1], 1, 1 );
 
-    // Output displacement magnitude along the x-axis
-    createDisplacementMagnitudeProfile(
-        MPI_COMM_WORLD, "displacement_magnitude_xaxis_profile.txt", *particles,
-        num_cells[0], 0 );
+        // Output displacement magnitude along the x-axis
+        createDisplacementMagnitudeProfile(
+            MPI_COMM_WORLD, "displacement_magnitude_xaxis_profile.txt",
+       *particles, num_cells[0], 0 );
 
-    // Output displacement magnitude along the y-axis
-    createDisplacementMagnitudeProfile(
-        MPI_COMM_WORLD, "displacement_magnitude_yaxis_profile.txt", *particles,
-        num_cells[1], 1 );
+        // Output displacement magnitude along the y-axis
+        createDisplacementMagnitudeProfile(
+            MPI_COMM_WORLD, "displacement_magnitude_yaxis_profile.txt",
+       *particles, num_cells[1], 1 );
+            */
 }
 
 // Initialize MPI+Kokkos.
