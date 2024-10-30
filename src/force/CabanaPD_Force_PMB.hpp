@@ -138,7 +138,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
     template <class PosType, class WType, class ParticleType,
               class NeighListType, class ParallelType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              const ParticleType& particles,
+                              ParticleType& particles,
                               const NeighListType& neigh_list,
                               const int n_local, ParallelType& neigh_op_tag )
     {
@@ -146,13 +146,16 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
 
         auto model = _model;
         const auto vol = particles.sliceVolume();
+        auto virial_stress = particles.sliceVirialStress();
+        const auto f = particles.sliceForce();
 
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
             // Get the bond distance, displacement, and stretch.
             double xi, r, s;
-            getDistance( x, u, i, j, xi, r, s );
+            double rx, ry, rz;
+            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
             model.thermalStretch( s, i, j );
 
@@ -161,6 +164,14 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
             double w = 0.25 * model.c * s * s * xi * vol( j );
             W( i ) += w;
             Phi += w * vol( i );
+
+            virial_stress( i, 0 ) += ( rx * f( i, 0 ) ) / vol( j );
+            virial_stress( i, 1 ) += ( ry * f( i, 1 ) ) / vol( j );
+            virial_stress( i, 2 ) += ( rz * f( i, 2 ) ) / vol( j );
+
+            virial_stress( i, 3 ) += ( rx * f( i, 1 ) ) / vol( j );
+            virial_stress( i, 4 ) += ( rx * f( i, 2 ) ) / vol( j );
+            virial_stress( i, 5 ) += ( ry * f( i, 2 ) ) / vol( j );
         };
 
         double strain_energy = 0.0;
@@ -266,7 +277,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
     template <class PosType, class WType, class DamageType, class ParticleType,
               class NeighListType, class MuView, class ParallelType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              DamageType& phi, const ParticleType& particles,
+                              DamageType& phi, ParticleType& particles,
                               const NeighListType& neigh_list, MuView& mu,
                               const int n_local, ParallelType& )
     {
@@ -274,6 +285,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
 
         auto model = _model;
         const auto vol = particles.sliceVolume();
+        auto virial_stress = particles.sliceVirialStress();
+        const auto f = particles.sliceForce();
 
         auto energy_full = KOKKOS_LAMBDA( const int i, double& Phi )
         {
@@ -282,6 +295,9 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
                                                                   i );
             double phi_i = 0.0;
             double vol_H_i = 0.0;
+            double sigma_xx = 0.0, sigma_yy = 0.0, sigma_zz = 0.0;
+            double sigma_xy = 0.0, sigma_xz = 0.0, sigma_yz = 0.0;
+
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
                 std::size_t j =
@@ -289,7 +305,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
                         neigh_list, i, n );
                 // Get the bond distance, displacement, and stretch.
                 double xi, r, s;
-                getDistance( x, u, i, j, xi, r, s );
+                double rx, ry, rz;
+                getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
                 model.thermalStretch( s, i, j );
 
@@ -300,7 +317,23 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
 
                 phi_i += mu( i, n ) * vol( j );
                 vol_H_i += vol( j );
+
+                sigma_xx += ( rx * f( i, 0 ) );
+                sigma_yy += ( ry * f( i, 1 ) );
+                sigma_zz += ( rz * f( i, 2 ) );
+
+                sigma_xy += ( rx * f( i, 1 ) );
+                sigma_xz += ( rx * f( i, 2 ) );
+                sigma_yz += ( ry * f( i, 2 ) );
             }
+            virial_stress( i, 0 ) += sigma_xx / ( vol_H_i + vol( i ) );
+            virial_stress( i, 1 ) += sigma_yy / ( vol_H_i + vol( i ) );
+            virial_stress( i, 2 ) += sigma_zz / ( vol_H_i + vol( i ) );
+
+            virial_stress( i, 3 ) += sigma_xy / ( vol_H_i + vol( i ) );
+            virial_stress( i, 4 ) += sigma_xz / ( vol_H_i + vol( i ) );
+            virial_stress( i, 5 ) += sigma_yz / ( vol_H_i + vol( i ) );
+
             Phi += W( i ) * vol( i );
             phi( i ) = 1 - phi_i / vol_H_i;
         };
