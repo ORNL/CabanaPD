@@ -88,6 +88,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
   public:
     using self_type =
         Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>;
+    using thermal_type = TemperatureIndependent;
     using memory_space = MemorySpace;
     using execution_space = typename memory_space::execution_space;
     static constexpr int dim = Dimension;
@@ -502,6 +503,7 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, Dimension>
         Particles<MemorySpace, LPS, TemperatureIndependent, Dimension>;
     using base_type =
         Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>;
+    using thermal_type = TemperatureIndependent;
     using memory_space = typename base_type::memory_space;
     using base_type::dim;
 
@@ -662,6 +664,7 @@ class Particles<MemorySpace, PMB, TemperatureDependent, Dimension>
         Particles<MemorySpace, PMB, TemperatureDependent, Dimension>;
     using base_type =
         Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>;
+    using thermal_type = TemperatureDependent;
     using memory_space = typename base_type::memory_space;
     using base_type::dim;
 
@@ -673,8 +676,8 @@ class Particles<MemorySpace, PMB, TemperatureDependent, Dimension>
 
     // These are split since weighted volume only needs to be communicated once
     // and dilatation only needs to be communicated for LPS.
-    using scalar_type = typename base_type::scalar_type;
-    using aosoa_temp_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
+    using temp_types = Cabana::MemberTypes<double, double>;
+    using aosoa_temp_type = Cabana::AoSoA<temp_types, memory_space, 1>;
 
     // Per type.
     using base_type::n_types;
@@ -728,6 +731,22 @@ class Particles<MemorySpace, PMB, TemperatureDependent, Dimension>
     auto sliceTemperature() const
     {
         return Cabana::slice<0>( _aosoa_temp, "temperature" );
+    }
+    auto sliceTemperatureConduction()
+    {
+        return Cabana::slice<1>( _aosoa_temp, "temperature_conduction" );
+    }
+    auto sliceTemperatureConduction() const
+    {
+        return Cabana::slice<1>( _aosoa_temp, "temperature_conduction" );
+    }
+    auto sliceTemperatureConductionAtomic()
+    {
+        auto temp = sliceTemperature();
+        using slice_type = decltype( temp );
+        using atomic_type = typename slice_type::atomic_access_slice;
+        atomic_type temp_a = temp;
+        return temp_a;
     }
 
     void resize( int new_local, int new_ghost )
