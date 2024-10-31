@@ -171,8 +171,6 @@ void crackBranchingExample( const std::string filename )
     {
         auto xpos = x( pid, 0 );
         auto ypos = x( pid, 1 );
-        auto sign = std::abs( ypos ) / ypos;
-
         if ( ( xpos - x_pin ) * ( xpos - x_pin ) +
                  ( std::abs( ypos ) - y_pin ) * ( std::abs( ypos ) - y_pin ) <
              R * R )
