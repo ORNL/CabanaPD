@@ -70,11 +70,11 @@
 namespace CabanaPD
 {
 template <class ExecutionSpace>
-class Force<ExecutionSpace, ForceModel<LPS, NoFracture>>
+class Force<ExecutionSpace, ForceModel<LPS, Elastic, NoFracture>>
 {
   protected:
     bool _half_neigh;
-    ForceModel<LPS, NoFracture> _model;
+    ForceModel<LPS, Elastic, NoFracture> _model;
 
     Timer _timer;
     Timer _energy_timer;
@@ -82,7 +82,8 @@ class Force<ExecutionSpace, ForceModel<LPS, NoFracture>>
   public:
     using exec_space = ExecutionSpace;
 
-    Force( const bool half_neigh, const ForceModel<LPS, NoFracture> model )
+    Force( const bool half_neigh,
+           const ForceModel<LPS, Elastic, NoFracture> model )
         : _half_neigh( half_neigh )
         , _model( model )
     {
@@ -253,13 +254,14 @@ class Force<ExecutionSpace, ForceModel<LPS, NoFracture>>
 };
 
 template <class ExecutionSpace>
-class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
-    : public Force<ExecutionSpace, ForceModel<LPS, NoFracture>>
+class Force<ExecutionSpace, ForceModel<LPS, Elastic, Fracture>>
+    : public Force<ExecutionSpace, ForceModel<LPS, Elastic, NoFracture>>
 {
   protected:
-    using base_type = Force<ExecutionSpace, ForceModel<LPS, NoFracture>>;
+    using base_type =
+        Force<ExecutionSpace, ForceModel<LPS, Elastic, NoFracture>>;
     using base_type::_half_neigh;
-    ForceModel<LPS, Fracture> _model;
+    ForceModel<LPS, Elastic, Fracture> _model;
 
     using base_type::_energy_timer;
     using base_type::_timer;
@@ -267,7 +269,8 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
   public:
     using exec_space = ExecutionSpace;
 
-    Force( const bool half_neigh, const ForceModel<LPS, Fracture> model )
+    Force( const bool half_neigh,
+           const ForceModel<LPS, Elastic, Fracture> model )
         : base_type( half_neigh, model )
         , _model( model )
     {
@@ -499,13 +502,14 @@ class Force<ExecutionSpace, ForceModel<LPS, Fracture>>
 };
 
 template <class ExecutionSpace>
-class Force<ExecutionSpace, ForceModel<LinearLPS, NoFracture>>
-    : public Force<ExecutionSpace, ForceModel<LPS, NoFracture>>
+class Force<ExecutionSpace, ForceModel<LinearLPS, Elastic, NoFracture>>
+    : public Force<ExecutionSpace, ForceModel<LPS, Elastic, NoFracture>>
 {
   protected:
-    using base_type = Force<ExecutionSpace, ForceModel<LPS, NoFracture>>;
+    using base_type =
+        Force<ExecutionSpace, ForceModel<LPS, Elastic, NoFracture>>;
     using base_type::_half_neigh;
-    ForceModel<LinearLPS, NoFracture> _model;
+    ForceModel<LinearLPS, Elastic, NoFracture> _model;
 
     using base_type::_energy_timer;
     using base_type::_timer;
@@ -514,7 +518,7 @@ class Force<ExecutionSpace, ForceModel<LinearLPS, NoFracture>>
     using exec_space = ExecutionSpace;
 
     Force( const bool half_neigh,
-           const ForceModel<LinearLPS, NoFracture> model )
+           const ForceModel<LinearLPS, Elastic, NoFracture> model )
         : base_type( half_neigh, model )
         , _model( model )
     {
