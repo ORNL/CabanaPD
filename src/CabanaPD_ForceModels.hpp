@@ -112,6 +112,7 @@ struct BaseDynamicTemperatureModel
 };
 
 template <typename ModelType, typename DamageType,
+          typename PlasticityType = Elastic,
           typename ThermalType = TemperatureIndependent, typename... DataTypes>
 struct ForceModel;
 

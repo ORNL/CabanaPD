@@ -19,11 +19,13 @@
 namespace CabanaPD
 {
 template <>
-struct ForceModel<PMB, Elastic, TemperatureIndependent> : public BaseForceModel
+struct ForceModel<PMB, NoFracture, Elastic, TemperatureIndependent>
+    : public BaseForceModel
 {
     using base_type = BaseForceModel;
     using base_model = PMB;
-    using fracture_type = Elastic;
+    using fracture_type = NoFracture;
+    using plasticity_type = Elastic;
     using thermal_type = TemperatureIndependent;
 
     using base_type::delta;
@@ -54,12 +56,13 @@ struct ForceModel<PMB, Elastic, TemperatureIndependent> : public BaseForceModel
 };
 
 template <>
-struct ForceModel<PMB, Fracture, TemperatureIndependent>
-    : public ForceModel<PMB, Elastic, TemperatureIndependent>
+struct ForceModel<PMB, Fracture, Elastic, TemperatureIndependent>
+    : public ForceModel<PMB, NoFracture, Elastic, TemperatureIndependent>
 {
-    using base_type = ForceModel<PMB, Elastic>;
+    using base_type = ForceModel<PMB, NoFracture>;
     using base_model = typename base_type::base_model;
     using fracture_type = Fracture;
+    using plasticity_type = Elastic;
     using thermal_type = base_type::thermal_type;
 
     using base_type::c;
@@ -101,12 +104,14 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent>
 };
 
 template <>
-struct ForceModel<PMB, Fracture, TemperatureIndependent, Plastic>
-    : public ForceModel<PMB, Fracture, TemperatureIndependent>
+struct ForceModel<PMB, Fracture, Plastic, TemperatureIndependent>
+    : public ForceModel<PMB, Fracture, Elastic, TemperatureIndependent>,
+      ForceModel<PMB, NoFracture, Plastic, TemperatureIndependent>
 {
     using base_type = ForceModel<PMB, Fracture>;
     using base_model = typename base_type::base_model;
     using fracture_type = Fracture;
+    using plasticity_type = Plastic;
     using thermal_type = base_type::thermal_type;
 
     // Purposely not using the (static) base class bond_break_coeff
@@ -137,12 +142,13 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent, Plastic>
 };
 
 template <>
-struct ForceModel<LinearPMB, Elastic, TemperatureIndependent>
-    : public ForceModel<PMB, Elastic, TemperatureIndependent>
+struct ForceModel<LinearPMB, NoFracture, Elastic, TemperatureIndependent>
+    : public ForceModel<PMB, NoFracture, Elastic, TemperatureIndependent>
 {
-    using base_type = ForceModel<PMB, Elastic>;
+    using base_type = ForceModel<PMB, NoFracture>;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
+    using plasticity_type = Elastic;
     using thermal_type = base_type::thermal_type;
 
     using base_type::base_type;
@@ -153,12 +159,13 @@ struct ForceModel<LinearPMB, Elastic, TemperatureIndependent>
 };
 
 template <>
-struct ForceModel<LinearPMB, Fracture, TemperatureIndependent>
-    : public ForceModel<PMB, Fracture, TemperatureIndependent>
+struct ForceModel<LinearPMB, Fracture, Elastic, TemperatureIndependent>
+    : public ForceModel<PMB, Fracture, Elastic, TemperatureIndependent>
 {
     using base_type = ForceModel<PMB, Fracture>;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
+    using plasticity_type = Elastic;
     using thermal_type = base_type::thermal_type;
 
     using base_type::base_type;
@@ -173,14 +180,17 @@ struct ForceModel<LinearPMB, Fracture, TemperatureIndependent>
 };
 
 template <typename TemperatureType>
-struct ForceModel<PMB, Elastic, TemperatureDependent, TemperatureType>
-    : public ForceModel<PMB, Elastic, TemperatureIndependent>,
+struct ForceModel<PMB, NoFracture, Elastic, TemperatureDependent,
+                  TemperatureType>
+    : public ForceModel<PMB, NoFracture, Elastic, TemperatureIndependent>,
       BaseTemperatureModel<TemperatureType>
 {
-    using base_type = ForceModel<PMB, Elastic, TemperatureIndependent>;
+    using base_type =
+        ForceModel<PMB, NoFracture, Elastic, TemperatureIndependent>;
     using base_temperature_type = BaseTemperatureModel<TemperatureType>;
     using base_model = PMB;
-    using fracture_type = Elastic;
+    using fracture_type = NoFracture;
+    using plasticity_type = Elastic;
     using thermal_type = TemperatureDependent;
 
     using base_type::c;
@@ -213,24 +223,27 @@ struct ForceModel<PMB, Elastic, TemperatureDependent, TemperatureType>
 };
 
 template <typename ParticleType>
-auto createForceModel( PMB, Elastic, ParticleType particles, const double delta,
-                       const double K, const double alpha, const double temp0 )
+auto createForceModel( PMB, NoFracture, ParticleType particles,
+                       const double delta, const double K, const double alpha,
+                       const double temp0 )
 {
     auto temp = particles.sliceTemperature();
     using temp_type = decltype( temp );
-    return ForceModel<PMB, Elastic, TemperatureDependent, temp_type>(
-        delta, K, temp, alpha, temp0 );
+    return ForceModel<PMB, NoFracture, Elastic, TemperatureDependent,
+                      temp_type>( delta, K, temp, alpha, temp0 );
 }
 
 template <typename TemperatureType>
-struct ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>
-    : public ForceModel<PMB, Fracture, TemperatureIndependent>,
+struct ForceModel<PMB, Fracture, Elastic, TemperatureDependent, TemperatureType>
+    : public ForceModel<PMB, Fracture, Elastic, TemperatureIndependent>,
       BaseTemperatureModel<TemperatureType>
 {
-    using base_type = ForceModel<PMB, Fracture, TemperatureIndependent>;
+    using base_type =
+        ForceModel<PMB, Fracture, Elastic, TemperatureIndependent>;
     using base_temperature_type = BaseTemperatureModel<TemperatureType>;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
+    using plasticity_type = Elastic;
     using thermal_type = TemperatureDependent;
 
     using base_type::c;
@@ -284,7 +297,7 @@ auto createForceModel( PMB, Fracture, ParticleType particles,
 {
     auto temp = particles.sliceTemperature();
     using temp_type = decltype( temp );
-    return ForceModel<PMB, Fracture, TemperatureDependent, temp_type>(
+    return ForceModel<PMB, Fracture, Elastic, TemperatureDependent, temp_type>(
         delta, K, G0, temp, alpha, temp0 );
 }
 

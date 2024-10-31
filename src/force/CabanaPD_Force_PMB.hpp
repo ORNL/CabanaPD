@@ -71,12 +71,12 @@
 namespace CabanaPD
 {
 template <class ExecutionSpace, class... ModelParams>
-class Force<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
+class Force<ExecutionSpace, ForceModel<PMB, NoFracture, ModelParams...>>
     : public Force<ExecutionSpace, BaseForceModel>
 {
   public:
     using exec_space = ExecutionSpace;
-    using model_type = ForceModel<PMB, Elastic, ModelParams...>;
+    using model_type = ForceModel<PMB, NoFracture, ModelParams...>;
     using base_type = Force<exec_space, BaseForceModel>;
 
   protected:
@@ -343,12 +343,12 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
 };
 
 template <class ExecutionSpace, class... ModelParams>
-class Force<ExecutionSpace, ForceModel<LinearPMB, Elastic, ModelParams...>>
+class Force<ExecutionSpace, ForceModel<LinearPMB, NoFracture, ModelParams...>>
     : public Force<ExecutionSpace, BaseForceModel>
 {
   public:
     using exec_space = ExecutionSpace;
-    using model_type = ForceModel<LinearPMB, Elastic, TemperatureIndependent>;
+    using model_type = ForceModel<LinearPMB, NoFracture>;
 
   protected:
     using base_type = Force<ExecutionSpace, BaseForceModel>;

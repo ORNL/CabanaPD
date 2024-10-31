@@ -55,7 +55,7 @@ void elasticWaveExample( const std::string filename )
     //                    Force model
     // ====================================================
     using model_type =
-        CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::Elastic>;
+        CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::NoFracture>;
     model_type force_model( delta, K, G );
 
     // ====================================================
@@ -100,7 +100,7 @@ void elasticWaveExample( const std::string filename )
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
+    auto cabana_pd = CabanaPD::createSolverNoFracture<memory_space>(
         inputs, particles, force_model );
 
     // ====================================================
