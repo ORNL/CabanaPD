@@ -763,7 +763,7 @@ TEST( TEST_CATEGORY, test_force_pmb )
     double dx = 2.0 / 11.0;
     double delta = dx * m;
     double K = 1.0;
-    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic> model( delta, K );
+    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::NoFracture> model( delta, K );
     testForce( model, NoDamageTag{}, dx, m, 1.1, LinearTag{}, 0.1 );
     testForce( model, NoDamageTag{}, dx, m, 1.1, QuadraticTag{}, 0.01 );
 }
@@ -773,8 +773,8 @@ TEST( TEST_CATEGORY, test_force_linear_pmb )
     double dx = 2.0 / 11.0;
     double delta = dx * m;
     double K = 1.0;
-    CabanaPD::ForceModel<CabanaPD::LinearPMB, CabanaPD::Elastic> model( delta,
-                                                                        K );
+    CabanaPD::ForceModel<CabanaPD::LinearPMB, CabanaPD::NoFracture> model(
+        delta, K );
     testForce( model, NoDamageTag{}, dx, m, 1.1, LinearTag{}, 0.1 );
 }
 TEST( TEST_CATEGORY, test_force_lps )
@@ -785,8 +785,8 @@ TEST( TEST_CATEGORY, test_force_lps )
     double delta = dx * m;
     double K = 1.0;
     double G = 0.5;
-    CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Elastic> model( delta, K, G,
-                                                                  1 );
+    CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::NoFracture> model( delta, K,
+                                                                     G, 1 );
     testForce( model, NoDamageTag{}, dx, m, 2.1, LinearTag{}, 0.1 );
     testForce( model, NoDamageTag{}, dx, m, 2.1, QuadraticTag{}, 0.01 );
 }
@@ -797,7 +797,7 @@ TEST( TEST_CATEGORY, test_force_linear_lps )
     double delta = dx * m;
     double K = 1.0;
     double G = 0.5;
-    CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::Elastic> model(
+    CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::NoFracture> model(
         delta, K, G, 1 );
     testForce( model, NoDamageTag{}, dx, m, 2.1, LinearTag{}, 0.1 );
 }
