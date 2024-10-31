@@ -70,13 +70,15 @@
 
 namespace CabanaPD
 {
-template <class ExecutionSpace, class... ModelParams>
-class Force<ExecutionSpace, ForceModel<PMB, NoFracture, ModelParams...>>
+template <class ExecutionSpace, class PlasticityType, class... ModelParams>
+class Force<ExecutionSpace,
+            ForceModel<PMB, PlasticityType, NoFracture, ModelParams...>>
     : public Force<ExecutionSpace, BaseForceModel>
 {
   public:
     using exec_space = ExecutionSpace;
-    using model_type = ForceModel<PMB, NoFracture, ModelParams...>;
+    using model_type =
+        ForceModel<PMB, PlasticityType, NoFracture, ModelParams...>;
     using base_type = Force<exec_space, BaseForceModel>;
 
   protected:
@@ -175,13 +177,15 @@ class Force<ExecutionSpace, ForceModel<PMB, NoFracture, ModelParams...>>
     }
 };
 
-template <class ExecutionSpace, class... ModelParams>
-class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
+template <class ExecutionSpace, class PlasticityType, class... ModelParams>
+class Force<ExecutionSpace,
+            ForceModel<PMB, PlasticityType, Fracture, ModelParams...>>
     : public Force<ExecutionSpace, BaseForceModel>
 {
   public:
     using exec_space = ExecutionSpace;
-    using model_type = ForceModel<PMB, Fracture, ModelParams...>;
+    using model_type =
+        ForceModel<PMB, PlasticityType, Fracture, ModelParams...>;
 
   protected:
     using base_model_type = typename model_type::base_type;
@@ -314,13 +318,15 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
     }
 };
 
-template <class ExecutionSpace, class... ModelParams>
-class Force<ExecutionSpace, ForceModel<LinearPMB, NoFracture, ModelParams...>>
+template <class ExecutionSpace, class PlasticityType, class... ModelParams>
+class Force<ExecutionSpace,
+            ForceModel<LinearPMB, PlasticityType, NoFracture, ModelParams...>>
     : public Force<ExecutionSpace, BaseForceModel>
 {
   public:
     using exec_space = ExecutionSpace;
-    using model_type = ForceModel<LinearPMB, NoFracture>;
+    using model_type =
+        ForceModel<LinearPMB, PlasticityType, NoFracture, ModelParams...>;
 
   protected:
     using base_type = Force<ExecutionSpace, BaseForceModel>;

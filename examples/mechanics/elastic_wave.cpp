@@ -55,7 +55,8 @@ void elasticWaveExample( const std::string filename )
     //                    Force model
     // ====================================================
     using model_type =
-        CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::NoFracture>;
+        CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::Elastic,
+                             CabanaPD::NoFracture>;
     model_type force_model( delta, K, G );
 
     // ====================================================
