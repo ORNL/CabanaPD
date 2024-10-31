@@ -117,7 +117,7 @@ class Force<ExecutionSpace, ForceModel<PMB, NoFracture, ModelParams...>>
 
             model.thermalStretch( s, i, j );
 
-            const double coeff = model.c * s * vol( j );
+            const double coeff = model.forceCoeff( s, vol( j ) );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -156,9 +156,7 @@ class Force<ExecutionSpace, ForceModel<PMB, NoFracture, ModelParams...>>
 
             model.thermalStretch( s, i, j );
 
-            // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
-            // the integrand (pairwise potential).
-            double w = 0.25 * model.c * s * s * xi * vol( j );
+            double w = model.energyCoeff( s, xi, vol( j ) );
             W( i ) += w;
             Phi += w * vol( i );
         };
@@ -243,19 +241,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
                 // Else if statement is only for performance.
                 else if ( mu( i, n ) > 0 )
                 {
-                    const double s_Y = 0.0014;
-                    // const double coeff = model.c * s * vol( j );
-
-                    double coeff = 0;
-
-                    if ( s < s_Y )
-                    {
-                        coeff = model.c * s * vol( j );
-                    }
-                    else
-                    {
-                        coeff = model.c * s_Y * vol( j );
-                    }
+                    const double coeff = model.forceCoeff( s, vol( j ) );
 
                     double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;
@@ -306,23 +292,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
 
                 model.thermalStretch( s, i, j );
 
-                // 0.25 factor is due to 1/2 from outside the integral and 1/2
-                // from the integrand (pairwise potential).
-                // double w = mu( i, n ) * 0.25 * model.c * s * s * xi * vol( j
-                // );
-
-                const double s_Y = 0.0014;
-
-                if ( s < s_Y )
-                {
-                    w = mu( i, n ) * 0.25 * model.c * s * s * xi * vol( j );
-                }
-                else
-                {
-                    w = mu( i, n ) * 0.25 * model.c * s_Y * ( 2 * s - s_Y ) *
-                        xi * vol( j );
-                }
-
+                double w = mu( i, n ) * model.energyCoeff( s, xi, vol( j ) );
                 W( i ) += w;
 
                 phi_i += mu( i, n ) * vol( j );
@@ -391,7 +361,7 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, NoFracture, ModelParams...>>
 
             model.thermalStretch( linear_s, i, j );
 
-            const double coeff = model.c * linear_s * vol( j );
+            const double coeff = model.forceCoeff( linear_s, vol( j ) );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
             fz_i = coeff * xi_z / xi;
@@ -430,9 +400,7 @@ class Force<ExecutionSpace, ForceModel<LinearPMB, NoFracture, ModelParams...>>
 
             model.thermalStretch( linear_s, i, j );
 
-            // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
-            // the integrand (pairwise potential).
-            double w = 0.25 * model.c * linear_s * linear_s * xi * vol( j );
+            double w = model.energyCoeff( linear_s, xi, vol( j ) );
             W( i ) += w;
             Phi += w * vol( i );
         };
