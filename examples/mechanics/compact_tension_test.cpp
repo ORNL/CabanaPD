@@ -100,12 +100,14 @@ void crackBranchingExample( const std::string filename )
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
     {
         // Thin rectangle
-        if ( x[0] < low_corner[1] + 0.25 * W + a && abs( x[1] ) < 0.5 * dy )
+        if ( x[0] < low_corner[1] + 0.25 * W + a &&
+             Kokkos::abs( x[1] ) < 0.5 * dy )
         {
             return false;
         }
         // Thick rectangle
-        else if ( x[0] < low_corner[1] + 0.25 * W && abs( x[1] ) < 25e-4 )
+        else if ( x[0] < low_corner[1] + 0.25 * W &&
+                  Kokkos::abs( x[1] ) < 25e-4 )
         {
             return false;
         }
@@ -140,8 +142,8 @@ void crackBranchingExample( const std::string filename )
         auto ypos = x( pid, 1 );
         auto distsq =
             ( xpos - x_pin ) * ( xpos - x_pin ) +
-            ( std::abs( ypos ) - y_pin ) * ( std::abs( ypos ) - y_pin );
-        auto sign = std::abs( ypos ) / ypos;
+            ( Kokkos::abs( ypos ) - y_pin ) * ( Kokkos::abs( ypos ) - y_pin );
+        auto sign = Kokkos::abs( ypos ) / ypos;
 
         // pins' y-velocity
         if ( distsq < R * R )
@@ -172,7 +174,8 @@ void crackBranchingExample( const std::string filename )
         auto xpos = x( pid, 0 );
         auto ypos = x( pid, 1 );
         if ( ( xpos - x_pin ) * ( xpos - x_pin ) +
-                 ( std::abs( ypos ) - y_pin ) * ( std::abs( ypos ) - y_pin ) <
+                 ( Kokkos::abs( ypos ) - y_pin ) *
+                     ( Kokkos::abs( ypos ) - y_pin ) <
              R * R )
             f( pid, 1 ) = 0;
     };
