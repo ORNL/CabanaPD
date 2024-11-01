@@ -228,6 +228,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
         _init_timer.stop();
     }
 
+    // FIXME: extra option here only meant for quick route to disk impact.
     template <class ExecSpace>
     void createParticles( const ExecSpace& exec_space )
     {
@@ -397,9 +398,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     auto getForce() { return _plist_f; }
     auto getReferencePosition() { return _plist_x; }
 
-    void updateCurrentPosition()
+    void updateCurrentPosition() const
     {
-        _timer.start();
+        //_timer.start();
         // Not using slice function because this is called inside.
         auto y = Cabana::slice<0>( _aosoa_y, "current_positions" );
         auto x = sliceReferencePosition();
@@ -412,7 +413,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
         };
         Kokkos::parallel_for( "CabanaPD::CalculateCurrentPositions", policy,
                               sum_x_u );
-        _timer.stop();
+        //_timer.stop();
     }
 
     void resize( int new_local, int new_ghost )

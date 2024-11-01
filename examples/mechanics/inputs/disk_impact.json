@@ -1,0 +1,16 @@
+{
+    "num_cells"              : {"value": [149, 149, 5]},
+    "low_corner"             : {"value": [-0.037, -0.037, 2.5e-3], "unit": "m"},
+    "high_corner"            : {"value": [0.037, 0.037, 0.0], "unit": "m"},
+    "density"                : {"value": 2200.0, "unit": "kg/m^3"},
+    "bulk_modulus"           : {"value": 14.9e+9, "unit": "Pa"},
+    "fracture_energy"        : {"value": 10.0575, "unit": "J/m^2"},
+    "horizon"                : {"value": 0.0015, "unit": "m"},   
+    "final_time"             : {"value": 2.0e-4, "unit": "s"},
+    "timestep"               : {"value": 1.0e-7,  "unit": "s"},
+    "timestep_safety_factor" : {"value": 0.85},
+    "output_frequency"       : {"value": 50},
+    "output_reference"       : {"value": false},
+    "impactor_radius"        : {"value": 5e-3, "unit": "m"},
+    "impactor_velocity"      : {"value": -100.0, "unit": "m/s"}
+}
