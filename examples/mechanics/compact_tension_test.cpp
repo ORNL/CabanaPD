@@ -18,9 +18,8 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate the Kalthoff-Winkler experiment of crack propagation in
-// a pre-notched steel plate due to impact.
-void kalthoffWinklerExample( const std::string filename )
+// Simulate crack propagation in a compact tension test.
+void crackBranchingExample( const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
@@ -38,10 +37,9 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     double rho0 = inputs["density"];
     double E = inputs["elastic_modulus"];
-    double nu = 1.0 / 3.0;
-    double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) );
+    double nu = 0.25; // Use bond-based model
+    double K = E / ( 3 * ( 1 - 2 * nu ) );
     double G0 = inputs["fracture_energy"];
-    // double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
     double delta = inputs["horizon"];
     delta += 1e-10;
 
@@ -51,64 +49,109 @@ void kalthoffWinklerExample( const std::string filename )
     // FIXME: set halo width based on delta
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
-    std::array<int, 3> num_cells = inputs["num_cells"];
-    int m = std::floor( delta /
-                        ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
-    int halo_width = m + 1; // Just to be safe.
 
     // ====================================================
-    //                   Pre-notches
+    //                    Pre-notch
     // ====================================================
-    std::array<double, 3> system_size = inputs["system_size"];
-    double height = system_size[0];
-    double width = system_size[1];
-    double thickness = system_size[2];
+    double height = inputs["system_size"][0];
+    double thickness = inputs["system_size"][2];
     double L_prenotch = height / 2.0;
-    double y_prenotch1 = -width / 8.0;
-    double y_prenotch2 = width / 8.0;
-    double low_x = low_corner[0];
-    double low_z = low_corner[2];
-    Kokkos::Array<double, 3> p01 = { low_x, y_prenotch1, low_z };
-    Kokkos::Array<double, 3> p02 = { low_x, y_prenotch2, low_z };
+    double y_prenotch1 = 0.0;
+    Kokkos::Array<double, 3> p01 = { low_corner[0], y_prenotch1,
+                                     low_corner[2] };
     Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
     Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-    Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { p01, p02 };
-    CabanaPD::Prenotch<2> prenotch( v1, v2, notch_positions );
+    Kokkos::Array<Kokkos::Array<double, 3>, 1> notch_positions = { p01 };
+    CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
 
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type = CabanaPD::ForceModel<CabanaPD::PMB>;
+    using model_type = CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Plastic>;
     model_type force_model( delta, K, G0 );
-    // using model_type =
-    //     CabanaPD::ForceModel<CabanaPD::LPS>;
-    // model_type force_model( delta, K, G, G0 );
 
     // ====================================================
     //                 Particle generation
     // ====================================================
-    // Does not set displacements, velocities, etc.
+    // Note that individual inputs can be passed instead (see other examples).
     auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space(), low_corner, high_corner, num_cells, halo_width );
+        exec_space{}, inputs );
 
     // ====================================================
-    //            Custom particle initialization
+    //    Custom particle generation and initialization
     // ====================================================
+
+    // Rectangular prism containing the full specimen: original geometry
+    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane(
+        low_corner[0], high_corner[0], low_corner[1], high_corner[1],
+        low_corner[2], high_corner[2] );
+    std::vector<CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>> planes = {
+        plane };
+
+    // Geometric parameters of specimen
+    double L = inputs["system_size"][1];
+    double W = L / 1.25;
+    double a = 0.45 * W;
+
+    // Grid spacing in y-direction
+    double dy = particles->dx[1];
+
+    // Remove particles from original geometry
+    auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
+    {
+        // Thin rectangle
+        if ( x[0] < low_corner[1] + 0.25 * W + a &&
+             Kokkos::abs( x[1] ) < 0.5 * dy )
+        {
+            return false;
+        }
+        // Thick rectangle
+        else if ( x[0] < low_corner[1] + 0.25 * W &&
+                  Kokkos::abs( x[1] ) < 25e-4 )
+        {
+            return false;
+        }
+        else
+        {
+            return true;
+        }
+    };
+
+    particles->createParticles( exec_space(), init_op );
+
     auto rho = particles->sliceDensity();
     auto x = particles->sliceReferencePosition();
     auto v = particles->sliceVelocity();
     auto f = particles->sliceForce();
+    auto nofail = particles->sliceNoFail();
 
-    double dx = particles->dx[0];
-    double v0 = inputs["impactor_velocity"];
+    // Pin radius
+    double R = 4e-3;
+    // Pin center coordinates (top)
+    double x_pin = low_corner[0] + 0.25 * W;
+    double y_pin = 0.37 * W;
+    // Pin velocity magnitude
+    double v0 = inputs["pin_velocity"];
+
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
-        // x velocity between the pre-notches
-        if ( x( pid, 1 ) > y_prenotch1 && x( pid, 1 ) < y_prenotch2 &&
-             x( pid, 0 ) < -0.5 * height + dx )
-            v( pid, 0 ) = v0;
+
+        auto xpos = x( pid, 0 );
+        auto ypos = x( pid, 1 );
+        auto distsq =
+            ( xpos - x_pin ) * ( xpos - x_pin ) +
+            ( Kokkos::abs( ypos ) - y_pin ) * ( Kokkos::abs( ypos ) - y_pin );
+        auto sign = Kokkos::abs( ypos ) / ypos;
+
+        // pins' y-velocity
+        if ( distsq < R * R )
+            v( pid, 1 ) = sign * v0;
+
+        // No-fail zone
+        if ( distsq < ( 2 * R ) * ( 2 * R ) )
+            nofail( pid ) = 1;
     };
     particles->updateParticles( exec_space{}, init_functor );
 
@@ -121,13 +164,23 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     //                Boundary conditions
     // ====================================================
+
     // Create BC last to ensure ghost particles are included.
-    double x_bc = -0.5 * height;
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane(
-        x_bc - dx, x_bc + dx, y_prenotch1 - 0.25 * dx, y_prenotch2 + 0.25 * dx,
-        -thickness, thickness );
-    auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
-                                       exec_space{}, *particles, plane );
+    f = particles->sliceForce();
+    x = particles->sliceReferencePosition();
+    // Create a symmetric force BC in the y-direction.
+    auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
+    {
+        auto xpos = x( pid, 0 );
+        auto ypos = x( pid, 1 );
+        if ( ( xpos - x_pin ) * ( xpos - x_pin ) +
+                 ( Kokkos::abs( ypos ) - y_pin ) *
+                     ( Kokkos::abs( ypos ) - y_pin ) <
+             R * R )
+            f( pid, 1 ) = 0;
+    };
+    auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, planes,
+                                       true );
 
     // ====================================================
     //                   Simulation run
@@ -142,7 +195,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    kalthoffWinklerExample( argv[1] );
+    crackBranchingExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();

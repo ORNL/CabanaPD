@@ -14,12 +14,20 @@
 
 namespace CabanaPD
 {
-struct Elastic
+struct NoFracture
 {
 };
 struct Fracture
 {
 };
+
+struct Elastic
+{
+};
+struct Plastic
+{
+};
+
 struct TemperatureDependent
 {
 };
