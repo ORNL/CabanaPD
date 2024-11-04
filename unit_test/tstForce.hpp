@@ -36,6 +36,8 @@
 #include <force/CabanaPD_Force_LPS.hpp>
 #include <force/CabanaPD_Force_PMB.hpp>
 
+#include <type_traits>
+
 namespace Test
 {
 struct LinearTag
@@ -54,11 +56,12 @@ struct QuadraticTag
 //---------------------------------------------------------------------------//
 // Get the PMB strain energy density (at the center point).
 // Simplified here because the stretch is constant.
-template <class DamageType>
+template <class ModelType>
 double computeReferenceStrainEnergyDensity(
-    LinearTag,
-    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic, DamageType> model,
-    const int m, const double s0, const double )
+    LinearTag, ModelType model, const int m, const double s0, const double,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        int>::type* = 0 )
 {
     double W = 0.0;
     double dx = model.delta / m;
@@ -80,11 +83,13 @@ double computeReferenceStrainEnergyDensity(
     return W;
 }
 
-template <class DamageType>
+template <class ModelType>
 double computeReferenceStrainEnergyDensity(
-    QuadraticTag,
-    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic, DamageType> model,
-    const int m, const double u11, const double x )
+    QuadraticTag, ModelType model, const int m, const double u11,
+    const double x,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        int>::type* = 0 )
 {
     double W = 0.0;
     double dx = model.delta / m;
@@ -121,11 +126,13 @@ double computeReferenceForceX( LinearTag, ModelType, const int, const double,
 
 // Get the PMB force (at one point).
 // Assumes zero y/z displacement components.
-template <class DamageType>
+template <class ModelType>
 double computeReferenceForceX(
-    QuadraticTag,
-    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic, DamageType> model,
-    const int m, const double u11, const double x )
+    QuadraticTag, ModelType model, const int m, const double u11,
+    const double x,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        int>::type* = 0 )
 {
     double fx = 0.0;
     double dx = model.delta / m;
@@ -249,11 +256,12 @@ double computeReferenceNeighbors( const double delta, const int m )
 }
 
 // Get the LPS strain energy density (at one point).
-template <class DamageType>
+template <class ModelType>
 double computeReferenceStrainEnergyDensity(
-    LinearTag,
-    CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Elastic, DamageType> model,
-    const int m, const double s0, const double )
+    LinearTag, ModelType model, const int m, const double s0, const double,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        int>::type* = 0 )
 {
     double W = 0.0;
     double dx = model.delta / m;
@@ -286,11 +294,13 @@ double computeReferenceStrainEnergyDensity(
     return W;
 }
 
-template <class DamageType>
+template <class ModelType>
 double computeReferenceStrainEnergyDensity(
-    QuadraticTag,
-    CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Elastic, DamageType> model,
-    const int m, const double u11, const double x )
+    QuadraticTag, ModelType model, const int m, const double u11,
+    const double x,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        int>::type* = 0 )
 {
     double W = 0.0;
     double dx = model.delta / m;
@@ -334,11 +344,13 @@ double computeReferenceStrainEnergyDensity(
 
 // Get the LPS strain energy density (at one point).
 // Assumes zero y/z displacement components.
-template <class DamageType>
+template <class ModelType>
 double computeReferenceForceX(
-    QuadraticTag,
-    CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Elastic, DamageType> model,
-    const int m, const double u11, const double x )
+    QuadraticTag, ModelType model, const int m, const double u11,
+    const double x,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        int>::type* = 0 )
 {
     double fx = 0.0;
     double dx = model.delta / m;
@@ -536,11 +548,12 @@ void checkParticle( QuadraticTag tag, ModelType model, const double s0,
     checkAnalyticalStrainEnergy( tag, model, s0, W, x );
 }
 
-template <class DamageType>
+template <class ModelType>
 void checkAnalyticalStrainEnergy(
-    LinearTag,
-    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic, DamageType> model,
-    const double s0, const double W, const double )
+    LinearTag, ModelType model, const double s0, const double W, const double,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        int>::type* = 0 )
 {
     // Relatively large error for small m.
     double threshold = W * 0.15;
@@ -548,22 +561,25 @@ void checkAnalyticalStrainEnergy(
     EXPECT_NEAR( W, analytical_W, threshold );
 }
 
-template <class DamageType>
+template <class ModelType>
 void checkAnalyticalStrainEnergy(
-    LinearTag,
-    CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Elastic, DamageType> model,
-    const double s0, const double W, const double )
+    LinearTag, ModelType model, const double s0, const double W, const double,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        int>::type* = 0 )
 {
     // LPS is exact.
     double analytical_W = 9.0 / 2.0 * model.K * s0 * s0;
     EXPECT_FLOAT_EQ( W, analytical_W );
 }
 
-template <class DamageType>
+template <class ModelType>
 void checkAnalyticalStrainEnergy(
-    QuadraticTag,
-    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic, DamageType> model,
-    const double u11, const double W, const double x )
+    QuadraticTag, ModelType model, const double u11, const double W,
+    const double x,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        int>::type* = 0 )
 {
     double threshold = W * 0.05;
     double analytical_W =
@@ -572,11 +588,13 @@ void checkAnalyticalStrainEnergy(
     EXPECT_NEAR( W, analytical_W, threshold );
 }
 
-template <class DamageType>
+template <class ModelType>
 void checkAnalyticalStrainEnergy(
-    QuadraticTag,
-    CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Elastic, DamageType> model,
-    const double u11, const double W, const double x )
+    QuadraticTag, ModelType model, const double u11, const double W,
+    const double x,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        int>::type* = 0 )
 {
     double threshold = W * 0.20;
     double analytical_W =
@@ -586,40 +604,46 @@ void checkAnalyticalStrainEnergy(
     EXPECT_NEAR( W, analytical_W, threshold );
 }
 
-template <class DamageType>
+template <class ModelType>
 void checkAnalyticalForce(
-    QuadraticTag,
-    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic, DamageType> model,
-    const double s0, const double fx )
+    QuadraticTag, ModelType model, const double s0, const double fx,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        int>::type* = 0 )
 {
     double threshold = fx * 0.10;
     double analytical_f = 18.0 / 5.0 * model.K * s0;
     EXPECT_NEAR( fx, analytical_f, threshold );
 }
 
-template <class DamageType>
+template <class ModelType>
 void checkAnalyticalForce(
-    QuadraticTag,
-    CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Elastic, DamageType> model,
-    const double s0, const double fx )
+    QuadraticTag, ModelType model, const double s0, const double fx,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        int>::type* = 0 )
 {
     double threshold = fx * 0.10;
     double analytical_f = 2.0 * ( model.K + 4.0 / 3.0 * model.G ) * s0;
     EXPECT_NEAR( fx, analytical_f, threshold );
 }
 
-template <class DamageType>
+template <class ModelType>
 void checkAnalyticalDilatation(
-    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic, DamageType>,
-    LinearTag, const double, const double theta )
+    ModelType, LinearTag, const double, const double theta,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        int>::type* = 0 )
 {
     EXPECT_FLOAT_EQ( 0.0, theta );
 }
 
-template <class DamageType>
+template <class ModelType>
 void checkAnalyticalDilatation(
-    CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Elastic, DamageType>,
-    LinearTag, const double s0, const double theta )
+    ModelType, LinearTag, const double s0, const double theta,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        int>::type* = 0 )
 {
     EXPECT_FLOAT_EQ( 3 * s0, theta );
 }
@@ -630,15 +654,8 @@ void checkAnalyticalDilatation( ModelType, QuadraticTag, const double,
 {
 }
 
-struct DamageTag
-{
-};
-struct NoDamageTag
-{
-};
-
 template <class ForceType, class ParticleType>
-double computeEnergyAndForce( NoDamageTag, ForceType force,
+double computeEnergyAndForce( CabanaPD::NoFracture, ForceType force,
                               ParticleType& particles, const int )
 {
     computeForce( force, particles, Cabana::SerialOpTag() );
@@ -646,7 +663,7 @@ double computeEnergyAndForce( NoDamageTag, ForceType force,
     return Phi;
 }
 template <class ForceType, class ParticleType>
-double computeEnergyAndForce( DamageTag, ForceType force,
+double computeEnergyAndForce( CabanaPD::Fracture, ForceType force,
                               ParticleType& particles, const int max_neighbors )
 {
     Kokkos::View<int**, TEST_MEMSPACE> mu(
@@ -695,10 +712,10 @@ void copyTheta( CabanaPD::LPS, ParticleType particles, AoSoAType aosoa_host )
 //---------------------------------------------------------------------------//
 // Main test function.
 //---------------------------------------------------------------------------//
-template <class ModelType, class TestType, class DamageType>
-void testForce( ModelType model, const DamageType damage_tag, const double dx,
-                const double m, const double boundary_width,
-                const TestType test_tag, const double s0 )
+template <class ModelType, class TestType>
+void testForce( ModelType model, const double dx, const double m,
+                const double boundary_width, const TestType test_tag,
+                const double s0 )
 {
     auto particles = createParticles( model, test_tag, dx, s0 );
 
@@ -717,8 +734,9 @@ void testForce( ModelType model, const DamageType damage_tag, const double dx,
     unsigned int max_neighbors;
     unsigned long long total_neighbors;
     force.getNeighborStatistics( max_neighbors, total_neighbors );
-    double Phi =
-        computeEnergyAndForce( damage_tag, force, particles, max_neighbors );
+    using fracture_type = typename ModelType::fracture_type;
+    double Phi = computeEnergyAndForce( fracture_type{}, force, particles,
+                                        max_neighbors );
 
     // Make a copy of final results on the host
     std::size_t num_particle = x.size();
@@ -759,8 +777,8 @@ TEST( TEST_CATEGORY, test_force_pmb )
     double K = 1.0;
     CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic, CabanaPD::NoFracture>
         model( delta, K );
-    testForce( model, NoDamageTag{}, dx, m, 1.1, LinearTag{}, 0.1 );
-    testForce( model, NoDamageTag{}, dx, m, 1.1, QuadraticTag{}, 0.01 );
+    testForce( model, dx, m, 1.1, LinearTag{}, 0.1 );
+    testForce( model, dx, m, 1.1, QuadraticTag{}, 0.01 );
 }
 TEST( TEST_CATEGORY, test_force_linear_pmb )
 {
@@ -771,7 +789,7 @@ TEST( TEST_CATEGORY, test_force_linear_pmb )
     CabanaPD::ForceModel<CabanaPD::LinearPMB, CabanaPD::Elastic,
                          CabanaPD::NoFracture>
         model( delta, K );
-    testForce( model, NoDamageTag{}, dx, m, 1.1, LinearTag{}, 0.1 );
+    testForce( model, dx, m, 1.1, LinearTag{}, 0.1 );
 }
 TEST( TEST_CATEGORY, test_force_lps )
 {
@@ -783,8 +801,8 @@ TEST( TEST_CATEGORY, test_force_lps )
     double G = 0.5;
     CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Elastic, CabanaPD::NoFracture>
         model( delta, K, G, 1 );
-    testForce( model, NoDamageTag{}, dx, m, 2.1, LinearTag{}, 0.1 );
-    testForce( model, NoDamageTag{}, dx, m, 2.1, QuadraticTag{}, 0.01 );
+    testForce( model, dx, m, 2.1, LinearTag{}, 0.1 );
+    testForce( model, dx, m, 2.1, QuadraticTag{}, 0.01 );
 }
 TEST( TEST_CATEGORY, test_force_linear_lps )
 {
@@ -796,7 +814,7 @@ TEST( TEST_CATEGORY, test_force_linear_lps )
     CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::Elastic,
                          CabanaPD::NoFracture>
         model( delta, K, G, 1 );
-    testForce( model, NoDamageTag{}, dx, m, 2.1, LinearTag{}, 0.1 );
+    testForce( model, dx, m, 2.1, LinearTag{}, 0.1 );
 }
 
 // Tests without damage, but using damage models.
@@ -809,8 +827,8 @@ TEST( TEST_CATEGORY, test_force_pmb_damage )
     // Large value to make sure no bonds break.
     double G0 = 1000.0;
     CabanaPD::ForceModel<CabanaPD::PMB> model( delta, K, G0 );
-    testForce( model, DamageTag{}, dx, m, 1.1, LinearTag{}, 0.1 );
-    testForce( model, DamageTag{}, dx, m, 1.1, QuadraticTag{}, 0.01 );
+    testForce( model, dx, m, 1.1, LinearTag{}, 0.1 );
+    testForce( model, dx, m, 1.1, QuadraticTag{}, 0.01 );
 }
 TEST( TEST_CATEGORY, test_force_lps_damage )
 {
@@ -821,7 +839,7 @@ TEST( TEST_CATEGORY, test_force_lps_damage )
     double G = 0.5;
     double G0 = 1000.0;
     CabanaPD::ForceModel<CabanaPD::LPS> model( delta, K, G, G0, 1 );
-    testForce( model, DamageTag{}, dx, m, 2.1, LinearTag{}, 0.1 );
-    testForce( model, DamageTag{}, dx, m, 2.1, QuadraticTag{}, 0.01 );
+    testForce( model, dx, m, 2.1, LinearTag{}, 0.1 );
+    testForce( model, dx, m, 2.1, QuadraticTag{}, 0.01 );
 }
 } // end namespace Test
