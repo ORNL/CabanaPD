@@ -281,13 +281,14 @@ class SolverElastic
                     computeHeatTransfer( *heat_transfer, *particles, *neighbors,
                                          neigh_iter_tag{}, dt );
             }
-            if constexpr ( is_temperature_dependent<
-                               typename force_model_type::thermal_type>::value )
-                comm->gatherTemperature();
 
             // Add non-force boundary condition.
             if ( !boundary_condition.forceUpdate() )
                 boundary_condition.apply( exec_space(), *particles, step * dt );
+
+            if constexpr ( is_temperature_dependent<
+                               typename force_model_type::thermal_type>::value )
+                comm->gatherTemperature();
 
             // Compute internal forces.
             updateForce();
