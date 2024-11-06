@@ -18,8 +18,8 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate thermally-induced deformation in a rectangular plate.
-void thermalDeformationExample( const std::string filename )
+// Simulate heat transfer in a pseudo-1d cube.
+void thermalDeformationHeatTransferExample( const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
@@ -42,6 +42,8 @@ void thermalDeformationExample( const std::string filename )
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double delta = inputs["horizon"];
     double alpha = inputs["thermal_expansion_coeff"];
+    double kappa = inputs["thermal_conductivity"];
+    double cp = inputs["specific_heat_capacity"];
 
     // Problem parameters
     double temp0 = inputs["reference_temperature"];
@@ -61,28 +63,37 @@ void thermalDeformationExample( const std::string filename )
     //                Force model type
     // ====================================================
     using model_type = CabanaPD::PMB;
-    using thermal_type = CabanaPD::TemperatureDependent;
+    using thermal_type = CabanaPD::DynamicTemperature;
 
     // ====================================================
     //                 Particle generation
     // ====================================================
     // Does not set displacements, velocities, etc.
     auto particles =
-        CabanaPD::createParticles<memory_space, model_type, thermal_type>(
+        std::make_shared<CabanaPD::Particles<memory_space, model_type,
+                                             typename thermal_type::base_type>>(
             exec_space(), low_corner, high_corner, num_cells, halo_width );
 
     // ====================================================
     //            Custom particle initialization
     // ====================================================
     auto rho = particles->sliceDensity();
-    auto init_functor = KOKKOS_LAMBDA( const int pid ) { rho( pid ) = rho0; };
+    auto temp = particles->sliceTemperature();
+    auto init_functor = KOKKOS_LAMBDA( const int pid )
+    {
+        // Density
+        rho( pid ) = rho0;
+        // Temperature
+        temp( pid ) = temp0;
+    };
     particles->updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                    Force model
     // ====================================================
     auto force_model = CabanaPD::createForceModel(
-        model_type{}, CabanaPD::Elastic{}, *particles, delta, K, alpha, temp0 );
+        model_type{}, CabanaPD::Elastic{}, *particles, delta, K, kappa, cp,
+        alpha, temp0 );
 
     // ====================================================
     //                   Create solver
@@ -91,47 +102,47 @@ void thermalDeformationExample( const std::string filename )
         inputs, particles, force_model );
 
     // ====================================================
-    //                   Imposed field
+    //                   Boundary condition
     // ====================================================
-    auto x = particles->sliceReferencePosition();
-    auto temp = particles->sliceTemperature();
-    const double low_corner_y = low_corner[1];
+    // Temperature profile imposed on top and bottom surfaces
+    double dy = particles->dx[1];
+    using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
+
+    // Top surface
+    plane_type plane1( low_corner[0], high_corner[0], high_corner[1] - dy,
+                       high_corner[1] + dy, low_corner[2], high_corner[2] );
+
+    // Bottom surface
+    plane_type plane2( low_corner[0], high_corner[0], low_corner[1] - dy,
+                       low_corner[1] + dy, low_corner[2], high_corner[2] );
+
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
-    auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
+    temp = particles->sliceTemperature();
+    auto temp_bc = KOKKOS_LAMBDA( const int pid, const double )
     {
-        temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
+        temp( pid ) = 0.0;
     };
-    auto body_term = CabanaPD::createBodyTerm( temp_func, false );
+
+    std::vector<plane_type> planes = { plane1, plane2 };
+    auto bc = CabanaPD::createBoundaryCondition(
+        temp_bc, exec_space{}, *particles, planes, false, 1.0 );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init( body_term );
-    cabana_pd->run( body_term );
+    cabana_pd->init( bc );
+    cabana_pd->run( bc );
 
     // ====================================================
     //                      Outputs
     // ====================================================
-    // Output y-displacement along the x-axis
-    createDisplacementProfile( MPI_COMM_WORLD,
-                               "ydisplacement_xaxis_profile.txt", *particles,
-                               num_cells[0], 0, 1 );
-
-    // Output y-displacement along the y-axis
-    createDisplacementProfile( MPI_COMM_WORLD,
-                               "ydisplacement_yaxis_profile.txt", *particles,
-                               num_cells[1], 1, 1 );
-
-    // Output displacement magnitude along the x-axis
-    createDisplacementMagnitudeProfile(
-        MPI_COMM_WORLD, "displacement_magnitude_xaxis_profile.txt", *particles,
-        num_cells[0], 0 );
-
-    // Output displacement magnitude along the y-axis
-    createDisplacementMagnitudeProfile(
-        MPI_COMM_WORLD, "displacement_magnitude_yaxis_profile.txt", *particles,
-        num_cells[1], 1 );
+    // Output temperature along the y-axis
+    int profile_dim = 1;
+    auto value = KOKKOS_LAMBDA( const int pid ) { return temp( pid ); };
+    std::string file_name = "temperature_yaxis_profile.txt";
+    createOutputProfile( MPI_COMM_WORLD, num_cells[1], profile_dim, file_name,
+                         *particles, value );
 }
 
 // Initialize MPI+Kokkos.
@@ -140,7 +151,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    thermalDeformationExample( argv[1] );
+    thermalDeformationHeatTransferExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();
