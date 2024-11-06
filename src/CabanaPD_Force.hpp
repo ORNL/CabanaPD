@@ -225,7 +225,7 @@ template <class ForceType, class ParticleType, class NeighListType,
           class NeighborView, class ParallelType>
 void computeForce( ForceType& force, ParticleType& particles,
                    const NeighListType& neigh_list, NeighborView& mu,
-                   const ParallelType& neigh_op_tag )
+                   double multiplier, const ParallelType& neigh_op_tag )
 {
     auto n_local = particles.n_local;
     auto x = particles.sliceReferencePosition();
@@ -244,10 +244,10 @@ void computeForce( ForceType& force, ParticleType& particles,
     // Forces only atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
         force.computeForceFull( f_a, x, u, particles, neigh_list, mu, n_local,
-                                neigh_op_tag );
+                                multiplier, neigh_op_tag );
     else
         force.computeForceFull( f, x, u, particles, neigh_list, mu, n_local,
-                                neigh_op_tag );
+                                multiplier, neigh_op_tag );
     Kokkos::fence();
 }
 

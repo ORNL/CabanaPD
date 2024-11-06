@@ -501,7 +501,25 @@ class SolverFracture
             Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
             particles->n_local, max_neighbors );
         Kokkos::deep_copy( mu, 1 );
+
+        // Initialize dual_mu in the same way
+        // dual_mu = NeighborView(
+        //    Kokkos::ViewAllocateWithoutInitializing( "dual_broken_bonds" ),
+        //    particles->n_local, max_neighbors );
+        // Kokkos::deep_copy( dual_mu, 1 );
+
         _init_timer.stop();
+    }
+
+    void init_dual_mu()
+    {
+        // Use the same max_neighbors as the primary neighbor list
+        int max_neighbors =
+            Cabana::NeighborList<neighbor_type>::maxNeighbor( *dual_neighbors );
+        dual_mu = NeighborView(
+            Kokkos::ViewAllocateWithoutInitializing( "dual_broken_bonds" ),
+            particles->n_local, max_neighbors );
+        Kokkos::deep_copy( dual_mu, 1 );
     }
 
     void init( const bool initial_output = true )
@@ -613,19 +631,21 @@ class SolverFracture
 
     // Compute and communicate fields needed for force computation and update
     // forces.
-    void updateForce()
+    void updateForce( std::shared_ptr<neighbor_type> neighbor_list,
+                      NeighborView& mu_array, double multiplier )
     {
         // Compute and communicate weighted volume for LPS (does nothing for
         // PMB).
-        force->computeWeightedVolume( *particles, *neighbors, mu );
+        force->computeWeightedVolume( *particles, *neighbor_list, mu_array );
         comm->gatherWeightedVolume();
 
         // Compute and communicate dilatation for LPS (does nothing for PMB).
-        force->computeDilatation( *particles, *neighbors, mu );
+        force->computeDilatation( *particles, *neighbor_list, mu_array );
         comm->gatherDilatation();
 
         // Compute internal forces.
-        computeForce( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
+        computeForce( *force, *particles, *neighbor_list, mu_array, multiplier,
+                      neigh_iter_tag{} );
     }
 
     void output( const int step )
@@ -662,6 +682,8 @@ class SolverFracture
 
     using NeighborView = typename Kokkos::View<int**, memory_space>;
     NeighborView mu;
+    NeighborView dual_mu; // Bond damage for dual horizon
+    std::shared_ptr<neighbor_type> dual_neighbors; // Dual neighbor list
 
     using base_type::_init_time;
     using base_type::_init_timer;
@@ -670,8 +692,8 @@ class SolverFracture
 };
 
 template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel, class ContactModel>
-class SolverContact
+          class ForceModel, class DHPDModel>
+class SolverDHPD
     : public SolverFracture<MemorySpace, InputType, ParticleType, ForceModel>
 {
   public:
@@ -688,17 +710,16 @@ class SolverContact
     using force_type = typename base_type::force_type;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using input_type = typename base_type::input_type;
-    using contact_type = Contact<memory_space, ContactModel>;
-    using contact_model_type = ContactModel;
+    ;
 
-    SolverContact( input_type _inputs,
-                   std::shared_ptr<particle_type> _particles,
-                   force_model_type force_model,
-                   contact_model_type _contact_model )
+    SolverDHPD( input_type _inputs, std::shared_ptr<particle_type> _particles,
+                force_model_type force_model )
         : base_type( _inputs, _particles, force_model )
     {
-        contact = std::make_shared<contact_type>( _inputs["half_neigh"],
-                                                  _contact_model, *particles );
+        // Copy the normal neighbor list and call it dual
+        dual_neighbors = neighbors;
+        // Initialize dual_mu
+        init_dual_mu();
     }
 
     void init( const bool initial_output = true )
@@ -706,7 +727,11 @@ class SolverContact
         base_type::init( false );
 
         // Compute initial contact
-        computeContact( *contact, *particles, neigh_iter_tag{} );
+        // computeContact( *contact, *particles, neigh_iter_tag{} );
+
+        // Compute initial forces for the dual horizon
+        computeForce( *force, *particles, *dual_neighbors, dual_mu, -1.0,
+                      neigh_iter_tag{} ); // Not sure about this
 
         if ( initial_output )
             particles->output( 0, 0.0, output_reference );
@@ -751,9 +776,8 @@ class SolverContact
             comm->gatherDisplacement();
 
             // Compute internal forces.
-            base_type::updateForce();
-
-            computeContact( *contact, *particles, neigh_iter_tag{} );
+            base_type::updateForce( dual_neighbors, dual_mu, 1.0 );
+            base_type::updateForce( neighbors, mu, -1.0 );
 
             // Add force boundary condition.
             if ( boundary_condition.forceUpdate() )

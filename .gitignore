@@ -3,3 +3,6 @@
 build/
 *.out
 *.silo
+run/
+examples/
+.vscode/
