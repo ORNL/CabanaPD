@@ -833,18 +833,15 @@ auto createParticles( const ExecSpace& exec_space,
 
 template <typename MemorySpace, typename ModelType, typename ThermalType,
           typename ExecSpace, std::size_t Dim>
-auto createParticles( const ExecSpace& exec_space,
-                      std::array<double, Dim> low_corner,
-                      std::array<double, Dim> high_corner,
-                      const std::array<int, Dim> num_cells,
-                      const int max_halo_width,
-                      typename std::enable_if<
-                          (std::is_same_v<ThermalType, TemperatureDependent> ||
-                           std::is_same_v<ThermalType, TemperatureIndependent>),
-                          int>::type* = 0 )
+auto createParticles(
+    const ExecSpace& exec_space, std::array<double, Dim> low_corner,
+    std::array<double, Dim> high_corner, const std::array<int, Dim> num_cells,
+    const int max_halo_width,
+    typename std::enable_if<( is_temperature_dependent<ThermalType>::value ),
+                            int>::type* = 0 )
 {
-    return std::make_shared<
-        CabanaPD::Particles<MemorySpace, ModelType, ThermalType>>(
+    return std::make_shared<CabanaPD::Particles<
+        MemorySpace, ModelType, typename ThermalType::base_type>>(
         exec_space, low_corner, high_corner, num_cells, max_halo_width );
 }
 

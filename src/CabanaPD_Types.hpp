@@ -25,9 +25,11 @@ struct Fracture
 // Thermal types.
 struct TemperatureIndependent
 {
+    using base_type = TemperatureIndependent;
 };
 struct TemperatureDependent
 {
+    using base_type = TemperatureDependent;
 };
 struct DynamicTemperature : public TemperatureDependent
 {
