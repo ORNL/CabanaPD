@@ -110,7 +110,7 @@ void fragmentingCylinderExample( const std::string filename )
     using random_type = Kokkos::Random_XorShift64<exec_space>;
     pool_type pool;
     int seed = 456854;
-    pool.init( seed, particles->n_local );
+    pool.init( seed, particles->localOffset() );
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density

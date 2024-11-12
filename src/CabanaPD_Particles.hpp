@@ -95,9 +95,10 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     static constexpr int dim = Dimension;
 
     // Per particle.
-    unsigned long long int n_global = 0;
-    std::size_t n_local = 0;
-    std::size_t n_ghost = 0;
+    unsigned long long int num_global = 0;
+    std::size_t frozen_offset = 0;
+    std::size_t local_offset = 0;
+    std::size_t num_ghost = 0;
     std::size_t size = 0;
 
     // x, u, f (vector matching system dimension).
@@ -164,13 +165,14 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     template <class ExecSpace>
     Particles( const ExecSpace& exec_space, std::array<double, dim> low_corner,
                std::array<double, dim> high_corner,
-               const std::array<int, dim> num_cells, const int max_halo_width )
+               const std::array<int, dim> num_cells, const int max_halo_width,
+               const bool create_frozen = false )
         : halo_width( max_halo_width )
         , _plist_x( "positions" )
         , _plist_f( "forces" )
     {
         createDomain( low_corner, high_corner, num_cells );
-        createParticles( exec_space );
+        createParticles( exec_space, create_frozen );
     }
 
     // Constructor which initializes particles on regular grid with
@@ -179,13 +181,13 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     Particles( const ExecSpace& exec_space, std::array<double, dim> low_corner,
                std::array<double, dim> high_corner,
                const std::array<int, dim> num_cells, const int max_halo_width,
-               UserFunctor user_create )
+               UserFunctor user_create, const bool create_frozen = false )
         : halo_width( max_halo_width )
         , _plist_x( "positions" )
         , _plist_f( "forces" )
     {
         createDomain( low_corner, high_corner, num_cells );
-        createParticles( exec_space, user_create );
+        createParticles( exec_space, user_create, create_frozen );
     }
 
     // Constructor with existing particle data.
@@ -247,17 +249,19 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     }
 
     template <class ExecSpace>
-    void createParticles( const ExecSpace& exec_space )
+    void createParticles( const ExecSpace& exec_space,
+                          const bool create_frozen = false )
     {
         auto empty = KOKKOS_LAMBDA( const int, const double[dim] )
         {
             return true;
         };
-        createParticles( exec_space, empty );
+        createParticles( exec_space, empty, create_frozen );
     }
 
     template <class ExecSpace, class UserFunctor>
-    void createParticles( const ExecSpace& exec_space, UserFunctor user_create )
+    void createParticles( const ExecSpace& exec_space, UserFunctor user_create,
+                          const bool create_frozen = false )
     {
         _init_timer.start();
         // Create a local mesh and owned space.
@@ -268,7 +272,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         int num_particles = particles_per_cell * owned_cells.size();
 
         // Use default aosoa construction and resize.
-        resize( num_particles, 0 );
+        assert( num_previous <= referenceOffset() );
+        resize( num_particles + num_previous, 0 );
 
         auto x = sliceReferencePosition();
         auto v = sliceVelocity();
@@ -310,25 +315,38 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
             return create;
         };
-        n_local = Cabana::Grid::createParticles( Cabana::InitUniform{},
-                                                 exec_space, create_functor,
-                                                 _plist_x, 1, *local_grid );
-        resize( n_local, 0 );
+        local_offset = Cabana::Grid::createParticles(
+            Cabana::InitUniform{}, exec_space, create_functor, _plist_x, 1,
+            *local_grid );
+        resize( local_offset, 0 );
         size = _plist_x.size();
 
+        // Only set this value if this generation of particles should be frozen.
+        if ( create_frozen )
+            frozen_offset = size;
+
         // Not using Allreduce because global count is only used for printing.
-        auto n_local_mpi = static_cast<unsigned long long int>( n_local );
-        MPI_Reduce( &n_local_mpi, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM,
-                    0, MPI_COMM_WORLD );
+        auto local_offset_mpi =
+            static_cast<unsigned long long int>( local_offset );
+        MPI_Reduce( &local_offset_mpi, &num_global, 1, MPI_UNSIGNED_LONG_LONG,
+                    MPI_SUM, 0, MPI_COMM_WORLD );
         _init_timer.stop();
     }
 
     // Store custom created particle positions and volumes.
     template <class ExecSpace, class PositionType, class VolumeType>
     void createParticles( const ExecSpace, const PositionType& x,
-                          const VolumeType& vol )
+                          const VolumeType& vol,
+                          const bool create_frozen = false )
     {
-        resize( vol.size(), 0 );
+        // Ensure valid previous particles.
+        assert( num_previous <= referenceOffset() );
+        // Ensure matching input sizes.
+        assert( vol.size() == x.extent( 0 ) );
+        resize( vol.size() + num_previous, 0 );
+        if ( create_frozen )
+            frozen_offset = size;
+
         auto p_x = sliceReferencePosition();
         auto p_vol = sliceVolume();
         auto v = sliceVelocity();
@@ -343,7 +361,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 memory_space, typename PositionType::execution_space>::value );
 
         Kokkos::parallel_for(
-            "copy_to_particles", Kokkos::RangePolicy<ExecSpace>( 0, n_local ),
+            "copy_to_particles",
+            Kokkos::RangePolicy<ExecSpace>( 0, localOffset() ),
             KOKKOS_LAMBDA( const int pid ) {
                 // Set the particle position and volume.
                 // Set everything else to zero.
@@ -365,12 +384,22 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     void updateParticles( const ExecSpace, const FunctorType init_functor )
     {
         _timer.start();
-        Kokkos::RangePolicy<ExecSpace> policy( 0, n_local );
+        Kokkos::RangePolicy<ExecSpace> policy( 0, local_offset );
         Kokkos::parallel_for(
             "CabanaPD::Particles::update_particles", policy,
             KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
         _timer.stop();
     }
+
+    // Particles are always in order frozen, local, ghost.
+    // Values for offsets are distinguished from separate (num) values.
+    auto numFrozen() const { return frozen_offset; }
+    auto frozenOffset() const { return frozen_offset; }
+    auto numLocal() const { return local_offset - frozen_offset; }
+    auto localOffset() const { return local_offset; }
+    auto numGhost() const { return num_ghost; }
+    auto referenceOffset() const { return size; }
+    auto numGlobal() const { return num_global; }
 
     auto sliceReferencePosition()
     {
@@ -449,7 +478,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         auto y = Cabana::slice<0>( _aosoa_y, "current_positions" );
         auto x = sliceReferencePosition();
         auto u = sliceDisplacement();
-        Kokkos::RangePolicy<execution_space> policy( 0, n_local + n_ghost );
+        Kokkos::RangePolicy<execution_space> policy( frozenOffset(),
+                                                     referenceOffset() );
         auto sum_x_u = KOKKOS_LAMBDA( const std::size_t pid )
         {
             for ( int d = 0; d < 3; d++ )
@@ -463,16 +493,17 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     void resize( int new_local, int new_ghost )
     {
         _timer.start();
-        n_local = new_local;
-        n_ghost = new_ghost;
+        local_offset = new_local;
+        num_ghost = new_ghost;
+        size = new_local + new_ghost;
 
-        _plist_x.aosoa().resize( new_local + new_ghost );
-        _aosoa_u.resize( new_local + new_ghost );
-        _aosoa_y.resize( new_local + new_ghost );
-        _aosoa_vol.resize( new_local + new_ghost );
-        _plist_f.aosoa().resize( new_local );
-        _aosoa_other.resize( new_local );
-        _aosoa_nofail.resize( new_local + new_ghost );
+        _plist_x.aosoa().resize( referenceOffset() );
+        _aosoa_u.resize( referenceOffset() );
+        _aosoa_y.resize( referenceOffset() );
+        _aosoa_vol.resize( referenceOffset() );
+        _plist_f.aosoa().resize( localOffset() );
+        _aosoa_other.resize( localOffset() );
+        _aosoa_nofail.resize( referenceOffset() );
         size = _plist_x.size();
         _timer.stop();
     };
@@ -485,6 +516,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             return sliceCurrentPosition();
     }
 
+    // TODO: enable ignoring frozen particles.
     template <typename... OtherFields>
     void output( [[maybe_unused]] const int output_step,
                  [[maybe_unused]] const double output_time,
@@ -496,7 +528,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 #ifdef Cabana_ENABLE_HDF5
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
-            n_local, getPosition( use_reference ), sliceForce(),
+            localOffset(), getPosition( use_reference ), sliceForce(),
             sliceDisplacement(), sliceVelocity(),
             std::forward<OtherFields>( other )... );
 #else
@@ -504,7 +536,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         Cabana::Grid::Experimental::SiloParticleOutput::
             writePartialRangeTimeStep(
                 "particles", local_grid->globalGrid(), output_step, output_time,
-                0, n_local, getPosition( use_reference ), sliceForce(),
+                0, localOffset(), getPosition( use_reference ), sliceForce(),
                 sliceDisplacement(), sliceVelocity(),
                 std::forward<OtherFields>( other )... );
 
@@ -557,12 +589,6 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
     using memory_space = typename base_type::memory_space;
     using base_type::dim;
 
-    // Per particle.
-    using base_type::n_ghost;
-    using base_type::n_global;
-    using base_type::n_local;
-    using base_type::size;
-
     // These are split since weighted volume only needs to be communicated once
     // and dilatation only needs to be communicated for LPS.
     using scalar_type = typename base_type::scalar_type;
@@ -606,8 +632,10 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
                      max_halo_width )
     {
         _init_timer.start();
-        _aosoa_m = aosoa_m_type( "Particle Weighted Volumes", n_local );
-        _aosoa_theta = aosoa_theta_type( "Particle Dilatations", n_local );
+        _aosoa_m = aosoa_m_type( "Particle Weighted Volumes",
+                                 base_type::localOffset() );
+        _aosoa_theta = aosoa_theta_type( "Particle Dilatations",
+                                         base_type::localOffset() );
         init_lps();
         _init_timer.stop();
     }
@@ -618,8 +646,8 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
         // Forward arguments to standard or custom particle creation.
         base_type::createParticles( std::forward<Args>( args )... );
         _init_timer.start();
-        _aosoa_m.resize( n_local );
-        _aosoa_theta.resize( n_local );
+        _aosoa_m.resize( base_type::localOffset() );
+        _aosoa_theta.resize( base_type::localOffset() );
         _init_timer.stop();
     }
 
@@ -644,8 +672,8 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
     {
         base_type::resize( new_local, new_ghost );
         _timer.start();
-        _aosoa_theta.resize( new_local + new_ghost );
-        _aosoa_m.resize( new_local + new_ghost );
+        _aosoa_theta.resize( base_type::referenceOffset() );
+        _aosoa_m.resize( base_type::referenceOffset() );
         _timer.stop();
     }
 
@@ -692,12 +720,6 @@ class Particles<MemorySpace, PMB, TemperatureDependent, BaseOutput, Dimension>
     using memory_space = typename base_type::memory_space;
     using base_type::dim;
 
-    // Per particle.
-    using base_type::n_ghost;
-    using base_type::n_global;
-    using base_type::n_local;
-    using base_type::size;
-
     // These are split since weighted volume only needs to be communicated once
     // and dilatation only needs to be communicated for LPS.
     using temp_types = Cabana::MemberTypes<double, double>;
@@ -736,7 +758,8 @@ class Particles<MemorySpace, PMB, TemperatureDependent, BaseOutput, Dimension>
         : base_type( exec_space, low_corner, high_corner, num_cells,
                      max_halo_width )
     {
-        _aosoa_temp = aosoa_temp_type( "Particle Temperature", n_local );
+        _aosoa_temp =
+            aosoa_temp_type( "Particle Temperature", base_type::localOffset() );
         init_temp();
     }
 
@@ -745,7 +768,7 @@ class Particles<MemorySpace, PMB, TemperatureDependent, BaseOutput, Dimension>
     {
         // Forward arguments to standard or custom particle creation.
         base_type::createParticles( std::forward<Args>( args )... );
-        _aosoa_temp.resize( n_local );
+        _aosoa_temp.resize( base_type::localOffset() );
     }
 
     auto sliceTemperature()
@@ -776,7 +799,7 @@ class Particles<MemorySpace, PMB, TemperatureDependent, BaseOutput, Dimension>
     void resize( int new_local, int new_ghost )
     {
         base_type::resize( new_local, new_ghost );
-        _aosoa_temp.resize( new_local + new_ghost );
+        _aosoa_temp.resize( base_type::referenceOffset() );
     }
 
     template <typename... OtherFields>
@@ -818,12 +841,6 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
     using memory_space = typename base_type::memory_space;
     using base_type::dim;
 
-    // Per particle.
-    using base_type::n_ghost;
-    using base_type::n_global;
-    using base_type::n_local;
-    using base_type::size;
-
     // energy, damage
     using output_types = Cabana::MemberTypes<double, double>;
     using aosoa_output_type = Cabana::AoSoA<output_types, memory_space, 1>;
@@ -858,7 +875,8 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
     Particles( Args&&... args )
         : base_type( std::forward<Args>( args )... )
     {
-        _aosoa_output = aosoa_output_type( "Particle Output Fields", n_local );
+        _aosoa_output = aosoa_output_type( "Particle Output Fields",
+                                           base_type::localOffset() );
         init_output();
     }
 
@@ -867,7 +885,7 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
     {
         // Forward arguments to standard or custom particle creation.
         base_type::createParticles( std::forward<Args>( args )... );
-        _aosoa_output.resize( n_local );
+        _aosoa_output.resize( base_type::localOffset() );
     }
 
     auto sliceStrainEnergy()
@@ -887,7 +905,7 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
     void resize( int new_local, int new_ghost )
     {
         base_type::resize( new_local, new_ghost );
-        _aosoa_output.resize( new_local + new_ghost );
+        _aosoa_output.resize( base_type::localOffset() );
     }
 
     template <typename... OtherFields>
