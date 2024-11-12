@@ -67,7 +67,7 @@ void testHalo()
     };
     particles.updateParticles( exec_space{}, init_functor );
 
-    int init_num_particles = particles.n_local;
+    int init_num_particles = particles.localOffset();
     using HostAoSoA = Cabana::AoSoA<Cabana::MemberTypes<double[3], double>,
                                     Kokkos::HostSpace>;
     HostAoSoA aosoa_init_host( "host_aosoa", init_num_particles );
@@ -81,7 +81,7 @@ void testHalo()
                    CabanaPD::TemperatureIndependent>
         comm( particles );
 
-    HostAoSoA aosoa_host( "host_aosoa", particles.size );
+    HostAoSoA aosoa_host( "host_aosoa", particles.referenceOffset() );
     x = particles.sliceReferencePosition();
     rank = particles.sliceVolume();
     auto x_host = Cabana::slice<0>( aosoa_host );
@@ -89,10 +89,10 @@ void testHalo()
     Cabana::deep_copy( x_host, x );
     Cabana::deep_copy( rank_host, rank );
 
-    EXPECT_EQ( particles.n_local, init_num_particles );
+    EXPECT_EQ( particles.localOffset(), init_num_particles );
 
     // Check all local particles unchanged.
-    for ( std::size_t p = 0; p < particles.n_local; ++p )
+    for ( std::size_t p = 0; p < particles.localOffset(); ++p )
     {
         for ( int d = 0; d < 3; ++d )
         {
@@ -106,10 +106,11 @@ void testHalo()
     // Ghosts should have been created for all but single rank systems.
     if ( current_size > 1 )
     {
-        EXPECT_GT( particles.n_ghost, 0 );
+        EXPECT_GT( particles.numGhost(), 0 );
     }
     // Check all ghost particles in the halo region.
-    for ( std::size_t p = particles.n_local; p < particles.size; ++p )
+    for ( std::size_t p = particles.localOffset();
+          p < particles.referenceOffset(); ++p )
     {
         for ( int d = 0; d < 3; ++d )
         {
@@ -128,13 +129,13 @@ void testHalo()
     using NeighListType =
         Cabana::VerletList<TEST_MEMSPACE, Cabana::FullNeighborTag,
                            Cabana::VerletLayout2D, Cabana::TeamOpTag>;
-    NeighListType nlist( x, 0, particles.n_local, delta, 1.0, mesh_min,
+    NeighListType nlist( x, 0, particles.localOffset(), delta, 1.0, mesh_min,
                          mesh_max );
 
     // Copy neighbors per particle to host.
     Kokkos::View<int*, TEST_MEMSPACE> num_neigh( "num_neighbors",
-                                                 particles.n_local );
-    Kokkos::RangePolicy<exec_space> policy( 0, particles.n_local );
+                                                 particles.localOffset() );
+    Kokkos::RangePolicy<exec_space> policy( 0, particles.localOffset() );
     Kokkos::parallel_for(
         "num_neighbors", policy, KOKKOS_LAMBDA( const int p ) {
             auto n =
@@ -148,7 +149,7 @@ void testHalo()
     // boundaries (less than internal particles).
     auto num_neigh_host =
         Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, num_neigh );
-    for ( std::size_t p = 0; p < particles.n_local; ++p )
+    for ( std::size_t p = 0; p < particles.localOffset(); ++p )
     {
         if ( x_host( p, 0 ) > box_min[0] + delta * 1.01 &&
              x_host( p, 0 ) < box_max[0] - delta * 1.01 &&
