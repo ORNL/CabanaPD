@@ -204,7 +204,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            const NeighListType& neigh_list, MuView& mu,
-                           const int n_local, ParallelType& )
+                           const int n_local, double multiplier = 1.0,
+                           ParallelType& )
     {
         _timer.start();
 
@@ -245,9 +246,9 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
                 {
                     const double coeff = model.c * s * vol( j );
                     double muij = mu( i, n );
-                    fx_i = muij * coeff * rx / r;
-                    fy_i = muij * coeff * ry / r;
-                    fz_i = muij * coeff * rz / r;
+                    fx_i = multiplier * muij * coeff * rx / r;
+                    fy_i = multiplier * muij * coeff * ry / r;
+                    fz_i = multiplier * muij * coeff * rz / r;
 
                     f( i, 0 ) += fx_i;
                     f( i, 1 ) += fy_i;

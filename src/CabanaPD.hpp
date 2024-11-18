@@ -16,6 +16,7 @@
 #include <CabanaPD_Boundary.hpp>
 #include <CabanaPD_Comm.hpp>
 #include <CabanaPD_Constants.hpp>
+#include <CabanaPD_Contact.hpp>
 #include <CabanaPD_DisplacementProfile.hpp>
 #include <CabanaPD_Fields.hpp>
 #include <CabanaPD_Force.hpp>
