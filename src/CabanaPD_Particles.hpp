@@ -362,14 +362,6 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     }
     auto sliceType() { return Cabana::slice<4>( _aosoa_other, "type" ); }
     auto sliceType() const { return Cabana::slice<4>( _aosoa_other, "type" ); }
-    auto sliceStrainEnergy()
-    {
-        return Cabana::slice<1>( _aosoa_other, "strain_energy" );
-    }
-    auto sliceStrainEnergy() const
-    {
-        return Cabana::slice<1>( _aosoa_other, "strain_energy" );
-    }
     auto sliceVelocity()
     {
         return Cabana::slice<0>( _aosoa_other, "velocities" );
@@ -377,6 +369,14 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     auto sliceVelocity() const
     {
         return Cabana::slice<0>( _aosoa_other, "velocities" );
+    }
+    auto sliceStrainEnergy()
+    {
+        return Cabana::slice<1>( _aosoa_other, "strain_energy" );
+    }
+    auto sliceStrainEnergy() const
+    {
+        return Cabana::slice<1>( _aosoa_other, "strain_energy" );
     }
     auto sliceDensity() { return Cabana::slice<2>( _aosoa_other, "density" ); }
     auto sliceDensity() const
