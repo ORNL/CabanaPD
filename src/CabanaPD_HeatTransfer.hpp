@@ -19,34 +19,40 @@ namespace CabanaPD
 
 // Peridynamic heat transfer with forward-Euler time integration.
 // Inherits only because this is a similar neighbor-based kernel.
-template <class ExecutionSpace, class ModelType>
-class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
+template <class MemorySpace, class ModelType>
+class HeatTransfer : public Force<MemorySpace, BaseForceModel>
 {
   protected:
-    using base_type = Force<ExecutionSpace, BaseForceModel>;
+    using base_type = Force<MemorySpace, BaseForceModel>;
     using base_type::_half_neigh;
     using base_type::_timer;
+
+    Timer _euler_timer = base_type::_energy_timer;
+    ModelType _model;
+    // Using the default exec_space.
+    using exec_space = typename MemorySpace::execution_space;
+
+  public:
+    using base_type::_neigh_list;
     using model_type = ModelType;
     static_assert(
         std::is_same_v<typename model_type::fracture_type, Elastic> );
 
-    Timer _euler_timer = base_type::_energy_timer;
-    ModelType _model;
-
-  public:
-    HeatTransfer( const bool half_neigh, const ModelType model )
-        : base_type( half_neigh )
+    // Running with mechanics as well; no reason to rebuild neighbors.
+    template <class NeighborType>
+    HeatTransfer( const bool half_neigh, const NeighborType& neighbors,
+                  const ModelType model )
+        : base_type( half_neigh, neighbors )
         , _model( model )
     {
     }
 
     template <class TemperatureType, class PosType, class ParticleType,
-              class NeighListType, class ParallelType>
+              class ParallelType>
     void
     computeHeatTransferFull( TemperatureType& conduction, const PosType& x,
                              const PosType& u, const ParticleType& particles,
-                             const NeighListType& neigh_list, const int n_local,
-                             ParallelType& neigh_op_tag )
+                             const int n_local, ParallelType& neigh_op_tag )
     {
         _timer.start();
 
@@ -64,9 +70,9 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
                 coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
         };
 
-        Kokkos::RangePolicy<ExecutionSpace> policy( 0, n_local );
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Cabana::neighbor_parallel_for(
-            policy, temp_func, neigh_list, Cabana::FirstNeighborsTag(),
+            policy, temp_func, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::HeatTransfer::computeFull" );
 
         _timer.stop();
@@ -85,7 +91,7 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
         {
             temp( i ) += dt / rho( i ) / model.cp * conduction( i );
         };
-        Kokkos::RangePolicy<ExecutionSpace> policy( 0, n_local );
+        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Kokkos::parallel_for( "CabanaPD::HeatTransfer::forwardEuler", policy,
                               euler_func );
         _euler_timer.stop();
@@ -93,11 +99,9 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
 };
 
 // Heat transfer free function.
-template <class HeatTransferType, class ParticleType, class NeighListType,
-          class ParallelType>
+template <class HeatTransferType, class ParticleType, class ParallelType>
 void computeHeatTransfer( HeatTransferType& heat_transfer,
                           ParticleType& particles,
-                          const NeighListType& neigh_list,
                           const ParallelType& neigh_op_tag, const double dt )
 {
     auto n_local = particles.n_local;
@@ -111,11 +115,11 @@ void computeHeatTransfer( HeatTransferType& heat_transfer,
 
     // Temperature only needs to be atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
-        heat_transfer.computeHeatTransferFull(
-            conduction_a, x, u, particles, neigh_list, n_local, neigh_op_tag );
+        heat_transfer.computeHeatTransferFull( conduction_a, x, u, particles,
+                                               n_local, neigh_op_tag );
     else
-        heat_transfer.computeHeatTransferFull(
-            conduction, x, u, particles, neigh_list, n_local, neigh_op_tag );
+        heat_transfer.computeHeatTransferFull( conduction, x, u, particles,
+                                               n_local, neigh_op_tag );
     Kokkos::fence();
 
     heat_transfer.forwardEuler( particles, dt );

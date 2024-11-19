@@ -126,11 +126,11 @@ getLinearizedDistance( const PosType& x, const PosType& u, const int i,
 }
 
 // Forward declaration.
-template <class ExecutionSpace, class ForceType>
+template <class MemorySpace, class ForceType>
 class Force;
 
-template <class ExecutionSpace>
-class Force<ExecutionSpace, BaseForceModel>
+template <class MemorySpace>
+class Force<MemorySpace, BaseForceModel>
 {
   protected:
     bool _half_neigh;
@@ -139,19 +139,79 @@ class Force<ExecutionSpace, BaseForceModel>
     Timer _energy_timer;
 
   public:
-    Force( const bool half_neigh )
+    using neighbor_list_type =
+        Cabana::VerletList<MemorySpace, Cabana::FullNeighborTag,
+                           Cabana::VerletLayout2D, Cabana::TeamOpTag>;
+    neighbor_list_type _neigh_list;
+
+    // Primary constructor: use positions and construct neighbors.
+    template <class ParticleType>
+    Force( const bool half_neigh, const double delta,
+           const ParticleType& particles, const double tol = 1e-14 )
         : _half_neigh( half_neigh )
+        , _neigh_list( neighbor_list_type( particles.sliceReferencePosition(),
+                                           0, particles.n_local, delta + tol,
+                                           1.0, particles.ghost_mesh_lo,
+                                           particles.ghost_mesh_hi ) )
     {
     }
 
-    template <class ParticleType, class NeighListType, class ParallelType>
-    void computeWeightedVolume( ParticleType&, const NeighListType&,
-                                const ParallelType ) const
+    // Primary constructor: use positions and construct neighbors.
+    template <class NeighborListType>
+    Force( const bool half_neigh, const NeighborListType& neighbors )
+        : _half_neigh( half_neigh )
+        , _neigh_list( neighbors )
     {
     }
-    template <class ParticleType, class NeighListType, class ParallelType>
-    void computeDilatation( ParticleType&, const NeighListType&,
-                            const ParallelType ) const
+
+    unsigned getMaxLocalNeighbors()
+    {
+        auto neigh = _neigh_list;
+        unsigned local_max_neighbors;
+        auto neigh_max = KOKKOS_LAMBDA( const int, unsigned& max_n )
+        {
+            max_n =
+                Cabana::NeighborList<neighbor_list_type>::maxNeighbor( neigh );
+        };
+        using exec_space = typename MemorySpace::execution_space;
+        Kokkos::RangePolicy<exec_space> policy( 0, 1 );
+        Kokkos::parallel_reduce( policy, neigh_max, local_max_neighbors );
+        Kokkos::fence();
+        return local_max_neighbors;
+    }
+
+    void getNeighborStatistics( unsigned& max_neighbors,
+                                unsigned long long& total_neighbors )
+    {
+        auto neigh = _neigh_list;
+        unsigned local_max_neighbors;
+        unsigned long long local_total_neighbors;
+        auto neigh_stats = KOKKOS_LAMBDA( const int, unsigned& max_n,
+                                          unsigned long long& total_n )
+        {
+            max_n =
+                Cabana::NeighborList<neighbor_list_type>::maxNeighbor( neigh );
+            total_n = Cabana::NeighborList<neighbor_list_type>::totalNeighbor(
+                neigh );
+        };
+        using exec_space = typename MemorySpace::execution_space;
+        Kokkos::RangePolicy<exec_space> policy( 0, 1 );
+        Kokkos::parallel_reduce( policy, neigh_stats, local_max_neighbors,
+                                 local_total_neighbors );
+        Kokkos::fence();
+        MPI_Reduce( &local_max_neighbors, &max_neighbors, 1, MPI_UNSIGNED,
+                    MPI_MAX, 0, MPI_COMM_WORLD );
+        MPI_Reduce( &local_total_neighbors, &total_neighbors, 1,
+                    MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD );
+    }
+
+    // Default to no-op for pair models.
+    template <class ParticleType, class ParallelType>
+    void computeWeightedVolume( ParticleType&, const ParallelType ) const
+    {
+    }
+    template <class ParticleType, class ParallelType>
+    void computeDilatation( ParticleType&, const ParallelType ) const
     {
     }
 
@@ -162,10 +222,8 @@ class Force<ExecutionSpace, BaseForceModel>
 /******************************************************************************
   Force free functions.
 ******************************************************************************/
-template <class ForceType, class ParticleType, class NeighListType,
-          class ParallelType>
+template <class ForceType, class ParticleType, class ParallelType>
 void computeForce( ForceType& force, ParticleType& particles,
-                   const NeighListType& neigh_list,
                    const ParallelType& neigh_op_tag )
 {
     auto n_local = particles.n_local;
@@ -179,23 +237,19 @@ void computeForce( ForceType& force, ParticleType& particles,
 
     // if ( half_neigh )
     // Forces must be atomic for half list
-    // computeForce_half( f_a, x, u, neigh_list, n_local,
+    // computeForce_half( f_a, x, u, n_local,
     //                    neigh_op_tag );
 
     // Forces only atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
-        force.computeForceFull( f_a, x, u, particles, neigh_list, n_local,
-                                neigh_op_tag );
+        force.computeForceFull( f_a, x, u, particles, n_local, neigh_op_tag );
     else
-        force.computeForceFull( f, x, u, particles, neigh_list, n_local,
-                                neigh_op_tag );
+        force.computeForceFull( f, x, u, particles, n_local, neigh_op_tag );
     Kokkos::fence();
 }
 
-template <class ForceType, class ParticleType, class NeighListType,
-          class ParallelType>
+template <class ForceType, class ParticleType, class ParallelType>
 double computeEnergy( ForceType& force, ParticleType& particles,
-                      const NeighListType& neigh_list,
                       const ParallelType& neigh_op_tag )
 {
     auto n_local = particles.n_local;
@@ -210,21 +264,20 @@ double computeEnergy( ForceType& force, ParticleType& particles,
 
     double energy;
     // if ( _half_neigh )
-    //    energy = computeEnergy_half( force, x, u, neigh_list,
+    //    energy = computeEnergy_half( force, x, u,
     //                                  n_local, neigh_op_tag );
     // else
-    energy = force.computeEnergyFull( W, x, u, particles, neigh_list, n_local,
-                                      neigh_op_tag );
+    energy =
+        force.computeEnergyFull( W, x, u, particles, n_local, neigh_op_tag );
     Kokkos::fence();
 
     return energy;
 }
 
 // Forces with bond breaking.
-template <class ForceType, class ParticleType, class NeighListType,
-          class NeighborView, class ParallelType>
-void computeForce( ForceType& force, ParticleType& particles,
-                   const NeighListType& neigh_list, NeighborView& mu,
+template <class ForceType, class ParticleType, class NeighborView,
+          class ParallelType>
+void computeForce( ForceType& force, ParticleType& particles, NeighborView& mu,
                    const ParallelType& neigh_op_tag )
 {
     auto n_local = particles.n_local;
@@ -238,25 +291,23 @@ void computeForce( ForceType& force, ParticleType& particles,
 
     // if ( half_neigh )
     // Forces must be atomic for half list
-    // computeForce_half( f_a, x, u, neigh_list, n_local,
+    // computeForce_half( f_a, x, u, n_local,
     //                    neigh_op_tag );
 
     // Forces only atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
-        force.computeForceFull( f_a, x, u, particles, neigh_list, mu, n_local,
+        force.computeForceFull( f_a, x, u, particles, mu, n_local,
                                 neigh_op_tag );
     else
-        force.computeForceFull( f, x, u, particles, neigh_list, mu, n_local,
-                                neigh_op_tag );
+        force.computeForceFull( f, x, u, particles, mu, n_local, neigh_op_tag );
     Kokkos::fence();
 }
 
 // Energy and damage.
-template <class ForceType, class ParticleType, class NeighListType,
-          class NeighborView, class ParallelType>
+template <class ForceType, class ParticleType, class NeighborView,
+          class ParallelType>
 double computeEnergy( ForceType& force, ParticleType& particles,
-                      const NeighListType& neigh_list, NeighborView& mu,
-                      const ParallelType& neigh_op_tag )
+                      NeighborView& mu, const ParallelType& neigh_op_tag )
 {
     auto n_local = particles.n_local;
     auto x = particles.sliceReferencePosition();
@@ -270,11 +321,11 @@ double computeEnergy( ForceType& force, ParticleType& particles,
 
     double energy;
     // if ( _half_neigh )
-    //    energy = computeEnergy_half( force, x, u, neigh_list,
+    //    energy = computeEnergy_half( force, x, u,
     //                                  n_local, neigh_op_tag );
     // else
-    energy = force.computeEnergyFull( W, x, u, phi, particles, neigh_list, mu,
-                                      n_local, neigh_op_tag );
+    energy = force.computeEnergyFull( W, x, u, phi, particles, mu, n_local,
+                                      neigh_op_tag );
     Kokkos::fence();
 
     return energy;
