@@ -28,7 +28,7 @@ class HeatTransfer : public Force<ExecutionSpace, BaseForceModel>
     using base_type::_timer;
     using model_type = ModelType;
     static_assert(
-        std::is_same_v<typename model_type::fracture_type, Elastic> );
+        std::is_same_v<typename model_type::fracture_type, NoFracture> );
 
     Timer _euler_timer = base_type::_energy_timer;
     ModelType _model;
