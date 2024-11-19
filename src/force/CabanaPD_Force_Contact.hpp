@@ -21,51 +21,7 @@
 namespace CabanaPD
 {
 /******************************************************************************
-  Contact model
-******************************************************************************/
-struct ContactModel
-{
-    double delta;
-    double Rc;
-
-    ContactModel(){};
-    // PD horizon
-    // Contact radius
-    ContactModel( const double _delta, const double _Rc )
-        : delta( _delta )
-        , Rc( _Rc ){};
-};
-
-/* Normal repulsion */
-
-struct NormalRepulsionModel : public ContactModel
-{
-    using ContactModel::delta;
-    using ContactModel::Rc;
-
-    double c;
-    double K;
-
-    NormalRepulsionModel(){};
-    NormalRepulsionModel( const double delta, const double Rc, const double _K )
-        : ContactModel( delta, Rc )
-        , K( _K )
-    {
-        set_param( delta, Rc, K );
-    }
-
-    void set_param( const double _delta, const double _Rc, const double _K )
-    {
-        delta = _delta;
-        Rc = _Rc;
-        K = _K;
-        // This could inherit from PMB (same c)
-        c = 18.0 * K / ( pi * delta * delta * delta * delta );
-    }
-};
-
-/******************************************************************************
-  Normal repulsion computation
+  Normal repulsion forces
 ******************************************************************************/
 template <class MemorySpace>
 class Force<MemorySpace, NormalRepulsionModel>
