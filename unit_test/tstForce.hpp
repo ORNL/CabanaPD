@@ -623,52 +623,44 @@ struct NoDamageTag
 {
 };
 
-template <class ForceType, class ParticleType, class NeighborList>
+template <class ForceType, class ParticleType>
 double computeEnergyAndForce( NoDamageTag, ForceType force,
-                              ParticleType& particles,
-                              const NeighborList& neigh_list, const int )
+                              ParticleType& particles, const int )
 {
-    computeForce( force, particles, neigh_list, Cabana::SerialOpTag() );
-    double Phi =
-        computeEnergy( force, particles, neigh_list, Cabana::SerialOpTag() );
+    computeForce( force, particles, Cabana::SerialOpTag() );
+    double Phi = computeEnergy( force, particles, Cabana::SerialOpTag() );
     return Phi;
 }
-template <class ForceType, class ParticleType, class NeighborList>
-double
-computeEnergyAndForce( DamageTag, ForceType force, ParticleType& particles,
-                       const NeighborList& neigh_list, const int max_neighbors )
+template <class ForceType, class ParticleType>
+double computeEnergyAndForce( DamageTag, ForceType force,
+                              ParticleType& particles, const int max_neighbors )
 {
     Kokkos::View<int**, TEST_MEMSPACE> mu(
         Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
         particles.n_local, max_neighbors );
     Kokkos::deep_copy( mu, 1 );
-    computeForce( force, particles, neigh_list, mu, Cabana::SerialOpTag() );
-    double Phi = computeEnergy( force, particles, neigh_list, mu,
-                                Cabana::SerialOpTag() );
+    computeForce( force, particles, mu, Cabana::SerialOpTag() );
+    double Phi = computeEnergy( force, particles, mu, Cabana::SerialOpTag() );
     return Phi;
 }
 
-template <class ModelType, class ForceType, class ParticleType,
-          class NeighborList>
-void initializeForce( ModelType, ForceType& force, ParticleType& particles,
-                      const NeighborList& neigh_list )
+template <class ModelType, class ForceType, class ParticleType>
+void initializeForce( ModelType, ForceType& force, ParticleType& particles )
 {
-    force.computeWeightedVolume( particles, neigh_list, Cabana::SerialOpTag() );
-    force.computeDilatation( particles, neigh_list, Cabana::SerialOpTag() );
+    force.computeWeightedVolume( particles, Cabana::SerialOpTag() );
+    force.computeDilatation( particles, Cabana::SerialOpTag() );
 }
 
-template <class ForceType, class ParticleType, class NeighborList>
+template <class ForceType, class ParticleType>
 void initializeForce( CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>,
-                      ForceType& force, ParticleType& particles,
-                      const NeighborList& neigh_list )
+                      ForceType& force, ParticleType& particles )
 {
-    int max_neighbors =
-        Cabana::NeighborList<NeighborList>::maxNeighbor( neigh_list );
+    auto max_neighbors = force.getMaxLocalNeighbors();
     Kokkos::View<int**, TEST_MEMSPACE> mu( "broken_bonds", particles.n_local,
                                            max_neighbors );
     Kokkos::deep_copy( mu, 1 );
-    force.computeWeightedVolume( particles, neigh_list, mu );
-    force.computeDilatation( particles, neigh_list, mu );
+    force.computeWeightedVolume( particles, mu );
+    force.computeDilatation( particles, mu );
 }
 
 template <class ParticleType, class AoSoAType>
@@ -698,33 +690,21 @@ void testForce( ModelType model, const DamageType damage_tag, const double dx,
 
     // This needs to exactly match the mesh spacing to compare with the single
     // particle calculation.
-    CabanaPD::Force<TEST_EXECSPACE, ModelType> force( true, model );
+    CabanaPD::Force<TEST_MEMSPACE, ModelType> force( true, particles, model );
 
-    double mesh_min[3] = { particles.ghost_mesh_lo[0],
-                           particles.ghost_mesh_lo[1],
-                           particles.ghost_mesh_lo[2] };
-    double mesh_max[3] = { particles.ghost_mesh_hi[0],
-                           particles.ghost_mesh_hi[1],
-                           particles.ghost_mesh_hi[2] };
-    using verlet_list =
-        Cabana::VerletList<TEST_MEMSPACE, Cabana::FullNeighborTag,
-                           Cabana::VerletLayout2D, Cabana::TeamOpTag>;
-    // Add to delta to make sure neighbors are found.
     auto x = particles.sliceReferencePosition();
-    verlet_list neigh_list( x, 0, particles.n_local, model.delta + 1e-14, 1.0,
-                            mesh_min, mesh_max );
-    int max_neighbors =
-        Cabana::NeighborList<verlet_list>::maxNeighbor( neigh_list );
-
     auto f = particles.sliceForce();
     auto W = particles.sliceStrainEnergy();
     auto vol = particles.sliceVolume();
     //  No communication needed (as in the main solver) since this test is only
     //  intended for one rank.
-    initializeForce( model, force, particles, neigh_list );
+    initializeForce( model, force, particles );
 
-    double Phi = computeEnergyAndForce( damage_tag, force, particles,
-                                        neigh_list, max_neighbors );
+    unsigned int max_neighbors;
+    unsigned long long total_neighbors;
+    force.getNeighborStatistics( max_neighbors, total_neighbors );
+    double Phi =
+        computeEnergyAndForce( damage_tag, force, particles, max_neighbors );
 
     // Make a copy of final results on the host
     std::size_t num_particle = x.size();

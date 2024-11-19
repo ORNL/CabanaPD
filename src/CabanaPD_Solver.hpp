@@ -103,17 +103,14 @@ class SolverElastic
     using particle_type = ParticleType;
     using integrator_type = Integrator<exec_space>;
     using force_model_type = ForceModel;
-    using force_type = Force<exec_space, force_model_type>;
+    using force_type = Force<memory_space, force_model_type>;
     using comm_type = Comm<particle_type, typename force_model_type::base_model,
                            typename particle_type::thermal_type>;
-    using neighbor_type =
-        Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
-                           Cabana::VerletLayout2D, Cabana::TeamOpTag>;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using input_type = InputType;
 
     // Optional module types.
-    using heat_transfer_type = HeatTransfer<exec_space, force_model_type>;
+    using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
 
     SolverElastic( input_type _inputs,
                    std::shared_ptr<particle_type> _particles,
@@ -138,35 +135,24 @@ class SolverElastic
                            typename force_model_type::thermal_type>::value )
             force_model.update( particles->sliceTemperature() );
 
+        _neighbor_timer.start();
+        force = std::make_shared<force_type>( inputs["half_neigh"], *particles,
+                                              force_model );
+        _neighbor_timer.stop();
+
+        _init_timer.start();
+        unsigned max_neighbors;
+        unsigned long long total_neighbors;
+        force->getNeighborStatistics( max_neighbors, total_neighbors );
+
         // Create heat transfer if needed.
         if constexpr ( is_heat_transfer<
                            typename force_model_type::thermal_type>::value )
         {
             thermal_subcycle_steps = inputs["thermal_subcycle_steps"];
             heat_transfer = std::make_shared<heat_transfer_type>(
-                inputs["half_neigh"], force_model );
+                inputs["half_neigh"], force->_neigh_list, force_model );
         }
-        force =
-            std::make_shared<force_type>( inputs["half_neigh"], force_model );
-
-        // Create the neighbor list.
-        _neighbor_timer.start();
-        double mesh_min[3] = { particles->ghost_mesh_lo[0],
-                               particles->ghost_mesh_lo[1],
-                               particles->ghost_mesh_lo[2] };
-        double mesh_max[3] = { particles->ghost_mesh_hi[0],
-                               particles->ghost_mesh_hi[1],
-                               particles->ghost_mesh_hi[2] };
-        auto x = particles->sliceReferencePosition();
-        neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
-                                                     force_model.delta, 1.0,
-                                                     mesh_min, mesh_max );
-        _neighbor_timer.stop();
-
-        _init_timer.start();
-        unsigned max_neighbors;
-        unsigned long long total_neighbors;
-        getNeighborStatistics( max_neighbors, total_neighbors );
 
         print = print_rank();
         if ( print )
@@ -195,40 +181,16 @@ class SolverElastic
         _init_timer.stop();
     }
 
-    void getNeighborStatistics( unsigned& max_neighbors,
-                                unsigned long long& total_neighbors )
-    {
-        auto neigh = *neighbors;
-        unsigned local_max_neighbors;
-        unsigned long long local_total_neighbors;
-        auto neigh_stats = KOKKOS_LAMBDA( const int, unsigned& max_n,
-                                          unsigned long long& total_n )
-        {
-            max_n = Cabana::NeighborList<neighbor_type>::maxNeighbor( neigh );
-            total_n =
-                Cabana::NeighborList<neighbor_type>::totalNeighbor( neigh );
-        };
-        Kokkos::RangePolicy<exec_space> policy( 0, 1 );
-        Kokkos::parallel_reduce( policy, neigh_stats, local_max_neighbors,
-                                 local_total_neighbors );
-        Kokkos::fence();
-        MPI_Reduce( &local_max_neighbors, &max_neighbors, 1, MPI_UNSIGNED,
-                    MPI_MAX, 0, MPI_COMM_WORLD );
-        MPI_Reduce( &local_total_neighbors, &total_neighbors, 1,
-                    MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD );
-    }
-
     void init( const bool initial_output = true )
     {
         // Compute and communicate weighted volume for LPS (does nothing for
         // PMB). Only computed once.
-        force->computeWeightedVolume( *particles, *neighbors,
-                                      neigh_iter_tag{} );
+        force->computeWeightedVolume( *particles, neigh_iter_tag{} );
         comm->gatherWeightedVolume();
 
         // Compute initial internal forces and energy.
         updateForce();
-        computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
+        computeEnergy( *force, *particles, neigh_iter_tag() );
 
         if ( initial_output )
             particles->output( 0, 0.0, output_reference );
@@ -278,7 +240,7 @@ class SolverElastic
                                typename force_model_type::thermal_type>::value )
             {
                 if ( step % thermal_subcycle_steps == 0 )
-                    computeHeatTransfer( *heat_transfer, *particles, *neighbors,
+                    computeHeatTransfer( *heat_transfer, *particles,
                                          neigh_iter_tag{}, dt );
             }
 
@@ -344,11 +306,11 @@ class SolverElastic
     void updateForce()
     {
         // Compute and communicate dilatation for LPS (does nothing for PMB).
-        force->computeDilatation( *particles, *neighbors, neigh_iter_tag{} );
+        force->computeDilatation( *particles, neigh_iter_tag{} );
         comm->gatherDilatation();
 
         // Compute internal forces.
-        computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
+        computeForce( *force, *particles, neigh_iter_tag{} );
     }
 
     void output( const int step )
@@ -356,8 +318,7 @@ class SolverElastic
         // Print output.
         if ( step % output_frequency == 0 )
         {
-            auto W = computeEnergy( *force, *particles, *neighbors,
-                                    neigh_iter_tag() );
+            auto W = computeEnergy( *force, *particles, neigh_iter_tag() );
 
             particles->output( step / output_frequency, step * dt,
                                output_reference );
@@ -459,7 +420,6 @@ class SolverElastic
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
-    std::shared_ptr<neighbor_type> neighbors;
     // Optional modules.
     std::shared_ptr<heat_transfer_type> heat_transfer;
 
@@ -490,7 +450,6 @@ class SolverFracture
     using particle_type = typename base_type::particle_type;
     using integrator_type = typename base_type::integrator_type;
     using comm_type = typename base_type::comm_type;
-    using neighbor_type = typename base_type::neighbor_type;
     using force_model_type = ForceModel;
     using force_type = typename base_type::force_type;
     using neigh_iter_tag = Cabana::SerialOpTag;
@@ -505,7 +464,7 @@ class SolverFracture
         init_mu();
 
         // Create prenotch.
-        prenotch.create( exec_space{}, mu, *particles, *neighbors );
+        prenotch.create( exec_space{}, mu, *particles, force->_neigh_list );
         _init_time += prenotch.time();
     }
 
@@ -521,8 +480,7 @@ class SolverFracture
     {
         _init_timer.start();
         // Create View to track broken bonds.
-        int max_neighbors =
-            Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
+        auto max_neighbors = force->getMaxLocalNeighbors();
         mu = NeighborView(
             Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
             particles->n_local, max_neighbors );
@@ -534,7 +492,7 @@ class SolverFracture
     {
         // Compute initial internal forces and energy.
         updateForce();
-        computeEnergy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
+        computeEnergy( *force, *particles, mu, neigh_iter_tag() );
 
         if ( initial_output )
             particles->output( 0, 0.0, output_reference );
@@ -643,15 +601,15 @@ class SolverFracture
     {
         // Compute and communicate weighted volume for LPS (does nothing for
         // PMB).
-        force->computeWeightedVolume( *particles, *neighbors, mu );
+        force->computeWeightedVolume( *particles, mu );
         comm->gatherWeightedVolume();
 
         // Compute and communicate dilatation for LPS (does nothing for PMB).
-        force->computeDilatation( *particles, *neighbors, mu );
+        force->computeDilatation( *particles, mu );
         comm->gatherDilatation();
 
         // Compute internal forces.
-        computeForce( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
+        computeForce( *force, *particles, mu, neigh_iter_tag{} );
     }
 
     void output( const int step )
@@ -659,8 +617,7 @@ class SolverFracture
         // Print output.
         if ( step % output_frequency == 0 )
         {
-            auto W = computeEnergy( *force, *particles, *neighbors, mu,
-                                    neigh_iter_tag() );
+            auto W = computeEnergy( *force, *particles, mu, neigh_iter_tag() );
 
             particles->output( step / output_frequency, step * dt,
                                output_reference );
@@ -683,7 +640,6 @@ class SolverFracture
     using base_type::force;
     using base_type::inputs;
     using base_type::integrator;
-    using base_type::neighbors;
     using base_type::particles;
 
     using NeighborView = typename Kokkos::View<int**, memory_space>;

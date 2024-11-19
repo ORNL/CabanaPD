@@ -134,8 +134,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     std::array<double, dim> local_mesh_ext;
     std::array<double, dim> local_mesh_lo;
     std::array<double, dim> local_mesh_hi;
-    std::array<double, dim> ghost_mesh_lo;
-    std::array<double, dim> ghost_mesh_hi;
+    // FIXME: this is for neighborlist construction.
+    double ghost_mesh_lo[dim];
+    double ghost_mesh_hi[dim];
     std::shared_ptr<
         Cabana::Grid::LocalGrid<Cabana::Grid::UniformMesh<double, dim>>>
         local_grid;
@@ -399,9 +400,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     auto getForce() { return _plist_f; }
     auto getReferencePosition() { return _plist_x; }
 
-    void updateCurrentPosition()
+    void updateCurrentPosition() const
     {
-        _timer.start();
+        //_timer.start();
         // Not using slice function because this is called inside.
         auto y = Cabana::slice<0>( _aosoa_y, "current_positions" );
         auto x = sliceReferencePosition();
@@ -414,7 +415,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
         };
         Kokkos::parallel_for( "CabanaPD::CalculateCurrentPositions", policy,
                               sum_x_u );
-        _timer.stop();
+        //_timer.stop();
     }
 
     void resize( int new_local, int new_ghost )
