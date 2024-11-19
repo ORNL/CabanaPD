@@ -156,7 +156,20 @@ class Force<MemorySpace, BaseForceModel>
     {
     }
 
-    // Primary constructor: use positions and construct neighbors.
+    // General constructor (necessary for contact, but could be used by any
+    // force routine).
+    template <class PositionType>
+    Force( const bool half_neigh, const double delta,
+           const PositionType& positions, const std::size_t num_local,
+           const double mesh_min[3], const double mesh_max[3],
+           const double tol = 1e-14 )
+        : _half_neigh( half_neigh )
+        , _neigh_list( neighbor_list_type( positions, 0, num_local, delta + tol,
+                                           1.0, mesh_min, mesh_max ) )
+    {
+    }
+
+    // Constructor which stores existing neighbors.
     template <class NeighborListType>
     Force( const bool half_neigh, const NeighborListType& neighbors )
         : _half_neigh( half_neigh )
