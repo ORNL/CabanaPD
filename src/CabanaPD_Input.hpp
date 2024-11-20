@@ -32,22 +32,7 @@ class Inputs
         inputs = parse( filename );
 
         // Add additional derived inputs to json. System size.
-        auto size = inputs["system_size"]["value"];
-        std::string size_unit = inputs["system_size"]["unit"];
-        for ( std::size_t d = 0; d < size.size(); d++ )
-        {
-            double s = size[d];
-            double low = -0.5 * s;
-            double high = 0.5 * s;
-            inputs["low_corner"]["value"][d] = low;
-            inputs["high_corner"]["value"][d] = high;
-
-            double nc = inputs["num_cells"]["value"][d];
-            inputs["dx"]["value"][d] = ( high - low ) / nc;
-        }
-        inputs["low_corner"]["unit"] = size_unit;
-        inputs["high_corner"]["unit"] = size_unit;
-        inputs["dx"]["unit"] = size_unit;
+        setupSize();
 
         // Number of steps.
         double tf = inputs["final_time"]["value"];
@@ -104,7 +89,55 @@ class Inputs
         // Not yet a user option.
         inputs["half_neigh"]["value"] = false;
     }
-    ~Inputs() {}
+
+    void setupSize()
+    {
+        if ( inputs.contains( "system_size" ) )
+        {
+            auto size = inputs["system_size"]["value"];
+            std::string size_unit = inputs["system_size"]["unit"];
+            for ( std::size_t d = 0; d < size.size(); d++ )
+            {
+                double s = size[d];
+                double low = -0.5 * s;
+                double high = 0.5 * s;
+                inputs["low_corner"]["value"][d] = low;
+                inputs["high_corner"]["value"][d] = high;
+            }
+            inputs["low_corner"]["unit"] = size_unit;
+            inputs["high_corner"]["unit"] = size_unit;
+        }
+        else if ( inputs.contains( "low_corner" ) &&
+                  ( inputs.contains( "high_corner" ) ) )
+        {
+            auto low_corner = inputs["low_corner"]["value"];
+            auto high_corner = inputs["high_corner"]["value"];
+            std::string size_unit = inputs["low_corner"]["unit"];
+            for ( std::size_t d = 0; d < low_corner.size(); d++ )
+            {
+                double low = low_corner[d];
+                double high = high_corner[d];
+                inputs["system_size"]["value"][d] = high - low;
+            }
+            inputs["system_size"]["unit"] = size_unit;
+        }
+        else
+        {
+            throw std::runtime_error( "Must input either system_size or "
+                                      "both low_corner and high_corner." );
+        }
+
+        auto size = inputs["system_size"]["value"];
+        for ( std::size_t d = 0; d < size.size(); d++ )
+        {
+            double low = inputs["low_corner"]["value"][d];
+            double high = inputs["low_corner"]["value"][d];
+            double nc = inputs["num_cells"]["value"][d];
+            inputs["dx"]["value"][d] = ( high - low ) / nc;
+        }
+        std::string size_unit = inputs["system_size"]["unit"];
+        inputs["dx"]["unit"] = size_unit;
+    }
 
     void computeCriticalTimeStep()
     {
