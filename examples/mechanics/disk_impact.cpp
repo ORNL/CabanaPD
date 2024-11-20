@@ -28,15 +28,12 @@ void diskImpactExample( const std::string filename )
     auto particles = CabanaPD::createParticles<memory_space, model_type>(
         exec_space(), inputs );
 
-    std::array<double, 3> low_corner = inputs["low_corner"];
-    std::array<double, 3> high_corner = inputs["high_corner"];
-    double global_mesh_ext = high_corner[0] - low_corner[0];
-    auto x = particles->sliceReferencePosition();
+    double system_size = inputs["system_size"][0];
     auto create_func = KOKKOS_LAMBDA( const int, const double px[3] )
     {
-        auto width = global_mesh_ext / 2.0;
+        auto radius = system_size / 2.0 - 1e-10;
         auto r2 = px[0] * px[0] + px[1] * px[1];
-        if ( r2 > width * width )
+        if ( r2 > radius * radius )
             return false;
         return true;
     };
@@ -44,9 +41,7 @@ void diskImpactExample( const std::string filename )
 
     // Define particle initialization.
     auto v = particles->sliceVelocity();
-    auto f = particles->sliceForce();
     auto rho = particles->sliceDensity();
-
     double rho0 = inputs["density"];
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
@@ -60,7 +55,6 @@ void diskImpactExample( const std::string filename )
     double r_c = dx * 2.0;
     CabanaPD::NormalRepulsionModel contact_model( delta, r_c, K );
 
-    // FIXME: use createSolver to switch backend at runtime.
     auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
         inputs, particles, force_model, contact_model );
 
@@ -68,6 +62,8 @@ void diskImpactExample( const std::string filename )
     double impact_v = inputs["impactor_velocity"];
     double impact_x = 0.0;
     double impact_y = 0.0;
+    auto x = particles->sliceReferencePosition();
+    auto f = particles->sliceForce();
     auto body_func = KOKKOS_LAMBDA( const int p, const double t )
     {
         auto z = t * impact_v + impact_r;
