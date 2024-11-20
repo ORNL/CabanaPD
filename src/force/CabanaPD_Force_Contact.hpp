@@ -45,19 +45,21 @@ class Force<MemorySpace, NormalRepulsionModel>
         }
     }
 
-    template <class ForceType, class ParticleType, class ParallelType>
+    template <class ForceType, class PosType, class ParticleType,
+              class ParallelType>
     void computeForceFull( ForceType& fc, const ParticleType& particles,
-                           const int n_local, ParallelType& neigh_op_tag ) const
+                           const PosType& x, const PosType& u,
+                           const int n_local, ParallelType& neigh_op_tag )
     {
         auto delta = _model.delta;
         auto Rc = _model.Rc;
         auto c = _model.c;
         const auto vol = particles.sliceVolume();
-        const auto x = particles.sliceReferencePosition();
-        const auto u = particles.sliceDisplacement();
         const auto y = particles.sliceCurrentPosition();
 
+        _neigh_timer.start();
         _neigh_list.build( y, 0, n_local, Rc, 1.0, mesh_min, mesh_max );
+        _neigh_timer.stop();
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -83,47 +85,28 @@ class Force<MemorySpace, NormalRepulsionModel>
             fc( i, 2 ) += fcz_i;
         };
 
+        _timer.start();
+
         // FIXME: using default space for now.
         using exec_space = typename MemorySpace::execution_space;
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Cabana::neighbor_parallel_for(
             policy, contact_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::Contact::compute_full" );
+
+        _timer.stop();
     }
 
   protected:
     NormalRepulsionModel _model;
     using base_type::_half_neigh;
     using base_type::_neigh_list;
+    using base_type::_timer;
+    Timer _neigh_timer;
 
     double mesh_max[3];
     double mesh_min[3];
 };
-
-template <class ForceType, class ParticleType, class ParallelType>
-void computeContact( const ForceType& force, ParticleType& particles,
-                     const ParallelType& neigh_op_tag )
-{
-    auto n_local = particles.n_local;
-    auto f = particles.sliceForce();
-    auto f_a = particles.sliceForceAtomic();
-
-    // Do NOT reset force - this is assumed to be done by the primary force
-    // kernel.
-
-    // if ( half_neigh )
-    // Forces must be atomic for half list
-    // compute_force_half( f_a, x, u, neigh_list, n_local,
-    //                    neigh_op_tag );
-
-    // Forces only atomic if using team threading
-    if constexpr ( std::is_same<decltype( neigh_op_tag ),
-                                Cabana::TeamOpTag>::value )
-        force.computeContactFull( f_a, particles, n_local, neigh_op_tag );
-    else
-        force.computeContactFull( f, particles, n_local, neigh_op_tag );
-    Kokkos::fence();
-}
 
 } // namespace CabanaPD
 

@@ -73,7 +73,6 @@
 
 #include <CabanaPD_Boundary.hpp>
 #include <CabanaPD_Comm.hpp>
-#include <CabanaPD_Contact.hpp>
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_HeatTransfer.hpp>
 #include <CabanaPD_Input.hpp>
@@ -290,7 +289,7 @@ class SolverElastic
             updateForce();
 
             if constexpr ( is_contact<contact_model_type>::value )
-                computeContact( *contact, *particles, neigh_iter_tag{} );
+                computeForce( *contact, *particles, neigh_iter_tag{}, false );
 
             // Add force boundary condition.
             if ( boundary_condition.forceUpdate() )
@@ -325,7 +324,7 @@ class SolverElastic
             updateForce();
 
             if constexpr ( is_contact<contact_model_type>::value )
-                computeContact( *contact, *particles, neigh_iter_tag{} );
+                computeForce( *contact, *particles, neigh_iter_tag{}, false );
 
             if constexpr ( is_temperature_dependent<
                                typename force_model_type::thermal_type>::value )
@@ -615,7 +614,7 @@ class SolverFracture
             updateForce();
 
             if constexpr ( is_contact<contact_model_type>::value )
-                computeContact( *contact, *particles, neigh_iter_tag{} );
+                computeForce( *contact, *particles, neigh_iter_tag{}, false );
 
             // Add force boundary condition.
             if ( boundary_condition.forceUpdate() )
@@ -654,7 +653,7 @@ class SolverFracture
             updateForce();
 
             if constexpr ( is_contact<contact_model_type>::value )
-                computeContact( *contact, *particles, neigh_iter_tag{} );
+                computeForce( *contact, *particles, neigh_iter_tag{}, false );
 
             // Integrate - velocity Verlet second half.
             integrator->finalHalfStep( *particles );
