@@ -1,6 +1,6 @@
 {
     "num_cells"              : {"value": [149, 149, 5]},
-    "low_corner"             : {"value": [-0.037, -0.037, 2.5e-3], "unit": "m"},
+    "low_corner"             : {"value": [-0.037, -0.037, -2.5e-3], "unit": "m"},
     "high_corner"            : {"value": [0.037, 0.037, 0.0], "unit": "m"},
     "density"                : {"value": 2200.0, "unit": "kg/m^3"},
     "bulk_modulus"           : {"value": 14.9e+9, "unit": "Pa"},
