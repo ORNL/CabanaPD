@@ -136,11 +136,14 @@ void fragmentingCylinderExample( const std::string filename )
     };
     particles->updateParticles( exec_space{}, init_functor );
 
+    double r_c = dx[0] * 2.0;
+    CabanaPD::NormalRepulsionModel contact_model( delta, r_c, K );
+
     // ====================================================
     //                   Simulation run
     // ====================================================
     auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
-        inputs, particles, force_model );
+        inputs, particles, force_model, contact_model );
     cabana_pd->init();
     cabana_pd->run();
 }
