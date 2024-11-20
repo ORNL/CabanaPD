@@ -33,7 +33,7 @@ void diskImpactExample( const std::string filename )
     {
         auto radius = system_size / 2.0 - 1e-10;
         auto r2 = px[0] * px[0] + px[1] * px[1];
-        if ( r2 > radius * radius )
+        if ( r2 > radius * radius || px[2] < 0.0 )
             return false;
         return true;
     };
@@ -51,8 +51,8 @@ void diskImpactExample( const std::string filename )
     };
     particles->updateParticles( exec_space{}, init_functor );
 
-    double dx = particles->dx[0];
-    double r_c = dx * 2.0;
+    double r_c = inputs["contact_horizon_factor"];
+    r_c *= particles->dx[0];
     CabanaPD::NormalRepulsionModel contact_model( delta, r_c, K );
 
     auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
@@ -72,7 +72,7 @@ void diskImpactExample( const std::string filename )
                          ( x( p, 2 ) - z ) * ( x( p, 2 ) - z ) );
         if ( r < impact_r )
         {
-            double fmag = -1.0e17 * ( r - impact_r ) * ( r - impact_r );
+            double fmag = 1.0e17 * ( r - impact_r ) * ( r - impact_r );
             f( p, 0 ) += fmag * x( p, 0 ) / r;
             f( p, 1 ) += fmag * x( p, 1 ) / r;
             f( p, 2 ) += fmag * ( x( p, 2 ) - z ) / r;

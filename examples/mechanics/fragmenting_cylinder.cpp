@@ -136,7 +136,8 @@ void fragmentingCylinderExample( const std::string filename )
     };
     particles->updateParticles( exec_space{}, init_functor );
 
-    double r_c = dx[0] * 2.0;
+    double r_c = inputs["contact_horizon_factor"];
+    r_c *= dx[0];
     CabanaPD::NormalRepulsionModel contact_model( delta, r_c, K );
 
     // ====================================================
