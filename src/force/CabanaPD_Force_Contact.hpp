@@ -104,6 +104,7 @@ class Force<MemorySpace, NormalRepulsionModel>
     double computeEnergyFull( WType&, const PosType&, const PosType&,
                               ParticleType&, const int, ParallelType& )
     {
+        return 0.0;
     }
 
   protected:
