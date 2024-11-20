@@ -40,6 +40,11 @@ struct ContactModel
 
 struct NormalRepulsionModel : public ContactModel
 {
+    // FIXME: This is for use as the primary force model.
+    using base_model = PMB;
+    using fracture_type = Elastic;
+    using thermal_type = TemperatureIndependent;
+
     using ContactModel::delta;
     using ContactModel::Rc;
 
@@ -63,6 +68,12 @@ struct NormalRepulsionModel : public ContactModel
         c = 18.0 * K / ( pi * delta * delta * delta * delta );
     }
 };
+
+template <>
+struct is_contact<NormalRepulsionModel> : public std::true_type
+{
+};
+
 } // namespace CabanaPD
 
 #endif

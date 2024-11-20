@@ -29,6 +29,7 @@ class Force<MemorySpace, NormalRepulsionModel>
 {
   public:
     using base_type = Force<MemorySpace, BaseForceModel>;
+    using neighbor_list_type = typename base_type::neighbor_list_type;
 
     template <class ParticleType>
     Force( const bool half_neigh, const ParticleType& particles,
@@ -47,9 +48,9 @@ class Force<MemorySpace, NormalRepulsionModel>
 
     template <class ForceType, class PosType, class ParticleType,
               class ParallelType>
-    void computeForceFull( ForceType& fc, const ParticleType& particles,
-                           const PosType& x, const PosType& u,
-                           const int n_local, ParallelType& neigh_op_tag )
+    void computeForceFull( ForceType& fc, const PosType& x, const PosType& u,
+                           const ParticleType& particles, const int n_local,
+                           ParallelType& neigh_op_tag )
     {
         auto delta = _model.delta;
         auto Rc = _model.Rc;
@@ -95,6 +96,14 @@ class Force<MemorySpace, NormalRepulsionModel>
             neigh_op_tag, "CabanaPD::Contact::compute_full" );
 
         _timer.stop();
+    }
+
+    // FIXME: implement energy
+    template <class PosType, class WType, class ParticleType,
+              class ParallelType>
+    double computeEnergyFull( WType&, const PosType&, const PosType&,
+                              ParticleType&, const int, ParallelType& )
+    {
     }
 
   protected:
