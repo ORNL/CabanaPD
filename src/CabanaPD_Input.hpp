@@ -127,16 +127,34 @@ class Inputs
                                       "both low_corner and high_corner." );
         }
 
-        auto size = inputs["system_size"]["value"];
-        for ( std::size_t d = 0; d < size.size(); d++ )
+        if ( inputs.contains( "dx" ) )
         {
-            double low = inputs["low_corner"]["value"][d];
-            double high = inputs["low_corner"]["value"][d];
-            double nc = inputs["num_cells"]["value"][d];
-            inputs["dx"]["value"][d] = ( high - low ) / nc;
+            auto size = inputs["system_size"]["value"];
+            for ( std::size_t d = 0; d < size.size(); d++ )
+            {
+                double system_size = inputs["system_size"]["value"][d];
+                double dx = inputs["dx"]["value"][d];
+                inputs["num_cells"]["value"][d] =
+                    static_cast<int>( system_size / dx );
+            }
         }
-        std::string size_unit = inputs["system_size"]["unit"];
-        inputs["dx"]["unit"] = size_unit;
+        else if ( inputs.contains( "num_cells" ) )
+        {
+            auto size = inputs["system_size"]["value"];
+            for ( std::size_t d = 0; d < size.size(); d++ )
+            {
+                double low = inputs["low_corner"]["value"][d];
+                double high = inputs["low_corner"]["value"][d];
+                double nc = inputs["num_cells"]["value"][d];
+                inputs["dx"]["value"][d] = ( high - low ) / nc;
+            }
+            std::string size_unit = inputs["system_size"]["unit"];
+            inputs["dx"]["unit"] = size_unit;
+        }
+        else
+        {
+            throw std::runtime_error( "Must input either num_cells or dx." );
+        }
     }
 
     void computeCriticalTimeStep()
