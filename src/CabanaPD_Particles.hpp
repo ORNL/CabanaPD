@@ -105,7 +105,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     // no-fail.
     using int_type = Cabana::MemberTypes<int>;
     // sigma, v, W, rho, damage, type.
-    using other_types = Cabana::MemberTypes<double[dim, dim], double[dim],
+    using other_types = Cabana::MemberTypes<double[dim][dim], double[dim],
                                             double, double, double, int>;
     // Potentially needed later: body force (b), ID.
 
