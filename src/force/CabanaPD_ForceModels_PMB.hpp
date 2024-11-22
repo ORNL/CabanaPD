@@ -92,10 +92,75 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent>
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 
-    KOKKOS_INLINE_FUNCTION
-    bool criticalStretch( const int, const int, const double r,
-                          const double xi ) const
+    // No-op.
+    template <class NeighListType, class PosType>
+    KOKKOS_INLINE_FUNCTION auto
+    minLocalStretch( const int, const NeighListType&, const PosType&,
+                     const PosType& ) const
     {
+        return s0;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    bool criticalStretch( const int, const int, const double r, const double xi,
+                          const double ) const
+    {
+        return r * r >= bond_break_coeff * xi * xi;
+    }
+};
+
+template <>
+struct ForceModel<PMB, Fracture, TemperatureIndependent, DynamicCriticalStretch>
+    : public ForceModel<PMB, Fracture, TemperatureIndependent>
+{
+    using base_type = ForceModel<PMB, Fracture>;
+    using base_model = typename base_type::base_model;
+    using fracture_type = Fracture;
+    using thermal_type = base_type::thermal_type;
+
+    // Purposely not using the (static) base class bond_break_coeff
+    using base_type::c;
+    using base_type::delta;
+    using base_type::G0;
+    using base_type::K;
+    using base_type::s0;
+    double alpha = 0.25;
+
+    ForceModel() {}
+    ForceModel( const double delta, const double K, const double G0 )
+        : base_type( delta, K, G0 )
+    {
+    }
+
+    template <class NeighListType, class PosType>
+    KOKKOS_INLINE_FUNCTION auto
+    minLocalStretch( const int i, const NeighListType& neigh_list,
+                     const PosType& x, const PosType& u ) const
+    {
+        std::size_t num_neighbors =
+            Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list, i );
+        double s_min = DBL_MAX;
+        for ( std::size_t n = 0; n < num_neighbors; n++ )
+        {
+            std::size_t j = Cabana::NeighborList<NeighListType>::getNeighbor(
+                neigh_list, i, n );
+
+            double xi, r, s;
+            double rx, ry, rz;
+            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+            if ( s < s_min )
+                s_min = s;
+        }
+        return s0 - alpha * s_min;
+    }
+
+    // Use the dynamic s0 from the minLocalStretch function, reused through the
+    // neighbor loop.
+    KOKKOS_INLINE_FUNCTION
+    bool criticalStretch( const int, const int, const double r, const double xi,
+                          const double s0_i ) const
+    {
+        double bond_break_coeff = ( 1.0 + s0_i ) * ( 1.0 + s0_i );
         return r * r >= bond_break_coeff * xi * xi;
     }
 };
@@ -232,7 +297,7 @@ struct ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>
 
     KOKKOS_INLINE_FUNCTION
     bool criticalStretch( const int i, const int j, const double r,
-                          const double xi ) const
+                          const double xi, const double ) const
     {
         double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
         double bond_break_coeff =

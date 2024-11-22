@@ -222,6 +222,8 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
 
         auto force_full = KOKKOS_LAMBDA( const int i )
         {
+            auto s_min = model.minLocalStretch( i, neigh_list, x, u );
+
             std::size_t num_neighbors =
                 Cabana::NeighborList<neighbor_list_type>::numNeighbor(
                     neigh_list, i );
@@ -243,8 +245,8 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
                 model.thermalStretch( s, i, j );
 
                 // Break if beyond critical stretch unless in no-fail zone.
-                if ( model.criticalStretch( i, j, r, xi ) && !nofail( i ) &&
-                     !nofail( j ) )
+                if ( model.criticalStretch( i, j, r, xi, s_min ) &&
+                     !nofail( i ) && !nofail( j ) )
                 {
                     mu( i, n ) = 0;
                 }
