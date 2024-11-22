@@ -204,8 +204,8 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            const NeighListType& neigh_list, MuView& mu,
-                           const int n_local, double multiplier = 1.0,
-                           ParallelType& )
+                           ParallelType&, const int n_local,
+                           double multiplier = 1.0 )
     {
         _timer.start();
 

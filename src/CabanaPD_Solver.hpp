@@ -511,17 +511,6 @@ class SolverFracture
         _init_timer.stop();
     }
 
-    void init_dual_mu()
-    {
-        // Use the same max_neighbors as the primary neighbor list
-        int max_neighbors =
-            Cabana::NeighborList<neighbor_type>::maxNeighbor( *dual_neighbors );
-        dual_mu = NeighborView(
-            Kokkos::ViewAllocateWithoutInitializing( "dual_broken_bonds" ),
-            particles->n_local, max_neighbors );
-        Kokkos::deep_copy( dual_mu, 1 );
-    }
-
     void init( const bool initial_output = true )
     {
         // Compute initial internal forces and energy.
@@ -644,8 +633,8 @@ class SolverFracture
         comm->gatherDilatation();
 
         // Compute internal forces.
-        computeForce( *force, *particles, *neighbor_list, mu_array, multiplier,
-                      neigh_iter_tag{} );
+        computeForce( *force, *particles, *neighbor_list, mu_array,
+                      neigh_iter_tag{}, multiplier );
     }
 
     void output( const int step )
@@ -682,8 +671,6 @@ class SolverFracture
 
     using NeighborView = typename Kokkos::View<int**, memory_space>;
     NeighborView mu;
-    NeighborView dual_mu; // Bond damage for dual horizon
-    std::shared_ptr<neighbor_type> dual_neighbors; // Dual neighbor list
 
     using base_type::_init_time;
     using base_type::_init_timer;
@@ -692,7 +679,7 @@ class SolverFracture
 };
 
 template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel, class DHPDModel>
+          class ForceModel, class DHPDModel = void>
 class SolverDHPD
     : public SolverFracture<MemorySpace, InputType, ParticleType, ForceModel>
 {
@@ -710,6 +697,10 @@ class SolverDHPD
     using force_type = typename base_type::force_type;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using input_type = typename base_type::input_type;
+    std::shared_ptr<neighbor_type> dual_neighbors; // Dual neighbor list
+    using NeighborView = typename Kokkos::View<int**, memory_space>;
+    NeighborView dual_mu; // Bond damage for dual horizon
+
     ;
 
     SolverDHPD( input_type _inputs, std::shared_ptr<particle_type> _particles,
@@ -717,9 +708,20 @@ class SolverDHPD
         : base_type( _inputs, _particles, force_model )
     {
         // Copy the normal neighbor list and call it dual
-        dual_neighbors = neighbors;
+        dual_neighbors = this->neighbors;
         // Initialize dual_mu
         init_dual_mu();
+    }
+
+    void init_dual_mu()
+    {
+        // Use the same max_neighbors as the primary neighbor list
+        int max_neighbors =
+            Cabana::NeighborList<neighbor_type>::maxNeighbor( *dual_neighbors );
+        dual_mu = NeighborView(
+            Kokkos::ViewAllocateWithoutInitializing( "dual_broken_bonds" ),
+            particles->n_local, max_neighbors );
+        Kokkos::deep_copy( dual_mu, 1 );
     }
 
     void init( const bool initial_output = true )
@@ -745,7 +747,7 @@ class SolverDHPD
 
         // Compute initial contact
         // FIXME: this should be before the final BC
-        computeContact( *contact, *particles, neigh_iter_tag{} );
+        // computeContact( *contact, *particles, neigh_iter_tag{} );
 
         if ( initial_output )
             particles->output( 0, 0.0, output_reference );
@@ -808,7 +810,7 @@ class SolverDHPD
 
     using base_type::mu;
 
-    std::shared_ptr<contact_type> contact;
+    // std::shared_ptr<contact_type> contact;
 
     using base_type::_init_time;
     using base_type::_init_timer;
@@ -851,15 +853,15 @@ auto createSolverFracture( InputsType inputs,
         inputs, particles, model, prenotch );
 }
 
-template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel, class ContactModel>
-auto createSolverContact( InputType inputs,
-                          std::shared_ptr<ParticleType> particles,
-                          ForceModel model, ContactModel contact )
+template <class MemorySpace, class InputsType, class ParticleType,
+          class ForceModel>
+auto createSolverDHPD( InputsType inputs,
+                       std::shared_ptr<ParticleType> particles,
+                       ForceModel model )
 {
-    return std::make_shared<SolverContact<MemorySpace, InputType, ParticleType,
-                                          ForceModel, ContactModel>>(
-        inputs, particles, model, contact );
+    return std::make_shared<
+        SolverDHPD<MemorySpace, InputsType, ParticleType, ForceModel>>(
+        inputs, particles, model );
 }
 
 } // namespace CabanaPD
