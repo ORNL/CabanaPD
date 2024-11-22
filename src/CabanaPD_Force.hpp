@@ -252,25 +252,27 @@ template <class ForceType, class ParticleType, class ParallelType>
 double computeEnergy( ForceType& force, ParticleType& particles,
                       const ParallelType& neigh_op_tag )
 {
-    auto n_local = particles.n_local;
-    auto x = particles.sliceReferencePosition();
-    auto u = particles.sliceDisplacement();
-    auto f = particles.sliceForce();
-    auto W = particles.sliceStrainEnergy();
-    auto vol = particles.sliceVolume();
+    double energy = 0.0;
+    if constexpr ( is_energy_output<typename ParticleType::output_type>::value )
+    {
+        auto n_local = particles.n_local;
+        auto x = particles.sliceReferencePosition();
+        auto u = particles.sliceDisplacement();
+        auto f = particles.sliceForce();
+        auto W = particles.sliceStrainEnergy();
+        auto vol = particles.sliceVolume();
 
-    // Reset energy.
-    Cabana::deep_copy( W, 0.0 );
+        // Reset energy.
+        Cabana::deep_copy( W, 0.0 );
 
-    double energy;
-    // if ( _half_neigh )
-    //    energy = computeEnergy_half( force, x, u,
-    //                                  n_local, neigh_op_tag );
-    // else
-    energy =
-        force.computeEnergyFull( W, x, u, particles, n_local, neigh_op_tag );
-    Kokkos::fence();
-
+        // if ( _half_neigh )
+        //    energy = computeEnergy_half( force, x, u,
+        //                                  n_local, neigh_op_tag );
+        // else
+        energy = force.computeEnergyFull( W, x, u, particles, n_local,
+                                          neigh_op_tag );
+        Kokkos::fence();
+    }
     return energy;
 }
 
@@ -303,31 +305,32 @@ void computeForce( ForceType& force, ParticleType& particles, NeighborView& mu,
     Kokkos::fence();
 }
 
-// Energy and damage.
 template <class ForceType, class ParticleType, class NeighborView,
           class ParallelType>
 double computeEnergy( ForceType& force, ParticleType& particles,
                       NeighborView& mu, const ParallelType& neigh_op_tag )
 {
-    auto n_local = particles.n_local;
-    auto x = particles.sliceReferencePosition();
-    auto u = particles.sliceDisplacement();
-    auto f = particles.sliceForce();
-    auto W = particles.sliceStrainEnergy();
-    auto phi = particles.sliceDamage();
+    double energy = 0.0;
+    if constexpr ( is_energy_output<typename ParticleType::output_type>::value )
+    {
+        auto n_local = particles.n_local;
+        auto x = particles.sliceReferencePosition();
+        auto u = particles.sliceDisplacement();
+        auto f = particles.sliceForce();
+        auto W = particles.sliceStrainEnergy();
+        auto phi = particles.sliceDamage();
 
-    // Reset energy.
-    Cabana::deep_copy( W, 0.0 );
+        // Reset energy.
+        Cabana::deep_copy( W, 0.0 );
 
-    double energy;
-    // if ( _half_neigh )
-    //    energy = computeEnergy_half( force, x, u,
-    //                                  n_local, neigh_op_tag );
-    // else
-    energy = force.computeEnergyFull( W, x, u, phi, particles, mu, n_local,
-                                      neigh_op_tag );
-    Kokkos::fence();
-
+        // if ( _half_neigh )
+        //    energy = computeEnergy_half( force, x, u,
+        //                                  n_local, neigh_op_tag );
+        // else
+        energy = force.computeEnergyFull( W, x, u, phi, particles, mu, n_local,
+                                          neigh_op_tag );
+        Kokkos::fence();
+    }
     return energy;
 }
 
