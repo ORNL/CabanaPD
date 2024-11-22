@@ -658,6 +658,155 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, Dimension>
 };
 
 template <class MemorySpace, int Dimension>
+class Particles<MemorySpace, Correspondence, TemperatureIndependent, Dimension>
+    : public Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
+{
+  public:
+    using self_type = Particles<MemorySpace, Correspondence,
+                                TemperatureIndependent, Dimension>;
+    using base_type =
+        Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>;
+    using memory_space = typename base_type::memory_space;
+    using base_type::dim;
+
+    // Per particle.
+    using base_type::n_ghost;
+    using base_type::n_global;
+    using base_type::n_local;
+    using base_type::size;
+
+    // Split?
+    using tensor_type = Cabana::MemberTypes<double[dim][dim]>;
+    using aosoa_tensor_type = Cabana::AoSoA<tensor_type, memory_space, 1>;
+
+    // Per type.
+    using base_type::n_types;
+
+    // Simulation total domain.
+    using base_type::global_mesh_ext;
+
+    // Simulation sub domain (single MPI rank).
+    using base_type::ghost_mesh_hi;
+    using base_type::ghost_mesh_lo;
+    using base_type::local_mesh_ext;
+    using base_type::local_mesh_hi;
+    using base_type::local_mesh_lo;
+
+    using base_type::dx;
+    using base_type::local_grid;
+
+    using base_type::halo_width;
+
+    // Default constructor.
+    Particles()
+        : base_type()
+    {
+        _init_timer.start();
+        _aosoa_F = aosoa_tensor_type( "Particle Deformation Gradient", 0 );
+        _aosoa_Kinv = aosoa_tensor_type( "Particle Shape Tensor", 0 );
+        _init_timer.stop();
+    }
+
+    // Constructor which initializes particles on regular grid.
+    template <typename... Args>
+    Particles( Args&&... args )
+        : base_type( std::forward<Args>( args )... )
+    {
+        _init_timer.start();
+        _aosoa_F =
+            aosoa_tensor_type( "Particle Deformation Gradient", n_local );
+        _aosoa_Kinv = aosoa_tensor_type( "Particle Shape Tensor", n_local );
+        init_corr();
+        _init_timer.stop();
+    }
+
+    template <typename... Args>
+    void createParticles( Args&&... args )
+    {
+        // Forward arguments to standard or custom particle creation.
+        base_type::createParticles( std::forward<Args>( args )... );
+        _init_timer.start();
+        _aosoa_F.resize( n_local );
+        _aosoa_Kinv.resize( n_local );
+        _init_timer.stop();
+    }
+
+    auto sliceDefGradient()
+    {
+        return Cabana::slice<0>( _aosoa_F, "deformation_gradient" );
+    }
+    auto sliceDefGradient() const { return sliceDefGradient(); }
+    auto sliceShapeTensor()
+    {
+        return Cabana::slice<0>( _aosoa_Kinv, "shape_tensor" );
+    }
+    auto sliceShapeTensor() const { return sliceShapeTensor(); }
+
+    void resize( int new_local, int new_ghost )
+    {
+        base_type::resize( new_local, new_ghost );
+        _timer.start();
+        _aosoa_F.resize( new_local + new_ghost );
+        _aosoa_Kinv.resize( new_local + new_ghost );
+        _timer.stop();
+    }
+
+    void output( [[maybe_unused]] const int output_step,
+                 [[maybe_unused]] const double output_time,
+                 [[maybe_unused]] const bool use_reference = true )
+    {
+        _output_timer.start();
+
+#ifdef Cabana_ENABLE_HDF5
+        Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
+            h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
+            n_local, base_type::getPosition( use_reference ),
+            base_type::sliceStrainEnergy(), base_type::sliceForce(),
+            base_type::sliceDisplacement(), base_type::sliceVelocity(),
+            base_type::sliceDamage(), sliceDefGradient() );
+#else
+#ifdef Cabana_ENABLE_SILO
+        Cabana::Grid::Experimental::SiloParticleOutput::
+            writePartialRangeTimeStep(
+                "particles", local_grid->globalGrid(), output_step, output_time,
+                0, n_local, base_type::getPosition( use_reference ),
+                base_type::sliceStrainEnergy(), base_type::sliceForce(),
+                base_type::sliceDisplacement(), base_type::sliceVelocity(),
+                base_type::sliceDamage(), sliceDefGradient() );
+#else
+        log( std::cout, "No particle output enabled." );
+#endif
+#endif
+
+        _output_timer.stop();
+    }
+
+    friend class Comm<self_type, PMB, TemperatureIndependent>;
+    friend class Comm<self_type, LPS, TemperatureIndependent>;
+    friend class Comm<self_type, Correspondence, TemperatureIndependent>;
+
+  protected:
+    void init_corr()
+    {
+        auto F = sliceDefGradient();
+        Cabana::deep_copy( F, 0.0 );
+        auto Kinv = sliceShapeTensor();
+        Cabana::deep_copy( Kinv, 0.0 );
+    }
+
+    aosoa_tensor_type _aosoa_F;
+    aosoa_tensor_type _aosoa_Kinv;
+
+#ifdef Cabana_ENABLE_HDF5
+    using base_type::h5_config;
+#endif
+
+    using base_type::_init_timer;
+    using base_type::_output_timer;
+    using base_type::_timer;
+};
+
+template <class MemorySpace, int Dimension>
 class Particles<MemorySpace, PMB, TemperatureDependent, Dimension>
     : public Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
 {

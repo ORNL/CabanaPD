@@ -32,6 +32,29 @@ struct BaseForceModel
     void thermalStretch( double&, const int, const int ) const {}
 };
 
+struct BaseInfluenceForceModel : public BaseForceModel
+{
+    using base_type = BaseForceModel;
+
+    using base_type::delta;
+    int influence_type;
+
+    BaseInfluenceForceModel( const double _delta, const int _influence = 0 )
+        : base_type( _delta )
+        , influence_type( _influence )
+    {
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    double influence_function( const double xi ) const
+    {
+        if ( influence_type == 1 )
+            return 1.0 / xi;
+        else
+            return 1.0;
+    }
+};
+
 template <typename TemperatureType>
 struct BaseTemperatureModel
 {

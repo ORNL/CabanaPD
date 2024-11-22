@@ -29,8 +29,10 @@
 #include <CabanaPD_Types.hpp>
 #include <CabanaPD_config.hpp>
 
+#include <force/CabanaPD_ForceModels_Correspondence.hpp>
 #include <force/CabanaPD_ForceModels_LPS.hpp>
 #include <force/CabanaPD_ForceModels_PMB.hpp>
+#include <force/CabanaPD_Force_Correspondence.hpp>
 #include <force/CabanaPD_Force_LPS.hpp>
 #include <force/CabanaPD_Force_PMB.hpp>
 
