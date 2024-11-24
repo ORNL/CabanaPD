@@ -115,7 +115,7 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
+    auto cabana_pd = CabanaPD::createSolverDHPD<memory_space>(
         inputs, particles, force_model, prenotch );
 
     // ====================================================

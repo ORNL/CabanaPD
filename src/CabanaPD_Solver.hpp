@@ -620,21 +620,19 @@ class SolverFracture
 
     // Compute and communicate fields needed for force computation and update
     // forces.
-    void updateForce( std::shared_ptr<neighbor_type> neighbor_list,
-                      NeighborView& mu_array, double multiplier )
+    void updateForce()
     {
         // Compute and communicate weighted volume for LPS (does nothing for
         // PMB).
-        force->computeWeightedVolume( *particles, *neighbor_list, mu_array );
+        force->computeWeightedVolume( *particles, *neighbors, mu );
         comm->gatherWeightedVolume();
 
         // Compute and communicate dilatation for LPS (does nothing for PMB).
-        force->computeDilatation( *particles, *neighbor_list, mu_array );
+        force->computeDilatation( *particles, *neighbors, mu );
         comm->gatherDilatation();
 
         // Compute internal forces.
-        computeForce( *force, *particles, *neighbor_list, mu_array,
-                      neigh_iter_tag{}, multiplier );
+        computeForce( *force, *particles, *neighbors, mu, neigh_iter_tag{}, 1 );
     }
 
     void output( const int step )
@@ -713,6 +711,34 @@ class SolverDHPD
         init_dual_mu();
     }
 
+    void updateForce()
+    {
+        // Compute and communicate weighted volume for LPS (does nothing for
+        // PMB).
+        force->computeWeightedVolume( *particles, *neighbors, mu );
+        comm->gatherWeightedVolume();
+
+        // Compute and communicate dilatation for LPS (does nothing for PMB).
+        force->computeDilatation( *particles, *neighbors, mu );
+        comm->gatherDilatation();
+
+        // Compute internal forces with multiplier +1.
+        computeForce( *force, *particles, *neighbors, mu, neigh_iter_tag{},
+                      1.0 );
+
+        // Dual component
+        force->computeWeightedVolume( *particles, *dual_neighbors, dual_mu );
+        comm->gatherWeightedVolume();
+
+        // Compute and communicate dilatation for LPS (does nothing for PMB).
+        force->computeDilatation( *particles, *dual_neighbors, dual_mu );
+        comm->gatherDilatation();
+
+        // Compute internal forces with multiplier -1.
+        computeForce( *force, *particles, *dual_neighbors, dual_mu,
+                      neigh_iter_tag{}, -1.0 );
+    }
+
     void init_dual_mu()
     {
         // Use the same max_neighbors as the primary neighbor list
@@ -732,8 +758,8 @@ class SolverDHPD
         // computeContact( *contact, *particles, neigh_iter_tag{} );
 
         // Compute initial forces for the dual horizon
-        computeForce( *force, *particles, *dual_neighbors, dual_mu, -1.0,
-                      neigh_iter_tag{} ); // Not sure about this
+        computeForce( *force, *particles, *dual_neighbors, dual_mu,
+                      neigh_iter_tag{}, -1.0 ); // Not sure about this
 
         if ( initial_output )
             particles->output( 0, 0.0, output_reference );
@@ -778,8 +804,7 @@ class SolverDHPD
             comm->gatherDisplacement();
 
             // Compute internal forces.
-            base_type::updateForce( dual_neighbors, dual_mu, 1.0 );
-            base_type::updateForce( neighbors, mu, -1.0 );
+            base_type::updateForce();
 
             // Add force boundary condition.
             if ( boundary_condition.forceUpdate() )
@@ -854,10 +879,10 @@ auto createSolverFracture( InputsType inputs,
 }
 
 template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel>
+          class ForceModel, class PrenotchType>
 auto createSolverDHPD( InputsType inputs,
                        std::shared_ptr<ParticleType> particles,
-                       ForceModel model )
+                       ForceModel model, PrenotchType Prenotch )
 {
     return std::make_shared<
         SolverDHPD<MemorySpace, InputsType, ParticleType, ForceModel>>(
