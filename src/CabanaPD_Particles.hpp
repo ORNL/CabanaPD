@@ -137,9 +137,10 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     // FIXME: this is for neighborlist construction.
     double ghost_mesh_lo[dim];
     double ghost_mesh_hi[dim];
-    std::shared_ptr<
-        Cabana::Grid::LocalGrid<Cabana::Grid::UniformMesh<double, dim>>>
-        local_grid;
+
+    using local_grid_type =
+        Cabana::Grid::LocalGrid<Cabana::Grid::UniformMesh<double, dim>>;
+    std::shared_ptr<local_grid_type> local_grid;
     Kokkos::Array<double, dim> dx;
 
     int halo_width;
@@ -476,6 +477,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
 
     friend class Comm<self_type, PMB, TemperatureIndependent>;
     friend class Comm<self_type, PMB, TemperatureDependent>;
+    friend class Comm<self_type, Contact, TemperatureIndependent>;
 
   protected:
     aosoa_u_type _aosoa_u;
