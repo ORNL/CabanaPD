@@ -85,7 +85,7 @@ void fragmentingCylinderExample( const std::string filename )
     {
         double rsq = ( x[0] - x_center ) * ( x[0] - x_center ) +
                      ( x[1] - y_center ) * ( x[1] - y_center );
-        if ( rsq < Rin * Rin || rsq > Rout * Rout )
+        if ( rsq < Rin * Rin || rsq > Rout * Rout || x[2] > 0.05 || x[2] < -0.05)
             return false;
         return true;
     };
