@@ -72,5 +72,21 @@ struct LinearLPS
 {
 };
 
+struct BaseOutput
+{
+};
+struct EnergyOutput
+{
+};
+
+template <class>
+struct is_energy_output : public std::false_type
+{
+};
+template <>
+struct is_energy_output<EnergyOutput> : public std::true_type
+{
+};
+
 } // namespace CabanaPD
 #endif
