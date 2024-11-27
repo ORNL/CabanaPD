@@ -412,17 +412,17 @@ class Comm<ParticleType, Contact, TemperatureIndependent>
         , max_export( max_export_guess )
         , halo_width( particles.local_grid->haloCellWidth() )
     {
-        // We use n_ghost here as the "local" halo count because these current
-        // frame ghosts are built on top of the existing, static, reference
-        // frame ghosts.
-        auto n_reference = particles.n_local + particles.n_ghost;
         auto topology = Cabana::Grid::getTopology( *particles.local_grid );
         halo = std::make_shared<halo_type>(
-            particles.local_grid->globalGrid().comm(), n_reference,
+            particles.local_grid->globalGrid().comm(), particles.n_reference,
             halo_ids._ids, halo_ids._destinations, topology );
         std::cout << "halo " << halo->numLocal() << " " << halo->numGhost()
                   << std::endl;
-        particles.resize( halo->numLocal(), halo->numGhost() );
+        // We use n_ghost here as the "local" halo count because these current
+        // frame ghosts are built on top of the existing, static, reference
+        // frame ghosts.
+        particles.resize( particles.n_local, particles.n_ghost,
+                          halo->numGhost() );
 
         gather_current =
             std::make_shared<gather_current_type>( *halo, particles._aosoa_y );
@@ -439,13 +439,13 @@ class Comm<ParticleType, Contact, TemperatureIndependent>
         // current positions.
         halo_ids.build( y );
 
-        auto n_reference = particles.n_local + particles.n_ghost;
         auto topology = Cabana::Grid::getTopology( *particles.local_grid );
         // FIXME: missing a build() interface
         halo = std::make_shared<halo_type>(
-            particles.local_grid->globalGrid().comm(), n_reference,
+            particles.local_grid->globalGrid().comm(), particles.n_reference,
             halo_ids._ids, halo_ids._destinations, topology );
-        particles.resize( halo->numLocal(), halo->numGhost() );
+        particles.resize( particles.n_local, particles.n_ghost,
+                          halo->numGhost() );
 
         gather_current->reserve( *halo, particles._aosoa_y );
 

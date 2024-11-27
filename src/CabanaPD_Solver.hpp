@@ -160,12 +160,6 @@ class SolverElastic
         std::cout << particles->n_local << " " << particles->n_ghost
                   << std::endl;
 
-        if constexpr ( is_contact<contact_model_type>::value )
-            contact_comm = std::make_shared<contact_comm_type>( *particles );
-
-        std::cout << particles->n_local << " " << particles->n_ghost
-                  << std::endl;
-
         // Update temperature ghost size if needed.
         if constexpr ( is_temperature_dependent<
                            typename force_model_type::thermal_type>::value )
@@ -199,6 +193,14 @@ class SolverElastic
             heat_transfer = std::make_shared<heat_transfer_type>(
                 inputs["half_neigh"], force->_neigh_list, force_model );
         }
+
+        // Purposely delay creating initial contact ghosts until after reference
+        // neighbor list.
+        if constexpr ( is_contact<contact_model_type>::value )
+            contact_comm = std::make_shared<contact_comm_type>( *particles );
+
+        std::cout << particles->n_local << " " << particles->n_ghost << " "
+                  << particles->n_contact_ghost << std::endl;
 
         print = print_rank();
         if ( print )
