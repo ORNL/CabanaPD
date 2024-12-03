@@ -400,17 +400,14 @@ class Comm<ParticleType, Contact, TemperatureIndependent>
     std::shared_ptr<gather_current_type> gather_current;
     std::shared_ptr<halo_type> halo;
     HaloIds<memory_space, local_grid_type> halo_ids;
-    int max_export;
-    int halo_width;
 
     // Note this initial guess is small because this is often used for very
     // short range interactions.
-    Comm( ParticleType& particles, int max_export_guess = 10 )
+    Comm( ParticleType& particles, int halo_width = 1,
+          int max_export_guess = 10 )
         : halo_ids( HaloIds<memory_space, local_grid_type>(
               *( particles.local_grid ), particles.sliceCurrentPosition(),
-              particles.local_grid->haloCellWidth(), max_export_guess ) )
-        , max_export( max_export_guess )
-        , halo_width( particles.local_grid->haloCellWidth() )
+              halo_width, max_export_guess ) )
     {
         auto topology = Cabana::Grid::getTopology( *particles.local_grid );
         halo = std::make_shared<halo_type>(
