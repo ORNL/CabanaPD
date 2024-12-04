@@ -250,21 +250,8 @@ void computeForce( ForceType& force, ParticleType& particles,
 }
 
 template <class ForceType, class ParticleType, class ParallelType>
-double computeEnergy(
-    ForceType&, ParticleType&, const ParallelType&,
-    typename std::enable_if<
-        ( !is_energy_output<typename ParticleType::output_type>::value ),
-        int>::type* = 0 )
-{
-    return 0.0;
-}
-
-template <class ForceType, class ParticleType, class ParallelType>
-double computeEnergy(
-    ForceType& force, ParticleType& particles, const ParallelType& neigh_op_tag,
-    typename std::enable_if<
-        ( is_energy_output<typename ParticleType::output_type>::value ),
-        int>::type* = 0 )
+double computeEnergy( ForceType& force, ParticleType& particles,
+                      const ParallelType& neigh_op_tag )
 {
     double energy = 0.0;
     if constexpr ( is_energy_output<typename ParticleType::output_type>::value )
@@ -291,28 +278,19 @@ double computeEnergy(
 }
 
 template <class ForceType, class ParticleType, class ParallelType>
-void computeStress(
-    ForceType&, ParticleType&, const ParallelType&,
-    typename std::enable_if<
-        ( !is_stress_output<typename ParticleType::output_type>::value ),
-        int>::type* = 0 )
+void computeStress( ForceType& force, ParticleType& particles,
+                    const ParallelType& neigh_op_tag )
 {
-}
+    if constexpr ( is_stress_output<typename ParticleType::output_type>::value )
+    {
+        auto stress = particles.sliceStress();
 
-template <class ForceType, class ParticleType, class ParallelType>
-void computeStress(
-    ForceType& force, ParticleType& particles, const ParallelType& neigh_op_tag,
-    typename std::enable_if<
-        ( is_stress_output<typename ParticleType::output_type>::value ),
-        int>::type* = 0 )
-{
-    auto stress = particles.sliceStress();
+        // Reset stress.
+        Cabana::deep_copy( stress, 0.0 );
 
-    // Reset stress.
-    Cabana::deep_copy( stress, 0.0 );
-
-    force.computeStressFull( particles, neigh_op_tag );
-    Kokkos::fence();
+        force.computeStressFull( particles, neigh_op_tag );
+        Kokkos::fence();
+    }
 }
 
 // Forces with bond breaking.
@@ -346,23 +324,8 @@ void computeForce( ForceType& force, ParticleType& particles, NeighborView& mu,
 
 template <class ForceType, class ParticleType, class NeighborView,
           class ParallelType>
-double computeEnergy(
-    ForceType&, ParticleType&, NeighborView&, const ParallelType&,
-    typename std::enable_if<
-        ( !is_energy_output<typename ParticleType::output_type>::value ),
-        int>::type* = 0 )
-{
-    return 0.0;
-}
-
-template <class ForceType, class ParticleType, class NeighborView,
-          class ParallelType>
-double computeEnergy(
-    ForceType& force, ParticleType& particles, NeighborView& mu,
-    const ParallelType& neigh_op_tag,
-    typename std::enable_if<
-        ( is_energy_output<typename ParticleType::output_type>::value ),
-        int>::type* = 0 )
+double computeEnergy( ForceType& force, ParticleType& particles,
+                      NeighborView& mu, const ParallelType& neigh_op_tag )
 {
     double energy = 0.0;
     if constexpr ( is_energy_output<typename ParticleType::output_type>::value )
@@ -390,30 +353,19 @@ double computeEnergy(
 
 template <class ForceType, class ParticleType, class NeighborView,
           class ParallelType>
-void computeStress(
-    ForceType&, ParticleType&, NeighborView&, const ParallelType&,
-    typename std::enable_if<
-        ( !is_stress_output<typename ParticleType::output_type>::value ),
-        int>::type* = 0 )
+void computeStress( ForceType& force, ParticleType& particles, NeighborView& mu,
+                    const ParallelType& neigh_op_tag )
 {
-}
+    if constexpr ( is_stress_output<typename ParticleType::output_type>::value )
+    {
+        auto stress = particles.sliceStress();
 
-template <class ForceType, class ParticleType, class NeighborView,
-          class ParallelType>
-void computeStress(
-    ForceType& force, ParticleType& particles, NeighborView& mu,
-    const ParallelType& neigh_op_tag,
-    typename std::enable_if<
-        ( is_stress_output<typename ParticleType::output_type>::value ),
-        int>::type* = 0 )
-{
-    auto stress = particles.sliceStress();
+        // Reset stress.
+        Cabana::deep_copy( stress, 0.0 );
 
-    // Reset stress.
-    Cabana::deep_copy( stress, 0.0 );
-
-    force.computeStressFull( particles, mu, neigh_op_tag );
-    Kokkos::fence();
+        force.computeStressFull( particles, mu, neigh_op_tag );
+        Kokkos::fence();
+    }
 }
 } // namespace CabanaPD
 
