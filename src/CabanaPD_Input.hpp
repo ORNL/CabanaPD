@@ -77,14 +77,6 @@ class Inputs
             inputs["bulk_modulus"]["value"] = K;
         }
 
-        // Check critical time steps
-        // This must be done after the values above are calculated
-        computeCriticalTimeStepMechanics();
-
-        // TODO: Here we need a condition to check whether heat transfer is
-        // included
-        computeCriticalTimeStepHeatTransfer();
-
         int num_steps = tf / dt;
         inputs["num_steps"]["value"] = num_steps;
 
@@ -110,7 +102,8 @@ class Inputs
     }
     ~Inputs() {}
 
-    void computeCriticalTimeStepMechanics()
+    template <class ForceModel>
+    void computeCriticalTimeStep( ForceModel model )
     {
         // Reference: Silling & Askari, Computers & Structures 83(17–18) (2005):
         // 1526-1535.
@@ -123,10 +116,10 @@ class Inputs
 
         // Initialize denominator's summation
         double sum = 0;
+        double sum_ht = 0;
 
         // Run over the neighborhood of a point in the bulk of a body
         int m = inputs["m"]["value"];
-        double rho = inputs["density"]["value"];
         double K = inputs["bulk_modulus"]["value"];
         double delta = inputs["horizon"]["value"];
         // FIXME: this is copied from the forces
@@ -156,97 +149,37 @@ class Inputs
                         // Check is bond is not 0
                         if ( r2 > 0 )
                         {
-                            // Compute denominator
-                            sum += v_p * c / std::sqrt( r2 );
-                        }
-                    }
-                }
-            }
-        }
-
-        double safety_factor = inputs["timestep_safety_factor"]["value"];
-        double dt_crit = safety_factor * std::sqrt( 2 * rho / sum );
-
-        double dt = inputs["timestep"]["value"];
-        if ( dt > dt_crit )
-        {
-            log( std::cout, "WARNING: timestep (", dt,
-                 ") is larger than estimated stable timestep for mechanics (",
-                 dt_crit, "), using safety factor of ", safety_factor, ".\n" );
-        }
-        // Store in inputs
-        inputs["critical_timestep_mechanics"]["value"] = dt_crit;
-    }
-
-    void computeCriticalTimeStepHeatTransfer()
-    {
-        // The calculation here uses a similar procedure as for the PMB critical
-        // time step calculation
-
-        // Compute particle volume
-        double dx = inputs["dx"]["value"][0];
-        double dy = inputs["dx"]["value"][1];
-        double dz = inputs["dx"]["value"][2];
-        double v_p = dx * dy * dz;
-
-        // Initialize denominator's summation
-        double sum = 0;
-
-        // Run over the neighborhood of a point in the bulk of a body
-        int m = inputs["m"]["value"];
-        double rho = inputs["density"]["value"];
-        double cp = inputs["specific_heat_capacity"]["value"];
-        double delta = inputs["horizon"]["value"];
-
-        for ( int i = -( m + 1 ); i < m + 2; i++ )
-        {
-            // x-component of bond
-            double xi_1 = i * dx;
-
-            for ( int j = -( m + 1 ); j < m + 2; j++ )
-            {
-                // y-component of bond
-                double xi_2 = j * dy;
-
-                for ( int k = -( m + 1 ); k < m + 2; k++ )
-                {
-                    // z-component of bond
-                    double xi_3 = k * dz;
-
-                    // Bond length squared
-                    double r2 = xi_1 * xi_1 + xi_2 * xi_2 + xi_3 * xi_3;
-
-                    // Check if bond is no longer than delta
-                    if ( r2 < delta * delta + 1e-10 )
-                    {
-                        // Check is bond is not 0
-                        if ( r2 > 0 )
-                        {
                             double xi = std::sqrt( r2 );
-                            double coeff =
-                                model.microconductivity_function( xi );
 
-                            // Compute denominator
-                            sum += v_p * coeff / r2;
+                            // Compute denominator for mechanics.
+                            sum += v_p * c / xi;
+
+                            // Compute denominator for heat transfer.
+                            if constexpr ( is_heat_transfer<
+                                               typename ForceModel::
+                                                   thermal_type>::value )
+                            {
+                                double coeff =
+                                    model.microconductivity_function( xi );
+                                sum_ht += v_p * coeff / r2;
+                            }
                         }
                     }
                 }
             }
         }
 
-        double safety_factor = inputs["timestep_safety_factor"]["value"];
-        double dt_crit = safety_factor * rho * cp / sum;
-
         double dt = inputs["timestep"]["value"];
-        if ( dt > dt_crit )
+        compareCriticalTimeStep( "mechanics", dt, sum );
+
+        // Heat transfer timestep.
+        if constexpr ( is_heat_transfer<
+                           typename ForceModel::thermal_type>::value )
         {
-            log( std::cout, "WARNING: timestep (", dt,
-                 ") is larger than estimated stable timestep for heat transfer "
-                 "(",
-                 dt_crit, "), using safety factor of ", safety_factor, ".\n" );
+            double dt_ht = inputs["thermal_subcycle_steps"]["value"];
+            dt_ht *= dt;
+            compareCriticalTimeStep( "heat_transfer", dt_ht, sum_ht );
         }
-        // Store in inputs
-        inputs["critical_timestep_heat_transfer"]["value"] = dt_crit;
     }
 
     // Parse JSON file.
@@ -272,6 +205,22 @@ class Inputs
     bool contains( std::string label ) { return inputs.contains( label ); }
 
   protected:
+    void compareCriticalTimeStep( std::string name, double dt, double sum )
+    {
+        double safety_factor = inputs["timestep_safety_factor"]["value"];
+        double rho = inputs["density"]["value"];
+        double dt_crit = safety_factor * std::sqrt( 2 * rho / sum );
+
+        if ( dt > dt_crit )
+        {
+            log( std::cout, "WARNING: timestep (", dt,
+                 ") is larger than estimated stable timestep for ", name, " (",
+                 dt_crit, "), using safety factor of ", safety_factor, ".\n" );
+        }
+        // Store in inputs
+        inputs["critical_timestep_" + name]["value"] = dt_crit;
+    }
+
     nlohmann::json inputs;
 };
 
