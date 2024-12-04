@@ -286,7 +286,9 @@ class Comm<ParticleType, PMB, TemperatureIndependent>
 
         _init_timer.stop();
     }
-    ~Comm() {}
+
+    auto size() { return mpi_size; }
+    auto rank() { return mpi_rank; }
 
     // Determine which particles should be ghosted, reallocating and recounting
     // if needed.

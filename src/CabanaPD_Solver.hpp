@@ -153,6 +153,13 @@ class SolverElastic
         // Add ghosts from other MPI ranks.
         comm = std::make_shared<comm_type>( *particles );
 
+        if constexpr ( is_contact<contact_model_type>::value )
+        {
+            if ( comm->size() > 1 )
+                throw std::runtime_error(
+                    "Contact with MPI is currently disabled." );
+        }
+
         // Update temperature ghost size if needed.
         if constexpr ( is_temperature_dependent<
                            typename force_model_type::thermal_type>::value )
