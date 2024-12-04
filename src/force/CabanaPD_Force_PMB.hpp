@@ -533,6 +533,33 @@ class Force<MemorySpace, ForceModel<LinearPMB, Elastic, ModelParams...>>
             double w = 0.25 * model.c * linear_s * linear_s * xi * vol( j );
             W( i ) += w;
             Phi += w * vol( i );
+
+            const double coeff = model.c * linear_s * vol( j );
+            fx_i = coeff * xi_x / xi;
+            fy_i = coeff * xi_y / xi;
+            fz_i = coeff * xi_z / xi;
+
+            // sigma_xx
+            stress( i, 0, 0 ) += 0.5 * fx_i * rx * vol( j );
+            // sigma_yy
+            stress( i, 1, 1 ) += 0.5 * fy_i * ry * vol( j );
+            // sigma_zz
+            stress( i, 2, 2 ) += 0.5 * fz_i * rz * vol( j );
+
+            // sigma_xy
+            stress( i, 0, 1 ) += 0.5 * fx_i * ry * vol( j );
+            // sigma_yx
+            stress( i, 1, 0 ) += 0.5 * fy_i * rx * vol( j );
+
+            // sigma_xz
+            stress( i, 0, 2 ) += 0.5 * fx_i * rz * vol( j );
+            // sigma_zx
+            stress( i, 2, 0 ) += 0.5 * fz_i * rx * vol( j );
+
+            // sigma_yz
+            stress( i, 1, 2 ) += 0.5 * fy_i * rz * vol( j );
+            // sigma_zy
+            stress( i, 2, 1 ) += 0.5 * fz_i * ry * vol( j );
         };
 
         double strain_energy = 0.0;
