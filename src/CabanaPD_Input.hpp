@@ -174,7 +174,7 @@ class Inputs
     }
 
     template <class ForceModel>
-    void computeCriticalTimeStep( ForceModel model )
+    void computeCriticalTimeStep( [[maybe_unused]] const ForceModel model )
     {
         // Reference: Silling & Askari, Computers & Structures 83(17–18) (2005):
         // 1526-1535.
