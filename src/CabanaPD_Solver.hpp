@@ -119,6 +119,8 @@ class SolverElastic
         , particles( _particles )
         , _init_time( 0.0 )
     {
+        inputs.computeCriticalTimeStep( force_model );
+
         num_steps = inputs["num_steps"];
         output_frequency = inputs["output_frequency"];
         output_reference = inputs["output_reference"];

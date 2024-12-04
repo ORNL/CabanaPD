@@ -77,10 +77,6 @@ class Inputs
             inputs["bulk_modulus"]["value"] = K;
         }
 
-        // Check critical time step
-        // This must be done after the values above are calculated
-        computeCriticalTimeStep();
-
         int num_steps = tf / dt;
         inputs["num_steps"]["value"] = num_steps;
 
@@ -106,7 +102,8 @@ class Inputs
     }
     ~Inputs() {}
 
-    void computeCriticalTimeStep()
+    template <class ForceModel>
+    void computeCriticalTimeStep( [[maybe_unused]] const ForceModel model )
     {
         // Reference: Silling & Askari, Computers & Structures 83(17–18) (2005):
         // 1526-1535.
@@ -119,10 +116,10 @@ class Inputs
 
         // Initialize denominator's summation
         double sum = 0;
+        double sum_ht = 0;
 
         // Run over the neighborhood of a point in the bulk of a body
         int m = inputs["m"]["value"];
-        double rho = inputs["density"]["value"];
         double K = inputs["bulk_modulus"]["value"];
         double delta = inputs["horizon"]["value"];
         // FIXME: this is copied from the forces
@@ -152,26 +149,37 @@ class Inputs
                         // Check is bond is not 0
                         if ( r2 > 0 )
                         {
-                            // Compute denominator
-                            sum += v_p * c / std::sqrt( r2 );
+                            double xi = std::sqrt( r2 );
+
+                            // Compute denominator for mechanics.
+                            sum += v_p * c / xi;
+
+                            // Compute denominator for heat transfer.
+                            if constexpr ( is_heat_transfer<
+                                               typename ForceModel::
+                                                   thermal_type>::value )
+                            {
+                                double coeff =
+                                    model.microconductivity_function( xi );
+                                sum_ht += v_p * coeff / r2;
+                            }
                         }
                     }
                 }
             }
         }
 
-        double safety_factor = inputs["timestep_safety_factor"]["value"];
-        double dt_crit = safety_factor * std::sqrt( 2 * rho / sum );
-
         double dt = inputs["timestep"]["value"];
-        if ( dt > dt_crit )
+        compareCriticalTimeStep( "mechanics", dt, sum );
+
+        // Heat transfer timestep.
+        if constexpr ( is_heat_transfer<
+                           typename ForceModel::thermal_type>::value )
         {
-            log( std::cout, "WARNING: timestep (", dt,
-                 ") is larger than estimated stable timestep (", dt_crit,
-                 "), using safety factor of ", safety_factor, ".\n" );
+            double dt_ht = inputs["thermal_subcycle_steps"]["value"];
+            dt_ht *= dt;
+            compareCriticalTimeStep( "heat_transfer", dt_ht, sum_ht );
         }
-        // Store in inputs
-        inputs["critical_timestep"]["value"] = dt_crit;
     }
 
     // Parse JSON file.
@@ -197,6 +205,22 @@ class Inputs
     bool contains( std::string label ) { return inputs.contains( label ); }
 
   protected:
+    void compareCriticalTimeStep( std::string name, double dt, double sum )
+    {
+        double safety_factor = inputs["timestep_safety_factor"]["value"];
+        double rho = inputs["density"]["value"];
+        double dt_crit = safety_factor * std::sqrt( 2 * rho / sum );
+
+        if ( dt > dt_crit )
+        {
+            log( std::cout, "WARNING: timestep (", dt,
+                 ") is larger than estimated stable timestep for ", name, " (",
+                 dt_crit, "), using safety factor of ", safety_factor, ".\n" );
+        }
+        // Store in inputs
+        inputs["critical_timestep_" + name]["value"] = dt_crit;
+    }
+
     nlohmann::json inputs;
 };
 
