@@ -85,7 +85,8 @@ void fragmentingCylinderExample( const std::string filename )
     {
         double rsq = ( x[0] - x_center ) * ( x[0] - x_center ) +
                      ( x[1] - y_center ) * ( x[1] - y_center );
-        if ( rsq < Rin * Rin || rsq > Rout * Rout || x[2] > 0.05 || x[2] < -0.05)
+        if ( rsq < Rin * Rin || rsq > Rout * Rout || x[2] > 0.05 ||
+             x[2] < -0.05 )
             return false;
         return true;
     };
@@ -136,17 +137,30 @@ void fragmentingCylinderExample( const std::string filename )
     };
     particles->updateParticles( exec_space{}, init_functor );
 
-    double r_c = inputs["contact_horizon_factor"];
-    r_c *= dx[0];
-    CabanaPD::NormalRepulsionModel contact_model( delta, r_c, K );
+    // ====================================================
+    //  Simulation run with contact physics
+    // ====================================================
+    if ( inputs["use_contact"] )
+    {
+        double r_c = inputs["contact_horizon_factor"];
+        r_c *= dx[0];
+        CabanaPD::NormalRepulsionModel contact_model( delta, r_c, K );
 
+        auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
+            inputs, particles, force_model, contact_model );
+        cabana_pd->init();
+        cabana_pd->run();
+    }
     // ====================================================
-    //                   Simulation run
+    //  Simulation run without contact
     // ====================================================
-    auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
-        inputs, particles, force_model, contact_model );
-    cabana_pd->init();
-    cabana_pd->run();
+    else
+    {
+        auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
+            inputs, particles, force_model );
+        cabana_pd->init();
+        cabana_pd->run();
+    }
 }
 
 // Initialize MPI+Kokkos.
