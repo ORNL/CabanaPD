@@ -137,8 +137,8 @@ class HeatTransfer<
                   const model_type model )
         : base_type( half_neigh, neighbors,
                      typename base_type::model_type(
-                         model.delta, model.K, model.temperature, model.cp,
-                         model.alpha, model.temp0,
+                         model.delta, model.K, model.temperature, model.kappa,
+                         model.cp, model.alpha, model.temp0,
                          model.constant_microconductivity ) )
         , _model( model )
     {
