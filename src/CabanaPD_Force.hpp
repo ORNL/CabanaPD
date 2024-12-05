@@ -156,7 +156,20 @@ class Force<MemorySpace, BaseForceModel>
     {
     }
 
-    // Primary constructor: use positions and construct neighbors.
+    // General constructor (necessary for contact, but could be used by any
+    // force routine).
+    template <class PositionType>
+    Force( const bool half_neigh, const double delta,
+           const PositionType& positions, const std::size_t num_local,
+           const double mesh_min[3], const double mesh_max[3],
+           const double tol = 1e-14 )
+        : _half_neigh( half_neigh )
+        , _neigh_list( neighbor_list_type( positions, 0, num_local, delta + tol,
+                                           1.0, mesh_min, mesh_max ) )
+    {
+    }
+
+    // Constructor which stores existing neighbors.
     template <class NeighborListType>
     Force( const bool half_neigh, const NeighborListType& neighbors )
         : _half_neigh( half_neigh )
@@ -224,7 +237,7 @@ class Force<MemorySpace, BaseForceModel>
 ******************************************************************************/
 template <class ForceType, class ParticleType, class ParallelType>
 void computeForce( ForceType& force, ParticleType& particles,
-                   const ParallelType& neigh_op_tag )
+                   const ParallelType& neigh_op_tag, const bool reset = true )
 {
     auto n_local = particles.n_local;
     auto x = particles.sliceReferencePosition();
@@ -233,7 +246,8 @@ void computeForce( ForceType& force, ParticleType& particles,
     auto f_a = particles.sliceForceAtomic();
 
     // Reset force.
-    Cabana::deep_copy( f, 0.0 );
+    if ( reset )
+        Cabana::deep_copy( f, 0.0 );
 
     // if ( half_neigh )
     // Forces must be atomic for half list
@@ -280,7 +294,7 @@ double computeEnergy( ForceType& force, ParticleType& particles,
 template <class ForceType, class ParticleType, class NeighborView,
           class ParallelType>
 void computeForce( ForceType& force, ParticleType& particles, NeighborView& mu,
-                   const ParallelType& neigh_op_tag )
+                   const ParallelType& neigh_op_tag, const bool reset = true )
 {
     auto n_local = particles.n_local;
     auto x = particles.sliceReferencePosition();
@@ -289,7 +303,8 @@ void computeForce( ForceType& force, ParticleType& particles, NeighborView& mu,
     auto f_a = particles.sliceForceAtomic();
 
     // Reset force.
-    Cabana::deep_copy( f, 0.0 );
+    if ( reset )
+        Cabana::deep_copy( f, 0.0 );
 
     // if ( half_neigh )
     // Forces must be atomic for half list

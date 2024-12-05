@@ -92,7 +92,7 @@ class SolverBase
 };
 
 template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel>
+          class ForceModelType, class ContactModelType = NoContact>
 class SolverElastic
 {
   public:
@@ -102,7 +102,7 @@ class SolverElastic
     // Core module types - required for all problems.
     using particle_type = ParticleType;
     using integrator_type = Integrator<exec_space>;
-    using force_model_type = ForceModel;
+    using force_model_type = ForceModelType;
     using force_type = Force<memory_space, force_model_type>;
     using comm_type = Comm<particle_type, typename force_model_type::base_model,
                            typename particle_type::thermal_type>;
@@ -111,6 +111,8 @@ class SolverElastic
 
     // Optional module types.
     using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
+    using contact_type = Force<memory_space, ContactModelType>;
+    using contact_model_type = ContactModelType;
 
     SolverElastic( input_type _inputs,
                    std::shared_ptr<particle_type> _particles,
@@ -118,6 +120,27 @@ class SolverElastic
         : inputs( _inputs )
         , particles( _particles )
         , _init_time( 0.0 )
+    {
+        setup( force_model );
+    }
+
+    SolverElastic( input_type _inputs,
+                   std::shared_ptr<particle_type> _particles,
+                   force_model_type force_model,
+                   contact_model_type contact_model )
+        : inputs( _inputs )
+        , particles( _particles )
+        , _init_time( 0.0 )
+    {
+        setup( force_model );
+
+        _neighbor_timer.start();
+        contact = std::make_shared<contact_type>( inputs["half_neigh"],
+                                                  *particles, contact_model );
+        _neighbor_timer.stop();
+    }
+
+    void setup( force_model_type force_model )
     {
         num_steps = inputs["num_steps"];
         output_frequency = inputs["output_frequency"];
@@ -130,12 +153,29 @@ class SolverElastic
         // Add ghosts from other MPI ranks.
         comm = std::make_shared<comm_type>( *particles );
 
+        if constexpr ( is_contact<contact_model_type>::value )
+        {
+            if ( comm->size() > 1 )
+                throw std::runtime_error(
+                    "Contact with MPI is currently disabled." );
+        }
+
         // Update temperature ghost size if needed.
         if constexpr ( is_temperature_dependent<
                            typename force_model_type::thermal_type>::value )
             force_model.update( particles->sliceTemperature() );
 
+        // Create heat transfer if needed.
+        if constexpr ( is_heat_transfer<
+                           typename force_model_type::thermal_type>::value )
+        {
+            thermal_subcycle_steps = inputs["thermal_subcycle_steps"];
+            heat_transfer = std::make_shared<heat_transfer_type>(
+                inputs["half_neigh"], force->_neigh_list, force_model );
+        }
+
         _neighbor_timer.start();
+        // This will either be PD or DEM forces.
         force = std::make_shared<force_type>( inputs["half_neigh"], *particles,
                                               force_model );
         _neighbor_timer.stop();
@@ -256,6 +296,9 @@ class SolverElastic
             // Compute internal forces.
             updateForce();
 
+            if constexpr ( is_contact<contact_model_type>::value )
+                computeForce( *contact, *particles, neigh_iter_tag{}, false );
+
             // Add force boundary condition.
             if ( boundary_condition.forceUpdate() )
                 boundary_condition.apply( exec_space(), *particles, step * dt );
@@ -287,6 +330,9 @@ class SolverElastic
 
             // Compute internal forces.
             updateForce();
+
+            if constexpr ( is_contact<contact_model_type>::value )
+                computeForce( *contact, *particles, neigh_iter_tag{}, false );
 
             if constexpr ( is_temperature_dependent<
                                typename force_model_type::thermal_type>::value )
@@ -423,6 +469,8 @@ class SolverElastic
     std::shared_ptr<force_type> force;
     // Optional modules.
     std::shared_ptr<heat_transfer_type> heat_transfer;
+    std::shared_ptr<contact_type> contact;
+    contact_model_type contact_model;
 
     // Output files.
     std::string output_file;
@@ -438,41 +486,40 @@ class SolverElastic
 };
 
 template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel>
+          class ForceModelType, class ContactModelType = NoContact>
 class SolverFracture
-    : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>
+    : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModelType,
+                           ContactModelType>
 {
   public:
-    using base_type =
-        SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>;
+    using base_type = SolverElastic<MemorySpace, InputType, ParticleType,
+                                    ForceModelType, ContactModelType>;
     using exec_space = typename base_type::exec_space;
     using memory_space = typename base_type::memory_space;
 
     using particle_type = typename base_type::particle_type;
     using integrator_type = typename base_type::integrator_type;
     using comm_type = typename base_type::comm_type;
-    using force_model_type = ForceModel;
+    using force_model_type = ForceModelType;
     using force_type = typename base_type::force_type;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using input_type = typename base_type::input_type;
 
-    template <typename PrenotchType>
-    SolverFracture( input_type _inputs,
-                    std::shared_ptr<particle_type> _particles,
-                    force_model_type force_model, PrenotchType prenotch )
-        : base_type( _inputs, _particles, force_model )
-    {
-        init_mu();
-
-        // Create prenotch.
-        prenotch.create( exec_space{}, mu, *particles, force->_neigh_list );
-        _init_time += prenotch.time();
-    }
+    using contact_model_type = ContactModelType;
 
     SolverFracture( input_type _inputs,
                     std::shared_ptr<particle_type> _particles,
                     force_model_type force_model )
         : base_type( _inputs, _particles, force_model )
+    {
+        init_mu();
+    }
+
+    SolverFracture( input_type _inputs,
+                    std::shared_ptr<particle_type> _particles,
+                    force_model_type force_model,
+                    contact_model_type contact_model )
+        : base_type( _inputs, _particles, force_model, contact_model )
     {
         init_mu();
     }
@@ -489,6 +536,14 @@ class SolverFracture
         _init_timer.stop();
     }
 
+    template <std::size_t NumPrenotch>
+    void init_prenotch( Prenotch<NumPrenotch> prenotch )
+    {
+        // Create prenotch.
+        prenotch.create( exec_space{}, mu, *particles, force->_neigh_list );
+        _init_time += prenotch.time();
+    }
+
     void init( const bool initial_output = true )
     {
         // Compute initial internal forces and energy.
@@ -497,6 +552,14 @@ class SolverFracture
 
         if ( initial_output )
             particles->output( 0, 0.0, output_reference );
+    }
+
+    template <std::size_t NumPrenotch>
+    void init( Prenotch<NumPrenotch> prenotch,
+               const bool initial_output = true )
+    {
+        init_prenotch( prenotch );
+        init( initial_output );
     }
 
     template <typename BoundaryType>
@@ -521,6 +584,14 @@ class SolverFracture
 
         if ( initial_output )
             particles->output( 0, 0.0, output_reference );
+    }
+
+    template <typename BoundaryType, std::size_t NumPrenotch>
+    void init( BoundaryType boundary_condition, Prenotch<NumPrenotch> prenotch,
+               const bool initial_output = true )
+    {
+        init_prenotch( prenotch );
+        init( boundary_condition, initial_output );
     }
 
     template <typename BoundaryType>
@@ -549,6 +620,9 @@ class SolverFracture
 
             // Compute internal forces.
             updateForce();
+
+            if constexpr ( is_contact<contact_model_type>::value )
+                computeForce( *contact, *particles, neigh_iter_tag{}, false );
 
             // Add force boundary condition.
             if ( boundary_condition.forceUpdate() )
@@ -585,6 +659,9 @@ class SolverFracture
 
             // Compute internal forces.
             updateForce();
+
+            if constexpr ( is_contact<contact_model_type>::value )
+                computeForce( *contact, *particles, neigh_iter_tag{}, false );
 
             // Integrate - velocity Verlet second half.
             integrator->finalHalfStep( *particles );
@@ -638,6 +715,7 @@ class SolverFracture
 
   protected:
     using base_type::comm;
+    using base_type::contact;
     using base_type::force;
     using base_type::inputs;
     using base_type::integrator;
@@ -652,37 +730,52 @@ class SolverFracture
     using base_type::print;
 };
 
+// ===============================================================
+
 template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel>
+          class ForceModelType>
 auto createSolverElastic( InputsType inputs,
                           std::shared_ptr<ParticleType> particles,
-                          ForceModel model )
+                          ForceModelType model )
 {
     return std::make_shared<
-        SolverElastic<MemorySpace, InputsType, ParticleType, ForceModel>>(
+        SolverElastic<MemorySpace, InputsType, ParticleType, ForceModelType>>(
         inputs, particles, model );
 }
 
 template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel>
+          class ForceModelType, class ContactModelType>
+auto createSolverElastic( InputsType inputs,
+                          std::shared_ptr<ParticleType> particles,
+                          ForceModelType model, ContactModelType contact_model )
+{
+    return std::make_shared<SolverElastic<MemorySpace, InputsType, ParticleType,
+                                          ForceModelType, ContactModelType>>(
+        inputs, particles, model, contact_model );
+}
+
+template <class MemorySpace, class InputsType, class ParticleType,
+          class ForceModelType>
 auto createSolverFracture( InputsType inputs,
                            std::shared_ptr<ParticleType> particles,
-                           ForceModel model )
+                           ForceModelType model )
 {
     return std::make_shared<
-        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModel>>(
+        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModelType>>(
         inputs, particles, model );
 }
 
 template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel, class PrenotchType>
+          class ForceModelType, class ContactModelType>
 auto createSolverFracture( InputsType inputs,
                            std::shared_ptr<ParticleType> particles,
-                           ForceModel model, PrenotchType prenotch )
+                           ForceModelType model,
+                           ContactModelType contact_model )
 {
     return std::make_shared<
-        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModel>>(
-        inputs, particles, model, prenotch );
+        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModelType,
+                       ContactModelType>>( inputs, particles, model,
+                                           contact_model );
 }
 
 } // namespace CabanaPD
