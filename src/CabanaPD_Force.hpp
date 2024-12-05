@@ -137,6 +137,7 @@ class Force<MemorySpace, BaseForceModel>
 
     Timer _timer;
     Timer _energy_timer;
+    Timer _stress_timer;
 
   public:
     using neighbor_list_type =
@@ -290,6 +291,22 @@ double computeEnergy( ForceType& force, ParticleType& particles,
     return energy;
 }
 
+template <class ForceType, class ParticleType, class ParallelType>
+void computeStress( ForceType& force, ParticleType& particles,
+                    const ParallelType& neigh_op_tag )
+{
+    if constexpr ( is_stress_output<typename ParticleType::output_type>::value )
+    {
+        auto stress = particles.sliceStress();
+
+        // Reset stress.
+        Cabana::deep_copy( stress, 0.0 );
+
+        force.computeStressFull( particles, neigh_op_tag );
+        Kokkos::fence();
+    }
+}
+
 // Forces with bond breaking.
 template <class ForceType, class ParticleType, class NeighborView,
           class ParallelType>
@@ -349,6 +366,22 @@ double computeEnergy( ForceType& force, ParticleType& particles,
     return energy;
 }
 
+template <class ForceType, class ParticleType, class NeighborView,
+          class ParallelType>
+void computeStress( ForceType& force, ParticleType& particles, NeighborView& mu,
+                    const ParallelType& neigh_op_tag )
+{
+    if constexpr ( is_stress_output<typename ParticleType::output_type>::value )
+    {
+        auto stress = particles.sliceStress();
+
+        // Reset stress.
+        Cabana::deep_copy( stress, 0.0 );
+
+        force.computeStressFull( particles, mu, neigh_op_tag );
+        Kokkos::fence();
+    }
+}
 } // namespace CabanaPD
 
 #endif

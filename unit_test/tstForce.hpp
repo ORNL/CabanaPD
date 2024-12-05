@@ -425,6 +425,7 @@ createParticles( ModelType, QuadraticTag, const double dx, const double s0 )
                             typename ModelType::thermal_type,
                             CabanaPD::EnergyOutput>;
     ptype particles( TEST_EXECSPACE{}, box_min, box_max, num_cells, 0 );
+
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto v = particles.sliceVelocity();

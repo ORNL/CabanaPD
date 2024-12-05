@@ -87,6 +87,7 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, ModelParams...>>
     model_type _model;
 
     using base_type::_energy_timer;
+    using base_type::_stress_timer;
     using base_type::_timer;
 
   public:
@@ -142,7 +143,7 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, ModelParams...>>
     template <class PosType, class WType, class ParticleType,
               class ParallelType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              const ParticleType& particles, const int n_local,
+                              ParticleType& particles, const int n_local,
                               ParallelType& neigh_op_tag )
     {
         _energy_timer.start();
@@ -176,6 +177,55 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, ModelParams...>>
         _energy_timer.stop();
         return strain_energy;
     }
+
+    template <class ParticleType, class ParallelType>
+    void computeStressFull( ParticleType& particles,
+                            ParallelType& neigh_op_tag )
+    {
+        _stress_timer.start();
+
+        auto model = _model;
+        const auto x = particles.sliceReferencePosition();
+        const auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        const auto f = particles.sliceForce();
+        auto stress = particles.sliceStress();
+
+        auto stress_full = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            // Get the bond distance, displacement, and stretch.
+            double xi, r, s;
+            double rx, ry, rz;
+            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+
+            model.thermalStretch( s, i, j );
+
+            const double coeff = 0.5 * model.c * s * vol( j ) * vol( j );
+            double fx_i = coeff * rx / r;
+            double fy_i = coeff * ry / r;
+            double fz_i = coeff * rz / r;
+
+            stress( i, 0, 0 ) += fx_i * rx;
+            stress( i, 1, 1 ) += fy_i * ry;
+            stress( i, 2, 2 ) += fz_i * rz;
+
+            stress( i, 0, 1 ) += fx_i * ry;
+            stress( i, 1, 0 ) += fy_i * rx;
+
+            stress( i, 0, 2 ) += fx_i * rz;
+            stress( i, 2, 0 ) += fz_i * rx;
+
+            stress( i, 1, 2 ) += fy_i * rz;
+            stress( i, 2, 1 ) += fz_i * ry;
+        };
+
+        Kokkos::RangePolicy<exec_space> policy( 0, particles.n_local );
+        Cabana::neighbor_parallel_for(
+            policy, stress_full, _neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForcePMB::computeStressFull" );
+
+        _stress_timer.stop();
+    }
 };
 
 template <class MemorySpace, class... ModelParams>
@@ -196,6 +246,7 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
     model_type _model;
 
     using base_type::_energy_timer;
+    using base_type::_stress_timer;
     using base_type::_timer;
 
   public:
@@ -274,7 +325,7 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
     template <class PosType, class WType, class DamageType, class ParticleType,
               class MuView, class ParallelType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              DamageType& phi, const ParticleType& particles,
+                              DamageType& phi, ParticleType& particles,
                               MuView& mu, const int n_local, ParallelType& )
     {
         _energy_timer.start();
@@ -282,6 +333,7 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
         auto model = _model;
         auto neigh_list = _neigh_list;
         const auto vol = particles.sliceVolume();
+        const auto f = particles.sliceForce();
 
         auto energy_full = KOKKOS_LAMBDA( const int i, double& Phi )
         {
@@ -290,6 +342,7 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
                     neigh_list, i );
             double phi_i = 0.0;
             double vol_H_i = 0.0;
+
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
                 std::size_t j =
@@ -297,7 +350,8 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
                         neigh_list, i, n );
                 // Get the bond distance, displacement, and stretch.
                 double xi, r, s;
-                getDistance( x, u, i, j, xi, r, s );
+                double rx, ry, rz;
+                getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
                 model.thermalStretch( s, i, j );
 
@@ -309,6 +363,7 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
                 phi_i += mu( i, n ) * vol( j );
                 vol_H_i += vol( j );
             }
+
             Phi += W( i ) * vol( i );
             phi( i ) = 1 - phi_i / vol_H_i;
         };
@@ -320,6 +375,65 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
 
         _energy_timer.stop();
         return strain_energy;
+    }
+
+    template <class ParticleType, class MuView, class ParallelType>
+    double computeStressFull( ParticleType& particles, MuView& mu,
+                              ParallelType& )
+    {
+        _stress_timer.start();
+
+        auto model = _model;
+        auto neigh_list = _neigh_list;
+        const auto x = particles.sliceReferencePosition();
+        const auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        const auto f = particles.sliceForce();
+        auto stress = particles.sliceStress();
+
+        auto stress_full = KOKKOS_LAMBDA( const int i )
+        {
+            std::size_t num_neighbors =
+                Cabana::NeighborList<neighbor_list_type>::numNeighbor(
+                    neigh_list, i );
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            {
+                std::size_t j =
+                    Cabana::NeighborList<neighbor_list_type>::getNeighbor(
+                        neigh_list, i, n );
+                // Get the bond distance, displacement, and stretch.
+                double xi, r, s;
+                double rx, ry, rz;
+                getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+
+                model.thermalStretch( s, i, j );
+
+                const double coeff =
+                    mu( i, n ) * 0.5 * model.c * s * vol( j ) * vol( j );
+                double fx_i = coeff * rx / r;
+                double fy_i = coeff * ry / r;
+                double fz_i = coeff * rz / r;
+
+                stress( i, 0, 0 ) += fx_i * rx;
+                stress( i, 1, 1 ) += fy_i * ry;
+                stress( i, 2, 2 ) += fz_i * rz;
+
+                stress( i, 0, 1 ) += fx_i * ry;
+                stress( i, 1, 0 ) += fy_i * rx;
+
+                stress( i, 0, 2 ) += fx_i * rz;
+                stress( i, 2, 0 ) += fz_i * rx;
+
+                stress( i, 1, 2 ) += fy_i * rz;
+                stress( i, 2, 1 ) += fz_i * ry;
+            }
+        };
+
+        Kokkos::RangePolicy<exec_space> policy( 0, particles.n_local );
+        Kokkos::parallel_for( "CabanaPD::ForcePMBDamage::computeStressFull",
+                              policy, stress_full );
+
+        _stress_timer.stop();
     }
 };
 
