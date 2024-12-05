@@ -732,26 +732,47 @@ class SolverFracture
 // ===============================================================
 
 template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel, class... ContactModelType>
+          class ForceModel>
 auto createSolverElastic( InputsType inputs,
                           std::shared_ptr<ParticleType> particles,
-                          ForceModel model, ContactModelType... contact_model )
+                          ForceModel model )
 {
-    return std::make_shared<SolverElastic<MemorySpace, InputsType, ParticleType,
-                                          ForceModel, ContactModelType...>>(
-        inputs, particles, model, contact_model... );
+    return std::make_shared<
+        SolverElastic<MemorySpace, InputsType, ParticleType, ForceModel>>(
+        inputs, particles, model );
 }
 
 template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel, class... ContactModelType>
+          class ForceModel, class ContactModelType>
+auto createSolverElastic( InputsType inputs,
+                          std::shared_ptr<ParticleType> particles,
+                          ForceModel model, ContactModelType contact_model )
+{
+    return std::make_shared<SolverElastic<MemorySpace, InputsType, ParticleType,
+                                          ForceModel, ContactModelType>>(
+        inputs, particles, model, contact_model );
+}
+
+template <class MemorySpace, class InputsType, class ParticleType,
+          class ForceModel>
 auto createSolverFracture( InputsType inputs,
                            std::shared_ptr<ParticleType> particles,
-                           ForceModel model, ContactModelType... contact_model )
+                           ForceModel model )
 {
     return std::make_shared<
-        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModel,
-                       ContactModelType...>>( inputs, particles, model,
-                                              contact_model... );
+        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModel>>(
+        inputs, particles, model );
+}
+
+template <class MemorySpace, class InputsType, class ParticleType,
+          class ForceModel, class ContactModelType>
+auto createSolverFracture( InputsType inputs,
+                           std::shared_ptr<ParticleType> particles,
+                           ForceModel model, ContactModelType contact_model )
+{
+    return std::make_shared<SolverFracture<
+        MemorySpace, InputsType, ParticleType, ForceModel, ContactModelType>>(
+        inputs, particles, model, contact_model );
 }
 
 } // namespace CabanaPD
