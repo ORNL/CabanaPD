@@ -92,7 +92,7 @@ class SolverBase
 };
 
 template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel, class ContactModel = NoContact>
+          class ForceModelType, class ContactModelType = NoContact>
 class SolverElastic
 {
   public:
@@ -102,7 +102,7 @@ class SolverElastic
     // Core module types - required for all problems.
     using particle_type = ParticleType;
     using integrator_type = Integrator<exec_space>;
-    using force_model_type = ForceModel;
+    using force_model_type = ForceModelType;
     using force_type = Force<memory_space, force_model_type>;
     using comm_type = Comm<particle_type, typename force_model_type::base_model,
                            typename particle_type::thermal_type>;
@@ -111,8 +111,8 @@ class SolverElastic
 
     // Optional module types.
     using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
-    using contact_type = Force<memory_space, ContactModel>;
-    using contact_model_type = ContactModel;
+    using contact_type = Force<memory_space, ContactModelType>;
+    using contact_model_type = ContactModelType;
 
     SolverElastic( input_type _inputs,
                    std::shared_ptr<particle_type> _particles,
@@ -485,26 +485,26 @@ class SolverElastic
 };
 
 template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel, class ContactModel = NoContact>
+          class ForceModelType, class ContactModelType = NoContact>
 class SolverFracture
-    : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModel,
-                           ContactModel>
+    : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModelType,
+                           ContactModelType>
 {
   public:
     using base_type = SolverElastic<MemorySpace, InputType, ParticleType,
-                                    ForceModel, ContactModel>;
+                                    ForceModelType, ContactModelType>;
     using exec_space = typename base_type::exec_space;
     using memory_space = typename base_type::memory_space;
 
     using particle_type = typename base_type::particle_type;
     using integrator_type = typename base_type::integrator_type;
     using comm_type = typename base_type::comm_type;
-    using force_model_type = ForceModel;
+    using force_model_type = ForceModelType;
     using force_type = typename base_type::force_type;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using input_type = typename base_type::input_type;
 
-    using contact_model_type = ContactModel;
+    using contact_model_type = ContactModelType;
 
     SolverFracture( input_type _inputs,
                     std::shared_ptr<particle_type> _particles,
@@ -732,47 +732,49 @@ class SolverFracture
 // ===============================================================
 
 template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel>
+          class ForceModelType>
 auto createSolverElastic( InputsType inputs,
                           std::shared_ptr<ParticleType> particles,
-                          ForceModel model )
+                          ForceModelType model )
 {
     return std::make_shared<
-        SolverElastic<MemorySpace, InputsType, ParticleType, ForceModel>>(
+        SolverElastic<MemorySpace, InputsType, ParticleType, ForceModelType>>(
         inputs, particles, model );
 }
 
 template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel, class ContactModelType>
+          class ForceModelType, class ContactModelType>
 auto createSolverElastic( InputsType inputs,
                           std::shared_ptr<ParticleType> particles,
-                          ForceModel model, ContactModelType contact_model )
+                          ForceModelType model, ContactModelType contact_model )
 {
     return std::make_shared<SolverElastic<MemorySpace, InputsType, ParticleType,
-                                          ForceModel, ContactModelType>>(
+                                          ForceModelType, ContactModelType>>(
         inputs, particles, model, contact_model );
 }
 
 template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel>
+          class ForceModelType>
 auto createSolverFracture( InputsType inputs,
                            std::shared_ptr<ParticleType> particles,
-                           ForceModel model )
+                           ForceModelType model )
 {
     return std::make_shared<
-        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModel>>(
+        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModelType>>(
         inputs, particles, model );
 }
 
 template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel, class ContactModelType>
+          class ForceModelType, class ContactModelType>
 auto createSolverFracture( InputsType inputs,
                            std::shared_ptr<ParticleType> particles,
-                           ForceModel model, ContactModelType contact_model )
+                           ForceModelType model,
+                           ContactModelType contact_model )
 {
-    return std::make_shared<SolverFracture<
-        MemorySpace, InputsType, ParticleType, ForceModel, ContactModelType>>(
-        inputs, particles, model, contact_model );
+    return std::make_shared<
+        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModelType,
+                       ContactModelType>>( inputs, particles, model,
+                                           contact_model );
 }
 
 } // namespace CabanaPD
