@@ -195,6 +195,9 @@ struct HaloIds
         Kokkos::parallel_for( "CabanaPD::Comm::GhostSearch", policy,
                               ghost_search );
         Kokkos::fence();
+
+        // Rebuild if needed.
+        rebuild( positions );
     }
 
     template <class PositionSliceType>
@@ -244,6 +247,7 @@ class Comm<ParticleType, Pair, SingleMaterial, TemperatureIndependent>
     int max_export;
 
     using memory_space = typename ParticleType::memory_space;
+    using local_grid_type = typename ParticleType::local_grid_type;
     using halo_type = Cabana::Halo<memory_space>;
     using gather_u_type =
         Cabana::Gather<halo_type, typename ParticleType::aosoa_u_type>;
@@ -263,12 +267,11 @@ class Comm<ParticleType, Pair, SingleMaterial, TemperatureIndependent>
         auto halo_width = local_grid->haloCellWidth();
         auto topology = Cabana::Grid::getTopology( *local_grid );
 
-        // Determine which particles need to be ghosted to neighbors.
+        // Determine which particles should be ghosted, reallocating and
+        // recounting if needed.
         // FIXME: set halo width based on cutoff distance.
-        auto halo_ids =
-            createHaloIds( *local_grid, positions, halo_width, max_export );
-        // Rebuild if needed.
-        halo_ids.rebuild( positions );
+        HaloIds<memory_space, local_grid_type> halo_ids(
+            *local_grid, positions, halo_width, max_export );
 
         // Create the Cabana Halo.
         halo = std::make_shared<halo_type>(
@@ -290,17 +293,6 @@ class Comm<ParticleType, Pair, SingleMaterial, TemperatureIndependent>
 
     auto size() { return mpi_size; }
     auto rank() { return mpi_rank; }
-
-    // Determine which particles should be ghosted, reallocating and recounting
-    // if needed.
-    template <class LocalGridType, class PositionSliceType>
-    auto createHaloIds( const LocalGridType& local_grid,
-                        const PositionSliceType& positions,
-                        const int min_halo_width, const int max_export )
-    {
-        return HaloIds<typename PositionSliceType::memory_space, LocalGridType>(
-            local_grid, positions, min_halo_width, max_export );
-    }
 
     // We assume here that the particle count has not changed and no resize
     // is necessary.
@@ -433,6 +425,90 @@ class Comm<ParticleType, ModelType, MultiMaterial, ThermalType>
         _timer.start();
         gather_material->apply();
         _timer.stop();
+    }
+};
+
+// Does not inherit because it does not use the same reference halo
+// communication pattern.
+template <class ParticleType>
+class Comm<ParticleType, Contact, SingleMaterial, TemperatureIndependent>
+{
+  public:
+    using memory_space = typename ParticleType::memory_space;
+    using local_grid_type = typename ParticleType::local_grid_type;
+    using halo_type = Cabana::Halo<memory_space>;
+    std::shared_ptr<halo_type> halo;
+    HaloIds<memory_space, local_grid_type> halo_ids;
+
+    using gather_u_type =
+        Cabana::Gather<halo_type, typename ParticleType::aosoa_u_type>;
+    std::shared_ptr<gather_u_type> gather_u;
+    using gather_x_type =
+        Cabana::Gather<halo_type,
+                       typename ParticleType::plist_x_type::aosoa_type>;
+    std::shared_ptr<gather_x_type> gather_x;
+    using gather_vol_type =
+        Cabana::Gather<halo_type, typename ParticleType::aosoa_vol_type>;
+    std::shared_ptr<gather_vol_type> gather_vol;
+
+    // Note this initial guess is small because this is often used for very
+    // short range interactions.
+    Comm( ParticleType& particles, int halo_width = 1,
+          int max_export_guess = 10 )
+        : halo_ids( HaloIds<memory_space, local_grid_type>(
+              *( particles.local_grid ), particles.sliceCurrentPosition(),
+              halo_width, max_export_guess ) )
+    {
+        auto topology = Cabana::Grid::getTopology( *particles.local_grid );
+        halo = std::make_shared<halo_type>(
+            particles.local_grid->globalGrid().comm(),
+            particles.referenceOffset(), halo_ids._ids, halo_ids._destinations,
+            topology );
+
+        // We use n_ghost here as the "local" halo count because these current
+        // frame ghosts are built on top of the existing, static, reference
+        // frame ghosts.
+        particles.resize( particles.localOffset(), particles.numGhost(), false,
+                          halo->numGhost() );
+
+        gather_u = std::make_shared<gather_u_type>( *halo, particles._aosoa_y );
+        gather_x = std::make_shared<gather_x_type>(
+            *halo, particles.getReferencePosition().aosoa() );
+        gather_vol =
+            std::make_shared<gather_vol_type>( *halo, particles._aosoa_vol );
+
+        // Communicate fields.
+        gather_u->apply();
+        gather_x->apply();
+        gather_vol->apply();
+    }
+
+    // This is a dynamic gather step where the steering vector needs to be
+    // recomputed.
+    void gather( ParticleType& particles )
+    {
+        // Get the current position. Note this is necessary to get the up to
+        // date current position.
+        auto y = particles.sliceCurrentPosition();
+        // Determine which particles need to be ghosted to neighbors for the
+        // current positions.
+        halo_ids.build( y );
+
+        auto topology = Cabana::Grid::getTopology( *particles.local_grid );
+        // FIXME: missing a build() interface
+        halo = std::make_shared<halo_type>(
+            particles.local_grid->globalGrid().comm(),
+            particles.referenceOffset(), halo_ids._ids, halo_ids._destinations,
+            topology );
+        particles.resize( particles.localOffset(), particles.numGhost(), false,
+                          halo->numGhost() );
+
+        gather_u->reserve( *halo, particles._aosoa_u );
+        gather_u->apply();
+        gather_x->reserve( *halo, particles.getReferencePosition().aosoa() );
+        gather_x->apply();
+        gather_vol->reserve( *halo, particles._aosoa_vol );
+        gather_vol->apply();
     }
 };
 

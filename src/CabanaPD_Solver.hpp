@@ -113,6 +113,8 @@ class Solver
     using contact_fracture_type = typename contact_model_type::fracture_type;
     using contact_type = Force<memory_space, contact_model_type,
                                contact_model_tag, contact_fracture_type>;
+    using contact_comm_type =
+        Comm<ParticleType, Contact, SingleMaterial, TemperatureIndependent>;
 
     // Flexible module types.
     // Integration should include max displacement tracking if either model
@@ -167,13 +169,6 @@ class Solver
         // Add ghosts from other MPI ranks.
         comm = std::make_shared<comm_type>( particles );
 
-        if constexpr ( is_contact<contact_model_type>::value )
-        {
-            if ( comm->size() > 1 )
-                throw std::runtime_error(
-                    "Contact with MPI is currently disabled." );
-        }
-
         // Update optional property ghost sizes if needed.
         if constexpr ( std::is_same<typename force_model_type::material_type,
                                     MultiMaterial>::value )
@@ -202,6 +197,12 @@ class Solver
             heat_transfer = std::make_shared<heat_transfer_type>(
                 inputs["half_neigh"], *force, force_model );
         }
+
+        // Purposely delay creating initial contact ghosts until after reference
+        // neighbor list. Needed for DEM or PD+contact.
+        if constexpr ( is_contact<force_model_type>::value ||
+                       is_contact<contact_model_type>::value )
+            contact_comm = std::make_shared<contact_comm_type>( particles );
 
         print = print_rank();
         if ( print )
@@ -361,6 +362,11 @@ class Solver
                            typename force_model_type::thermal_type>::value )
             comm->gatherTemperature();
 
+        // Ghosts must be up to date for any contact, DEM or PD+contact.
+        if constexpr ( is_contact<force_model_type>::value ||
+                       is_contact<contact_model_type>::value )
+            contact_comm->gather( particles );
+
         // Compute internal forces.
         updateForce();
 
@@ -388,6 +394,11 @@ class Solver
 
         // Update ghost particles.
         comm->gatherDisplacement();
+
+        // Ghosts must be up to date for any contact, DEM or PD+contact.
+        if constexpr ( is_contact<force_model_type>::value ||
+                       is_contact<contact_model_type>::value )
+            contact_comm->gather( particles );
 
         // Compute internal forces.
         updateForce();
@@ -612,6 +623,18 @@ class Solver
         return global;
     }
 
+    template <typename KeepType>
+    void remove( const int num_keep, const KeepType& keep )
+    {
+        // Remove particles based on user View.
+        particles->remove( num_keep, keep );
+        // Recreate comm lists since they're out of date.
+        comm = std::make_shared<comm_type>( particles );
+        if constexpr ( is_contact<force_model_type>::value ||
+                       is_contact<contact_model_type>::value )
+            contact_comm = std::make_shared<contact_comm_type>( particles );
+    }
+
     int num_steps;
     int output_frequency;
     bool output_reference;
@@ -642,6 +665,7 @@ class Solver
     // Optional modules.
     std::shared_ptr<heat_transfer_type> heat_transfer;
     std::shared_ptr<contact_type> contact;
+    std::shared_ptr<contact_comm_type> contact_comm;
 
     // Output files.
     std::string output_file;
