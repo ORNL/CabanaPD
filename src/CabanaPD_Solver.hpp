@@ -106,6 +106,8 @@ class Solver
     using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
     using contact_type = Force<memory_space, ContactModelType>;
     using contact_model_type = ContactModelType;
+    using contact_comm_type =
+        Comm<particle_type, Contact, TemperatureIndependent>;
 
     Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
             force_model_type force_model )
@@ -142,15 +144,10 @@ class Solver
         dt = inputs["timestep"];
         integrator = std::make_shared<integrator_type>( dt );
 
+        std::cout << particles->n_local << " " << particles->n_ghost
+                  << std::endl;
         // Add ghosts from other MPI ranks.
         comm = std::make_shared<comm_type>( *particles );
-
-        if constexpr ( is_contact<contact_model_type>::value )
-        {
-            if ( comm->size() > 1 )
-                throw std::runtime_error(
-                    "Contact with MPI is currently disabled." );
-        }
 
         // Update temperature ghost size if needed.
         if constexpr ( is_temperature_dependent<
@@ -177,6 +174,14 @@ class Solver
             heat_transfer = std::make_shared<heat_transfer_type>(
                 inputs["half_neigh"], *force, force_model );
         }
+
+        // Purposely delay creating initial contact ghosts until after reference
+        // neighbor list.
+        if constexpr ( is_contact<contact_model_type>::value )
+            contact_comm = std::make_shared<contact_comm_type>( *particles );
+
+        std::cout << particles->n_local << " " << particles->n_ghost << " "
+                  << particles->n_contact_ghost << std::endl;
 
         print = print_rank();
         if ( print )
@@ -497,6 +502,7 @@ class Solver
     // Optional modules.
     std::shared_ptr<heat_transfer_type> heat_transfer;
     std::shared_ptr<contact_type> contact;
+    std::shared_ptr<contact_comm_type> contact_comm;
 
     // Output files.
     std::string output_file;

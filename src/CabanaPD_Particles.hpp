@@ -99,6 +99,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     std::size_t frozen_offset = 0;
     std::size_t local_offset = 0;
     std::size_t num_ghost = 0;
+    std::size_t reference_offset = 0;
+    std::size_t num_contact_ghost = 0;
     std::size_t size = 0;
 
     // x, u, f (vector matching system dimension).
@@ -137,9 +139,10 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     // FIXME: this is for neighborlist construction.
     double ghost_mesh_lo[dim];
     double ghost_mesh_hi[dim];
-    std::shared_ptr<
-        Cabana::Grid::LocalGrid<Cabana::Grid::UniformMesh<double, dim>>>
-        local_grid;
+
+    using local_grid_type =
+        Cabana::Grid::LocalGrid<Cabana::Grid::UniformMesh<double, dim>>;
+    std::shared_ptr<local_grid_type> local_grid;
     Kokkos::Array<double, dim> dx;
 
     int halo_width;
@@ -464,7 +467,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     auto numLocal() const { return local_offset - frozen_offset; }
     auto localOffset() const { return local_offset; }
     auto numGhost() const { return num_ghost; }
-    auto referenceOffset() const { return size; }
+    auto referenceOffset() const { return reference_offset; }
+    auto size() const { return size; }
     auto numGlobal() const { return num_global; }
 
     auto sliceReferencePosition()
@@ -558,28 +562,30 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         //_timer.stop();
     }
 
-    void resize( int new_local, int new_ghost,
-                 const bool create_frozen = false )
+    void resize( int new_local, int new_ghost, const bool create_frozen = false,
+                 int new_contact_ghost = 0 )
     {
         _timer.start();
         if ( new_ghost > 0 )
             assert( create_frozen == false );
 
+        if ( create_frozen )
+            frozen_offset = size;
         local_offset = new_local;
         num_ghost = new_ghost;
-        size = new_local + new_ghost;
+        reference_offset = new_local + new_ghost;
+        num_contact_ghost = new_contact_ghost;
+        size = reference_offset + num_contact_ghost;
 
-        _plist_x.aosoa().resize( referenceOffset() );
-        _aosoa_u.resize( referenceOffset() );
-        _aosoa_y.resize( referenceOffset() );
-        _aosoa_vol.resize( referenceOffset() );
+        _plist_x.aosoa().resize( size() );
+        _aosoa_u.resize( size() );
+        _aosoa_y.resize( size() );
+        _aosoa_vol.resize( size() );
         _plist_f.aosoa().resize( localOffset() );
         _aosoa_other.resize( localOffset() );
         _aosoa_nofail.resize( referenceOffset() );
 
-        size = _plist_x.size();
-        if ( create_frozen )
-            frozen_offset = size;
+        assert( size == _plist_x.size() );
         _timer.stop();
     };
 
@@ -662,6 +668,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
     friend class Comm<self_type, PMB, TemperatureIndependent>;
     friend class Comm<self_type, PMB, TemperatureDependent>;
+    friend class Comm<self_type, Contact, TemperatureIndependent>;
 
   protected:
     aosoa_u_type _aosoa_u;
