@@ -40,6 +40,15 @@ struct ElasticPerfectlyPlastic
 {
 };
 
+// Contact and DEM (contact without PD) tags.
+
+struct Contact
+{
+};
+struct NoContact
+{
+};
+
 // Model category tags.
 struct Pair
 {
