@@ -9,39 +9,24 @@
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef CONTACT_H
-#define CONTACT_H
+#ifndef CONTACT_HERTZIAN_H
+#define CONTACT_HERTZIAN_H
 
 #include <cmath>
 
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Output.hpp>
+#include <force/CabanaPD_Force_Contact.hpp>
+#include <force/CabanaPD_HertzianContact.hpp>
 
 namespace CabanaPD
 {
 /******************************************************************************
-Contact helper functions
-******************************************************************************/
-template <class VelType>
-KOKKOS_INLINE_FUNCTION void getRelativeNormalVelocityComponents(
-    const VelType& vel, const int i, const int j, const double rx,
-    const double ry, const double rz, const double r, double& vx, double& vy,
-    double& vz, double& vn )
-{
-    vx = vel( i, 0 ) - vel( j, 0 );
-    vy = vel( i, 1 ) - vel( j, 1 );
-    vz = vel( i, 2 ) - vel( j, 2 );
-
-    vn = vx * rx + vy * ry + vz * rz;
-    vn /= r;
-};
-
-/******************************************************************************
   Normal repulsion forces
 ******************************************************************************/
 template <class MemorySpace>
-class Force<MemorySpace, NormalRepulsionModel>
+class Force<MemorySpace, HertzianModel>
     : public Force<MemorySpace, BaseForceModel>
 {
   public:
@@ -50,7 +35,7 @@ class Force<MemorySpace, NormalRepulsionModel>
 
     template <class ParticleType>
     Force( const bool half_neigh, const ParticleType& particles,
-           const NormalRepulsionModel model )
+           const HertzianModel model )
         : base_type( half_neigh, model.Rc, particles.sliceCurrentPosition(),
                      particles.n_local, particles.ghost_mesh_lo,
                      particles.ghost_mesh_hi )
@@ -69,11 +54,19 @@ class Force<MemorySpace, NormalRepulsionModel>
                            const ParticleType& particles, const int n_local,
                            ParallelType& neigh_op_tag )
     {
-        auto delta = _model.delta;
         auto Rc = _model.Rc;
-        auto c = _model.c;
+        auto radius = _model.radius;
+        auto Es = _model.Es;
+        auto Rs = _model.Rs;
+        auto beta = _model.beta;
+
+        const double coeff_h_n = 4.0 / 3.0 * Es * std::sqrt( Rs );
+        const double coeff_h_d = -2.0 * sqrt( 5.0 / 6.0 ) * beta;
+
         const auto vol = particles.sliceVolume();
+        const auto rho = particles.sliceDensity();
         const auto y = particles.sliceCurrentPosition();
+        const auto vel = particles.sliceVelocity();
 
         _neigh_timer.start();
         _neigh_list.build( y, 0, n_local, Rc, 1.0, mesh_min, mesh_max );
@@ -81,6 +74,11 @@ class Force<MemorySpace, NormalRepulsionModel>
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {
+            using Kokkos::abs;
+            using Kokkos::min;
+            using Kokkos::pow;
+            using Kokkos::sqrt;
+
             double fcx_i = 0.0;
             double fcy_i = 0.0;
             double fcz_i = 0.0;
@@ -89,14 +87,40 @@ class Force<MemorySpace, NormalRepulsionModel>
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-            // Contact "stretch"
-            const double sc = ( r - Rc ) / delta;
+            // Contact "overlap"
+            const double delta_n = ( r - 2.0 * radius );
 
-            // Normal repulsion uses a 15 factor compared to the PMB force
-            const double coeff = 15 * c * sc * vol( j );
+            // Hertz normal force coefficient
+            double coeff = 0.0;
+            double Sn = 0.0;
+            if ( delta_n < 0.0 )
+            {
+                coeff =
+                    min( 0.0, -coeff_h_n * pow( abs( delta_n ), 3.0 / 2.0 ) );
+                Sn = 2.0 * Es * sqrt( Rs * abs( delta_n ) );
+            }
+
+            coeff /= vol( i );
+
             fcx_i = coeff * rx / r;
             fcy_i = coeff * ry / r;
             fcz_i = coeff * rz / r;
+
+            fc( i, 0 ) += fcx_i;
+            fc( i, 1 ) += fcy_i;
+            fc( i, 2 ) += fcz_i;
+
+            // Hertz normal force damping component
+            double vx, vy, vz, vn;
+            getRelativeNormalVelocityComponents( vel, i, j, rx, ry, rz, r, vx,
+                                                 vy, vz, vn );
+
+            double ms = ( rho( i ) * vol( i ) ) / 2.0;
+            double fnd = coeff_h_d * sqrt( Sn * ms ) * vn / vol( i );
+
+            fcx_i = fnd * rx / r;
+            fcy_i = fnd * ry / r;
+            fcz_i = fnd * rz / r;
 
             fc( i, 0 ) += fcx_i;
             fc( i, 1 ) += fcy_i;
@@ -125,7 +149,7 @@ class Force<MemorySpace, NormalRepulsionModel>
     }
 
   protected:
-    NormalRepulsionModel _model;
+    HertzianModel _model;
     using base_type::_half_neigh;
     using base_type::_neigh_list;
     using base_type::_timer;
