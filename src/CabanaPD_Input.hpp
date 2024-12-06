@@ -95,6 +95,9 @@ class Inputs
         if ( inputs.contains( "system_size" ) )
         {
             auto size = inputs["system_size"]["value"];
+            if ( size != 3 )
+                log_err( std::cout, "CabanaPD requires 3d (system_size)." );
+
             std::string size_unit = inputs["system_size"]["unit"];
             for ( std::size_t d = 0; d < size.size(); d++ )
             {
@@ -110,10 +113,16 @@ class Inputs
         else if ( inputs.contains( "low_corner" ) &&
                   ( inputs.contains( "high_corner" ) ) )
         {
+            auto size = inputs["low_corner"]["value"].size();
+            if ( size != 3 )
+                log_err( std::cout, "CabanaPD requires 3d (low_corner)." );
+            if ( inputs["high_corner"]["value"].size() != 3 )
+                log_err( std::cout, "CabanaPD requires 3d (high_corner)." );
+
             auto low_corner = inputs["low_corner"]["value"];
             auto high_corner = inputs["high_corner"]["value"];
             std::string size_unit = inputs["low_corner"]["unit"];
-            for ( std::size_t d = 0; d < low_corner.size(); d++ )
+            for ( std::size_t d = 0; d < size; d++ )
             {
                 double low = low_corner[d];
                 double high = high_corner[d];
@@ -129,24 +138,29 @@ class Inputs
 
         if ( inputs.contains( "dx" ) )
         {
-            auto size = inputs["system_size"]["value"];
-            for ( std::size_t d = 0; d < size.size(); d++ )
+            auto dx = inputs["dx"]["value"];
+            if ( dx != 3 )
+                log_err( std::cout, "CabanaPD requires 3d (dx)." );
+
+            for ( std::size_t d = 0; d < dx.size(); d++ )
             {
-                double system_size = inputs["system_size"]["value"][d];
-                double dx = inputs["dx"]["value"][d];
+                double size_d = inputs["system_size"]["value"][d];
+                double dx_d = dx[d];
                 inputs["num_cells"]["value"][d] =
-                    static_cast<int>( system_size / dx );
+                    static_cast<int>( size_d / dx_d );
             }
         }
         else if ( inputs.contains( "num_cells" ) )
         {
-            auto size = inputs["system_size"]["value"];
-            for ( std::size_t d = 0; d < size.size(); d++ )
+            auto nc = inputs["num_cells"]["value"];
+            if ( nc != 3 )
+                log_err( std::cout, "CabanaPD requires 3d (num_cells)." );
+
+            for ( std::size_t d = 0; d < nc.size(); d++ )
             {
-                double low = inputs["low_corner"]["value"][d];
-                double high = inputs["low_corner"]["value"][d];
-                double nc = inputs["num_cells"]["value"][d];
-                inputs["dx"]["value"][d] = ( high - low ) / nc;
+                double size_d = inputs["system_size"]["value"][d];
+                double nc_d = nc[d];
+                inputs["dx"]["value"][d] = size_d / nc_d;
             }
             std::string size_unit = inputs["system_size"]["unit"];
             inputs["dx"]["unit"] = size_unit;
@@ -155,6 +169,13 @@ class Inputs
         {
             throw std::runtime_error( "Must input either num_cells or dx." );
         }
+
+        // Error for inconsistent units. There is currently no conversion.
+        if ( inputs["low_corner"]["unit"] != inputs["high_corner"]["unit"] )
+            log_err( std::cout,
+                     "Units for low_corner and high_corner do not match." );
+        if ( inputs["dx"]["unit"] != inputs["high_corner"]["unit"] )
+            log_err( std::cout, "Units for dx do not match." );
     }
 
     void computeCriticalTimeStep()
