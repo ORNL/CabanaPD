@@ -667,7 +667,6 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     auto time() { return _timer.time(); };
 
     friend class Comm<self_type, PMB, TemperatureIndependent>;
-    friend class Comm<self_type, PMB, TemperatureDependent>;
     friend class Comm<self_type, Contact, TemperatureIndependent>;
 
   protected:
@@ -779,9 +778,10 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
         return Cabana::slice<0>( _aosoa_m, "weighted_volume" );
     }
 
-    void resize( int new_local, int new_ghost )
+    template <typename... Args>
+    void resize( Args&&... args )
     {
-        base_type::resize( new_local, new_ghost );
+        base_type::resize( std::forward<Args>( args )... );
         _timer.start();
         _aosoa_theta.resize( base_type::referenceOffset() );
         _aosoa_m.resize( base_type::referenceOffset() );
@@ -924,6 +924,8 @@ class Particles<MemorySpace, PMB, TemperatureDependent, BaseOutput, Dimension>
     friend class Comm<self_type, LPS, TemperatureIndependent>;
     friend class Comm<self_type, PMB, TemperatureDependent>;
     friend class Comm<self_type, LPS, TemperatureDependent>;
+    friend class Comm<self_type, Contact, TemperatureIndependent>;
+    friend class Comm<self_type, Contact, TemperatureDependent>;
 
   protected:
     void init_temp()
@@ -1029,8 +1031,10 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
 
     friend class Comm<self_type, PMB, TemperatureIndependent>;
     friend class Comm<self_type, LPS, TemperatureIndependent>;
+    friend class Comm<self_type, Contact, TemperatureIndependent>;
     friend class Comm<self_type, PMB, TemperatureDependent>;
     friend class Comm<self_type, LPS, TemperatureDependent>;
+    friend class Comm<self_type, Contact, TemperatureDependent>;
 
   protected:
     void init_output()
