@@ -396,12 +396,19 @@ class Comm<ParticleType, Contact, TemperatureIndependent>
     using memory_space = typename ParticleType::memory_space;
     using local_grid_type = typename ParticleType::local_grid_type;
     using halo_type = Cabana::Halo<memory_space>;
-
-    using gather_current_type =
-        Cabana::Gather<halo_type, typename ParticleType::aosoa_y_type>;
-    std::shared_ptr<gather_current_type> gather_current;
     std::shared_ptr<halo_type> halo;
     HaloIds<memory_space, local_grid_type> halo_ids;
+
+    using gather_u_type =
+        Cabana::Gather<halo_type, typename ParticleType::aosoa_u_type>;
+    std::shared_ptr<gather_u_type> gather_u;
+    using gather_x_type =
+        Cabana::Gather<halo_type,
+                       typename ParticleType::plist_x_type::aosoa_type>;
+    std::shared_ptr<gather_x_type> gather_x;
+    using gather_vol_type =
+        Cabana::Gather<halo_type, typename ParticleType::aosoa_vol_type>;
+    std::shared_ptr<gather_vol_type> gather_vol;
 
     // Note this initial guess is small because this is often used for very
     // short range interactions.
@@ -423,13 +430,16 @@ class Comm<ParticleType, Contact, TemperatureIndependent>
         particles.resize( particles.n_local, particles.n_ghost, false,
                           halo->numGhost() );
 
-        gather_current =
-            std::make_shared<gather_current_type>( *halo, particles._aosoa_y );
+        gather_u = std::make_shared<gather_u_type>( *halo, particles._aosoa_y );
+        gather_x = std::make_shared<gather_x_type>(
+            *halo, particles.getReferencePosition().aosoa() );
+        gather_vol =
+            std::make_shared<gather_vol_type>( *halo, particles._aosoa_vol );
     }
 
     // This is a dynamic gather step where the steering vector needs to be
     // recomputed.
-    void gatherCurrentPostiion( ParticleType& particles )
+    void gather( ParticleType& particles )
     {
         // Get the current position. Note this is necessary to get the up to
         // date current position.
@@ -446,9 +456,12 @@ class Comm<ParticleType, Contact, TemperatureIndependent>
         particles.resize( particles.n_local, particles.n_ghost, false,
                           halo->numGhost() );
 
-        gather_current->reserve( *halo, particles._aosoa_y );
-
-        gather_current->apply();
+        gather_u->reserve( *halo, particles._aosoa_u );
+        gather_u->apply();
+        gather_x->reserve( *halo, particles.getReferencePosition().aosoa() );
+        gather_x->apply();
+        gather_vol->reserve( *halo, particles._aosoa_vol );
+        gather_vol->apply();
     }
 };
 
