@@ -9,14 +9,15 @@
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef CONTACT_H
-#define CONTACT_H
+#ifndef CONTACT_HERTZIAN_H
+#define CONTACT_HERTZIAN_H
 
 #include <cmath>
 
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Output.hpp>
+#include <force/CabanaPD_HertzianContact.hpp>
 
 namespace CabanaPD
 {
@@ -54,9 +55,8 @@ class Force<MemorySpace, HertzianModel>
     {
         auto delta = _model.delta;
         auto Rc = _model.Rc;
-        auto c = _model.c;
-        auto Es = _model.Es;
-        auto Rs = _model.Rs;
+        auto Es = _model.E_s;
+        auto Rs = _model.R_s;
 
         const double coeff_h_n = 4.0 / 3.0 * Es * std::sqrt( Rs );
 

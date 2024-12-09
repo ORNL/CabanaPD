@@ -9,8 +9,8 @@
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef CONTACTMODELS_H
-#define CONTACTMODELS_H
+#ifndef CONTACTMODEL_HERTZIAN_H
+#define CONTACTMODEL_HERTZIAN_H
 
 #include <cmath>
 
@@ -20,24 +20,6 @@
 
 namespace CabanaPD
 {
-/******************************************************************************
-  Contact model
-******************************************************************************/
-struct ContactModel
-{
-    double delta;
-    double Rc;
-
-    ContactModel() {};
-    // PD horizon
-    // Contact radius
-    ContactModel( const double _delta, const double _Rc )
-        : delta( _delta )
-        , Rc( _Rc ) {};
-};
-
-/* Normal repulsion */
-
 struct HertzianModel : public ContactModel
 {
     // FIXME: This is for use as the primary force model.
@@ -54,10 +36,9 @@ struct HertzianModel : public ContactModel
     double beta; // Damping coefficient
     double Sn;   // Normal stiffness
 
-    HertzianModel() {};
     HertzianModel( const double _Rc, const double _nu, const double _E,
                    const double _e )
-        : ContactModel( 1.0, Rc )
+        : ContactModel( 1.0, _Rc )
     {
         set_param( _Rc, _nu, _E, _e );
     }
