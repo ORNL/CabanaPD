@@ -1,0 +1,15 @@
+{
+    "num_cells"              : {"value": [1, 1, 1]},
+    "system_size"            : {"value": [2.0, 2.0, 2.0], "unit": "m"},
+    "density"                : {"value": 1e3,  "unit": "kg/m^3"},
+    "volume"                 : {"value": 1e-3,  "unit": "m^3"},
+    "elastic_modulus"        : {"value": 72e+9, "unit": "Pa"},
+    "poisson_ratio"          : {"value": 0.25, "unit": ""},
+    "restitution"            : {"value": 0.5},  
+    "horizon"                : {"value": 1.5},  
+    "final_time"             : {"value": 43e-6, "unit": "s"},
+    "timestep"               : {"value": 4.5e-8,  "unit": "s"},
+    "timestep_safety_factor" : {"value": 0.85},
+    "output_frequency"       : {"value": 5},
+    "output_reference"       : {"value": true}
+}
