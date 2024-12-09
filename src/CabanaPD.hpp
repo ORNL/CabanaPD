@@ -33,7 +33,9 @@
 #include <force/CabanaPD_ForceModels_LPS.hpp>
 #include <force/CabanaPD_ForceModels_PMB.hpp>
 #include <force/CabanaPD_Force_Contact.hpp>
+#include <force/CabanaPD_Force_HertzianContact.hpp>
 #include <force/CabanaPD_Force_LPS.hpp>
 #include <force/CabanaPD_Force_PMB.hpp>
+#include <force/CabanaPD_HertzianContact.hpp>
 
 #endif
