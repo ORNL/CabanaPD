@@ -143,7 +143,7 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, ModelParams...>>
     template <class PosType, class WType, class ParticleType,
               class ParallelType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              ParticleType& particles, const int n_local,
+                              const ParticleType& particles, const int n_local,
                               ParallelType& neigh_op_tag )
     {
         _energy_timer.start();
@@ -325,7 +325,7 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
     template <class PosType, class WType, class DamageType, class ParticleType,
               class MuView, class ParallelType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              DamageType& phi, ParticleType& particles,
+                              DamageType& phi, const ParticleType& particles,
                               MuView& mu, const int n_local, ParallelType& )
     {
         _energy_timer.start();
@@ -333,7 +333,6 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
         auto model = _model;
         auto neigh_list = _neigh_list;
         const auto vol = particles.sliceVolume();
-        const auto f = particles.sliceForce();
 
         auto energy_full = KOKKOS_LAMBDA( const int i, double& Phi )
         {
@@ -342,7 +341,6 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
                     neigh_list, i );
             double phi_i = 0.0;
             double vol_H_i = 0.0;
-
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
                 std::size_t j =
@@ -350,8 +348,7 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
                         neigh_list, i, n );
                 // Get the bond distance, displacement, and stretch.
                 double xi, r, s;
-                double rx, ry, rz;
-                getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+                getDistance( x, u, i, j, xi, r, s );
 
                 model.thermalStretch( s, i, j );
 
@@ -363,7 +360,6 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
                 phi_i += mu( i, n ) * vol( j );
                 vol_H_i += vol( j );
             }
-
             Phi += W( i ) * vol( i );
             phi( i ) = 1 - phi_i / vol_H_i;
         };
@@ -511,7 +507,7 @@ class Force<MemorySpace, ForceModel<LinearPMB, Elastic, ModelParams...>>
     template <class PosType, class WType, class ParticleType,
               class ParallelType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              ParticleType& particles, const int n_local,
+                              const ParticleType& particles, const int n_local,
                               ParallelType& neigh_op_tag )
     {
         _energy_timer.start();
