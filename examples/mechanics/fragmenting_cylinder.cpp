@@ -67,13 +67,7 @@ void fragmentingCylinderExample( const std::string filename )
     // model_type force_model( delta, K, G, G0 );
 
     // ====================================================
-    //                 Particle generation
-    // ====================================================
-    auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space(), low_corner, high_corner, num_cells, halo_width );
-
-    // ====================================================
-    //            Custom particle initialization
+    //    Custom particle generation and initialization
     // ====================================================
     double x_center = 0.5 * ( low_corner[0] + high_corner[0] );
     double y_center = 0.5 * ( low_corner[1] + high_corner[1] );
@@ -90,7 +84,9 @@ void fragmentingCylinderExample( const std::string filename )
             return false;
         return true;
     };
-    particles->createParticles( exec_space(), init_op );
+
+    auto particles = CabanaPD::createParticles<memory_space, model_type>(
+        exec_space(), low_corner, high_corner, num_cells, halo_width, init_op );
 
     auto rho = particles->sliceDensity();
     auto x = particles->sliceReferencePosition();

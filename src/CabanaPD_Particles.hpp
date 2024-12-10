@@ -932,6 +932,20 @@ auto createParticles( const ExecSpace& exec_space,
         EnergyOutput{} );
 }
 
+template <typename MemorySpace, typename ModelType, typename ExecSpace,
+          class UserFunctor, std::size_t Dim>
+auto createParticles( const ExecSpace& exec_space,
+                      std::array<double, Dim> low_corner,
+                      std::array<double, Dim> high_corner,
+                      const std::array<int, Dim> num_cells,
+                      const int max_halo_width, UserFunctor user )
+{
+    return std::make_shared<
+        CabanaPD::Particles<MemorySpace, typename ModelType::base_model,
+                            typename ModelType::thermal_type>>(
+        exec_space, low_corner, high_corner, num_cells, max_halo_width, user );
+}
+
 template <typename MemorySpace, typename ModelType, typename ThermalType,
           typename ExecSpace, std::size_t Dim>
 auto createParticles(
