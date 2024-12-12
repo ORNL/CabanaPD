@@ -26,7 +26,7 @@ available on some systems or can be installed with `spack` (see
 https://spack.readthedocs.io/en/latest/getting_started.html):
 
 ```
-spack install cabana@master+cajita+silo
+spack install cabana@master+grid+hdf5
 ```
 
 Alternatively, Kokkos can be built locally, followed by Cabana:
