@@ -19,12 +19,13 @@ void hertzianContactExample( const std::string filename )
     //                Material parameters
     // ====================================================
     double rho0 = inputs["density"];
-    double vol = inputs["restitution"];
+    double vol = inputs["volume"];
+    double delta = inputs["horizon"];
+    delta += 1e-10;
+    double radius = inputs["radius"];
     double nu = inputs["poisson_ratio"];
     double E = inputs["elastic_modulus"];
     double e = inputs["restitution"];
-    double delta = inputs["horizon"];
-    delta += 1e-10;
 
     // ====================================================
     //                  Discretization
@@ -45,9 +46,9 @@ void hertzianContactExample( const std::string filename )
         "create_particles", Kokkos::RangePolicy<exec_space>( 0, num_particles ),
         KOKKOS_LAMBDA( const int p ) {
             if ( p == 0 )
-                position( p, 0 ) = 1.0;
+                position( p, 0 ) = 1e-4;
             else
-                position( p, 0 ) = -1.0;
+                position( p, 0 ) = -1e-4;
             volume( p ) = vol;
         } );
 
@@ -55,7 +56,7 @@ void hertzianContactExample( const std::string filename )
     //            Force model
     // ====================================================
     using model_type = CabanaPD::HertzianModel;
-    model_type contact_model( delta, nu, E, e );
+    model_type contact_model( delta, radius, nu, E, e );
 
     // ====================================================
     //                 Particle generation

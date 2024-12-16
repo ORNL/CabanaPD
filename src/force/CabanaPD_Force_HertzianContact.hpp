@@ -55,8 +55,9 @@ class Force<MemorySpace, HertzianModel>
     {
         auto delta = _model.delta;
         auto Rc = _model.Rc;
-        auto Es = _model.E_s;
-        auto Rs = _model.R_s;
+        auto radius = _model.radius;
+        auto Es = _model.Es;
+        auto Rs = _model.Rs;
 
         const double coeff_h_n = 4.0 / 3.0 * Es * std::sqrt( Rs );
 
@@ -78,11 +79,15 @@ class Force<MemorySpace, HertzianModel>
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
             // Contact "overlap"
-            const double delta_n = ( r - 2.0 * Rc );
+            const double delta_n = ( r - 2.0 * radius );
 
             // Hertz force normal coefficient
-            const double coeff =
-                std::min( 0.0, -coeff_h_n * std::pow( delta_n, 3.0 / 2.0 ) );
+            double coeff = 0.0;
+            if (delta_n < 0.0) {
+               coeff = std::min( 0.0, -coeff_h_n * std::pow( std::abs(delta_n), 3.0 / 2.0 ) );
+            }
+
+            coeff /= vol( i );
 
             fcx_i = coeff * rx / r;
             fcy_i = coeff * ry / r;

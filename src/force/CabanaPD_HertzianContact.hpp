@@ -27,28 +27,30 @@ struct HertzianModel : public ContactModel
     using fracture_type = Elastic;
     using thermal_type = TemperatureIndependent;
 
-    using ContactModel::Rc;
+    using ContactModel::Rc; // Contact horizon (should be > 2*radius)
 
     double nu;   // Poisson's ratio
-    double E_s;  // Equivalent Young's modulus
-    double R_s;  // Equivalent radius
+    double radius; // Actual radius
+    double Rs;  // Equivalent radius
+    double Es;  // Equivalent Young's modulus
     double e;    // Coefficient of restitution
     double beta; // Damping coefficient
     double Sn;   // Normal stiffness
 
-    HertzianModel( const double _Rc, const double _nu, const double _E,
+    HertzianModel( const double _Rc, const double _radius, const double _nu, const double _E,
                    const double _e )
         : ContactModel( 1.0, _Rc )
     {
-        set_param( _Rc, _nu, _E, _e );
+        set_param( _radius, _nu, _E, _e );
     }
 
-    void set_param( const double _Rc, const double _nu, const double _E,
+    void set_param( const double _radius, const double _nu, const double _E,
                     const double _e )
     {
-        R_s = 0.5 * _Rc;
         nu = _nu;
-        E_s = _E / ( 2.0 * std::pow( 1.0 - nu, 2.0 ) );
+        radius = _radius;
+        Rs = 0.5 * radius;
+        Es = _E / ( 2.0 * std::pow( 1.0 - nu, 2.0 ) );
         e = _e;
         double ln_e = std::log( e );
         beta = -ln_e / std::sqrt( std::pow( ln_e, 2.0 ) + std::pow( pi, 2.0 ) );
