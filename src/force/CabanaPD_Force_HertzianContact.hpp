@@ -58,11 +58,15 @@ class Force<MemorySpace, HertzianModel>
         auto radius = _model.radius;
         auto Es = _model.Es;
         auto Rs = _model.Rs;
+        auto beta = _model.beta;
 
         const double coeff_h_n = 4.0 / 3.0 * Es * std::sqrt( Rs );
+        const double coeff_h_d = -2.0 * sqrt( 5.0 / 6.0 ) * beta;
 
         const auto vol = particles.sliceVolume();
+        const auto rho = particles.sliceDensity();
         const auto y = particles.sliceCurrentPosition();
+        const auto vel = particles.sliceVelocity();
 
         _neigh_timer.start();
         _neigh_list.build( y, 0, n_local, Rc, 1.0, mesh_min, mesh_max );
@@ -81,10 +85,15 @@ class Force<MemorySpace, HertzianModel>
             // Contact "overlap"
             const double delta_n = ( r - 2.0 * radius );
 
-            // Hertz force normal coefficient
+            // Hertz normal force coefficient
             double coeff = 0.0;
-            if (delta_n < 0.0) {
-               coeff = std::min( 0.0, -coeff_h_n * std::pow( std::abs(delta_n), 3.0 / 2.0 ) );
+            double Sn = 0.0;
+            if ( delta_n < 0.0 )
+            {
+                coeff =
+                    std::min( 0.0, -coeff_h_n * std::pow( std::abs( delta_n ),
+                                                          3.0 / 2.0 ) );
+                Sn = 2.0 * Es * sqrt( Rs * std::abs( delta_n ) );
             }
 
             coeff /= vol( i );
@@ -92,6 +101,22 @@ class Force<MemorySpace, HertzianModel>
             fcx_i = coeff * rx / r;
             fcy_i = coeff * ry / r;
             fcz_i = coeff * rz / r;
+
+            fc( i, 0 ) += fcx_i;
+            fc( i, 1 ) += fcy_i;
+            fc( i, 2 ) += fcz_i;
+
+            // Hertz normal force damping component
+            double vx, vy, vz, vn;
+            getRelativeNormalVelocity( vel, i, j, rx, ry, rz, r, vx, vy, vz,
+                                       vn );
+
+            double ms = ( rho( i ) * vol( i ) ) / 2.0;
+            double ft = coeff_h_d * std::sqrt( Sn * ms ) * vn / vol( i );
+
+            fcx_i = ft * rx / r;
+            fcy_i = ft * ry / r;
+            fcz_i = ft * rz / r;
 
             fc( i, 0 ) += fcx_i;
             fc( i, 1 ) += fcy_i;

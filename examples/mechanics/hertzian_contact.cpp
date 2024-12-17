@@ -46,9 +46,9 @@ void hertzianContactExample( const std::string filename )
         "create_particles", Kokkos::RangePolicy<exec_space>( 0, num_particles ),
         KOKKOS_LAMBDA( const int p ) {
             if ( p == 0 )
-                position( p, 0 ) = 1e-4;
+                position( p, 0 ) = 0.51e-4;
             else
-                position( p, 0 ) = -1e-4;
+                position( p, 0 ) = -0.51e-4;
             volume( p ) = vol;
         } );
 
