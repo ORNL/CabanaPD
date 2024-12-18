@@ -10,7 +10,4 @@ target_link_libraries(CrackBranching LINK_PUBLIC CabanaPD)
 add_executable(FragmentingCylinder fragmenting_cylinder.cpp)
 target_link_libraries(FragmentingCylinder LINK_PUBLIC CabanaPD)
 
-add_executable(HertzianContact hertzian_contact.cpp)
-target_link_libraries(HertzianContact LINK_PUBLIC CabanaPD)
-
-install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder HertzianContact DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder  DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -29,16 +29,15 @@ struct HertzianModel : public ContactModel
 
     using ContactModel::Rc; // Contact horizon (should be > 2*radius)
 
-    double nu;   // Poisson's ratio
+    double nu;     // Poisson's ratio
     double radius; // Actual radius
-    double Rs;  // Equivalent radius
-    double Es;  // Equivalent Young's modulus
-    double e;    // Coefficient of restitution
-    double beta; // Damping coefficient
-    double Sn;   // Normal stiffness
+    double Rs;     // Equivalent radius
+    double Es;     // Equivalent Young's modulus
+    double e;      // Coefficient of restitution
+    double beta;   // Damping coefficient
 
-    HertzianModel( const double _Rc, const double _radius, const double _nu, const double _E,
-                   const double _e )
+    HertzianModel( const double _Rc, const double _radius, const double _nu,
+                   const double _E, const double _e )
         : ContactModel( 1.0, _Rc )
     {
         set_param( _radius, _nu, _E, _e );
@@ -47,13 +46,17 @@ struct HertzianModel : public ContactModel
     void set_param( const double _radius, const double _nu, const double _E,
                     const double _e )
     {
+        using Kokkos::log;
+        using Kokkos::pow;
+        using Kokkos::sqrt;
+
         nu = _nu;
         radius = _radius;
         Rs = 0.5 * radius;
-        Es = _E / ( 2.0 * std::pow( 1.0 - nu, 2.0 ) );
+        Es = _E / ( 2.0 * pow( 1.0 - nu, 2.0 ) );
         e = _e;
-        double ln_e = std::log( e );
-        beta = -ln_e / std::sqrt( std::pow( ln_e, 2.0 ) + std::pow( pi, 2.0 ) );
+        double ln_e = log( e );
+        beta = -ln_e / sqrt( pow( ln_e, 2.0 ) + pow( pi, 2.0 ) );
     }
 };
 

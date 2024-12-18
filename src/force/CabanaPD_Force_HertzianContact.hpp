@@ -74,6 +74,11 @@ class Force<MemorySpace, HertzianModel>
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {
+            using Kokkos::abs;
+            using Kokkos::min;
+            using Kokkos::pow;
+            using Kokkos::sqrt;
+
             double fcx_i = 0.0;
             double fcy_i = 0.0;
             double fcz_i = 0.0;
@@ -91,9 +96,8 @@ class Force<MemorySpace, HertzianModel>
             if ( delta_n < 0.0 )
             {
                 coeff =
-                    std::min( 0.0, -coeff_h_n * std::pow( std::abs( delta_n ),
-                                                          3.0 / 2.0 ) );
-                Sn = 2.0 * Es * sqrt( Rs * std::abs( delta_n ) );
+                    min( 0.0, -coeff_h_n * pow( abs( delta_n ), 3.0 / 2.0 ) );
+                Sn = 2.0 * Es * sqrt( Rs * abs( delta_n ) );
             }
 
             coeff /= vol( i );
@@ -112,11 +116,11 @@ class Force<MemorySpace, HertzianModel>
                                        vn );
 
             double ms = ( rho( i ) * vol( i ) ) / 2.0;
-            double ft = coeff_h_d * std::sqrt( Sn * ms ) * vn / vol( i );
+            double fnd = coeff_h_d * sqrt( Sn * ms ) * vn / vol( i );
 
-            fcx_i = ft * rx / r;
-            fcy_i = ft * ry / r;
-            fcz_i = ft * rz / r;
+            fcx_i = fnd * rx / r;
+            fcy_i = fnd * ry / r;
+            fcz_i = fnd * rz / r;
 
             fc( i, 0 ) += fcx_i;
             fc( i, 1 ) += fcy_i;

@@ -1,14 +1,35 @@
 #include <CabanaPD.hpp>
 
 #include <Kokkos_Core.hpp>
+#include <gtest/gtest.h>
 
-void hertzianContactExample( const std::string filename )
+namespace Test
+{
+template <class VelType, class DensityType, class VolumeType>
+double calculateKE( const VelType& v, const DensityType& rho,
+                    const VolumeType& vol )
+{
+    using Kokkos::hypot;
+    using Kokkos::pow;
+
+    double tke = 0.0;
+    Kokkos::parallel_reduce(
+        "total_ke", v.size(),
+        KOKKOS_LAMBDA( const int i, double& sum ) {
+            sum += 0.5 * rho( i ) * vol( i ) *
+                   pow( hypot( v( i, 0 ), v( i, 1 ), v( i, 2 ) ), 2.0 );
+        },
+        tke );
+    return tke;
+}
+
+void testHertzianContact( const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
     // ====================================================
-    using exec_space = Kokkos::DefaultExecutionSpace;
-    using memory_space = typename exec_space::memory_space;
+    using exec_space = TEST_EXECSPACE;
+    using memory_space = TEST_MEMSPACE;
 
     // ====================================================
     //                   Read inputs
@@ -71,6 +92,7 @@ void hertzianContactExample( const std::string filename )
     // ====================================================
     auto rho = particles->sliceDensity();
     auto v = particles->sliceVelocity();
+    auto vo = particles->sliceVolume();
 
     auto init_functor = KOKKOS_LAMBDA( const int p )
     {
@@ -83,6 +105,9 @@ void hertzianContactExample( const std::string filename )
     };
     particles->updateParticles( exec_space{}, init_functor );
 
+    // Get initial total KE
+    double ke_i = calculateKE( v, rho, vo );
+
     // ====================================================
     //  Simulation run
     // ====================================================
@@ -91,16 +116,16 @@ void hertzianContactExample( const std::string filename )
         inputs, particles, contact_model );
     cabana_pd->init();
     cabana_pd->run();
+
+    // Get final total KE
+    double ke_f = calculateKE( v, rho, vo );
+    EXPECT_NEAR( std::sqrt(ke_f / ke_i), e, 1e-3 );
 }
 
-// Initialize Kokkos.
-int main( int argc, char* argv[] )
+TEST( TEST_CATEGORY, test_hertzian_contact )
 {
-    MPI_Init( &argc, &argv );
-    Kokkos::initialize( argc, argv );
-
-    hertzianContactExample( argv[1] );
-
-    Kokkos::finalize();
-    MPI_Finalize();
+    std::string input = "hertzian_contact.json";
+    testHertzianContact( input );
 }
+
+} // end namespace Test
