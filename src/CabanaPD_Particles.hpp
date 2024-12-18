@@ -485,7 +485,6 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     friend class Comm<self_type, PMB, TemperatureIndependent>;
     friend class Comm<self_type, PMB, TemperatureDependent>;
 
-  protected:
     // This is necessary to avoid Cuda lambda capture issues in the constructor.
     template <class ExecSpace, class PositionType, class VolumeType>
     void implInitCustomParticles( const ExecSpace& exec_space,
@@ -524,6 +523,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             } );
     }
 
+  protected:
     aosoa_u_type _aosoa_u;
     aosoa_y_type _aosoa_y;
     aosoa_vol_type _aosoa_vol;
