@@ -1,3 +1,8 @@
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/inputs/hertzian_contact.json
+  ${CMAKE_CURRENT_BINARY_DIR}/hertzian_contact.json
+  COPYONLY
+)
 ##--------------------------------------------------------------------------##
 ## On-node tests
 ##--------------------------------------------------------------------------##
@@ -48,6 +53,6 @@ macro(CabanaPD_add_tests)
   endforeach()
 endmacro()
 
-CabanaPD_add_tests(NAMES Force Integrator)
+CabanaPD_add_tests(NAMES Force Integrator Hertz)
 
 CabanaPD_add_tests(MPI NAMES Comm)
