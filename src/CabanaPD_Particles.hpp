@@ -381,10 +381,14 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     }
 
     template <class ExecSpace, class FunctorType>
-    void updateParticles( const ExecSpace, const FunctorType init_functor )
+    void updateParticles( const ExecSpace, const FunctorType init_functor,
+                          const bool update_frozen = false )
     {
         _timer.start();
-        Kokkos::RangePolicy<ExecSpace> policy( 0, local_offset );
+        std::size_t start = frozen_offset;
+        if ( update_frozen )
+            start = 0;
+        Kokkos::RangePolicy<ExecSpace> policy( start, local_offset );
         Kokkos::parallel_for(
             "CabanaPD::Particles::update_particles", policy,
             KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
