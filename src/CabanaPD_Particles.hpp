@@ -162,8 +162,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
     // Constructor with existing particle data.
     template <class ExecSpace, class PositionType, class VolumeType>
-    Particles( const ExecSpace& exec_space, PositionType x, VolumeType vol,
-               std::array<double, dim> low_corner,
+    Particles( const ExecSpace& exec_space, const PositionType& x,
+               const VolumeType& vol, std::array<double, dim> low_corner,
                std::array<double, dim> high_corner,
                const std::array<int, dim> num_cells, const int max_halo_width )
         : halo_width( max_halo_width )
@@ -173,38 +173,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         createDomain( low_corner, high_corner, num_cells );
 
         _init_timer.start();
-        resize( vol.size(), 0 );
-        auto p_x = sliceReferencePosition();
-        auto p_vol = sliceVolume();
-        auto v = sliceVelocity();
-        auto f = sliceForce();
-        auto type = sliceType();
-        auto rho = sliceDensity();
-        auto u = sliceDisplacement();
-        auto nofail = sliceNoFail();
-
-        static_assert(
-            Cabana::is_accessible_from<
-                memory_space, typename PositionType::execution_space>::value );
-
-        Kokkos::parallel_for(
-            "copy_to_particles", Kokkos::RangePolicy( exec_space, 0, n_local ),
-            KOKKOS_LAMBDA( const int pid ) {
-                // Set the particle position and volume.
-                // Set everything else to zero.
-                p_vol( pid ) = vol( pid );
-                for ( int d = 0; d < 3; d++ )
-                {
-                    p_x( pid, d ) = x( pid, d );
-                    u( pid, d ) = 0.0;
-                    v( pid, d ) = 0.0;
-                    f( pid, d ) = 0.0;
-                }
-                type( pid ) = 0;
-                nofail( pid ) = 0;
-                rho( pid ) = 1.0;
-            } );
-
+        implInitCustomParticles( exec_space, x, vol );
         _init_timer.stop();
     }
 
@@ -517,6 +486,44 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     friend class Comm<self_type, PMB, TemperatureDependent>;
 
   protected:
+    // This is necessary to avoid Cuda lambda capture issues in the constructor.
+    template <class ExecSpace, class PositionType, class VolumeType>
+    void implInitCustomParticles( const ExecSpace& exec_space,
+                                  const PositionType& x, const VolumeType& vol )
+    {
+        resize( vol.size(), 0 );
+        auto p_x = sliceReferencePosition();
+        auto p_vol = sliceVolume();
+        auto v = sliceVelocity();
+        auto f = sliceForce();
+        auto type = sliceType();
+        auto rho = sliceDensity();
+        auto u = sliceDisplacement();
+        auto nofail = sliceNoFail();
+
+        static_assert(
+            Cabana::is_accessible_from<
+                memory_space, typename PositionType::execution_space>::value );
+
+        Kokkos::parallel_for(
+            "copy_to_particles", Kokkos::RangePolicy( exec_space, 0, n_local ),
+            KOKKOS_LAMBDA( const int pid ) {
+                // Set the particle position and volume.
+                // Set everything else to zero.
+                p_vol( pid ) = vol( pid );
+                for ( int d = 0; d < 3; d++ )
+                {
+                    p_x( pid, d ) = x( pid, d );
+                    u( pid, d ) = 0.0;
+                    v( pid, d ) = 0.0;
+                    f( pid, d ) = 0.0;
+                }
+                type( pid ) = 0;
+                nofail( pid ) = 0;
+                rho( pid ) = 1.0;
+            } );
+    }
+
     aosoa_u_type _aosoa_u;
     aosoa_y_type _aosoa_y;
     aosoa_vol_type _aosoa_vol;
