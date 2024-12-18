@@ -37,7 +37,7 @@ double calculateKE( const VelType& v, const DensityType& rho,
 void testHertzianContact( const std::string filename )
 {
     // ====================================================
-    //             Use default Kokkos spaces
+    //             Use test Kokkos spaces
     // ====================================================
     using exec_space = TEST_EXECSPACE;
     using memory_space = TEST_MEMSPACE;
@@ -122,7 +122,6 @@ void testHertzianContact( const std::string filename )
     // ====================================================
     //  Simulation run
     // ====================================================
-
     auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
         inputs, particles, contact_model );
     cabana_pd->init();
