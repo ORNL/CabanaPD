@@ -119,7 +119,7 @@ void testHertzianContact( const std::string filename )
 
     // Get final total KE
     double ke_f = calculateKE( v, rho, vo );
-    EXPECT_NEAR( std::sqrt(ke_f / ke_i), e, 1e-3 );
+    EXPECT_NEAR( std::sqrt( ke_f / ke_i ), e, 1e-3 );
 }
 
 TEST( TEST_CATEGORY, test_hertzian_contact )
