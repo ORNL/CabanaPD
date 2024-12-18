@@ -374,8 +374,7 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
     }
 
     template <class ParticleType, class MuView, class ParallelType>
-    double computeStressFull( ParticleType& particles, MuView& mu,
-                              ParallelType& )
+    void computeStressFull( ParticleType& particles, MuView& mu, ParallelType& )
     {
         _stress_timer.start();
 
