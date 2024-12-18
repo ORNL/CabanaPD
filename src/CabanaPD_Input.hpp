@@ -45,12 +45,12 @@ class Inputs
         int m = std::floor( delta / dx );
         inputs["m"]["value"] = m;
 
-        // Set timestep safety factor if it not set by user
+        // Set timestep safety factor if not set by user.
         if ( !inputs.contains( "timestep_safety_factor" ) )
             inputs["timestep_safety_factor"]["value"] = 0.85;
 
         // Set approximate bulk modulus if not set by user
-        // Used in timestep estimation
+        // (used in timestep estimation).
         if ( !inputs.contains( "bulk_modulus" ) )
         {
             if ( !inputs.contains( "elastic_modulus" ) )
@@ -179,17 +179,18 @@ class Inputs
         // Reference: Silling & Askari, Computers & Structures 83(17–18) (2005):
         // 1526-1535.
 
-        // Compute particle volume
+        // Compute particle volume.
         double dx = inputs["dx"]["value"][0];
         double dy = inputs["dx"]["value"][1];
         double dz = inputs["dx"]["value"][2];
         double v_p = dx * dy * dz;
 
-        // Initialize denominator's summation
+        // Initialize denominator's summation.
         double sum = 0;
         double sum_ht = 0;
 
-        // Run over the neighborhood of a point in the bulk of a body
+        // Run over the neighborhood of a point in the bulk of a body (at the
+        // origin).
         int m = inputs["m"]["value"];
         double K = inputs["bulk_modulus"]["value"];
         double delta = inputs["horizon"]["value"];
@@ -198,26 +199,26 @@ class Inputs
 
         for ( int i = -( m + 1 ); i < m + 2; i++ )
         {
-            // x-component of bond
+            // x-component of bond.
             double xi_1 = i * dx;
 
             for ( int j = -( m + 1 ); j < m + 2; j++ )
             {
-                // y-component of bond
+                // y-component of bond.
                 double xi_2 = j * dy;
 
                 for ( int k = -( m + 1 ); k < m + 2; k++ )
                 {
-                    // z-component of bond
+                    // z-component of bond.
                     double xi_3 = k * dz;
 
-                    // Bond length squared
+                    // Bond length squared.
                     double r2 = xi_1 * xi_1 + xi_2 * xi_2 + xi_3 * xi_3;
 
-                    // Check if bond is no longer than delta
+                    // Check if bond is no longer than delta.
                     if ( r2 < delta * delta + 1e-10 )
                     {
-                        // Check is bond is not 0
+                        // Check if bond is not 0
                         if ( r2 > 0 )
                         {
                             double xi = std::sqrt( r2 );
