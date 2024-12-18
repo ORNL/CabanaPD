@@ -53,7 +53,6 @@ class Force<MemorySpace, HertzianModel>
                            const ParticleType& particles, const int n_local,
                            ParallelType& neigh_op_tag )
     {
-        auto delta = _model.delta;
         auto Rc = _model.Rc;
         auto radius = _model.radius;
         auto Es = _model.Es;
