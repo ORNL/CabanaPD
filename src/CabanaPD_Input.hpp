@@ -56,10 +56,6 @@ class Inputs
             if ( !inputs.contains( "elastic_modulus" ) )
                 throw std::runtime_error( "Must input either bulk_modulus or "
                                           "elastic_modulus." );
-            double E = inputs["elastic_modulus"]["value"];
-            double nu = 0.25;
-            double K = E / ( 3 * ( 1 - 2 * nu ) );
-            inputs["bulk_modulus"]["value"] = K;
         }
 
         int num_steps = tf / dt;
@@ -189,10 +185,23 @@ class Inputs
         double sum = 0;
         double sum_ht = 0;
 
+        // Estimate the bulk modulus if needed.
+        double K;
+        if ( inputs.contains( "bulk_modulus" ) )
+        {
+            K = inputs["bulk_modulus"]["value"];
+        }
+        else
+        {
+            double E = inputs["elastic_modulus"]["value"];
+            // This is only exact for bond-based (PMB).
+            double nu = 0.25;
+            K = E / ( 3 * ( 1 - 2 * nu ) );
+        }
+
         // Run over the neighborhood of a point in the bulk of a body (at the
         // origin).
         int m = inputs["m"]["value"];
-        double K = inputs["bulk_modulus"]["value"];
         double delta = inputs["horizon"]["value"];
         // FIXME: this is copied from the forces
         double c = 18.0 * K / ( pi * delta * delta * delta * delta );
