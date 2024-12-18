@@ -487,8 +487,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
     // This is necessary to avoid Cuda lambda capture issues in the constructor.
     template <class ExecSpace, class PositionType, class VolumeType>
-    void implInitCustomParticles( const ExecSpace& exec_space,
-                                  const PositionType& x, const VolumeType& vol )
+    void implInitCustomParticles( const ExecSpace, const PositionType& x,
+                                  const VolumeType& vol )
     {
         resize( vol.size(), 0 );
         auto p_x = sliceReferencePosition();
@@ -505,7 +505,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 memory_space, typename PositionType::execution_space>::value );
 
         Kokkos::parallel_for(
-            "copy_to_particles", Kokkos::RangePolicy( exec_space, 0, n_local ),
+            "copy_to_particles", Kokkos::RangePolicy<ExecSpace>( 0, n_local ),
             KOKKOS_LAMBDA( const int pid ) {
                 // Set the particle position and volume.
                 // Set everything else to zero.
