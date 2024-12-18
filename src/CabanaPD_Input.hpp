@@ -251,7 +251,9 @@ class Inputs
         }
 
         double dt = inputs["timestep"]["value"];
-        compareCriticalTimeStep( "mechanics", dt, sum );
+        double rho = inputs["density"]["value"];
+        double dt_crit = std::sqrt( 2.0 * rho / sum );
+        compareCriticalTimeStep( "mechanics", dt, dt_crit );
 
         // Heat transfer timestep.
         if constexpr ( is_heat_transfer<
@@ -259,7 +261,10 @@ class Inputs
         {
             double dt_ht = inputs["thermal_subcycle_steps"]["value"];
             dt_ht *= dt;
-            compareCriticalTimeStep( "heat_transfer", dt_ht, sum_ht );
+
+            double cp = inputs["specific_heat_capacity"]["value"];
+            double dt_ht_crit = rho * cp / sum_ht;
+            compareCriticalTimeStep( "heat_transfer", dt_ht, dt_ht_crit );
         }
     }
 
@@ -286,20 +291,19 @@ class Inputs
     bool contains( std::string label ) { return inputs.contains( label ); }
 
   protected:
-    void compareCriticalTimeStep( std::string name, double dt, double sum )
+    void compareCriticalTimeStep( std::string name, double dt, double dt_crit )
     {
         double safety_factor = inputs["timestep_safety_factor"]["value"];
-        double rho = inputs["density"]["value"];
-        double dt_crit = safety_factor * std::sqrt( 2 * rho / sum );
+        double dt_crit_safety = safety_factor * dt_crit;
 
-        if ( dt > dt_crit )
+        if ( dt > dt_crit_safety )
         {
             log( std::cout, "WARNING: timestep (", dt,
                  ") is larger than estimated stable timestep for ", name, " (",
                  dt_crit, "), using safety factor of ", safety_factor, ".\n" );
         }
         // Store in inputs
-        inputs["critical_timestep_" + name]["value"] = dt_crit;
+        inputs["critical_timestep_" + name]["value"] = dt_crit_safety;
     }
 
     nlohmann::json inputs;
