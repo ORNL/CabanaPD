@@ -166,13 +166,14 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     Particles( const ExecSpace& exec_space, std::array<double, dim> low_corner,
                std::array<double, dim> high_corner,
                const std::array<int, dim> num_cells, const int max_halo_width,
+               const std::size_t num_previous = 0,
                const bool create_frozen = false )
         : halo_width( max_halo_width )
         , _plist_x( "positions" )
         , _plist_f( "forces" )
     {
         createDomain( low_corner, high_corner, num_cells );
-        createParticles( exec_space, create_frozen );
+        createParticles( exec_space, num_previous, create_frozen );
     }
 
     // Constructor which initializes particles on regular grid with
@@ -181,13 +182,14 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     Particles( const ExecSpace& exec_space, std::array<double, dim> low_corner,
                std::array<double, dim> high_corner,
                const std::array<int, dim> num_cells, const int max_halo_width,
-               UserFunctor user_create, const bool create_frozen = false )
+               UserFunctor user_create, const std::size_t num_previous = 0,
+               const bool create_frozen = false )
         : halo_width( max_halo_width )
         , _plist_x( "positions" )
         , _plist_f( "forces" )
     {
         createDomain( low_corner, high_corner, num_cells );
-        createParticles( exec_space, user_create, create_frozen );
+        createParticles( exec_space, user_create, num_previous, create_frozen );
     }
 
     // Constructor with existing particle data.
@@ -250,17 +252,19 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
     template <class ExecSpace>
     void createParticles( const ExecSpace& exec_space,
+                          const std::size_t num_previous = 0,
                           const bool create_frozen = false )
     {
         auto empty = KOKKOS_LAMBDA( const int, const double[dim] )
         {
             return true;
         };
-        createParticles( exec_space, empty, create_frozen );
+        createParticles( exec_space, empty, num_previous, create_frozen );
     }
 
     template <class ExecSpace, class UserFunctor>
     void createParticles( const ExecSpace& exec_space, UserFunctor user_create,
+                          const std::size_t num_previous = 0,
                           const bool create_frozen = false )
     {
         _init_timer.start();
@@ -317,7 +321,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         };
         local_offset = Cabana::Grid::createParticles(
             Cabana::InitUniform{}, exec_space, create_functor, _plist_x, 1,
-            *local_grid );
+            *local_grid, num_previous );
         resize( local_offset, 0 );
         size = _plist_x.size();
 
