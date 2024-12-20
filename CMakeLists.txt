@@ -17,7 +17,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 ##---------------------------------------------------------------------------##
 # Set up main options (inherit from Kokkos and Cabana CMake)
 ##---------------------------------------------------------------------------##
-find_package(Cabana REQUIRED)
+find_package(Cabana REQUIRED 0.7.0)
 
 macro(CabanaPD_check_optional)
   cmake_parse_arguments(CABANA "" "OPTION" "" ${ARGN})
