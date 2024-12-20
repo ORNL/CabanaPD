@@ -568,7 +568,7 @@ class Force<MemorySpace, ForceModel<LinearPMB, Elastic, ModelParams...>>
             // Get the bond distance, displacement, and stretch
             double xi, r, s;
             double rx, ry, rz;
-            getDistanceComponents(x, u, i, j, xi, r, s, rx, ry, rz);
+            getLinearizedDistanceComponents(x, u, i, j, xi, r, s, rx, ry, rz);
 
             model.thermalStretch(s, i, j);
 
