@@ -149,10 +149,10 @@ class Force<MemorySpace, BaseForceModel>
     Force( const bool half_neigh, const double delta,
            const ParticleType& particles, const double tol = 1e-14 )
         : _half_neigh( half_neigh )
-        , _neigh_list( neighbor_list_type( particles.sliceReferencePosition(),
-                                           0, particles.n_local, delta + tol,
-                                           1.0, particles.ghost_mesh_lo,
-                                           particles.ghost_mesh_hi ) )
+        , _neigh_list( neighbor_list_type(
+              particles.sliceReferencePosition(), particles.frozenOffset(),
+              particles.localOffset(), delta + tol, 1.0,
+              particles.ghost_mesh_lo, particles.ghost_mesh_hi ) )
     {
     }
 
@@ -160,12 +160,13 @@ class Force<MemorySpace, BaseForceModel>
     // force routine).
     template <class PositionType>
     Force( const bool half_neigh, const double delta,
-           const PositionType& positions, const std::size_t num_local,
-           const double mesh_min[3], const double mesh_max[3],
-           const double tol = 1e-14 )
+           const PositionType& positions, const std::size_t frozen_offset,
+           const std::size_t local_offset, const double mesh_min[3],
+           const double mesh_max[3], const double tol = 1e-14 )
         : _half_neigh( half_neigh )
-        , _neigh_list( neighbor_list_type( positions, 0, num_local, delta + tol,
-                                           1.0, mesh_min, mesh_max ) )
+        , _neigh_list( neighbor_list_type( positions, frozen_offset,
+                                           local_offset, delta + tol, 1.0,
+                                           mesh_min, mesh_max ) )
     {
     }
 
@@ -239,7 +240,6 @@ template <class ForceType, class ParticleType, class ParallelType>
 void computeForce( ForceType& force, ParticleType& particles,
                    const ParallelType& neigh_op_tag, const bool reset = true )
 {
-    auto n_local = particles.n_local;
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto f = particles.sliceForce();
@@ -251,14 +251,14 @@ void computeForce( ForceType& force, ParticleType& particles,
 
     // if ( half_neigh )
     // Forces must be atomic for half list
-    // computeForce_half( f_a, x, u, n_local,
+    // computeForce_half( f_a, x, u,
     //                    neigh_op_tag );
 
     // Forces only atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
-        force.computeForceFull( f_a, x, u, particles, n_local, neigh_op_tag );
+        force.computeForceFull( f_a, x, u, particles, neigh_op_tag );
     else
-        force.computeForceFull( f, x, u, particles, n_local, neigh_op_tag );
+        force.computeForceFull( f, x, u, particles, neigh_op_tag );
     Kokkos::fence();
 }
 
@@ -269,7 +269,6 @@ double computeEnergy( ForceType& force, ParticleType& particles,
     double energy = 0.0;
     if constexpr ( is_energy_output<typename ParticleType::output_type>::value )
     {
-        auto n_local = particles.n_local;
         auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
         auto f = particles.sliceForce();
@@ -281,10 +280,9 @@ double computeEnergy( ForceType& force, ParticleType& particles,
 
         // if ( _half_neigh )
         //    energy = computeEnergy_half( force, x, u,
-        //                                  n_local, neigh_op_tag );
+        //                                   neigh_op_tag );
         // else
-        energy = force.computeEnergyFull( W, x, u, particles, n_local,
-                                          neigh_op_tag );
+        energy = force.computeEnergyFull( W, x, u, particles, neigh_op_tag );
         Kokkos::fence();
     }
     return energy;
@@ -296,7 +294,6 @@ template <class ForceType, class ParticleType, class NeighborView,
 void computeForce( ForceType& force, ParticleType& particles, NeighborView& mu,
                    const ParallelType& neigh_op_tag, const bool reset = true )
 {
-    auto n_local = particles.n_local;
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto f = particles.sliceForce();
@@ -308,15 +305,14 @@ void computeForce( ForceType& force, ParticleType& particles, NeighborView& mu,
 
     // if ( half_neigh )
     // Forces must be atomic for half list
-    // computeForce_half( f_a, x, u, n_local,
+    // computeForce_half( f_a, x, u,
     //                    neigh_op_tag );
 
     // Forces only atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
-        force.computeForceFull( f_a, x, u, particles, mu, n_local,
-                                neigh_op_tag );
+        force.computeForceFull( f_a, x, u, particles, mu, neigh_op_tag );
     else
-        force.computeForceFull( f, x, u, particles, mu, n_local, neigh_op_tag );
+        force.computeForceFull( f, x, u, particles, mu, neigh_op_tag );
     Kokkos::fence();
 }
 
@@ -328,7 +324,6 @@ double computeEnergy( ForceType& force, ParticleType& particles,
     double energy = 0.0;
     if constexpr ( is_energy_output<typename ParticleType::output_type>::value )
     {
-        auto n_local = particles.n_local;
         auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
         auto f = particles.sliceForce();
@@ -340,9 +335,9 @@ double computeEnergy( ForceType& force, ParticleType& particles,
 
         // if ( _half_neigh )
         //    energy = computeEnergy_half( force, x, u,
-        //                                  n_local, neigh_op_tag );
+        //                                   neigh_op_tag );
         // else
-        energy = force.computeEnergyFull( W, x, u, phi, particles, mu, n_local,
+        energy = force.computeEnergyFull( W, x, u, phi, particles, mu,
                                           neigh_op_tag );
         Kokkos::fence();
     }

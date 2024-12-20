@@ -639,7 +639,7 @@ double computeEnergyAndForce( DamageTag, ForceType force,
 {
     Kokkos::View<int**, TEST_MEMSPACE> mu(
         Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
-        particles.n_local, max_neighbors );
+        particles.numLocal(), max_neighbors );
     Kokkos::deep_copy( mu, 1 );
     computeForce( force, particles, mu, Cabana::SerialOpTag() );
     double Phi = computeEnergy( force, particles, mu, Cabana::SerialOpTag() );
@@ -658,7 +658,7 @@ void initializeForce( CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>,
                       ForceType& force, ParticleType& particles )
 {
     auto max_neighbors = force.getMaxLocalNeighbors();
-    Kokkos::View<int**, TEST_MEMSPACE> mu( "broken_bonds", particles.n_local,
+    Kokkos::View<int**, TEST_MEMSPACE> mu( "broken_bonds", particles.numLocal(),
                                            max_neighbors );
     Kokkos::deep_copy( mu, 1 );
     force.computeWeightedVolume( particles, mu );
