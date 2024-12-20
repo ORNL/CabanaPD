@@ -59,31 +59,33 @@ void centralCrackExample( const std::string filename )
     double crack_length = 0.01;                     // Crack length is 10 mm
 
     // Assume the plate is symmetric, ranging from -0.025 to +0.025
-    double plate_center_x = 0.0;  // Center is at 0 for symmetric coordinates
-    double plate_center_y = 0.0;  // Center is at 0 for symmetric coordinates
+    double plate_center_x = 0.0; // Center is at 0 for symmetric coordinates
+    double plate_center_y = 0.0; // Center is at 0 for symmetric coordinates
 
     // Define the crack start and end points for a horizontal crack
-    Kokkos::Array<double, 3> crack_start = { 
-        plate_center_x - (crack_length / 2.0), // Center the crack along the x-axis
-        plate_center_y,                        // Center the crack along the y-axis
-        0.0                                   // Assume the crack lies in the z=0 plane
+    Kokkos::Array<double, 3> crack_start = {
+        plate_center_x -
+            ( crack_length / 2.0 ), // Center the crack along the x-axis
+        plate_center_y,             // Center the crack along the y-axis
+        0.0                         // Assume the crack lies in the z=0 plane
     };
-    Kokkos::Array<double, 3> crack_end = { 
-        plate_center_x + (crack_length / 2.0), // Center the crack along the x-axis
-        plate_center_y,                        // Center the crack along the y-axis
-        0.0                                   // Assume the crack lies in the z=0 plane
+    Kokkos::Array<double, 3> crack_end = {
+        plate_center_x +
+            ( crack_length / 2.0 ), // Center the crack along the x-axis
+        plate_center_y,             // Center the crack along the y-axis
+        0.0                         // Assume the crack lies in the z=0 plane
     };
 
     // Compute the vector defining the crack
-    Kokkos::Array<double, 3> crack_vector = { 
-        crack_end[0] - crack_start[0], 
-        crack_end[1] - crack_start[1], 
-        crack_end[2] - crack_start[2] 
-    };
+    Kokkos::Array<double, 3> crack_vector = { crack_end[0] - crack_start[0],
+                                              crack_end[1] - crack_start[1],
+                                              crack_end[2] - crack_start[2] };
 
     // Define the crack using Prenotch
-    Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { crack_start, crack_end };
-    CabanaPD::Prenotch<2> prenotch( crack_vector, { 0.0, 0.0, thickness }, notch_positions );
+    Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { crack_start,
+                                                                   crack_end };
+    CabanaPD::Prenotch<2> prenotch( crack_vector, { 0.0, 0.0, thickness },
+                                    notch_positions );
 
     // ====================================================
     //                    Force model
@@ -148,7 +150,8 @@ void centralCrackExample( const std::string filename )
     auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
     {
         auto ypos = x( pid, 1 );
-        auto sign = (ypos > (low_corner[1] + high_corner[1]) / 2.0) ? 1.0 : -1.0;
+        auto sign =
+            ( ypos > ( low_corner[1] + high_corner[1] ) / 2.0 ) ? 1.0 : -1.0;
         f( pid, 1 ) += b0 * sign;
     };
     auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, planes,
