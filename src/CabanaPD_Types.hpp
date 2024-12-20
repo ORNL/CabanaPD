@@ -88,6 +88,9 @@ struct BaseOutput
 struct EnergyOutput
 {
 };
+struct EnergyStressOutput
+{
+};
 
 template <class>
 struct is_energy_output : public std::false_type
@@ -95,6 +98,19 @@ struct is_energy_output : public std::false_type
 };
 template <>
 struct is_energy_output<EnergyOutput> : public std::true_type
+{
+};
+template <>
+struct is_energy_output<EnergyStressOutput> : public std::true_type
+{
+};
+
+template <class>
+struct is_stress_output : public std::false_type
+{
+};
+template <>
+struct is_stress_output<EnergyStressOutput> : public std::true_type
 {
 };
 
