@@ -329,11 +329,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         if ( create_frozen )
             frozen_offset = size;
 
-        // Not using Allreduce because global count is only used for printing.
-        auto local_offset_mpi =
-            static_cast<unsigned long long int>( local_offset );
-        MPI_Reduce( &local_offset_mpi, &num_global, 1, MPI_UNSIGNED_LONG_LONG,
-                    MPI_SUM, 0, MPI_COMM_WORLD );
+        updateGlobal();
         _init_timer.stop();
     }
 
@@ -382,6 +378,17 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 nofail( pid ) = 0;
                 rho( pid ) = 1.0;
             } );
+
+        updateGlobal();
+    }
+
+    void updateGlobal()
+    {
+        // Not using Allreduce because global count is only used for printing.
+        auto local_offset_mpi =
+            static_cast<unsigned long long int>( local_offset );
+        MPI_Reduce( &local_offset_mpi, &num_global, 1, MPI_UNSIGNED_LONG_LONG,
+                    MPI_SUM, 0, MPI_COMM_WORLD );
     }
 
     template <class ExecSpace, class FunctorType>
