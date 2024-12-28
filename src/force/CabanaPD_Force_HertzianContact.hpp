@@ -12,7 +12,7 @@
 #ifndef CONTACT_HERTZIAN_H
 #define CONTACT_HERTZIAN_H
 
-#include <cmath>
+#include <Kokkos_Core.hpp>
 
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_Input.hpp>
@@ -62,8 +62,8 @@ class Force<MemorySpace, HertzianModel>
         const int n_frozen = particles.frozenOffset();
         const int n_local = particles.localOffset();
 
-        const double coeff_h_n = 4.0 / 3.0 * Es * std::sqrt( Rs );
-        const double coeff_h_d = -2.0 * sqrt( 5.0 / 6.0 ) * beta;
+        const double coeff_h_n = 4.0 / 3.0 * Es * Kokkos::sqrt( Rs );
+        const double coeff_h_d = -2.0 * Kokkos::sqrt( 5.0 / 6.0 ) * beta;
 
         const auto vol = particles.sliceVolume();
         const auto rho = particles.sliceDensity();
@@ -76,11 +76,6 @@ class Force<MemorySpace, HertzianModel>
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {
-            using Kokkos::abs;
-            using Kokkos::min;
-            using Kokkos::pow;
-            using Kokkos::sqrt;
-
             double fcx_i = 0.0;
             double fcy_i = 0.0;
             double fcz_i = 0.0;
@@ -97,9 +92,10 @@ class Force<MemorySpace, HertzianModel>
             double Sn = 0.0;
             if ( delta_n < 0.0 )
             {
-                coeff =
-                    min( 0.0, -coeff_h_n * pow( abs( delta_n ), 3.0 / 2.0 ) );
-                Sn = 2.0 * Es * sqrt( Rs * abs( delta_n ) );
+                coeff = Kokkos::min(
+                    0.0, -coeff_h_n *
+                             Kokkos::pow( Kokkos::abs( delta_n ), 3.0 / 2.0 ) );
+                Sn = 2.0 * Es * Kokkos::sqrt( Rs * Kokkos::abs( delta_n ) );
             }
 
             coeff /= vol( i );
@@ -118,7 +114,7 @@ class Force<MemorySpace, HertzianModel>
                                                  vy, vz, vn );
 
             double ms = ( rho( i ) * vol( i ) ) / 2.0;
-            double fnd = coeff_h_d * sqrt( Sn * ms ) * vn / vol( i );
+            double fnd = coeff_h_d * Kokkos::sqrt( Sn * ms ) * vn / vol( i );
 
             fcx_i = fnd * rx / r;
             fcy_i = fnd * ry / r;

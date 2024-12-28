@@ -12,6 +12,8 @@
 #ifndef FORCE_MODELS_PMB_H
 #define FORCE_MODELS_PMB_H
 
+#include <Kokkos_Core.hpp>
+
 #include <CabanaPD_Constants.hpp>
 #include <CabanaPD_ForceModels.hpp>
 #include <CabanaPD_Types.hpp>
@@ -88,7 +90,7 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent>
     {
         base_type::set_param( _delta, _K );
         G0 = _G0;
-        s0 = sqrt( 5.0 * G0 / 9.0 / K / delta );
+        s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / K / delta );
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 

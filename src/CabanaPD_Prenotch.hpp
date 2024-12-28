@@ -20,35 +20,6 @@
 
 namespace CabanaPD
 {
-KOKKOS_INLINE_FUNCTION
-double abs( const double a )
-{
-#if KOKKOS_VERSION >= 30700
-    return Kokkos::abs( a );
-#else
-    return Kokkos::Experimental::abs( a );
-#endif
-}
-
-KOKKOS_INLINE_FUNCTION
-double fmin( const double a, const double b )
-{
-#if KOKKOS_VERSION >= 30700
-    return Kokkos::fmin( a, b );
-#else
-    return Kokkos::Experimental::fmin( a, b );
-#endif
-}
-
-KOKKOS_INLINE_FUNCTION
-double fmax( const double a, const double b )
-{
-#if KOKKOS_VERSION >= 30700
-    return Kokkos::fmax( a, b );
-#else
-    return Kokkos::Experimental::fmax( a, b );
-#endif
-}
 
 KOKKOS_INLINE_FUNCTION
 double dot( Kokkos::Array<double, 3> a, Kokkos::Array<double, 3> b )
@@ -60,7 +31,10 @@ double dot( Kokkos::Array<double, 3> a, Kokkos::Array<double, 3> b )
 }
 
 KOKKOS_INLINE_FUNCTION
-double norm( Kokkos::Array<double, 3> a ) { return sqrt( dot( a, a ) ); }
+double norm( Kokkos::Array<double, 3> a )
+{
+    return Kokkos::sqrt( dot( a, a ) );
+}
 
 KOKKOS_INLINE_FUNCTION
 Kokkos::Array<double, 3> cross( Kokkos::Array<double, 3> a,
@@ -108,9 +82,9 @@ int linePlaneIntersection( const Kokkos::Array<double, 3> p0,
                            const Kokkos::Array<double, 3> l,
                            const double tol = 1e-10 )
 {
-    if ( abs( dot( l, n ) ) < tol )
+    if ( Kokkos::abs( dot( l, n ) ) < tol )
     {
-        if ( abs( dot( diff( p0, l0 ), n ) ) < tol )
+        if ( Kokkos::abs( dot( diff( p0, l0 ), n ) ) < tol )
             return 1;
         else
             return 2;
@@ -131,7 +105,7 @@ int bondPrenotchIntersection( const Kokkos::Array<double, 3> v1,
     double norm_cross_v1_v2 = norm( cross_v1_v2 );
 
     // Check if v1 and v2 are parallel.
-    assert( abs( norm( cross( v1, v2 ) ) ) > tol );
+    assert( Kokkos::abs( norm( cross( v1, v2 ) ) ) > tol );
 
     // Define plane normal.
     auto n = scale( cross_v1_v2, 1.0 / norm_cross_v1_v2 );
@@ -159,8 +133,10 @@ int bondPrenotchIntersection( const Kokkos::Array<double, 3> v1,
         double lj2 = -dot( cross( diff( x_j, p0 ), v1 ), cross_v1_v2 ) /
                      norm2_cross_v1_v2;
 
-        if ( !( fmin( li1, lj1 ) > 1 + tol || fmax( li1, lj1 ) < -tol ||
-                fmin( li2, lj2 ) > 1 + tol || fmax( li2, lj2 ) < -tol ) )
+        if ( !( Kokkos::fmin( li1, lj1 ) > 1 + tol ||
+                Kokkos::fmax( li1, lj1 ) < -tol ||
+                Kokkos::fmin( li2, lj2 ) > 1 + tol ||
+                Kokkos::fmax( li2, lj2 ) < -tol ) )
             keep_bond = 0;
     }
     // Case II: no intersection.
@@ -168,7 +144,7 @@ int bondPrenotchIntersection( const Kokkos::Array<double, 3> v1,
     // Case III: single point intersection.
     else if ( case_flag == 3 )
     {
-        assert( abs( dot( l, n ) ) > tol );
+        assert( Kokkos::abs( dot( l, n ) ) > tol );
 
         // Check if intersection point belongs to the bond.
         auto d = dot( diff( p0, l0 ), n ) / dot( l, n );
@@ -185,7 +161,8 @@ int bondPrenotchIntersection( const Kokkos::Array<double, 3> v1,
             double l2 = -dot( cross( diff( p, p0 ), v1 ), cross_v1_v2 ) /
                         norm2_cross_v1_v2;
 
-            if ( -tol < fmin( l1, l2 ) && fmax( l1, l2 ) < 1 + tol )
+            if ( -tol < Kokkos::fmin( l1, l2 ) &&
+                 Kokkos::fmax( l1, l2 ) < 1 + tol )
                 // Intersection.
                 keep_bond = 0;
         }
