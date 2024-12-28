@@ -130,11 +130,66 @@ void testCreateFrozenParticles()
                             particles.frozenOffset(), particles.localOffset() );
 }
 
+void testCreateCustomParticles()
+{
+    using exec_space = TEST_EXECSPACE;
+    using memory_space = TEST_MEMSPACE;
+
+    std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
+    std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
+    std::array<int, 3> num_cells = { 10, 10, 10 };
+
+    std::size_t expected_local = num_cells[0] * num_cells[1] * num_cells[2] / 2;
+    Kokkos::View<double* [3], memory_space> position( "custom_position",
+                                                      expected_local );
+    Kokkos::View<double*, memory_space> volume( "custom_volume",
+                                                expected_local );
+
+    // Create every bottom half point in the same location.
+    Kokkos::RangePolicy<TEST_EXECSPACE> policy( 0, expected_local );
+    Kokkos::parallel_for(
+        policy, KOKKOS_LAMBDA( const int p ) {
+            for ( int d = 0; d < 3; ++d )
+                position( p, d ) = -0.5;
+            volume( p ) = 10.2;
+        } );
+
+    CabanaPD::Particles<TEST_MEMSPACE, CabanaPD::PMB,
+                        CabanaPD::TemperatureIndependent>
+        particles( exec_space{}, position, volume, box_min, box_max, num_cells,
+                   0, 0, true );
+
+    // Overwrite the previous particles and put them on top instead.
+    Kokkos::parallel_for(
+        policy, KOKKOS_LAMBDA( const int p ) {
+            for ( int d = 0; d < 3; ++d )
+                position( p, d ) = 0.5;
+            volume( p ) = 3.1;
+        } );
+    // Create more, starting from the current number of frozen points.
+    particles.createParticles( exec_space{}, position, volume,
+                               particles.frozenOffset() );
+
+    // Check expected values for each block of particles.
+    std::size_t expected_frozen = expected_local;
+    checkNumParticles( particles, expected_frozen, expected_local );
+
+    // Check frozen and local separately.
+    box_max[2] = 0.0;
+    checkParticlePositions( particles, box_min, box_max, 0,
+                            particles.frozenOffset() );
+    box_min[2] = 0.0;
+    box_max[2] = 1.0;
+    checkParticlePositions( particles, box_min, box_max,
+                            particles.frozenOffset(), particles.localOffset() );
+}
+
 //---------------------------------------------------------------------------//
 // TESTS
 //---------------------------------------------------------------------------//
 TEST( TEST_CATEGORY, test_create_local ) { testCreateParticles(); }
 TEST( TEST_CATEGORY, test_create_frozen ) { testCreateFrozenParticles(); }
+TEST( TEST_CATEGORY, test_create_custom ) { testCreateCustomParticles(); }
 
 //---------------------------------------------------------------------------//
 

@@ -197,7 +197,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     Particles( const ExecSpace& exec_space, const PositionType& x,
                const VolumeType& vol, std::array<double, dim> low_corner,
                std::array<double, dim> high_corner,
-               const std::array<int, dim> num_cells, const int max_halo_width )
+               const std::array<int, dim> num_cells, const int max_halo_width,
+               const std::size_t num_previous = 0,
+               const bool create_frozen = false )
         : halo_width( max_halo_width )
         , _plist_x( "positions" )
         , _plist_f( "forces" )
@@ -205,7 +207,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         createDomain( low_corner, high_corner, num_cells );
 
         _init_timer.start();
-        createParticles( exec_space, x, vol );
+        createParticles( exec_space, x, vol, num_previous, create_frozen );
         _init_timer.stop();
     }
 
@@ -337,6 +339,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     template <class ExecSpace, class PositionType, class VolumeType>
     void createParticles( const ExecSpace, const PositionType& x,
                           const VolumeType& vol,
+                          const std::size_t num_previous = 0,
                           const bool create_frozen = false )
     {
         // Ensure valid previous particles.
@@ -362,14 +365,15 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
         Kokkos::parallel_for(
             "copy_to_particles",
-            Kokkos::RangePolicy<ExecSpace>( 0, localOffset() ),
+            Kokkos::RangePolicy<ExecSpace>( num_previous, localOffset() ),
             KOKKOS_LAMBDA( const int pid ) {
+                auto pid_offset = pid - num_previous;
                 // Set the particle position and volume.
                 // Set everything else to zero.
-                p_vol( pid ) = vol( pid );
+                p_vol( pid ) = vol( pid_offset );
                 for ( int d = 0; d < 3; d++ )
                 {
-                    p_x( pid, d ) = x( pid, d );
+                    p_x( pid, d ) = x( pid_offset, d );
                     u( pid, d ) = 0.0;
                     v( pid, d ) = 0.0;
                     f( pid, d ) = 0.0;
