@@ -60,7 +60,7 @@
 #ifndef FORCE_H
 #define FORCE_H
 
-#include <cmath>
+#include <Kokkos_Core.hpp>
 
 #include <CabanaPD_ForceModels.hpp>
 #include <CabanaPD_Particles.hpp>
@@ -86,8 +86,8 @@ getDistanceComponents( const PosType& x, const PosType& u, const int i,
     rx = xi_x + eta_u;
     ry = xi_y + eta_v;
     rz = xi_z + eta_w;
-    r = sqrt( rx * rx + ry * ry + rz * rz );
-    xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+    r = Kokkos::sqrt( rx * rx + ry * ry + rz * rz );
+    xi = Kokkos::sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
     s = ( r - xi ) / xi;
 }
 
@@ -112,7 +112,7 @@ KOKKOS_INLINE_FUNCTION void getLinearizedDistanceComponents(
     const double eta_v = u( j, 1 ) - u( i, 1 );
     xi_z = x( j, 2 ) - x( i, 2 );
     const double eta_w = u( j, 2 ) - u( i, 2 );
-    xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+    xi = Kokkos::sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
     s = ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
 }
 

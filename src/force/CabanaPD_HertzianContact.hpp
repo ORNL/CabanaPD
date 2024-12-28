@@ -12,7 +12,7 @@
 #ifndef CONTACTMODEL_HERTZIAN_H
 #define CONTACTMODEL_HERTZIAN_H
 
-#include <cmath>
+#include <Kokkos_Core.hpp>
 
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_Input.hpp>
@@ -46,17 +46,14 @@ struct HertzianModel : public ContactModel
     void set_param( const double _radius, const double _nu, const double _E,
                     const double _e )
     {
-        using Kokkos::log;
-        using Kokkos::pow;
-        using Kokkos::sqrt;
-
         nu = _nu;
         radius = _radius;
         Rs = 0.5 * radius;
-        Es = _E / ( 2.0 * pow( 1.0 - nu, 2.0 ) );
+        Es = _E / ( 2.0 * Kokkos::pow( 1.0 - nu, 2.0 ) );
         e = _e;
-        double ln_e = log( e );
-        beta = -ln_e / sqrt( pow( ln_e, 2.0 ) + pow( pi, 2.0 ) );
+        double ln_e = Kokkos::log( e );
+        beta = -ln_e / Kokkos::sqrt( Kokkos::pow( ln_e, 2.0 ) +
+                                     Kokkos::pow( pi, 2.0 ) );
     }
 };
 
