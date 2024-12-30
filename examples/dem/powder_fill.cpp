@@ -59,7 +59,7 @@ void powderSettlingExample( const std::string filename )
     //                    Force model
     // ====================================================
     using model_type = CabanaPD::HertzianModel;
-    model_type contact_model( delta, radius, nu, E, e );
+    model_type contact_model( delta / m * 0.9, radius, nu, E, e );
 
     // ====================================================
     //            Custom particle initialization
@@ -89,7 +89,7 @@ void powderSettlingExample( const std::string filename )
     // Container particles should be frozen, never updated.
     auto particles = CabanaPD::createParticles<memory_space, model_type>(
         exec_space(), low_corner, high_corner, num_cells, halo_width,
-        create_container, CabanaPD::BaseOutput{}, 0, true );
+        CabanaPD::BaseOutput{}, create_container, 0, true );
     std::cout << particles->numFrozen() << " " << particles->numLocal()
               << std::endl;
 
@@ -100,21 +100,22 @@ void powderSettlingExample( const std::string filename )
         double rsq = x[0] * x[0] + x[1] * x[1];
 
         // Only create particles in between inner and outer cylinder.
-        if ( x[2] > low_corner[2] + Wall_th + dx &&
-             rsq > ( Rin + dx ) * ( Rin + dx ) &&
-             rsq < ( Rout - Wall_th - dx ) * ( Rout - Wall_th - dx ) )
+        if ( x[2] > low_corner[2] + Wall_th && rsq > ( Rin ) * ( Rin ) &&
+             rsq < ( Rout - Wall_th ) * ( Rout - Wall_th ) )
             return true;
 
         return false;
     };
     particles->createParticles( exec_space(), Cabana::InitRandom{},
                                 create_powder, particles->numFrozen() );
+    std::cout << particles->numFrozen() << " " << particles->numLocal()
+              << std::endl;
 
+    // Set density/volumes.
     auto rho = particles->sliceDensity();
     auto vol = particles->sliceVolume();
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
-        // Density
         rho( pid ) = rho0;
         vol( pid ) = vol0;
     };
@@ -159,10 +160,21 @@ void powderSettlingExample( const std::string filename )
     std::cout << particles->numFrozen() << " " << particles->numLocal()
               << std::endl;
     // Need to rebuild ghosts..
+
+    // ====================================================
+    //                   Boundary condition
+    // ====================================================
+    f = cabana_pd->particles->sliceForce();
+    auto body_functor = KOKKOS_LAMBDA( const int pid, const double )
+    {
+        f( pid, 2 ) -= 9.8 * rho( pid ); // * vol( pid );
+    };
+    auto gravity = CabanaPD::createBodyTerm( body_functor, true );
+
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->run();
+    cabana_pd->run( gravity );
 }
 
 // Initialize MPI+Kokkos.

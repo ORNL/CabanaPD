@@ -1139,21 +1139,6 @@ auto createParticles( const ExecSpace& exec_space,
         user, num_previous, create_frozen );
 }
 
-template <typename MemorySpace, typename ModelType, typename ExecSpace,
-          class UserFunctor, std::size_t Dim>
-auto createParticles( const ExecSpace& exec_space,
-                      std::array<double, Dim> low_corner,
-                      std::array<double, Dim> high_corner,
-                      const std::array<int, Dim> num_cells,
-                      const int max_halo_width, UserFunctor user,
-                      const std::size_t num_previous = 0,
-                      const bool create_frozen = false )
-{
-    return createParticles<MemorySpace, ModelType, ExecSpace, UserFunctor, Dim>(
-        exec_space, low_corner, high_corner, num_cells, max_halo_width, user,
-        EnergyOutput{}, num_previous, create_frozen );
-}
-
 template <typename MemorySpace, typename ModelType, typename ThermalType,
           typename ExecSpace, std::size_t Dim>
 auto createParticles(
@@ -1181,6 +1166,21 @@ auto createParticles( const ExecSpace& exec_space,
     return std::make_shared<
         CabanaPD::Particles<MemorySpace, typename ModelType::base_model,
                             typename ModelType::thermal_type, EnergyOutput>>(
+        exec_space, low_corner, high_corner, num_cells, max_halo_width,
+        user_create, num_previous, create_frozen );
+}
+
+template <typename MemorySpace, typename ModelType, typename ExecSpace,
+          typename UserFunctor, std::size_t Dim, typename OutputType>
+auto createParticles(
+    const ExecSpace& exec_space, std::array<double, Dim> low_corner,
+    std::array<double, Dim> high_corner, const std::array<int, Dim> num_cells,
+    const int max_halo_width, OutputType, UserFunctor user_create,
+    const std::size_t num_previous = 0, const bool create_frozen = false )
+{
+    return std::make_shared<
+        CabanaPD::Particles<MemorySpace, typename ModelType::base_model,
+                            typename ModelType::thermal_type, OutputType>>(
         exec_space, low_corner, high_corner, num_cells, max_halo_width,
         user_create, num_previous, create_frozen );
 }
