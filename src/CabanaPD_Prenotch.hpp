@@ -222,7 +222,8 @@ struct Prenotch
         _timer.start();
 
         auto x = particles.sliceReferencePosition();
-        Kokkos::RangePolicy<ExecSpace> policy( 0, particles.n_local );
+        // TODO: decide whether to disallow prenotches in frozen particles.
+        Kokkos::RangePolicy<ExecSpace> policy( 0, particles.localOffset() );
 
         auto v1 = _v1;
         auto v2 = _v2;

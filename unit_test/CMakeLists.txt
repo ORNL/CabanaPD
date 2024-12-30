@@ -53,6 +53,6 @@ macro(CabanaPD_add_tests)
   endforeach()
 endmacro()
 
-CabanaPD_add_tests(NAMES Force Integrator Hertz)
+CabanaPD_add_tests(NAMES Particles Force Integrator Hertz)
 
 CabanaPD_add_tests(MPI NAMES Comm)

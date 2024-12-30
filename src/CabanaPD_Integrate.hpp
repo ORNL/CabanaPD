@@ -106,7 +106,8 @@ class Integrator
             u( i, 1 ) += dt * v( i, 1 );
             u( i, 2 ) += dt * v( i, 2 );
         };
-        Kokkos::RangePolicy<exec_space> policy( 0, v.size() );
+        Kokkos::RangePolicy<exec_space> policy( p.frozenOffset(),
+                                                p.localOffset() );
         Kokkos::parallel_for( "CabanaPD::Integrator::Initial", policy,
                               init_func );
 
@@ -130,7 +131,8 @@ class Integrator
             v( i, 1 ) += half_dt_m * f( i, 1 );
             v( i, 2 ) += half_dt_m * f( i, 2 );
         };
-        Kokkos::RangePolicy<exec_space> policy( 0, v.size() );
+        Kokkos::RangePolicy<exec_space> policy( p.frozenOffset(),
+                                                p.localOffset() );
         Kokkos::parallel_for( "CabanaPD::Integrator::Final", policy,
                               final_func );
 

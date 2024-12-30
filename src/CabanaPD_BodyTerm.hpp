@@ -26,12 +26,14 @@ struct BodyTerm
 {
     UserFunctor _user_functor;
     bool _force_update;
+    bool _update_frozen;
 
     Timer _timer;
 
-    BodyTerm( UserFunctor user, const bool force )
+    BodyTerm( UserFunctor user, const bool force, const bool update_frozen )
         : _user_functor( user )
         , _force_update( force )
+        , _update_frozen( update_frozen )
     {
     }
 
@@ -41,7 +43,10 @@ struct BodyTerm
     void apply( ExecSpace, ParticleType& particles, const double time )
     {
         _timer.start();
-        Kokkos::RangePolicy<ExecSpace> policy( 0, particles.n_local );
+        std::size_t start = particles.frozenOffset();
+        if ( _update_frozen )
+            start = 0;
+        Kokkos::RangePolicy<ExecSpace> policy( start, particles.localOffset() );
         auto user = _user_functor;
         Kokkos::parallel_for(
             "CabanaPD::BodyTerm::apply", policy,
@@ -56,9 +61,10 @@ struct BodyTerm
 };
 
 template <class UserFunctor>
-auto createBodyTerm( UserFunctor user_functor, const bool force_update )
+auto createBodyTerm( UserFunctor user_functor, const bool force_update,
+                     const bool update_frozen = false )
 {
-    return BodyTerm<UserFunctor>( user_functor, force_update );
+    return BodyTerm<UserFunctor>( user_functor, force_update, update_frozen );
 }
 
 } // namespace CabanaPD

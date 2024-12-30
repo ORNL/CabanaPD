@@ -197,7 +197,7 @@ class SolverElastic
         print = print_rank();
         if ( print )
         {
-            log( std::cout, "Local particles: ", particles->n_local,
+            log( std::cout, "Local particles: ", particles->numLocal(),
                  ", Maximum neighbors: ", max_neighbors );
             log( std::cout, "#Timestep/Total-steps Simulation-time" );
 
@@ -212,8 +212,8 @@ class SolverElastic
             exec_space().print_configuration( out );
 
             log( out, "Local particles, Ghosted particles, Global particles\n",
-                 particles->n_local, ", ", particles->n_ghost, ", ",
-                 particles->n_global );
+                 particles->numLocal(), ", ", particles->numGhost(), ", ",
+                 particles->numGlobal() );
             log( out, "Maximum neighbors: ", max_neighbors,
                  ", Total neighbors: ", total_neighbors, "\n" );
             out.close();
@@ -407,7 +407,7 @@ class SolverElastic
             double energy_time = force->timeEnergy();
             double output_time = particles->timeOutput();
             _total_time += step_time;
-            auto rate = static_cast<double>( particles->n_global *
+            auto rate = static_cast<double>( particles->numGlobal() *
                                              output_frequency / ( step_time ) );
             _step_timer.reset();
             log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
@@ -434,15 +434,15 @@ class SolverElastic
                           energy_time + output_time + particles->time();
 
             double steps_per_sec = 1.0 * num_steps / _total_time;
-            double p_steps_per_sec = particles->n_global * steps_per_sec;
+            double p_steps_per_sec = particles->numGlobal() * steps_per_sec;
             log( out, std::fixed, std::setprecision( 2 ),
                  "\n#Procs Particles | Total Force Comm Integrate Energy "
                  "Output Init Init_Neighbor |\n",
-                 comm->mpi_size, " ", particles->n_global, " | \t", _total_time,
-                 " ", force_time, " ", comm_time, " ", integrate_time, " ",
-                 energy_time, " ", output_time, " ", _init_time, " ",
-                 neighbor_time, " | PERFORMANCE\n", std::fixed, comm->mpi_size,
-                 " ", particles->n_global, " | \t", 1.0, " ",
+                 comm->mpi_size, " ", particles->numGlobal(), " | \t",
+                 _total_time, " ", force_time, " ", comm_time, " ",
+                 integrate_time, " ", energy_time, " ", output_time, " ",
+                 _init_time, " ", neighbor_time, " | PERFORMANCE\n", std::fixed,
+                 comm->mpi_size, " ", particles->numGlobal(), " | \t", 1.0, " ",
                  force_time / _total_time, " ", comm_time / _total_time, " ",
                  integrate_time / _total_time, " ", energy_time / _total_time,
                  " ", output_time / _total_time, " ", _init_time / _total_time,
@@ -529,9 +529,10 @@ class SolverFracture
         _init_timer.start();
         // Create View to track broken bonds.
         auto max_neighbors = force->getMaxLocalNeighbors();
+        // TODO: this could be optimized to ignore frozen particle bonds.
         mu = NeighborView(
             Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
-            particles->n_local, max_neighbors );
+            particles->localOffset(), max_neighbors );
         Kokkos::deep_copy( mu, 1 );
         _init_timer.stop();
     }
