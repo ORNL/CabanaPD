@@ -975,12 +975,6 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
     using memory_space = typename base_type::memory_space;
     using base_type::dim;
 
-    // Per particle.
-    using base_type::n_ghost;
-    using base_type::n_global;
-    using base_type::n_local;
-    using base_type::size;
-
     using output_types = Cabana::MemberTypes<double[dim][dim]>;
     using aosoa_output_type = Cabana::AoSoA<output_types, memory_space, 1>;
 
@@ -1017,7 +1011,8 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
         : base_type( exec_space, low_corner, high_corner, num_cells,
                      max_halo_width )
     {
-        _aosoa_output = aosoa_output_type( "Particle Stress Output", n_local );
+        _aosoa_output = aosoa_output_type( "Particle Stress Output",
+                                           base_type::localOffset() );
         init_output();
     }
 
@@ -1026,7 +1021,7 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
     {
         // Forward arguments to standard or custom particle creation.
         base_type::createParticles( std::forward<Args>( args )... );
-        _aosoa_output.resize( n_local );
+        _aosoa_output.resize( base_type::localOffset() );
     }
 
     auto sliceStress() { return Cabana::slice<0>( _aosoa_output, "stress" ); }

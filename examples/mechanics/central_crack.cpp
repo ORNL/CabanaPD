@@ -53,10 +53,8 @@ void centralCrackExample( const std::string filename )
     // ====================================================
     //                    Central Crack
     // ====================================================
-    double plate_width = inputs["system_size"][1];  // Plate width
-    double plate_length = inputs["system_size"][0]; // Plate length
-    double thickness = inputs["system_size"][2];    // Plate thickness
-    double crack_length = 0.01;                     // Crack length is 10 mm
+    double thickness = inputs["system_size"][2]; // Plate thickness
+    double crack_length = 0.01;                  // Crack length is 10 mm
 
     // Assume the plate is symmetric, ranging from -0.025 to +0.025
     double plate_center_x = 0.0; // Center is at 0 for symmetric coordinates
@@ -136,7 +134,7 @@ void centralCrackExample( const std::string filename )
     //                   Create solver
     // ====================================================
     auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
-        inputs, particles, force_model, prenotch );
+        inputs, particles, force_model );
 
     // ====================================================
     //                Boundary conditions
@@ -160,7 +158,7 @@ void centralCrackExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init();
+    cabana_pd->init( bc, prenotch );
     cabana_pd->run( bc );
 }
 
