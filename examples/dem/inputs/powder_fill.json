@@ -1,0 +1,19 @@
+{
+    "num_cells"                : {"value": [201, 201, 21]},
+    "system_size"              : {"value": [0.23749, 0.23749, 0.024906], "unit": "m"},
+    "density"                : {"value": 7.95e3,  "unit": "kg/m^3"},
+    "volume"                 : {"value": 5.236e-10,  "unit": "m^3"},
+    "elastic_modulus"        : {"value": 195.6e6, "unit": "Pa"},
+    "poisson_ratio"          : {"value": 0.25, "unit": ""},
+    "restitution"            : {"value": 0.5},  
+    "radius"                 : {"value": 5e-4 },
+    "horizon"                  : {"value": 0.0035, "unit": "m"},  
+    "cylinder_diameter"        : {"value": 0.23749, "unit": "m"},
+    "wall_thickness"           : {"value": 0.0045, "unit": "m"},
+    "min_height"               : {"value": 0.01, "unit": "m"},
+    "final_time"               : {"value": 4e0, "unit": "s"},
+    "timestep"                 : {"value": 2e-6, "unit": "s"},
+    "timestep_safety_factor"   : {"value": 0.9},
+    "output_frequency"         : {"value": 1000},
+    "output_reference"         : {"value": false}
+}
