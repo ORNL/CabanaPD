@@ -105,7 +105,6 @@ void fragmentingCylinderExample( const std::string filename )
 
     auto dx = particles->dx;
     double height = inputs["system_size"][2];
-    double factor = inputs["grid_perturbation_factor"];
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
