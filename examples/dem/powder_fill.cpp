@@ -127,9 +127,41 @@ void powderSettlingExample( const std::string filename )
         inputs, particles, contact_model );
 
     // ====================================================
-    //                   Simulation run
+    //                   Simulation init
     // ====================================================
     cabana_pd->init();
+
+    // Remove any points that are too close.
+    Kokkos::View<int*, memory_space> keep( "keep_points",
+                                           particles->numLocal() );
+    Kokkos::deep_copy( keep, 1 );
+    int num_keep;
+    auto num_frozen = particles->numFrozen();
+    auto f = particles->sliceForce();
+    auto remove_functor = KOKKOS_LAMBDA( const int pid, int& k )
+    {
+        auto f_mag = Kokkos::hypot( f( pid, 0 ), f( pid, 1 ), f( pid, 2 ) );
+        if ( f( pid, 0 ) > 0 )
+            std::cout << f_mag << std::endl;
+        if ( f_mag > 1e8 )
+            keep( pid - num_frozen ) = 0;
+        else
+            k++;
+    };
+    Kokkos::RangePolicy<exec_space> policy( num_frozen,
+                                            particles->localOffset() );
+    Kokkos::parallel_reduce( "remove", policy, remove_functor,
+                             Kokkos::Sum<int>( num_keep ) );
+    std::cout << num_frozen << " " << particles->localOffset() << " "
+              << particles->numLocal() - num_keep << " " << keep.size()
+              << std::endl;
+    cabana_pd->particles->remove( num_keep, keep );
+    std::cout << particles->numFrozen() << " " << particles->numLocal()
+              << std::endl;
+    // Need to rebuild ghosts..
+    // ====================================================
+    //                   Simulation run
+    // ====================================================
     cabana_pd->run();
 }
 
