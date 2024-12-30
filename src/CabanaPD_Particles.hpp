@@ -173,7 +173,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         , _plist_f( "forces" )
     {
         createDomain( low_corner, high_corner, num_cells );
-        createParticles( exec_space, num_previous, create_frozen );
+        createParticles( exec_space, Cabana::InitUniform{}, num_previous,
+                         create_frozen );
     }
 
     // Constructor which initializes particles on regular grid with
@@ -189,7 +190,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         , _plist_f( "forces" )
     {
         createDomain( low_corner, high_corner, num_cells );
-        createParticles( exec_space, user_create, num_previous, create_frozen );
+        createParticles( exec_space, Cabana::InitUniform{}, user_create,
+                         num_previous, create_frozen );
     }
 
     // Constructor with existing particle data.
@@ -252,22 +254,34 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         _init_timer.stop();
     }
 
-    template <class ExecSpace>
-    void createParticles( const ExecSpace& exec_space,
-                          const std::size_t num_previous = 0,
-                          const bool create_frozen = false )
+    template <class ExecSpace, class InitType>
+    void
+    createParticles( const ExecSpace& exec_space, InitType init_type,
+                     const std::size_t num_previous = 0,
+                     const bool create_frozen = false,
+                     typename std::enable_if<
+                         ( std::is_same<InitType, Cabana::InitUniform>::value ||
+                           std::is_same<InitType, Cabana::InitRandom>::value ),
+                         int>::type* = 0 )
     {
         auto empty = KOKKOS_LAMBDA( const int, const double[dim] )
         {
             return true;
         };
-        createParticles( exec_space, empty, num_previous, create_frozen );
+        createParticles( exec_space, init_type, empty, num_previous,
+                         create_frozen );
     }
 
-    template <class ExecSpace, class UserFunctor>
-    void createParticles( const ExecSpace& exec_space, UserFunctor user_create,
-                          const std::size_t num_previous = 0,
-                          const bool create_frozen = false )
+    template <class ExecSpace, class InitType, class UserFunctor>
+    void
+    createParticles( const ExecSpace& exec_space, InitType init_type,
+                     UserFunctor user_create,
+                     const std::size_t num_previous = 0,
+                     const bool create_frozen = false,
+                     typename std::enable_if<
+                         ( std::is_same<InitType, Cabana::InitUniform>::value ||
+                           std::is_same<InitType, Cabana::InitRandom>::value ),
+                         int>::type* = 0 )
     {
         _init_timer.start();
         // Create a local mesh and owned space.
@@ -319,15 +333,10 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
             return create;
         };
-        local_offset = Cabana::Grid::createParticles(
-            Cabana::InitUniform{}, exec_space, create_functor, _plist_x, 1,
-            *local_grid, num_previous );
-        resize( local_offset, 0 );
-        size = _plist_x.size();
-
-        // Only set this value if this generation of particles should be frozen.
-        if ( create_frozen )
-            frozen_offset = size;
+        auto local_created = Cabana::Grid::createParticles(
+            init_type, exec_space, create_functor, _plist_x, particles_per_cell,
+            *local_grid, num_previous, false );
+        resize( local_created, 0, create_frozen );
 
         updateGlobal();
         _init_timer.stop();
@@ -335,18 +344,20 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
     // Store custom created particle positions and volumes.
     template <class ExecSpace, class PositionType, class VolumeType>
-    void createParticles( const ExecSpace, const PositionType& x,
-                          const VolumeType& vol,
-                          const std::size_t num_previous = 0,
-                          const bool create_frozen = false )
+    void createParticles(
+        const ExecSpace, const PositionType& x, const VolumeType& vol,
+        const std::size_t num_previous = 0, const bool create_frozen = false,
+        typename std::enable_if<( Cabana::is_slice<PositionType>::value ||
+                                  Kokkos::is_view<PositionType>::value ) &&
+                                    ( Cabana::is_slice<VolumeType>::value ||
+                                      Kokkos::is_view<VolumeType>::value ),
+                                int>::type* = 0 )
     {
         // Ensure valid previous particles.
         assert( num_previous <= referenceOffset() );
         // Ensure matching input sizes.
         assert( vol.size() == x.extent( 0 ) );
-        resize( vol.size() + num_previous, 0 );
-        if ( create_frozen )
-            frozen_offset = size;
+        resize( vol.size() + num_previous, 0, create_frozen );
 
         auto p_x = sliceReferencePosition();
         auto p_vol = sliceVolume();
@@ -509,9 +520,13 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         //_timer.stop();
     }
 
-    void resize( int new_local, int new_ghost )
+    void resize( int new_local, int new_ghost,
+                 const bool create_frozen = false )
     {
         _timer.start();
+        if ( new_ghost > 0 )
+            assert( create_frozen == false );
+
         local_offset = new_local;
         num_ghost = new_ghost;
         size = new_local + new_ghost;
@@ -523,7 +538,10 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         _plist_f.aosoa().resize( localOffset() );
         _aosoa_other.resize( localOffset() );
         _aosoa_nofail.resize( referenceOffset() );
+
         size = _plist_x.size();
+        if ( create_frozen )
+            frozen_offset = size;
         _timer.stop();
     };
 
@@ -815,9 +833,10 @@ class Particles<MemorySpace, PMB, TemperatureDependent, BaseOutput, Dimension>
         return temp_a;
     }
 
-    void resize( int new_local, int new_ghost )
+    template <typename... Args>
+    void resize( Args&&... args )
     {
-        base_type::resize( new_local, new_ghost );
+        base_type::resize( std::forward<Args>( args )... );
         _aosoa_temp.resize( base_type::referenceOffset() );
     }
 
@@ -921,9 +940,10 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
         return Cabana::slice<1>( _aosoa_output, "damage" );
     }
 
-    void resize( int new_local, int new_ghost )
+    template <typename... Args>
+    void resize( Args&&... args )
     {
-        base_type::resize( new_local, new_ghost );
+        base_type::resize( std::forward<Args>( args )... );
         _aosoa_output.resize( base_type::localOffset() );
     }
 
