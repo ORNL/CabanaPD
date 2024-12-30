@@ -117,8 +117,8 @@ class SolverElastic
     SolverElastic( input_type _inputs,
                    std::shared_ptr<particle_type> _particles,
                    force_model_type force_model )
-        : inputs( _inputs )
-        , particles( _particles )
+        : particles( _particles )
+        , inputs( _inputs )
         , _init_time( 0.0 )
     {
         setup( force_model );
@@ -128,8 +128,8 @@ class SolverElastic
                    std::shared_ptr<particle_type> _particles,
                    force_model_type force_model,
                    contact_model_type contact_model )
-        : inputs( _inputs )
-        , particles( _particles )
+        : particles( _particles )
+        , inputs( _inputs )
         , _init_time( 0.0 )
     {
         setup( force_model );
@@ -453,7 +453,7 @@ class SolverElastic
     bool output_reference;
     double dt;
     int thermal_subcycle_steps;
-
+    // Sometimes necessary to update particles after solver creation.
     std::shared_ptr<particle_type> particles;
 
   protected:

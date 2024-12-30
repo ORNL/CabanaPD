@@ -90,8 +90,6 @@ void powderSettlingExample( const std::string filename )
     auto particles = CabanaPD::createParticles<memory_space, model_type>(
         exec_space(), low_corner, high_corner, num_cells, halo_width,
         CabanaPD::BaseOutput{}, create_container, 0, true );
-    std::cout << particles->numFrozen() << " " << particles->numLocal()
-              << std::endl;
 
     // Create powder.
     auto dx = particles->dx[0] * 2.0;
@@ -108,8 +106,6 @@ void powderSettlingExample( const std::string filename )
     };
     particles->createParticles( exec_space(), Cabana::InitRandom{},
                                 create_powder, particles->numFrozen() );
-    std::cout << particles->numFrozen() << " " << particles->numLocal()
-              << std::endl;
 
     // Set density/volumes.
     auto rho = particles->sliceDensity();
@@ -142,8 +138,6 @@ void powderSettlingExample( const std::string filename )
     auto remove_functor = KOKKOS_LAMBDA( const int pid, int& k )
     {
         auto f_mag = Kokkos::hypot( f( pid, 0 ), f( pid, 1 ), f( pid, 2 ) );
-        if ( f( pid, 0 ) > 0 )
-            std::cout << f_mag << std::endl;
         if ( f_mag > 1e8 )
             keep( pid - num_frozen ) = 0;
         else
@@ -153,13 +147,8 @@ void powderSettlingExample( const std::string filename )
                                             particles->localOffset() );
     Kokkos::parallel_reduce( "remove", policy, remove_functor,
                              Kokkos::Sum<int>( num_keep ) );
-    std::cout << num_frozen << " " << particles->localOffset() << " "
-              << particles->numLocal() - num_keep << " " << keep.size()
-              << std::endl;
     cabana_pd->particles->remove( num_keep, keep );
-    std::cout << particles->numFrozen() << " " << particles->numLocal()
-              << std::endl;
-    // Need to rebuild ghosts..
+    // FIXME: Will need to rebuild ghosts.
 
     // ====================================================
     //                   Boundary condition
