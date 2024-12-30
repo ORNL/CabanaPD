@@ -583,6 +583,39 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         _timer.stop();
     };
 
+    void shrink()
+    {
+        _timer.start();
+        _plist_x.aosoa().shrinkToFit();
+        _aosoa_u.shrinkToFit();
+        _aosoa_y.shrinkToFit();
+        _aosoa_vol.shrinkToFit();
+        _plist_f.aosoa().shrinkToFit();
+        _aosoa_other.shrinkToFit();
+        _aosoa_nofail.shrinkToFit();
+        _timer.stop();
+    };
+
+    template <typename KeepType>
+    void remove( const int num_keep, const KeepType& keep )
+    {
+        Cabana::remove( execution_space(), num_keep, keep, _plist_x.aosoa(),
+                        numFrozen() );
+        Cabana::remove( execution_space(), num_keep, keep, _plist_f.aosoa(),
+                        numFrozen() );
+        Cabana::remove( execution_space(), num_keep, keep, _aosoa_u,
+                        numFrozen() );
+        Cabana::remove( execution_space(), num_keep, keep, _aosoa_vol,
+                        numFrozen() );
+        Cabana::remove( execution_space(), num_keep, keep, _aosoa_y,
+                        numFrozen() );
+        Cabana::remove( execution_space(), num_keep, keep, _aosoa_other,
+                        numFrozen() );
+        Cabana::remove( execution_space(), num_keep, keep, _aosoa_nofail,
+                        numFrozen() );
+        resize( frozen_offset + num_keep, 0 );
+    }
+
     auto getPosition( const bool use_reference )
     {
         if ( use_reference )
