@@ -460,10 +460,11 @@ class SolverElastic
     double dt;
     int thermal_subcycle_steps;
 
+    std::shared_ptr<particle_type> particles;
+
   protected:
     // Core modules.
     input_type inputs;
-    std::shared_ptr<particle_type> particles;
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
@@ -714,13 +715,14 @@ class SolverFracture
     using base_type::output_frequency;
     using base_type::output_reference;
 
+    using base_type::particles;
+
   protected:
     using base_type::comm;
     using base_type::contact;
     using base_type::force;
     using base_type::inputs;
     using base_type::integrator;
-    using base_type::particles;
 
     using NeighborView = typename Kokkos::View<int**, memory_space>;
     NeighborView mu;
