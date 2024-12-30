@@ -287,7 +287,6 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         auto type = sliceType();
         auto rho = sliceDensity();
         auto u = sliceDisplacement();
-        auto y = sliceCurrentPosition();
         auto vol = sliceVolume();
         auto nofail = sliceNoFail();
 
@@ -307,7 +306,6 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 Cabana::get( particle, CabanaPD::Field::ReferencePosition(),
                              d ) = px[d];
                 u( pid, d ) = 0.0;
-                y( pid, d ) = 0.0;
                 v( pid, d ) = 0.0;
                 f( pid, d ) = 0.0;
             }
@@ -497,8 +495,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         auto y = Cabana::slice<0>( _aosoa_y, "current_positions" );
         auto x = sliceReferencePosition();
         auto u = sliceDisplacement();
-        Kokkos::RangePolicy<execution_space> policy( frozenOffset(),
-                                                     referenceOffset() );
+        // Frozen particles are included in output so we include them in this
+        // loop to guarantee they are correct even though they never change.
+        Kokkos::RangePolicy<execution_space> policy( 0, referenceOffset() );
         auto sum_x_u = KOKKOS_LAMBDA( const std::size_t pid )
         {
             for ( int d = 0; d < 3; d++ )
@@ -506,6 +505,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         };
         Kokkos::parallel_for( "CabanaPD::CalculateCurrentPositions", policy,
                               sum_x_u );
+        Kokkos::fence();
         //_timer.stop();
     }
 
