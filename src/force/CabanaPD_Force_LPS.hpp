@@ -79,6 +79,7 @@ class Force<MemorySpace, ForceModel<LPS, Elastic>>
     ForceModel<LPS, Elastic> _model;
 
     using base_type::_energy_timer;
+    using base_type::_stress_timer;
     using base_type::_timer;
 
   public:
@@ -256,7 +257,7 @@ class Force<MemorySpace, ForceModel<LPS, Elastic>>
     auto timeEnergy() { return _energy_timer.time(); };
 
     template <class ParticleType, class ParallelType>
-    void computeStressFull( ParticleType& particles, const MuView& mu,
+    void computeStressFull( ParticleType& particles,
                             ParallelType& neigh_op_tag )
     {
         _stress_timer.start();
@@ -270,56 +271,41 @@ class Force<MemorySpace, ForceModel<LPS, Elastic>>
         const auto m = particles.sliceWeightedVolume();
         auto stress = particles.sliceStress();
 
-        auto stress_full = KOKKOS_LAMBDA( const int i )
+        auto stress_full = KOKKOS_LAMBDA( const int i, const int j )
         {
-            std::size_t num_neighbors =
-                Cabana::NeighborList<neighbor_list_type>::numNeighbor(
-                    neigh_list, i );
-            for ( std::size_t n = 0; n < num_neighbors; n++ )
-            {
-                std::size_t j =
-                    Cabana::NeighborList<neighbor_list_type>::getNeighbor(
-                        neigh_list, i, n );
+            double xi, r, s;
+            double rx, ry, rz;
+            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-                if ( mu( i, n ) > 0 ) // Only compute stress for unbroken bonds
-                {
-                    double xi, r, s;
-                    double rx, ry, rz;
-                    getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+            const double coeff =
+                ( model.theta_coeff *
+                      ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
+                  model.s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
+                model.influence_function( xi ) * xi * vol( j ) * vol( j );
 
-                    const double coeff =
-                        ( model.theta_coeff *
-                              ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
-                          model.s_coeff * s *
-                              ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                        model.influence_function( xi ) * xi * vol( j ) *
-                        vol( j );
+            double fx_i = coeff * rx / r;
+            double fy_i = coeff * ry / r;
+            double fz_i = coeff * rz / r;
 
-                    double muij = mu( i, n );
-                    double fx_i = muij * coeff * rx / r;
-                    double fy_i = muij * coeff * ry / r;
-                    double fz_i = muij * coeff * rz / r;
+            // Update stress tensor components
+            stress( i, 0, 0 ) += fx_i * rx;
+            stress( i, 1, 1 ) += fy_i * ry;
+            stress( i, 2, 2 ) += fz_i * rz;
 
-                    // Update stress tensor components
-                    stress( i, 0, 0 ) += fx_i * rx;
-                    stress( i, 1, 1 ) += fy_i * ry;
-                    stress( i, 2, 2 ) += fz_i * rz;
+            stress( i, 0, 1 ) += fx_i * ry;
+            stress( i, 1, 0 ) += fy_i * rx;
 
-                    stress( i, 0, 1 ) += fx_i * ry;
-                    stress( i, 1, 0 ) += fy_i * rx;
+            stress( i, 0, 2 ) += fx_i * rz;
+            stress( i, 2, 0 ) += fz_i * rx;
 
-                    stress( i, 0, 2 ) += fx_i * rz;
-                    stress( i, 2, 0 ) += fz_i * rx;
-
-                    stress( i, 1, 2 ) += fy_i * rz;
-                    stress( i, 2, 1 ) += fz_i * ry;
-                }
-            }
+            stress( i, 1, 2 ) += fy_i * rz;
+            stress( i, 2, 1 ) += fz_i * ry;
         };
 
         Kokkos::RangePolicy<exec_space> policy( 0, particles.n_local );
-        Kokkos::parallel_for( "CabanaPD::ForceLPSFracture::computeStressFull",
-                              policy, stress_full );
+        Cabana::neighbor_parallel_for(
+            policy, stress_full, _neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::ForceLPSFracture::computeStressFull" );
 
         _stress_timer.stop();
     }
@@ -335,6 +321,7 @@ class Force<MemorySpace, ForceModel<LPS, Fracture>>
     ForceModel<LPS, Fracture> _model;
 
     using base_type::_energy_timer;
+    using base_type::_stress_timer;
     using base_type::_timer;
 
   public:
@@ -574,7 +561,7 @@ class Force<MemorySpace, ForceModel<LPS, Fracture>>
         return strain_energy;
     }
 
-    template <class ParticleType, class ParallelType>
+    template <class ParticleType, class MuView, class ParallelType>
     void computeStressFull( ParticleType& particles, const MuView& mu,
                             ParallelType& neigh_op_tag )
     {
@@ -653,6 +640,7 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic>>
     ForceModel<LinearLPS, Elastic> _model;
 
     using base_type::_energy_timer;
+    using base_type::_stress_timer;
     using base_type::_timer;
 
   public:
