@@ -92,7 +92,6 @@ void powderSettlingExample( const std::string filename )
         CabanaPD::BaseOutput{}, create_container, 0, true );
 
     // Create powder.
-    auto dx = particles->dx[0] * 2.0;
     auto create_powder = KOKKOS_LAMBDA( const int, const double x[3] )
     {
         double rsq = x[0] * x[0] + x[1] * x[1];
