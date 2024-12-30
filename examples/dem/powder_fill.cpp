@@ -89,7 +89,7 @@ void powderSettlingExample( const std::string filename )
     // Container particles should be frozen, never updated.
     auto particles = CabanaPD::createParticles<memory_space, model_type>(
         exec_space(), low_corner, high_corner, num_cells, halo_width,
-        create_container, 0, true );
+        create_container, CabanaPD::BaseOutput{}, 0, true );
     std::cout << particles->numFrozen() << " " << particles->numLocal()
               << std::endl;
 
