@@ -112,7 +112,7 @@ void testCreateFrozenParticles()
         return false;
     };
     // Create more, starting from the current number of frozen points.
-    particles.createParticles( exec_space{}, init_top,
+    particles.createParticles( exec_space{}, Cabana::InitUniform{}, init_top,
                                particles.frozenOffset() );
 
     // Check expected values for each block of particles.
