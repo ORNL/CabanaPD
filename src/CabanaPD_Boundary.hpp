@@ -140,7 +140,7 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
         _timer.start();
 
         _view = index_view_type( "boundary_indices",
-                                 particles.n_local * initial_guess );
+                                 particles.localOffset() * initial_guess );
         _count = index_view_type( "count", 1 );
 
         for ( RegionBoundary plane : planes )
@@ -169,7 +169,8 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
         auto index_space = _view;
         auto count = _count;
         auto x = particles.sliceReferencePosition();
-        Kokkos::RangePolicy<ExecSpace> policy( 0, particles.n_local );
+        // TODO: configure including frozen particles.
+        Kokkos::RangePolicy<ExecSpace> policy( 0, particles.localOffset() );
         auto index_functor = KOKKOS_LAMBDA( const std::size_t pid )
         {
             if ( region.inside( x, pid ) )

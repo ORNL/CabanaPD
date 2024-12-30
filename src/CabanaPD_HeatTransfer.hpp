@@ -49,10 +49,10 @@ class HeatTransfer : public Force<MemorySpace, BaseForceModel>
 
     template <class TemperatureType, class PosType, class ParticleType,
               class ParallelType>
-    void
-    computeHeatTransferFull( TemperatureType& conduction, const PosType& x,
-                             const PosType& u, const ParticleType& particles,
-                             const int n_local, ParallelType& neigh_op_tag )
+    void computeHeatTransferFull( TemperatureType& conduction, const PosType& x,
+                                  const PosType& u,
+                                  const ParticleType& particles,
+                                  ParallelType& neigh_op_tag )
     {
         _timer.start();
 
@@ -70,7 +70,8 @@ class HeatTransfer : public Force<MemorySpace, BaseForceModel>
                 coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
         };
 
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
+                                                particles.localOffset() );
         Cabana::neighbor_parallel_for(
             policy, temp_func, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::HeatTransfer::computeFull" );
@@ -86,12 +87,12 @@ class HeatTransfer : public Force<MemorySpace, BaseForceModel>
         const auto rho = particles.sliceDensity();
         const auto conduction = particles.sliceTemperatureConduction();
         auto temp = particles.sliceTemperature();
-        auto n_local = particles.n_local;
         auto euler_func = KOKKOS_LAMBDA( const int i )
         {
             temp( i ) += dt / rho( i ) / model.cp * conduction( i );
         };
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
+                                                particles.localOffset() );
         Kokkos::parallel_for( "CabanaPD::HeatTransfer::forwardEuler", policy,
                               euler_func );
         _euler_timer.stop();
@@ -104,7 +105,6 @@ void computeHeatTransfer( HeatTransferType& heat_transfer,
                           ParticleType& particles,
                           const ParallelType& neigh_op_tag, const double dt )
 {
-    auto n_local = particles.n_local;
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto conduction = particles.sliceTemperatureConduction();
@@ -116,10 +116,10 @@ void computeHeatTransfer( HeatTransferType& heat_transfer,
     // Temperature only needs to be atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
         heat_transfer.computeHeatTransferFull( conduction_a, x, u, particles,
-                                               n_local, neigh_op_tag );
+                                               neigh_op_tag );
     else
         heat_transfer.computeHeatTransferFull( conduction, x, u, particles,
-                                               n_local, neigh_op_tag );
+                                               neigh_op_tag );
     Kokkos::fence();
 
     heat_transfer.forwardEuler( particles, dt );

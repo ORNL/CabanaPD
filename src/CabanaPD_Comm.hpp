@@ -270,9 +270,9 @@ class Comm<ParticleType, PMB, TemperatureIndependent>
         halo_ids.rebuild( positions );
 
         // Create the Cabana Halo.
-        halo = std::make_shared<halo_type>( local_grid->globalGrid().comm(),
-                                            particles.n_local, halo_ids._ids,
-                                            halo_ids._destinations, topology );
+        halo = std::make_shared<halo_type>(
+            local_grid->globalGrid().comm(), particles.localOffset(),
+            halo_ids._ids, halo_ids._destinations, topology );
 
         particles.resize( halo->numLocal(), halo->numGhost() );
 
@@ -286,7 +286,9 @@ class Comm<ParticleType, PMB, TemperatureIndependent>
 
         _init_timer.stop();
     }
-    ~Comm() {}
+
+    auto size() { return mpi_size; }
+    auto rank() { return mpi_rank; }
 
     // Determine which particles should be ghosted, reallocating and recounting
     // if needed.

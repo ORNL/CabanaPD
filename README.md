@@ -26,11 +26,11 @@ available on some systems or can be installed with `spack` (see
 https://spack.readthedocs.io/en/latest/getting_started.html):
 
 ```
-spack install cabana@master+cajita+silo
+spack install cabana@master+grid+hdf5
 ```
 
 Alternatively, Kokkos can be built locally, followed by Cabana:
-https://github.com/ECP-copa/Cabana/wiki/1-Build-Instructions
+https://github.com/ECP-CoPA/Cabana/wiki/1-Build-Instructions
 
 Build instructions are available for both CPU and GPU. Note that Cabana must be
 compiled with MPI and the Grid sub-package.
@@ -66,7 +66,7 @@ make install
 ### CUDA Build
 
 After building Kokkos and Cabana for Cuda:
-https://github.com/ECP-copa/Cabana/wiki/CUDA-Build
+https://github.com/ECP-CoPA/Cabana/wiki/Build-CUDA
 
 The CUDA build script is identical to that above, but again note that Kokkos
 must be compiled with the CUDA backend. 
@@ -76,7 +76,7 @@ Note that the same compiler should be used for Kokkos, Cabana, and CabanaPD.
 ### HIP Build
 
 After building Kokkos and Cabana for HIP:
-https://github.com/ECP-copa/Cabana/wiki/HIP-and-SYCL-Build#HIP
+https://github.com/ECP-CoPA/Cabana/wiki/Build-HIP-and-SYCL#HIP
 
 The HIP build script is identical to that above, except that `hipcc` compiler
 must be used:

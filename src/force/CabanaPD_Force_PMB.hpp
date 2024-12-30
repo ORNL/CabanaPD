@@ -102,7 +102,7 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, ModelParams...>>
     template <class ForceType, class PosType, class ParticleType,
               class ParallelType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
-                           const ParticleType& particles, const int n_local,
+                           const ParticleType& particles,
                            ParallelType& neigh_op_tag )
     {
         _timer.start();
@@ -132,7 +132,8 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, ModelParams...>>
             f( i, 2 ) += fz_i;
         };
 
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
+                                                particles.localOffset() );
         Cabana::neighbor_parallel_for(
             policy, force_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForcePMB::computeFull" );
@@ -143,7 +144,7 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, ModelParams...>>
     template <class PosType, class WType, class ParticleType,
               class ParallelType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              const ParticleType& particles, const int n_local,
+                              const ParticleType& particles,
                               ParallelType& neigh_op_tag )
     {
         _energy_timer.start();
@@ -168,7 +169,8 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, ModelParams...>>
         };
 
         double strain_energy = 0.0;
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
+                                                particles.localOffset() );
         Cabana::neighbor_parallel_reduce(
             policy, energy_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, strain_energy,
@@ -262,7 +264,7 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
               class ParallelType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles, MuView& mu,
-                           const int n_local, ParallelType& )
+                           ParallelType& )
     {
         _timer.start();
 
@@ -315,7 +317,8 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
             }
         };
 
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
+                                                particles.localOffset() );
         Kokkos::parallel_for( "CabanaPD::ForcePMBDamage::computeFull", policy,
                               force_full );
 
@@ -326,7 +329,7 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
               class MuView, class ParallelType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
                               DamageType& phi, const ParticleType& particles,
-                              MuView& mu, const int n_local, ParallelType& )
+                              MuView& mu, ParallelType& )
     {
         _energy_timer.start();
 
@@ -365,7 +368,8 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
         };
 
         double strain_energy = 0.0;
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
+                                                particles.localOffset() );
         Kokkos::parallel_reduce( "CabanaPD::ForcePMBDamage::computeEnergyFull",
                                  policy, energy_full, strain_energy );
 
@@ -464,8 +468,7 @@ class Force<MemorySpace, ForceModel<LinearPMB, Elastic, ModelParams...>>
     template <class ForceType, class PosType, class ParticleType,
               class ParallelType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
-                           ParticleType& particles, const int n_local,
-                           ParallelType& neigh_op_tag )
+                           ParticleType& particles, ParallelType& neigh_op_tag )
     {
         _timer.start();
 
@@ -496,7 +499,8 @@ class Force<MemorySpace, ForceModel<LinearPMB, Elastic, ModelParams...>>
             f( i, 2 ) += fz_i;
         };
 
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
+                                                particles.localOffset() );
         Cabana::neighbor_parallel_for(
             policy, force_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLinearPMB::computeFull" );
@@ -507,7 +511,7 @@ class Force<MemorySpace, ForceModel<LinearPMB, Elastic, ModelParams...>>
     template <class PosType, class WType, class ParticleType,
               class ParallelType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              const ParticleType& particles, const int n_local,
+                              const ParticleType& particles,
                               ParallelType& neigh_op_tag )
     {
         _energy_timer.start();
@@ -532,7 +536,8 @@ class Force<MemorySpace, ForceModel<LinearPMB, Elastic, ModelParams...>>
         };
 
         double strain_energy = 0.0;
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
+        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
+                                                particles.localOffset() );
         Cabana::neighbor_parallel_reduce(
             policy, energy_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, strain_energy,
