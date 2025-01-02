@@ -165,15 +165,6 @@ class SolverElastic
                            typename force_model_type::thermal_type>::value )
             force_model.update( particles->sliceTemperature() );
 
-        // Create heat transfer if needed.
-        if constexpr ( is_heat_transfer<
-                           typename force_model_type::thermal_type>::value )
-        {
-            thermal_subcycle_steps = inputs["thermal_subcycle_steps"];
-            heat_transfer = std::make_shared<heat_transfer_type>(
-                inputs["half_neigh"], force->_neigh_list, force_model );
-        }
-
         _neighbor_timer.start();
         // This will either be PD or DEM forces.
         force = std::make_shared<force_type>( inputs["half_neigh"], *particles,
@@ -185,7 +176,8 @@ class SolverElastic
         unsigned long long total_neighbors;
         force->getNeighborStatistics( max_neighbors, total_neighbors );
 
-        // Create heat transfer if needed.
+        // Create heat transfer if needed, using the same neighbor list as
+        // the mechanics.
         if constexpr ( is_heat_transfer<
                            typename force_model_type::thermal_type>::value )
         {
