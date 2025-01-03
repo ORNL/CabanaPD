@@ -24,7 +24,7 @@ struct HertzianModel : public ContactModel
 {
     // FIXME: This is for use as the primary force model.
     using base_model = PMB;
-    using fracture_type = Elastic;
+    using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
 
     using ContactModel::Rc; // Contact horizon (should be > 2*radius)

@@ -60,7 +60,7 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type = CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
+    using model_type = CabanaPD::ForceModel<CabanaPD::PMB>;
     model_type force_model( delta, K, G0 );
     // using model_type =
     //      CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;

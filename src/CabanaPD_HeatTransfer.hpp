@@ -36,7 +36,7 @@ class HeatTransfer : public Force<MemorySpace, BaseForceModel>
     using base_type::_neigh_list;
     using model_type = ModelType;
     static_assert(
-        std::is_same_v<typename model_type::fracture_type, Elastic> );
+        std::is_same_v<typename model_type::fracture_type, NoFracture> );
 
     // Running with mechanics as well; no reason to rebuild neighbors.
     template <class NeighborType>

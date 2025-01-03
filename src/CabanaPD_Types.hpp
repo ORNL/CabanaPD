@@ -15,15 +15,19 @@
 namespace CabanaPD
 {
 // Fracture tags.
-struct Elastic
+struct NoFracture
 {
 };
 struct Fracture
 {
 };
 
-// Contact and DEM (contact without PD) tags.
+// Mechanics tags.
+struct Elastic
+{
+};
 
+// Contact and DEM (contact without PD) tags.
 struct NoContact
 {
 };
@@ -37,6 +41,7 @@ struct TemperatureIndependent
 {
     using base_type = TemperatureIndependent;
 };
+
 struct TemperatureDependent
 {
     using base_type = TemperatureDependent;

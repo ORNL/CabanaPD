@@ -71,13 +71,13 @@
 namespace CabanaPD
 {
 template <class MemorySpace, class... ModelParams>
-class Force<MemorySpace, ForceModel<PMB, Elastic, ModelParams...>>
+class Force<MemorySpace, ForceModel<PMB, Elastic, NoFracture, ModelParams...>>
     : public Force<MemorySpace, BaseForceModel>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ForceModel<PMB, Elastic, ModelParams...>;
+    using model_type = ForceModel<PMB, Elastic, NoFracture, ModelParams...>;
     using base_type = Force<MemorySpace, BaseForceModel>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
     using base_type::_neigh_list;
@@ -181,13 +181,13 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, ModelParams...>>
 };
 
 template <class MemorySpace, class... ModelParams>
-class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
+class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
     : public Force<MemorySpace, BaseForceModel>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ForceModel<PMB, Fracture, ModelParams...>;
+    using model_type = ForceModel<PMB, Elastic, Fracture, ModelParams...>;
     using base_type = Force<MemorySpace, BaseForceModel>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
     using base_type::_neigh_list;
@@ -328,13 +328,15 @@ class Force<MemorySpace, ForceModel<PMB, Fracture, ModelParams...>>
 };
 
 template <class MemorySpace, class... ModelParams>
-class Force<MemorySpace, ForceModel<LinearPMB, Elastic, ModelParams...>>
+class Force<MemorySpace,
+            ForceModel<LinearPMB, Elastic, NoFracture, ModelParams...>>
     : public Force<MemorySpace, BaseForceModel>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ForceModel<LinearPMB, Elastic, TemperatureIndependent>;
+    using model_type =
+        ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>;
     using base_type = Force<MemorySpace, BaseForceModel>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
     using base_type::_neigh_list;
