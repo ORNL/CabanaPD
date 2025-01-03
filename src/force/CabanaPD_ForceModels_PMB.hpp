@@ -88,7 +88,7 @@ struct ForceModel<PMB, Fracture, TemperatureIndependent>
     {
         base_type::set_param( _delta, _K );
         G0 = _G0;
-        s0 = sqrt( 5.0 * G0 / 9.0 / K / delta );
+        s0 = std::sqrt( 5.0 * G0 / 9.0 / K / delta );
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 
