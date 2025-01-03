@@ -45,26 +45,17 @@ class Inputs
         int m = std::floor( delta / dx );
         inputs["m"]["value"] = m;
 
-        // Set timestep safety factor if it not set by user
+        // Set timestep safety factor if not set by user.
         if ( !inputs.contains( "timestep_safety_factor" ) )
             inputs["timestep_safety_factor"]["value"] = 0.85;
 
-        // Set approximate bulk modulus if not set by user
-        // Used in timestep estimation
+        // Check one of bulk or elastic modulus set by user.
         if ( !inputs.contains( "bulk_modulus" ) )
         {
             if ( !inputs.contains( "elastic_modulus" ) )
                 throw std::runtime_error( "Must input either bulk_modulus or "
                                           "elastic_modulus." );
-            double E = inputs["elastic_modulus"]["value"];
-            double nu = 0.25;
-            double K = E / ( 3 * ( 1 - 2 * nu ) );
-            inputs["bulk_modulus"]["value"] = K;
         }
-
-        // Check critical time step
-        // This must be done after the values above are calculated
-        computeCriticalTimeStep();
 
         int num_steps = tf / dt;
         inputs["num_steps"]["value"] = num_steps;
@@ -177,72 +168,103 @@ class Inputs
             log_err( std::cout, "Units for dx do not match system units." );
     }
 
-    void computeCriticalTimeStep()
+    template <class ForceModel>
+    void computeCriticalTimeStep( [[maybe_unused]] const ForceModel model )
     {
         // Reference: Silling & Askari, Computers & Structures 83(17–18) (2005):
         // 1526-1535.
 
-        // Compute particle volume
+        // Compute particle volume.
         double dx = inputs["dx"]["value"][0];
         double dy = inputs["dx"]["value"][1];
         double dz = inputs["dx"]["value"][2];
         double v_p = dx * dy * dz;
 
-        // Initialize denominator's summation
+        // Initialize denominator's summation.
         double sum = 0;
+        double sum_ht = 0;
 
-        // Run over the neighborhood of a point in the bulk of a body
+        // Estimate the bulk modulus if needed.
+        double K;
+        if ( inputs.contains( "bulk_modulus" ) )
+        {
+            K = inputs["bulk_modulus"]["value"];
+        }
+        else
+        {
+            double E = inputs["elastic_modulus"]["value"];
+            // This is only exact for bond-based (PMB).
+            double nu = 0.25;
+            K = E / ( 3 * ( 1 - 2 * nu ) );
+        }
+
+        // Run over the neighborhood of a point in the bulk of a body (at the
+        // origin).
         int m = inputs["m"]["value"];
-        double rho = inputs["density"]["value"];
-        double K = inputs["bulk_modulus"]["value"];
         double delta = inputs["horizon"]["value"];
         // FIXME: this is copied from the forces
         double c = 18.0 * K / ( pi * delta * delta * delta * delta );
 
         for ( int i = -( m + 1 ); i < m + 2; i++ )
         {
-            // x-component of bond
+            // x-component of bond.
             double xi_1 = i * dx;
 
             for ( int j = -( m + 1 ); j < m + 2; j++ )
             {
-                // y-component of bond
+                // y-component of bond.
                 double xi_2 = j * dy;
 
                 for ( int k = -( m + 1 ); k < m + 2; k++ )
                 {
-                    // z-component of bond
+                    // z-component of bond.
                     double xi_3 = k * dz;
 
-                    // Bond length squared
+                    // Bond length squared.
                     double r2 = xi_1 * xi_1 + xi_2 * xi_2 + xi_3 * xi_3;
 
-                    // Check if bond is no longer than delta
+                    // Check if bond is no longer than delta.
                     if ( r2 < delta * delta + 1e-10 )
                     {
-                        // Check is bond is not 0
+                        // Check if bond is not 0.
                         if ( r2 > 0 )
                         {
-                            // Compute denominator
-                            sum += v_p * c / std::sqrt( r2 );
+                            double xi = std::sqrt( r2 );
+
+                            // Compute denominator for mechanics.
+                            sum += v_p * c / xi;
+
+                            // Compute denominator for heat transfer.
+                            if constexpr ( is_heat_transfer<
+                                               typename ForceModel::
+                                                   thermal_type>::value )
+                            {
+                                double coeff =
+                                    model.microconductivity_function( xi );
+                                sum_ht += v_p * coeff / r2;
+                            }
                         }
                     }
                 }
             }
         }
 
-        double safety_factor = inputs["timestep_safety_factor"]["value"];
-        double dt_crit = safety_factor * std::sqrt( 2 * rho / sum );
-
         double dt = inputs["timestep"]["value"];
-        if ( dt > dt_crit )
+        double rho = inputs["density"]["value"];
+        double dt_crit = std::sqrt( 2.0 * rho / sum );
+        compareCriticalTimeStep( "mechanics", dt, dt_crit );
+
+        // Heat transfer timestep.
+        if constexpr ( is_heat_transfer<
+                           typename ForceModel::thermal_type>::value )
         {
-            log( std::cout, "WARNING: timestep (", dt,
-                 ") is larger than estimated stable timestep (", dt_crit,
-                 "), using safety factor of ", safety_factor, ".\n" );
+            double dt_ht = inputs["thermal_subcycle_steps"]["value"];
+            dt_ht *= dt;
+
+            double cp = inputs["specific_heat_capacity"]["value"];
+            double dt_ht_crit = rho * cp / sum_ht;
+            compareCriticalTimeStep( "heat_transfer", dt_ht, dt_ht_crit );
         }
-        // Store in inputs
-        inputs["critical_timestep"]["value"] = dt_crit;
     }
 
     // Parse JSON file.
@@ -268,6 +290,22 @@ class Inputs
     bool contains( std::string label ) { return inputs.contains( label ); }
 
   protected:
+    void compareCriticalTimeStep( std::string name, double dt, double dt_crit )
+    {
+        double safety_factor = inputs["timestep_safety_factor"]["value"];
+        double dt_crit_safety = safety_factor * dt_crit;
+
+        if ( dt > dt_crit_safety )
+        {
+            log( std::cout, "WARNING: timestep (", dt,
+                 ") is larger than estimated stable timestep for ", name, " (",
+                 dt_crit_safety, "), using safety factor of ", safety_factor,
+                 ".\n" );
+        }
+        // Store in inputs.
+        inputs["critical_timestep_" + name]["value"] = dt_crit_safety;
+    }
+
     nlohmann::json inputs;
 };
 
