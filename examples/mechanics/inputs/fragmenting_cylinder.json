@@ -1,6 +1,5 @@
 {
-    "num_cells"                : {"value": [51, 51, 101]},
-    "dx":           {"value": [0.001, 0.001, 0.001]},
+    "dx"                       : {"value": [0.001, 0.001, 0.001], "unit": "m"},
     "system_size"              : {"value": [0.1, 0.1, 0.15], "unit": "m"},
     "grid_perturbation_factor" : {"value": 0.1},
     "density"                  : {"value": 7800, "unit": "kg/m^3"},
