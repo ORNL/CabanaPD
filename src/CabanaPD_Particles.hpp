@@ -296,9 +296,10 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                            typename plist_x_type::particle_type& particle )
         {
             // Customize new particle.
+            // NOTE: we fill information for all particles because only the
+            // positions are correctly selectively created. This will only work
+            // when setting all values uniformly, as is currently the case!
             bool create = user_create( pid, px );
-            if ( !create )
-                return create;
 
             // Set the particle position.
             for ( int d = 0; d < 3; d++ )
