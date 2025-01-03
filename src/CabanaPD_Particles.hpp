@@ -368,6 +368,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
             return create;
         };
+        // Fence inside create.
         auto local_created = Cabana::Grid::createParticles(
             init_type, exec_space, create_functor, _plist_x, particles_per_cell,
             *local_grid, num_previous, false );
@@ -426,6 +427,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 nofail( pid ) = 0;
                 rho( pid ) = 1.0;
             } );
+        Kokkos::fence();
 
         updateGlobal();
     }
@@ -451,6 +453,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         Kokkos::parallel_for(
             "CabanaPD::Particles::update_particles", policy,
             KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
+        Kokkos::fence();
         _timer.stop();
     }
 
