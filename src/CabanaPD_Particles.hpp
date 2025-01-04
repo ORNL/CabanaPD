@@ -447,6 +447,12 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         return Cabana::slice<0>( _aosoa_u, "displacements" );
     }
     auto sliceForce() { return _plist_f.slice( CabanaPD::Field::Force() ); }
+
+    auto sliceForce() const
+    {
+        return _plist_f.slice( CabanaPD::Field::Force() );
+    }
+
     auto sliceForceAtomic()
     {
         auto f = sliceForce();
@@ -948,6 +954,107 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
         Cabana::deep_copy( energy, 0.0 );
         auto phi = sliceDamage();
         Cabana::deep_copy( phi, 0.0 );
+    }
+
+    aosoa_output_type _aosoa_output;
+};
+
+template <class MemorySpace, class ModelType, class ThermalType, int Dimension>
+class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
+                Dimension>
+    : public Particles<MemorySpace, ModelType, ThermalType, EnergyOutput,
+                       Dimension>
+{
+  public:
+    using self_type = Particles<MemorySpace, ModelType, ThermalType,
+                                EnergyStressOutput, Dimension>;
+    using base_type =
+        Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>;
+    using thermal_type = typename base_type::thermal_type;
+    using output_type = EnergyStressOutput;
+    using memory_space = typename base_type::memory_space;
+    using base_type::dim;
+
+    using output_types = Cabana::MemberTypes<double[dim][dim]>;
+    using aosoa_output_type = Cabana::AoSoA<output_types, memory_space, 1>;
+
+    // Per type.
+    using base_type::n_types;
+
+    // Simulation total domain.
+    using base_type::global_mesh_ext;
+
+    // Simulation sub domain (single MPI rank).
+    using base_type::ghost_mesh_hi;
+    using base_type::ghost_mesh_lo;
+    using base_type::local_mesh_ext;
+    using base_type::local_mesh_hi;
+    using base_type::local_mesh_lo;
+
+    using base_type::dx;
+    using base_type::local_grid;
+
+    using base_type::halo_width;
+
+    // Default constructor.
+    Particles()
+        : base_type()
+    {
+        _aosoa_output = aosoa_output_type( "Particle Stress Output", 0 );
+    }
+
+    // Constructor which initializes particles on regular grid.
+    template <class ExecSpace>
+    Particles( const ExecSpace& exec_space, std::array<double, dim> low_corner,
+               std::array<double, dim> high_corner,
+               const std::array<int, dim> num_cells, const int max_halo_width )
+        : base_type( exec_space, low_corner, high_corner, num_cells,
+                     max_halo_width )
+    {
+        _aosoa_output = aosoa_output_type( "Particle Stress Output",
+                                           base_type::localOffset() );
+        init_output();
+    }
+
+    template <typename... Args>
+    void createParticles( Args&&... args )
+    {
+        // Forward arguments to standard or custom particle creation.
+        base_type::createParticles( std::forward<Args>( args )... );
+        _aosoa_output.resize( base_type::localOffset() );
+    }
+
+    auto sliceStress() { return Cabana::slice<0>( _aosoa_output, "stress" ); }
+    auto sliceStress() const
+    {
+        return Cabana::slice<0>( _aosoa_output, "stress" );
+    }
+
+    void resize( int new_local, int new_ghost )
+    {
+        base_type::resize( new_local, new_ghost );
+        _aosoa_output.resize( new_local + new_ghost );
+    }
+
+    template <typename... OtherFields>
+    void output( const int output_step, const double output_time,
+                 const bool use_reference, OtherFields&&... other )
+    {
+        base_type::output( output_step, output_time, use_reference,
+                           sliceStress(),
+                           std::forward<OtherFields>( other )... );
+    }
+
+    friend class Comm<self_type, PMB, TemperatureIndependent>;
+    friend class Comm<self_type, LPS, TemperatureIndependent>;
+    friend class Comm<self_type, PMB, TemperatureDependent>;
+    friend class Comm<self_type, LPS, TemperatureDependent>;
+
+  protected:
+    void init_output()
+    {
+        auto stress = sliceStress();
+        Cabana::deep_copy( stress, 0.0 );
     }
 
     aosoa_output_type _aosoa_output;

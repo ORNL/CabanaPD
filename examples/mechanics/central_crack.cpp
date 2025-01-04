@@ -18,8 +18,8 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate crack branching from an pre-crack.
-void crackBranchingExample( const std::string filename )
+// Simulate a square plate with a central crack under tension.
+void centralCrackExample( const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
@@ -46,23 +46,44 @@ void crackBranchingExample( const std::string filename )
     // ====================================================
     //                  Discretization
     // ====================================================
-    // FIXME: set halo width based on delta
+    // Set halo width based on delta
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
 
     // ====================================================
-    //                    Pre-notch
+    //                    Central Crack
     // ====================================================
-    double height = inputs["system_size"][0];
-    double thickness = inputs["system_size"][2];
-    double L_prenotch = height / 2.0;
-    double y_prenotch1 = 0.0;
-    Kokkos::Array<double, 3> p01 = { low_corner[0], y_prenotch1,
-                                     low_corner[2] };
-    Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
-    Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-    Kokkos::Array<Kokkos::Array<double, 3>, 1> notch_positions = { p01 };
-    CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
+    double thickness = inputs["system_size"][2]; // Plate thickness
+    double crack_length = 0.01;                  // Crack length is 10 mm
+
+    // Assume the plate is symmetric, ranging from -0.025 to +0.025
+    double plate_center_x = 0.0; // Center is at 0 for symmetric coordinates
+    double plate_center_y = 0.0; // Center is at 0 for symmetric coordinates
+
+    // Define the crack start and end points for a horizontal crack
+    Kokkos::Array<double, 3> crack_start = {
+        plate_center_x -
+            ( crack_length / 2.0 ), // Center the crack along the x-axis
+        plate_center_y,             // Center the crack along the y-axis
+        0.0                         // Assume the crack lies in the z=0 plane
+    };
+    Kokkos::Array<double, 3> crack_end = {
+        plate_center_x +
+            ( crack_length / 2.0 ), // Center the crack along the x-axis
+        plate_center_y,             // Center the crack along the y-axis
+        0.0                         // Assume the crack lies in the z=0 plane
+    };
+
+    // Compute the vector defining the crack
+    Kokkos::Array<double, 3> crack_vector = { crack_end[0] - crack_start[0],
+                                              crack_end[1] - crack_start[1],
+                                              crack_end[2] - crack_start[2] };
+
+    // Define the crack using Prenotch
+    Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { crack_start,
+                                                                   crack_end };
+    CabanaPD::Prenotch<2> prenotch( crack_vector, { 0.0, 0.0, thickness },
+                                    notch_positions );
 
     // ====================================================
     //                    Force model
@@ -73,7 +94,6 @@ void crackBranchingExample( const std::string filename )
     // ====================================================
     //                 Particle generation
     // ====================================================
-    // Note that individual inputs can be passed instead (see other examples).
     auto particles = CabanaPD::createParticles<memory_space, model_type>(
         exec_space{}, inputs, CabanaPD::EnergyStressOutput{} );
 
@@ -128,7 +148,8 @@ void crackBranchingExample( const std::string filename )
     auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
     {
         auto ypos = x( pid, 1 );
-        auto sign = std::abs( ypos ) / ypos;
+        auto sign =
+            ( ypos > ( low_corner[1] + high_corner[1] ) / 2.0 ) ? 1.0 : -1.0;
         f( pid, 1 ) += b0 * sign;
     };
     auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, planes,
@@ -147,7 +168,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    crackBranchingExample( argv[1] );
+    centralCrackExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();
