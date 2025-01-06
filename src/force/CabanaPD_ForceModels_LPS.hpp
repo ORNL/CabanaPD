@@ -12,6 +12,8 @@
 #ifndef FORCE_MODELS_LPS_H
 #define FORCE_MODELS_LPS_H
 
+#include <Kokkos_Core.hpp>
+
 #include <CabanaPD_ForceModels.hpp>
 #include <CabanaPD_Types.hpp>
 
@@ -95,11 +97,11 @@ struct ForceModel<LPS, Fracture> : public ForceModel<LPS, Elastic>
         G0 = _G0;
         if ( influence_type == 1 )
         {
-            s0 = sqrt( 5.0 * G0 / 9.0 / K / delta ); // 1/xi
+            s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / K / delta ); // 1/xi
         }
         else
         {
-            s0 = sqrt( 8.0 * G0 / 15.0 / K / delta ); // 1
+            s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / K / delta ); // 1
         }
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
