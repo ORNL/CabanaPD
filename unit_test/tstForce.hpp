@@ -676,15 +676,22 @@ double computeEnergyAndForce( CabanaPD::Fracture, ForceType force,
 }
 
 template <class ModelType, class ForceType, class ParticleType>
-void initializeForce( ModelType, ForceType& force, ParticleType& particles )
+void initializeForce(
+    ModelType, ForceType& force, ParticleType& particles,
+    typename std::enable_if<( std::is_same<typename ModelType::fracture_type,
+                                           CabanaPD::NoFracture>::value ),
+                            int>::type* = 0 )
 {
     force.computeWeightedVolume( particles, Cabana::SerialOpTag() );
     force.computeDilatation( particles, Cabana::SerialOpTag() );
 }
 
-template <class ForceType, class ParticleType>
-void initializeForce( CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Elastic>,
-                      ForceType& force, ParticleType& particles )
+template <class ModelType, class ForceType, class ParticleType>
+void initializeForce(
+    ModelType, ForceType& force, ParticleType& particles,
+    typename std::enable_if<( std::is_same<typename ModelType::fracture_type,
+                                           CabanaPD::Fracture>::value ),
+                            int>::type* = 0 )
 {
     auto max_neighbors = force.getMaxLocalNeighbors();
     Kokkos::View<int**, TEST_MEMSPACE> mu( "broken_bonds", particles.numLocal(),
