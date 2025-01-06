@@ -279,7 +279,6 @@ struct ForceModel<PMB, Elastic, DynamicTemperature, TemperatureType>
     // Explicitly use the temperature-dependent stretch.
     using base_type::thermalStretch;
 
-    // ForceModel(){};
     ForceModel( const double _delta, const double _K,
                 const TemperatureType _temp, const double _kappa,
                 const double _cp, const double _alpha,
@@ -346,17 +345,17 @@ struct ForceModel<PMB, Fracture, DynamicTemperature, TemperatureType>
     // Explicitly use the temperature-dependent stretch.
     using base_type::thermalStretch;
 
-    // ForceModel(){};
     ForceModel( const double _delta, const double _K, const double _G0,
                 const TemperatureType _temp, const double _kappa,
                 const double _cp, const double _alpha,
                 const double _temp0 = 0.0,
                 const bool _constant_microconductivity = true )
         : base_type( _delta, _K, _G0, _temp, _alpha, _temp0 )
+        , base_temperature_type( _delta, _kappa, _cp,
+                                 _constant_microconductivity )
     {
-        set_param( _delta, _K, _G0, _kappa, _cp, _alpha, _temp0 );
-        base_temperature_type::set_param( _delta, _kappa, _cp,
-                                          _constant_microconductivity );
+        set_param( _delta, _K, _G0, _kappa, _cp, _alpha, _temp0,
+                   _constant_microconductivity );
     }
 
     void set_param( const double _delta, const double _K, const double _G0,

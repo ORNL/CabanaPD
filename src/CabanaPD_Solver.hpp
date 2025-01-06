@@ -602,6 +602,18 @@ class SolverFracture
             // Integrate - velocity Verlet first half.
             integrator->initialHalfStep( *particles );
 
+            // Update ghost particles.
+            comm->gatherDisplacement();
+
+            if constexpr ( is_heat_transfer<
+                               typename force_model_type::thermal_type>::value )
+            {
+                if ( step % thermal_subcycle_steps == 0 )
+                    computeHeatTransfer( *heat_transfer, *particles, mu,
+                                         neigh_iter_tag{},
+                                         thermal_subcycle_steps * dt );
+            }
+
             // Add non-force boundary condition.
             if ( !boundary_condition.forceUpdate() )
                 boundary_condition.apply( exec_space(), *particles, step * dt );
@@ -609,9 +621,6 @@ class SolverFracture
             if constexpr ( is_temperature_dependent<
                                typename force_model_type::thermal_type>::value )
                 comm->gatherTemperature();
-
-            // Update ghost particles.
-            comm->gatherDisplacement();
 
             // Compute internal forces.
             updateForce();
@@ -707,11 +716,13 @@ class SolverFracture
     using base_type::num_steps;
     using base_type::output_frequency;
     using base_type::output_reference;
+    using base_type::thermal_subcycle_steps;
 
   protected:
     using base_type::comm;
     using base_type::contact;
     using base_type::force;
+    using base_type::heat_transfer;
     using base_type::inputs;
     using base_type::integrator;
     using base_type::particles;
