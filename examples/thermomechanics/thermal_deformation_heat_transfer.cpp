@@ -91,13 +91,13 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     //                    Force model
     // ====================================================
     auto force_model = CabanaPD::createForceModel(
-        model_type{}, CabanaPD::Elastic{}, *particles, delta, K, kappa, cp,
+        model_type{}, CabanaPD::NoFracture{}, *particles, delta, K, kappa, cp,
         alpha, temp0 );
 
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
+    auto cabana_pd = CabanaPD::createSolverNoFracture<memory_space>(
         inputs, particles, force_model );
 
     // ====================================================

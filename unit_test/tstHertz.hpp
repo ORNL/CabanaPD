@@ -122,7 +122,7 @@ void testHertzianContact( const std::string filename )
     // ====================================================
     //  Simulation run
     // ====================================================
-    auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
+    auto cabana_pd = CabanaPD::createSolverNoFracture<memory_space>(
         inputs, particles, contact_model );
     cabana_pd->init();
     cabana_pd->run();

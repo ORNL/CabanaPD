@@ -93,7 +93,7 @@ class SolverBase
 
 template <class MemorySpace, class InputType, class ParticleType,
           class ForceModelType, class ContactModelType = NoContact>
-class SolverElastic
+class SolverNoFracture
 {
   public:
     using memory_space = MemorySpace;
@@ -114,9 +114,9 @@ class SolverElastic
     using contact_type = Force<memory_space, ContactModelType>;
     using contact_model_type = ContactModelType;
 
-    SolverElastic( input_type _inputs,
-                   std::shared_ptr<particle_type> _particles,
-                   force_model_type force_model )
+    SolverNoFracture( input_type _inputs,
+                      std::shared_ptr<particle_type> _particles,
+                      force_model_type force_model )
         : inputs( _inputs )
         , particles( _particles )
         , _init_time( 0.0 )
@@ -124,10 +124,10 @@ class SolverElastic
         setup( force_model );
     }
 
-    SolverElastic( input_type _inputs,
-                   std::shared_ptr<particle_type> _particles,
-                   force_model_type force_model,
-                   contact_model_type contact_model )
+    SolverNoFracture( input_type _inputs,
+                      std::shared_ptr<particle_type> _particles,
+                      force_model_type force_model,
+                      contact_model_type contact_model )
         : inputs( _inputs )
         , particles( _particles )
         , _init_time( 0.0 )
@@ -482,12 +482,12 @@ class SolverElastic
 template <class MemorySpace, class InputType, class ParticleType,
           class ForceModelType, class ContactModelType = NoContact>
 class SolverFracture
-    : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModelType,
-                           ContactModelType>
+    : public SolverNoFracture<MemorySpace, InputType, ParticleType,
+                              ForceModelType, ContactModelType>
 {
   public:
-    using base_type = SolverElastic<MemorySpace, InputType, ParticleType,
-                                    ForceModelType, ContactModelType>;
+    using base_type = SolverNoFracture<MemorySpace, InputType, ParticleType,
+                                       ForceModelType, ContactModelType>;
     using exec_space = typename base_type::exec_space;
     using memory_space = typename base_type::memory_space;
 
@@ -729,24 +729,26 @@ class SolverFracture
 
 template <class MemorySpace, class InputsType, class ParticleType,
           class ForceModelType>
-auto createSolverElastic( InputsType inputs,
-                          std::shared_ptr<ParticleType> particles,
-                          ForceModelType model )
+auto createSolverNoFracture( InputsType inputs,
+                             std::shared_ptr<ParticleType> particles,
+                             ForceModelType model )
 {
-    return std::make_shared<
-        SolverElastic<MemorySpace, InputsType, ParticleType, ForceModelType>>(
+    return std::make_shared<SolverNoFracture<MemorySpace, InputsType,
+                                             ParticleType, ForceModelType>>(
         inputs, particles, model );
 }
 
 template <class MemorySpace, class InputsType, class ParticleType,
           class ForceModelType, class ContactModelType>
-auto createSolverElastic( InputsType inputs,
-                          std::shared_ptr<ParticleType> particles,
-                          ForceModelType model, ContactModelType contact_model )
+auto createSolverNoFracture( InputsType inputs,
+                             std::shared_ptr<ParticleType> particles,
+                             ForceModelType model,
+                             ContactModelType contact_model )
 {
-    return std::make_shared<SolverElastic<MemorySpace, InputsType, ParticleType,
-                                          ForceModelType, ContactModelType>>(
-        inputs, particles, model, contact_model );
+    return std::make_shared<
+        SolverNoFracture<MemorySpace, InputsType, ParticleType, ForceModelType,
+                         ContactModelType>>( inputs, particles, model,
+                                             contact_model );
 }
 
 template <class MemorySpace, class InputsType, class ParticleType,

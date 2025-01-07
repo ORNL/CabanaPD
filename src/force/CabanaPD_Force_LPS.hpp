@@ -70,13 +70,14 @@
 namespace CabanaPD
 {
 template <class MemorySpace>
-class Force<MemorySpace, ForceModel<LPS, Elastic>>
+class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
     : public Force<MemorySpace, BaseForceModel>
 {
   protected:
     using base_type = Force<MemorySpace, BaseForceModel>;
     using base_type::_half_neigh;
-    ForceModel<LPS, Elastic> _model;
+    using model_type = ForceModel<LPS, Elastic, NoFracture>;
+    model_type _model;
 
     using base_type::_energy_timer;
     using base_type::_timer;
@@ -89,7 +90,7 @@ class Force<MemorySpace, ForceModel<LPS, Elastic>>
 
     template <class ParticleType>
     Force( const bool half_neigh, ParticleType& particles,
-           const ForceModel<LPS, Elastic> model )
+           const model_type model )
         : base_type( half_neigh, model.delta, particles )
         , _model( model )
     {
@@ -259,13 +260,14 @@ class Force<MemorySpace, ForceModel<LPS, Elastic>>
 };
 
 template <class MemorySpace>
-class Force<MemorySpace, ForceModel<LPS, Fracture>>
-    : public Force<MemorySpace, ForceModel<LPS, Elastic>>
+class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
+    : public Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
 {
   protected:
-    using base_type = Force<MemorySpace, ForceModel<LPS, Elastic>>;
+    using base_type = Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>;
     using base_type::_half_neigh;
-    ForceModel<LPS, Fracture> _model;
+    using model_type = ForceModel<LPS, Elastic, Fracture>;
+    model_type _model;
 
     using base_type::_energy_timer;
     using base_type::_timer;
@@ -278,7 +280,7 @@ class Force<MemorySpace, ForceModel<LPS, Fracture>>
 
     template <class ParticleType>
     Force( const bool half_neigh, const ParticleType& particles,
-           const ForceModel<LPS, Fracture> model )
+           const model_type model )
         : base_type( half_neigh, particles, model )
         , _model( model )
     {
@@ -511,12 +513,13 @@ class Force<MemorySpace, ForceModel<LPS, Fracture>>
 };
 
 template <class MemorySpace>
-class Force<MemorySpace, ForceModel<LinearLPS, Elastic>>
-    : public Force<MemorySpace, ForceModel<LPS, Elastic>>
+class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
+    : public Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
 {
   protected:
-    using base_type = Force<MemorySpace, ForceModel<LPS, Elastic>>;
-    ForceModel<LinearLPS, Elastic> _model;
+    using base_type = Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>;
+    using model_type = ForceModel<LinearLPS, Elastic, NoFracture>;
+    model_type _model;
 
     using base_type::_energy_timer;
     using base_type::_timer;
@@ -529,7 +532,7 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic>>
 
     template <class ParticleType>
     Force( const bool half_neigh, ParticleType& particles,
-           const ForceModel<LinearLPS, Elastic> model )
+           const model_type model )
         : base_type( half_neigh, particles, model )
         , _model( model )
     {
