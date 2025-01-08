@@ -777,41 +777,41 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic>>
         const auto x = particles.sliceReferencePosition();
         const auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();
-        const auto theta = particles.sliceDilatation();
+        const auto linear_theta = particles.sliceDilatation();
         const auto m = particles.sliceWeightedVolume();
         auto stress = particles.sliceStress();
 
         auto stress_full = KOKKOS_LAMBDA( const int i, const int j )
         {
-            // Get the bond distance, displacement, and stretch
-            double xi, r, s;
-            double rx, ry, rz;
-            getLinearizedDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+            // Get the linearized components
+            double xi, linear_s;
+            double xi_x, xi_y, xi_z;
+            getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
+                                             xi_y, xi_z );
 
-            // LPS specific coefficients
             const double coeff =
-                ( model.theta_coeff *
-                      ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
-                  model.s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
+                ( model.theta_coeff * ( linear_theta( i ) / m( i ) +
+                                        linear_theta( j ) / m( j ) ) +
+                  model.s_coeff * linear_s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
                 model.influence_function( xi ) * xi * vol( j ) * vol( j );
 
-            double fx_i = coeff * rx / r;
-            double fy_i = coeff * ry / r;
-            double fz_i = coeff * rz / r;
+            double fx_i = coeff * xi_x / xi;
+            double fy_i = coeff * xi_y / xi;
+            double fz_i = coeff * xi_z / xi;
 
             // Update stress tensor components
-            stress( i, 0, 0 ) += fx_i * rx;
-            stress( i, 1, 1 ) += fy_i * ry;
-            stress( i, 2, 2 ) += fz_i * rz;
+            stress( i, 0, 0 ) += fx_i * xi_x;
+            stress( i, 1, 1 ) += fy_i * xi_y;
+            stress( i, 2, 2 ) += fz_i * xi_z;
 
-            stress( i, 0, 1 ) += fx_i * ry;
-            stress( i, 1, 0 ) += fy_i * rx;
+            stress( i, 0, 1 ) += fx_i * xi_y;
+            stress( i, 1, 0 ) += fy_i * xi_x;
 
-            stress( i, 0, 2 ) += fx_i * rz;
-            stress( i, 2, 0 ) += fz_i * rx;
+            stress( i, 0, 2 ) += fx_i * xi_z;
+            stress( i, 2, 0 ) += fz_i * xi_x;
 
-            stress( i, 1, 2 ) += fy_i * rz;
-            stress( i, 2, 1 ) += fz_i * ry;
+            stress( i, 1, 2 ) += fy_i * xi_z;
+            stress( i, 2, 1 ) += fz_i * xi_y;
         };
 
         Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
