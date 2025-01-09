@@ -70,15 +70,15 @@
 
 namespace CabanaPD
 {
-template <class MemorySpace, class... ModelParams>
-class Force<MemorySpace, ForceModel<PMB, Elastic, NoFracture, ModelParams...>>
-    : public Force<MemorySpace, BaseForceModel>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, PMB, NoFracture>
+    : public BaseForce<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ForceModel<PMB, Elastic, NoFracture, ModelParams...>;
-    using base_type = Force<MemorySpace, BaseForceModel>;
+    using model_type = ModelType;
+    using base_type = BaseForce<MemorySpace>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
     using base_type::_neigh_list;
 
@@ -119,9 +119,9 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, NoFracture, ModelParams...>>
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-            model.thermalStretch( s, i, j );
+            model.thermalStretch( i, j, s );
 
-            const double coeff = model.forceCoeff( s, vol( j ) );
+            const double coeff = model.forceCoeff( i, j, s, vol( j ) );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -158,9 +158,9 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, NoFracture, ModelParams...>>
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
-            model.thermalStretch( s, i, j );
+            model.thermalStretch( i, j, s );
 
-            double w = model.energy( s, xi, vol( j ) );
+            double w = model.energy( i, j, s, xi, vol( j ) );
             W( i ) += w;
             Phi += w * vol( i );
         };
@@ -178,25 +178,22 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, NoFracture, ModelParams...>>
     }
 };
 
-template <class MemorySpace, class... ModelParams>
-class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
-    : public Force<MemorySpace, BaseForceModel>,
-      public BaseFracture<MemorySpace>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, PMB, Fracture>
+    : public BaseForce<MemorySpace>, public BaseFracture<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ForceModel<PMB, Elastic, Fracture, ModelParams...>;
-    using base_type = Force<MemorySpace, BaseForceModel>;
+    using model_type = ModelType;
+    using base_type = BaseForce<MemorySpace>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
     using base_type::_neigh_list;
 
   protected:
+    using base_type::_half_neigh;
     using fracture_type = BaseFracture<MemorySpace>;
     using fracture_type::_mu;
-
-    using base_model_type = typename model_type::base_type;
-    using base_type::_half_neigh;
     model_type _model;
 
     using base_type::_energy_timer;
@@ -253,7 +250,7 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
                 double rx, ry, rz;
                 getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-                model.thermalStretch( s, i, j );
+                model.thermalStretch( i, j, s );
 
                 // Break if beyond critical stretch unless in no-fail zone.
                 if ( model.criticalStretch( i, j, r, xi ) && !nofail( i ) &&
@@ -264,7 +261,7 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
                 // Else if statement is only for performance.
                 else if ( mu( i, n ) > 0 )
                 {
-                    const double coeff = model.forceCoeff( s, vol( j ) );
+                    const double coeff = model.forceCoeff( i, j, s, vol( j ) );
 
                     double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;
@@ -315,9 +312,9 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
 
-                model.thermalStretch( s, i, j );
+                model.thermalStretch( i, j, s );
 
-                double w = mu( i, n ) * model.energy( s, xi, vol( j ) );
+                double w = mu( i, n ) * model.energy( i, j, s, xi, vol( j ) );
                 W( i ) += w;
 
                 phi_i += mu( i, n ) * vol( j );
@@ -338,17 +335,15 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
     }
 };
 
-template <class MemorySpace, class... ModelParams>
-class Force<MemorySpace,
-            ForceModel<LinearPMB, Elastic, NoFracture, ModelParams...>>
-    : public Force<MemorySpace, BaseForceModel>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, LinearPMB, NoFracture>
+    : public BaseForce<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type =
-        ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>;
-    using base_type = Force<MemorySpace, BaseForceModel>;
+    using model_type = ModelType;
+    using base_type = BaseForce<MemorySpace>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
     using base_type::_neigh_list;
 
@@ -390,9 +385,9 @@ class Force<MemorySpace,
             getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
                                              xi_y, xi_z );
 
-            model.thermalStretch( linear_s, i, j );
+            model.thermalStretch( i, j, linear_s );
 
-            const double coeff = model.forceCoeff( linear_s, vol( j ) );
+            const double coeff = model.forceCoeff( i, j, linear_s, vol( j ) );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
             fz_i = coeff * xi_z / xi;
@@ -429,9 +424,9 @@ class Force<MemorySpace,
             double xi, linear_s;
             getLinearizedDistance( x, u, i, j, xi, linear_s );
 
-            model.thermalStretch( linear_s, i, j );
+            model.thermalStretch( i, j, linear_s );
 
-            double w = model.energy( linear_s, xi, vol( j ) );
+            double w = model.energy( i, j, linear_s, xi, vol( j ) );
             W( i ) += w;
             Phi += w * vol( i );
         };
