@@ -122,10 +122,9 @@ void testHertzianContact( const std::string filename )
     // ====================================================
     //  Simulation run
     // ====================================================
-    auto cabana_pd = CabanaPD::createSolver<memory_space>( inputs, particles,
-                                                           contact_model );
-    cabana_pd->init();
-    cabana_pd->run();
+    CabanaPD::Solver solver( inputs, particles, contact_model );
+    solver.init();
+    solver.run();
 
     // Get final total KE
     double ke_f = calculateKE( v, rho, vo );
