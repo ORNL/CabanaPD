@@ -47,12 +47,48 @@ struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModel
         s_coeff = 15.0 * G;
     }
 
-    KOKKOS_INLINE_FUNCTION double influence_function( double xi ) const
+    KOKKOS_INLINE_FUNCTION double influenceFunction( double xi ) const
     {
         if ( influence_type == 1 )
             return 1.0 / xi;
         else
             return 1.0;
+    }
+
+    KOKKOS_INLINE_FUNCTION auto weightedVolume( const double xi,
+                                                const double vol ) const
+    {
+        return influenceFunction( xi ) * xi * xi * vol;
+    }
+
+    KOKKOS_INLINE_FUNCTION auto dilatation( const double s, const double xi,
+                                            const double vol,
+                                            const double m_i ) const
+    {
+        double theta_i = influenceFunction( xi ) * s * xi * xi * vol;
+        return 3.0 * theta_i / m_i;
+    }
+
+    KOKKOS_INLINE_FUNCTION auto forceCoeff( const double s, const double xi,
+                                            const double vol, const double m_i,
+                                            const double m_j,
+                                            const double theta_i,
+                                            const double theta_j ) const
+    {
+        return ( theta_coeff * ( theta_i / m_i + theta_j / m_j ) +
+                 s_coeff * s * ( 1.0 / m_i + 1.0 / m_j ) ) *
+               influenceFunction( xi ) * xi * vol;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto energy( const double s, const double xi, const double vol,
+                 const double m_i, const double theta_i,
+                 const double num_bonds ) const
+    {
+        return 1.0 / num_bonds * 0.5 * theta_coeff / 3.0 *
+                   ( theta_i * theta_i ) +
+               0.5 * ( s_coeff / m_i ) * influenceFunction( xi ) * s * s * xi *
+                   xi * vol;
     }
 };
 

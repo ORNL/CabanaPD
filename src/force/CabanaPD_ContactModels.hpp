@@ -58,6 +58,15 @@ struct NormalRepulsionModel : public ContactModel
         // This could inherit from PMB (same c)
         c = 18.0 * K / ( pi * delta * delta * delta * delta );
     }
+
+    KOKKOS_INLINE_FUNCTION
+    auto forceCoeff( const double r, const double vol ) const
+    {
+        // Contact "stretch"
+        const double sc = ( r - Rc ) / delta;
+        // Normal repulsion uses a 15 factor compared to the PMB force
+        return 15.0 * c * sc * vol;
+    }
 };
 
 template <>

@@ -114,8 +114,7 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
             // Get the reference positions and displacements.
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
-            double m_j = model.influence_function( xi ) * xi * xi * vol( j );
-            m( i ) += m_j;
+            m( i ) += model.weightedVolume( xi, vol( j ) );
         };
 
         Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
@@ -146,9 +145,7 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
             // Get the bond distance, displacement, and stretch.
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
-            double theta_i =
-                model.influence_function( xi ) * s * xi * xi * vol( j );
-            theta( i ) += 3.0 * theta_i / m( i );
+            theta( i ) += model.dilatation( s, xi, vol( j ), m( i ) );
         };
 
         Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
@@ -168,10 +165,7 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
     {
         _timer.start();
 
-        auto theta_coeff = _model.theta_coeff;
-        auto s_coeff = _model.s_coeff;
         auto model = _model;
-
         const auto vol = particles.sliceVolume();
         auto theta = particles.sliceDilatation();
         auto m = particles.sliceWeightedVolume();
@@ -184,10 +178,9 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
             double xi, r, s;
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-            const double coeff =
-                ( theta_coeff * ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
-                  s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                model.influence_function( xi ) * xi * vol( j );
+
+            const double coeff = model.forceCoeff(
+                s, xi, vol( j ), m( i ), m( j ), theta( i ), theta( j ) );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -214,8 +207,6 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
     {
         _energy_timer.start();
 
-        auto theta_coeff = _model.theta_coeff;
-        auto s_coeff = _model.s_coeff;
         auto model = _model;
         auto neigh_list = _neigh_list;
 
@@ -233,11 +224,8 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
                 Cabana::NeighborList<neighbor_list_type>::numNeighbor(
                     neigh_list, i ) );
 
-            double w = ( 1.0 / num_neighbors ) * 0.5 * theta_coeff / 3.0 *
-                           ( theta( i ) * theta( i ) ) +
-                       0.5 * ( s_coeff / m( i ) ) *
-                           model.influence_function( xi ) * s * s * xi * xi *
-                           vol( j );
+            double w = model.energy( s, xi, vol( j ), m( i ), theta( i ),
+                                     num_neighbors );
             W( i ) += w;
             Phi += w * vol( i );
         };
@@ -314,9 +302,7 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
                 // mu is included to account for bond breaking.
-                double m_j = mu( i, n ) * model.influence_function( xi ) * xi *
-                             xi * vol( j );
-                m( i ) += m_j;
+                m( i ) += mu( i, n ) * model.weightedVolume( xi, vol( j ) );
             }
         };
 
@@ -356,14 +342,14 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
                 // Get the bond distance, displacement, and stretch.
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
-                // mu is included to account for bond breaking.
-                double theta_i = mu( i, n ) * model.influence_function( xi ) *
-                                 s * xi * xi * vol( j );
+
                 // Check if all bonds are broken (m=0) to avoid dividing by
                 // zero. Alternatively, one could check if this bond mu(i,n) is
                 // broken, because m=0 only occurs when all bonds are broken.
+                // mu is still included to account for individual bond breaking.
                 if ( m( i ) > 0 )
-                    theta( i ) += 3.0 * theta_i / m( i );
+                    theta( i ) += mu( i, n ) *
+                                  model.dilatation( s, xi, vol( j ), m( i ) );
             }
         };
 
@@ -384,8 +370,6 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
         _timer.start();
 
         auto break_coeff = _model.bond_break_coeff;
-        auto theta_coeff = _model.theta_coeff;
-        auto s_coeff = _model.s_coeff;
         auto model = _model;
         auto neigh_list = _neigh_list;
 
@@ -425,10 +409,8 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
                 else if ( mu( i, n ) > 0 )
                 {
                     const double coeff =
-                        ( theta_coeff *
-                              ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
-                          s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                        model.influence_function( xi ) * xi * vol( j );
+                        model.forceCoeff( s, xi, vol( j ), m( i ), m( j ),
+                                          theta( i ), theta( j ) );
                     double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;
                     fy_i = muij * coeff * ry / r;
@@ -457,8 +439,6 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
     {
         _energy_timer.start();
 
-        auto theta_coeff = _model.theta_coeff;
-        auto s_coeff = _model.s_coeff;
         auto model = _model;
         auto neigh_list = _neigh_list;
 
@@ -486,12 +466,8 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
 
-                double w =
-                    mu( i, n ) * ( ( 1.0 / num_bonds ) * 0.5 * theta_coeff /
-                                       3.0 * ( theta( i ) * theta( i ) ) +
-                                   0.5 * ( s_coeff / m( i ) ) *
-                                       model.influence_function( xi ) * s * s *
-                                       xi * xi * vol( j ) );
+                double w = mu( i, n ) * model.energy( s, xi, vol( j ), m( i ),
+                                                      theta( i ), num_bonds );
                 W( i ) += w;
 
                 phi_i += mu( i, n ) * vol( j );
@@ -546,12 +522,9 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
     {
         _timer.start();
 
-        auto theta_coeff = _model.theta_coeff;
-        auto s_coeff = _model.s_coeff;
         auto model = _model;
-
         const auto vol = particles.sliceVolume();
-        auto linear_theta = particles.sliceDilatation();
+        auto theta = particles.sliceDilatation();
         // Using weighted volume from base LPS class.
         auto m = particles.sliceWeightedVolume();
 
@@ -568,10 +541,8 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
                                              xi_y, xi_z );
 
             const double coeff =
-                ( theta_coeff * ( linear_theta( i ) / m( i ) +
-                                  linear_theta( j ) / m( j ) ) +
-                  s_coeff * linear_s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                model.influence_function( xi ) * xi * vol( j );
+                model.forceCoeff( linear_s, xi, vol( j ), m( i ), m( j ),
+                                  theta( i ), theta( j ) );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
             fz_i = coeff * xi_z / xi;
@@ -598,20 +569,17 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
     {
         _energy_timer.start();
 
-        auto theta_coeff = _model.theta_coeff;
-        auto s_coeff = _model.s_coeff;
         auto model = _model;
         auto neigh_list = _neigh_list;
 
         const auto vol = particles.sliceVolume();
-        const auto linear_theta = particles.sliceDilatation();
+        const auto theta = particles.sliceDilatation();
         auto m = particles.sliceWeightedVolume();
 
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
         {
             // Do we need to recompute linear_theta_i?
-
             double xi, linear_s;
             getLinearizedDistance( x, u, i, j, xi, linear_s );
 
@@ -619,11 +587,8 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
                 Cabana::NeighborList<neighbor_list_type>::numNeighbor(
                     neigh_list, i ) );
 
-            double w = ( 1.0 / num_neighbors ) * 0.5 * theta_coeff / 3.0 *
-                           ( linear_theta( i ) * linear_theta( i ) ) +
-                       0.5 * ( s_coeff / m( i ) ) *
-                           model.influence_function( xi ) * linear_s *
-                           linear_s * xi * xi * vol( j );
+            double w = model.energy( linear_s, xi, vol( j ), m( i ), theta( i ),
+                                     num_neighbors );
             W( i ) += w;
             Phi += w * vol( i );
         };

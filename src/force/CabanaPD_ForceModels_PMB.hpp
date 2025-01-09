@@ -40,6 +40,20 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
     {
         c = 18.0 * K / ( pi * delta * delta * delta * delta );
     }
+
+    KOKKOS_INLINE_FUNCTION
+    auto forceCoeff( const double s, const double vol ) const
+    {
+        return c * s * vol;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto energy( const double s, const double xi, const double vol ) const
+    {
+        // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
+        // the integrand (pairwise potential).
+        return 0.25 * c * s * s * xi * vol;
+    }
 };
 
 template <>
