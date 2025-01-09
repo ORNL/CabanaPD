@@ -54,6 +54,15 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
 
     void init() { c = 18.0 * K / ( pi * delta * delta * delta * delta ); }
 
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    BaseForceModelPMB( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+    {
+        K = ( model1.K + model2.K ) / 2.0;
+        c = ( model1.c + model2.c ) / 2.0;
+    }
+
     KOKKOS_INLINE_FUNCTION
     auto operator()( ForceCoeffTag, const int, const int, const double s,
                      const double vol ) const
@@ -93,6 +102,13 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
         : base_type( model, NoFracture{}, delta, K )
         , base_plasticity_type()
         , s_Y( sigma_y / 3.0 / K )
+    {
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    BaseForceModelPMB( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
     {
     }
 
@@ -189,6 +205,14 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
         , base_fracture_type( G0, s0 )
     {
     }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_fracture_type( model1, model2 )
+    {
+    }
 };
 
 template <typename MemorySpace>
@@ -216,6 +240,14 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
                               ( 5.0 * G0 / sigma_y / delta + sigma_y / K ) /
                                   6.0 )
         , base_temperature_type()
+    {
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_fracture_type( model1, model2 )
     {
     }
 };
@@ -322,6 +354,14 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
 
     {
     }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_temperature_type( model1, model2 )
+    {
+    }
 };
 
 template <typename TemperatureType>
@@ -402,11 +442,9 @@ ForceModel( ModelType, NoFracture, const double delta, const double K,
 
 template <typename ModelType, typename TemperatureType>
 struct ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
-                  TemperatureType>
-
-    : public BaseForceModelPMB<Elastic>,
-      ThermalFractureModel<TemperatureType>,
-      BaseDynamicTemperatureModel
+                  TemperatureType> : public BaseForceModelPMB<Elastic>,
+                                     ThermalFractureModel<TemperatureType>,
+                                     BaseDynamicTemperatureModel
 {
     using base_type = BaseForceModelPMB<Elastic>;
     using base_temperature_type = ThermalFractureModel<TemperatureType>;
