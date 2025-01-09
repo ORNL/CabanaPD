@@ -84,16 +84,9 @@
 
 namespace CabanaPD
 {
-class SolverBase
-{
-  public:
-    virtual ~SolverBase() = default;
-    virtual void run() = 0;
-};
-
 template <class MemorySpace, class InputType, class ParticleType,
           class ForceModelType, class ContactModelType = NoContact>
-class SolverNoFracture
+class Solver
 {
   public:
     using memory_space = MemorySpace;
@@ -114,9 +107,8 @@ class SolverNoFracture
     using contact_type = Force<memory_space, ContactModelType>;
     using contact_model_type = ContactModelType;
 
-    SolverNoFracture( input_type _inputs,
-                      std::shared_ptr<particle_type> _particles,
-                      force_model_type force_model )
+    Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
+            force_model_type force_model )
         : inputs( _inputs )
         , particles( _particles )
         , _init_time( 0.0 )
@@ -124,10 +116,8 @@ class SolverNoFracture
         setup( force_model );
     }
 
-    SolverNoFracture( input_type _inputs,
-                      std::shared_ptr<particle_type> _particles,
-                      force_model_type force_model,
-                      contact_model_type contact_model )
+    Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
+            force_model_type force_model, contact_model_type contact_model )
         : inputs( _inputs )
         , particles( _particles )
         , _init_time( 0.0 )
@@ -218,10 +208,14 @@ class SolverNoFracture
     void init( const bool initial_output = true )
     {
         // Compute and communicate weighted volume for LPS (does nothing for
-        // PMB). Only computed once.
-        force->computeWeightedVolume( *particles, neigh_iter_tag{} );
-        comm->gatherWeightedVolume();
-
+        // PMB). Only computed once without fracture (and inside updateForce for
+        // fracture).
+        if constexpr ( !is_fracture<
+                           typename force_model_type::fracture_type>::value )
+        {
+            force->computeWeightedVolume( *particles, neigh_iter_tag{} );
+            comm->gatherWeightedVolume();
+        }
         // Compute initial internal forces and energy.
         updateForce();
         computeEnergy( *force, *particles, neigh_iter_tag() );
@@ -252,6 +246,24 @@ class SolverNoFracture
 
         if ( initial_output )
             particles->output( 0, 0.0, output_reference );
+    }
+
+    // Initialize with prenotch, but no BC.
+    template <std::size_t NumPrenotch>
+    void init( Prenotch<NumPrenotch> prenotch,
+               const bool initial_output = true )
+    {
+        init_prenotch( prenotch );
+        init( initial_output );
+    }
+
+    // Initialize with prenotch and BC.
+    template <typename BoundaryType, std::size_t NumPrenotch>
+    void init( BoundaryType boundary_condition, Prenotch<NumPrenotch> prenotch,
+               const bool initial_output = true )
+    {
+        init_prenotch( prenotch );
+        init( boundary_condition, initial_output );
     }
 
     template <typename BoundaryType>
@@ -346,6 +358,14 @@ class SolverNoFracture
     // forces.
     void updateForce()
     {
+        // Compute and communicate weighted volume for LPS (does nothing for
+        // PMB). Only computed once without fracture.
+        if constexpr ( is_fracture<
+                           typename force_model_type::fracture_type>::value )
+        {
+            force->computeWeightedVolume( *particles, neigh_iter_tag{} );
+            comm->gatherWeightedVolume();
+        }
         // Compute and communicate dilatation for LPS (does nothing for PMB).
         force->computeDilatation( *particles, neigh_iter_tag{} );
         comm->gatherDilatation();
@@ -455,6 +475,18 @@ class SolverNoFracture
     int thermal_subcycle_steps;
 
   protected:
+    template <std::size_t NumPrenotch>
+    void init_prenotch( Prenotch<NumPrenotch> prenotch )
+    {
+        static_assert(
+            is_fracture<typename force_model_type::fracture_type>::value,
+            "Cannot create prenotch in system without fracture." );
+
+        // Create prenotch.
+        force->prenotch( exec_space{}, *particles, prenotch );
+        _init_time += prenotch.time();
+    }
+
     // Core modules.
     input_type inputs;
     std::shared_ptr<particle_type> particles;
@@ -478,300 +510,24 @@ class SolverNoFracture
     bool print;
 };
 
-template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModelType, class ContactModelType = NoContact>
-class SolverFracture
-    : public SolverNoFracture<MemorySpace, InputType, ParticleType,
-                              ForceModelType, ContactModelType>
-{
-  public:
-    using base_type = SolverNoFracture<MemorySpace, InputType, ParticleType,
-                                       ForceModelType, ContactModelType>;
-    using exec_space = typename base_type::exec_space;
-    using memory_space = typename base_type::memory_space;
-
-    using particle_type = typename base_type::particle_type;
-    using integrator_type = typename base_type::integrator_type;
-    using comm_type = typename base_type::comm_type;
-    using force_model_type = ForceModelType;
-    using force_type = typename base_type::force_type;
-    using neigh_iter_tag = Cabana::SerialOpTag;
-    using input_type = typename base_type::input_type;
-
-    using contact_model_type = ContactModelType;
-
-    SolverFracture( input_type _inputs,
-                    std::shared_ptr<particle_type> _particles,
-                    force_model_type force_model )
-        : base_type( _inputs, _particles, force_model )
-    {
-        init_mu();
-    }
-
-    SolverFracture( input_type _inputs,
-                    std::shared_ptr<particle_type> _particles,
-                    force_model_type force_model,
-                    contact_model_type contact_model )
-        : base_type( _inputs, _particles, force_model, contact_model )
-    {
-        init_mu();
-    }
-
-    void init_mu()
-    {
-        _init_timer.start();
-        // Create View to track broken bonds.
-        auto max_neighbors = force->getMaxLocalNeighbors();
-        // TODO: this could be optimized to ignore frozen particle bonds.
-        mu = NeighborView(
-            Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
-            particles->localOffset(), max_neighbors );
-        Kokkos::deep_copy( mu, 1 );
-        _init_timer.stop();
-    }
-
-    template <std::size_t NumPrenotch>
-    void init_prenotch( Prenotch<NumPrenotch> prenotch )
-    {
-        // Create prenotch.
-        prenotch.create( exec_space{}, mu, *particles, force->_neigh_list );
-        _init_time += prenotch.time();
-    }
-
-    void init( const bool initial_output = true )
-    {
-        // Compute initial internal forces and energy.
-        updateForce();
-        computeEnergy( *force, *particles, mu, neigh_iter_tag() );
-
-        if ( initial_output )
-            particles->output( 0, 0.0, output_reference );
-    }
-
-    template <std::size_t NumPrenotch>
-    void init( Prenotch<NumPrenotch> prenotch,
-               const bool initial_output = true )
-    {
-        init_prenotch( prenotch );
-        init( initial_output );
-    }
-
-    template <typename BoundaryType>
-    void init( BoundaryType boundary_condition,
-               const bool initial_output = true )
-    {
-        // Add non-force boundary condition.
-        if ( !boundary_condition.forceUpdate() )
-            boundary_condition.apply( exec_space(), *particles, 0.0 );
-
-        // Communicate temperature.
-        if constexpr ( is_temperature_dependent<
-                           typename force_model_type::thermal_type>::value )
-            comm->gatherTemperature();
-
-        // Force init without particle output.
-        init( false );
-
-        // Add force boundary condition.
-        if ( boundary_condition.forceUpdate() )
-            boundary_condition.apply( exec_space(), *particles, 0.0 );
-
-        if ( initial_output )
-            particles->output( 0, 0.0, output_reference );
-    }
-
-    template <typename BoundaryType, std::size_t NumPrenotch>
-    void init( BoundaryType boundary_condition, Prenotch<NumPrenotch> prenotch,
-               const bool initial_output = true )
-    {
-        init_prenotch( prenotch );
-        init( boundary_condition, initial_output );
-    }
-
-    template <typename BoundaryType>
-    void run( BoundaryType boundary_condition )
-    {
-        this->init_output( boundary_condition.timeInit() );
-
-        // Main timestep loop.
-        for ( int step = 1; step <= num_steps; step++ )
-        {
-            _step_timer.start();
-
-            // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( *particles );
-
-            // Add non-force boundary condition.
-            if ( !boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space(), *particles, step * dt );
-
-            if constexpr ( is_temperature_dependent<
-                               typename force_model_type::thermal_type>::value )
-                comm->gatherTemperature();
-
-            // Update ghost particles.
-            comm->gatherDisplacement();
-
-            // Compute internal forces.
-            updateForce();
-
-            if constexpr ( is_contact<contact_model_type>::value )
-                computeForce( *contact, *particles, neigh_iter_tag{}, false );
-
-            // Add force boundary condition.
-            if ( boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space{}, *particles, step * dt );
-
-            // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( *particles );
-
-            output( step );
-        }
-
-        // Final output and timings.
-        this->final_output();
-    }
-
-    void run()
-    {
-        this->init_output( 0.0 );
-
-        // Main timestep loop.
-        for ( int step = 1; step <= num_steps; step++ )
-        {
-            _step_timer.start();
-
-            // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( *particles );
-
-            if constexpr ( is_temperature_dependent<
-                               typename force_model_type::thermal_type>::value )
-                comm->gatherTemperature();
-
-            // Update ghost particles.
-            comm->gatherDisplacement();
-
-            // Compute internal forces.
-            updateForce();
-
-            if constexpr ( is_contact<contact_model_type>::value )
-                computeForce( *contact, *particles, neigh_iter_tag{}, false );
-
-            // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( *particles );
-
-            output( step );
-        }
-
-        // Final output and timings.
-        this->final_output();
-    }
-
-    // Compute and communicate fields needed for force computation and update
-    // forces.
-    void updateForce()
-    {
-        // Compute and communicate weighted volume for LPS (does nothing for
-        // PMB).
-        force->computeWeightedVolume( *particles, mu );
-        comm->gatherWeightedVolume();
-
-        // Compute and communicate dilatation for LPS (does nothing for PMB).
-        force->computeDilatation( *particles, mu );
-        comm->gatherDilatation();
-
-        // Compute internal forces.
-        computeForce( *force, *particles, mu, neigh_iter_tag{} );
-    }
-
-    void output( const int step )
-    {
-        // Print output.
-        if ( step % output_frequency == 0 )
-        {
-            auto W = computeEnergy( *force, *particles, mu, neigh_iter_tag() );
-
-            particles->output( step / output_frequency, step * dt,
-                               output_reference );
-            _step_timer.stop();
-            this->step_output( step, W );
-        }
-        else
-        {
-            _step_timer.stop();
-        }
-    }
-
-    using base_type::dt;
-    using base_type::num_steps;
-    using base_type::output_frequency;
-    using base_type::output_reference;
-
-  protected:
-    using base_type::comm;
-    using base_type::contact;
-    using base_type::force;
-    using base_type::inputs;
-    using base_type::integrator;
-    using base_type::particles;
-
-    using NeighborView = typename Kokkos::View<int**, memory_space>;
-    NeighborView mu;
-
-    using base_type::_init_time;
-    using base_type::_init_timer;
-    using base_type::_step_timer;
-    using base_type::print;
-};
-
-// ===============================================================
-
 template <class MemorySpace, class InputsType, class ParticleType,
           class ForceModelType>
-auto createSolverNoFracture( InputsType inputs,
-                             std::shared_ptr<ParticleType> particles,
-                             ForceModelType model )
+auto createSolver( InputsType inputs, std::shared_ptr<ParticleType> particles,
+                   ForceModelType model )
 {
-    return std::make_shared<SolverNoFracture<MemorySpace, InputsType,
-                                             ParticleType, ForceModelType>>(
+    return std::make_shared<
+        Solver<MemorySpace, InputsType, ParticleType, ForceModelType>>(
         inputs, particles, model );
 }
 
 template <class MemorySpace, class InputsType, class ParticleType,
           class ForceModelType, class ContactModelType>
-auto createSolverNoFracture( InputsType inputs,
-                             std::shared_ptr<ParticleType> particles,
-                             ForceModelType model,
-                             ContactModelType contact_model )
+auto createSolver( InputsType inputs, std::shared_ptr<ParticleType> particles,
+                   ForceModelType model, ContactModelType contact_model )
 {
-    return std::make_shared<
-        SolverNoFracture<MemorySpace, InputsType, ParticleType, ForceModelType,
-                         ContactModelType>>( inputs, particles, model,
-                                             contact_model );
-}
-
-template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModelType>
-auto createSolverFracture( InputsType inputs,
-                           std::shared_ptr<ParticleType> particles,
-                           ForceModelType model )
-{
-    return std::make_shared<
-        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModelType>>(
-        inputs, particles, model );
-}
-
-template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModelType, class ContactModelType>
-auto createSolverFracture( InputsType inputs,
-                           std::shared_ptr<ParticleType> particles,
-                           ForceModelType model,
-                           ContactModelType contact_model )
-{
-    return std::make_shared<
-        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModelType,
-                       ContactModelType>>( inputs, particles, model,
-                                           contact_model );
+    return std::make_shared<Solver<MemorySpace, InputsType, ParticleType,
+                                   ForceModelType, ContactModelType>>(
+        inputs, particles, model, contact_model );
 }
 
 } // namespace CabanaPD

@@ -21,6 +21,14 @@ struct NoFracture
 struct Fracture
 {
 };
+template <class>
+struct is_fracture : public std::false_type
+{
+};
+template <>
+struct is_fracture<Fracture> : public std::true_type
+{
+};
 
 // Mechanics tags.
 struct Elastic

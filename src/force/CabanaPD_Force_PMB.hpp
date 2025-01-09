@@ -180,7 +180,8 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, NoFracture, ModelParams...>>
 
 template <class MemorySpace, class... ModelParams>
 class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
-    : public Force<MemorySpace, BaseForceModel>
+    : public Force<MemorySpace, BaseForceModel>,
+      public BaseFracture<MemorySpace>
 {
   public:
     // Using the default exec_space.
@@ -191,6 +192,9 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
     using base_type::_neigh_list;
 
   protected:
+    using fracture_type = BaseFracture<MemorySpace>;
+    using fracture_type::_mu;
+
     using base_model_type = typename model_type::base_type;
     using base_type::_half_neigh;
     model_type _model;
@@ -203,20 +207,29 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
     Force( const bool half_neigh, const ParticleType& particles,
            const model_type model )
         : base_type( half_neigh, model.delta, particles )
+        , fracture_type( particles.localOffset(),
+                         base_type::getMaxLocalNeighbors() )
         , _model( model )
     {
     }
 
-    template <class ForceType, class PosType, class ParticleType, class MuView,
+    template <class ExecSpace, class ParticleType, class PrenotchType>
+    void prenotch( ExecSpace exec_space, const ParticleType& particles,
+                   PrenotchType& prenotch )
+    {
+        fracture_type::prenotch( exec_space, particles, prenotch, _neigh_list );
+    }
+
+    template <class ForceType, class PosType, class ParticleType,
               class ParallelType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
-                           const ParticleType& particles, MuView& mu,
-                           ParallelType& )
+                           const ParticleType& particles, ParallelType& )
     {
         _timer.start();
 
         auto model = _model;
         auto neigh_list = _neigh_list;
+        auto mu = _mu;
         const auto vol = particles.sliceVolume();
         const auto nofail = particles.sliceNoFail();
 
@@ -273,17 +286,18 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
         _timer.stop();
     }
 
-    template <class PosType, class WType, class DamageType, class ParticleType,
-              class MuView, class ParallelType>
+    template <class PosType, class WType, class ParticleType,
+              class ParallelType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              DamageType& phi, const ParticleType& particles,
-                              MuView& mu, ParallelType& )
+                              ParticleType& particles, ParallelType& )
     {
         _energy_timer.start();
 
         auto model = _model;
         auto neigh_list = _neigh_list;
+        auto mu = _mu;
         const auto vol = particles.sliceVolume();
+        auto phi = particles.sliceDamage();
 
         auto energy_full = KOKKOS_LAMBDA( const int i, double& Phi )
         {

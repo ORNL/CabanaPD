@@ -97,8 +97,8 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd = CabanaPD::createSolverNoFracture<memory_space>(
-        inputs, particles, force_model );
+    auto cabana_pd =
+        CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
 
     // ====================================================
     //                   Boundary condition

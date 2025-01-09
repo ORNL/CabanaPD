@@ -233,6 +233,36 @@ class Force<MemorySpace, BaseForceModel>
     auto timeEnergy() { return _energy_timer.time(); };
 };
 
+template <class MemorySpace>
+class BaseFracture
+{
+  protected:
+    using memory_space = MemorySpace;
+    using NeighborView = typename Kokkos::View<int**, memory_space>;
+    NeighborView _mu;
+
+  public:
+    BaseFracture( const int local_particles, const int max_neighbors )
+    {
+        // Create View to track broken bonds.
+        // TODO: this could be optimized to ignore frozen particle bonds.
+        _mu = NeighborView(
+            Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
+            local_particles, max_neighbors );
+        Kokkos::deep_copy( _mu, 1 );
+    }
+
+    template <class ExecSpace, class ParticleType, class PrenotchType,
+              class NeighborList>
+    void prenotch( ExecSpace exec_space, const ParticleType& particles,
+                   PrenotchType& prenotch, NeighborList& neigh_list )
+    {
+        prenotch.create( exec_space, _mu, particles, neigh_list );
+    }
+
+    auto getBrokenBonds() { return _mu; }
+};
+
 /******************************************************************************
   Force free functions.
 ******************************************************************************/
@@ -283,62 +313,6 @@ double computeEnergy( ForceType& force, ParticleType& particles,
         //                                   neigh_op_tag );
         // else
         energy = force.computeEnergyFull( W, x, u, particles, neigh_op_tag );
-        Kokkos::fence();
-    }
-    return energy;
-}
-
-// Forces with bond breaking.
-template <class ForceType, class ParticleType, class NeighborView,
-          class ParallelType>
-void computeForce( ForceType& force, ParticleType& particles, NeighborView& mu,
-                   const ParallelType& neigh_op_tag, const bool reset = true )
-{
-    auto x = particles.sliceReferencePosition();
-    auto u = particles.sliceDisplacement();
-    auto f = particles.sliceForce();
-    auto f_a = particles.sliceForceAtomic();
-
-    // Reset force.
-    if ( reset )
-        Cabana::deep_copy( f, 0.0 );
-
-    // if ( half_neigh )
-    // Forces must be atomic for half list
-    // computeForce_half( f_a, x, u,
-    //                    neigh_op_tag );
-
-    // Forces only atomic if using team threading.
-    if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
-        force.computeForceFull( f_a, x, u, particles, mu, neigh_op_tag );
-    else
-        force.computeForceFull( f, x, u, particles, mu, neigh_op_tag );
-    Kokkos::fence();
-}
-
-template <class ForceType, class ParticleType, class NeighborView,
-          class ParallelType>
-double computeEnergy( ForceType& force, ParticleType& particles,
-                      NeighborView& mu, const ParallelType& neigh_op_tag )
-{
-    double energy = 0.0;
-    if constexpr ( is_energy_output<typename ParticleType::output_type>::value )
-    {
-        auto x = particles.sliceReferencePosition();
-        auto u = particles.sliceDisplacement();
-        auto f = particles.sliceForce();
-        auto W = particles.sliceStrainEnergy();
-        auto phi = particles.sliceDamage();
-
-        // Reset energy.
-        Cabana::deep_copy( W, 0.0 );
-
-        // if ( _half_neigh )
-        //    energy = computeEnergy_half( force, x, u,
-        //                                   neigh_op_tag );
-        // else
-        energy = force.computeEnergyFull( W, x, u, phi, particles, mu,
-                                          neigh_op_tag );
         Kokkos::fence();
     }
     return energy;

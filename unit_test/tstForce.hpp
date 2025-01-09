@@ -654,50 +654,19 @@ void checkAnalyticalDilatation( ModelType, QuadraticTag, const double,
 }
 
 template <class ForceType, class ParticleType>
-double computeEnergyAndForce( CabanaPD::NoFracture, ForceType force,
-                              ParticleType& particles, const int )
+double computeEnergyAndForce( ForceType force, ParticleType& particles,
+                              const int )
 {
     computeForce( force, particles, Cabana::SerialOpTag() );
     double Phi = computeEnergy( force, particles, Cabana::SerialOpTag() );
     return Phi;
 }
+
 template <class ForceType, class ParticleType>
-double computeEnergyAndForce( CabanaPD::Fracture, ForceType force,
-                              ParticleType& particles, const int max_neighbors )
+void initializeForce( ForceType& force, ParticleType& particles )
 {
-    Kokkos::View<int**, TEST_MEMSPACE> mu(
-        Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
-        particles.numLocal(), max_neighbors );
-    Kokkos::deep_copy( mu, 1 );
-    computeForce( force, particles, mu, Cabana::SerialOpTag() );
-    double Phi = computeEnergy( force, particles, mu, Cabana::SerialOpTag() );
-    return Phi;
-}
-
-template <class ModelType, class ForceType, class ParticleType>
-void initializeForce(
-    ModelType, ForceType& force, ParticleType& particles,
-    typename std::enable_if<( std::is_same<typename ModelType::fracture_type,
-                                           CabanaPD::NoFracture>::value ),
-                            int>::type* = 0 )
-{
-    force.computeWeightedVolume( particles, Cabana::SerialOpTag() );
-    force.computeDilatation( particles, Cabana::SerialOpTag() );
-}
-
-template <class ModelType, class ForceType, class ParticleType>
-void initializeForce(
-    ModelType, ForceType& force, ParticleType& particles,
-    typename std::enable_if<( std::is_same<typename ModelType::fracture_type,
-                                           CabanaPD::Fracture>::value ),
-                            int>::type* = 0 )
-{
-    auto max_neighbors = force.getMaxLocalNeighbors();
-    Kokkos::View<int**, TEST_MEMSPACE> mu( "broken_bonds", particles.numLocal(),
-                                           max_neighbors );
-    Kokkos::deep_copy( mu, 1 );
-    force.computeWeightedVolume( particles, mu );
-    force.computeDilatation( particles, mu );
+    force.computeWeightedVolume( particles, Cabana::SerialOpTag{} );
+    force.computeDilatation( particles, Cabana::SerialOpTag{} );
 }
 
 template <class ParticleType, class AoSoAType>
@@ -735,14 +704,12 @@ void testForce( ModelType model, const double dx, const double m,
     auto vol = particles.sliceVolume();
     //  No communication needed (as in the main solver) since this test is only
     //  intended for one rank.
-    initializeForce( model, force, particles );
+    initializeForce( force, particles );
 
     unsigned int max_neighbors;
     unsigned long long total_neighbors;
     force.getNeighborStatistics( max_neighbors, total_neighbors );
-    using fracture_type = typename ModelType::fracture_type;
-    double Phi = computeEnergyAndForce( fracture_type{}, force, particles,
-                                        max_neighbors );
+    double Phi = computeEnergyAndForce( force, particles, max_neighbors );
 
     // Make a copy of final results on the host
     std::size_t num_particle = x.size();
