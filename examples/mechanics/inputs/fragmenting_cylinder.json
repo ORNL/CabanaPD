@@ -1,6 +1,6 @@
 {
     "dx"                       : {"value": [0.001, 0.001, 0.001], "unit": "m"},
-    "system_size"              : {"value": [0.1, 0.1, 0.15], "unit": "m"},
+    "system_size"              : {"value": [0.2, 0.2, 0.3], "unit": "m"},
     "grid_perturbation_factor" : {"value": 0.1},
     "density"                  : {"value": 7800, "unit": "kg/m^3"},
     "bulk_modulus"             : {"value": 130e+9, "unit": "Pa"},
