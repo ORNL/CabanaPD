@@ -85,23 +85,21 @@
 
 namespace CabanaPD
 {
-template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModelType, class ContactModelType = NoContact>
+template <class ParticleType, class ForceModelType,
+          class ContactModelType = NoContact>
 class Solver
 {
   public:
-    using memory_space = MemorySpace;
+    using memory_space = typename ParticleType::memory_space;
     using exec_space = typename memory_space::execution_space;
 
     // Core module types - required for all problems.
-    using particle_type = ParticleType;
     using force_model_type = ForceModelType;
     using force_type = Force<memory_space, force_model_type>;
     using comm_type =
-        Comm<particle_type, typename force_model_type::base_model::base_type,
-             typename particle_type::thermal_type>;
+        Comm<ParticleType, typename force_model_type::base_model::base_type,
+             typename ParticleType::thermal_type>;
     using neigh_iter_tag = Cabana::SerialOpTag;
-    using input_type = InputType;
 
     // Optional module types.
     using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
@@ -115,7 +113,7 @@ class Solver
         VelocityVerlet<typename either_contact<force_model_type,
                                                contact_model_type>::base_type>;
 
-    Solver( input_type _inputs, particle_type _particles,
+    Solver( Inputs _inputs, ParticleType _particles,
             force_model_type force_model )
         : particles( _particles )
         , inputs( _inputs )
@@ -124,7 +122,7 @@ class Solver
         setup( force_model );
     }
 
-    Solver( input_type _inputs, particle_type _particles,
+    Solver( Inputs _inputs, ParticleType _particles,
             force_model_type force_model, contact_model_type contact_model )
         : particles( _particles )
         , inputs( _inputs )
@@ -539,7 +537,7 @@ class Solver
     }
 
     // Core modules.
-    input_type inputs;
+    Inputs inputs;
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
@@ -559,26 +557,6 @@ class Solver
     double _total_time;
     bool print;
 };
-
-template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModelType>
-auto createSolver( InputsType inputs, ParticleType particles,
-                   ForceModelType model )
-{
-    return std::make_shared<
-        Solver<MemorySpace, InputsType, ParticleType, ForceModelType>>(
-        inputs, particles, model );
-}
-
-template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModelType, class ContactModelType>
-auto createSolver( InputsType inputs, ParticleType particles,
-                   ForceModelType model, ContactModelType contact_model )
-{
-    return std::make_shared<Solver<MemorySpace, InputsType, ParticleType,
-                                   ForceModelType, ContactModelType>>(
-        inputs, particles, model, contact_model );
-}
 
 } // namespace CabanaPD
 

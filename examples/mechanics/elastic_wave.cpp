@@ -101,14 +101,13 @@ void elasticWaveExample( const std::string filename )
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd =
-        CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
+    CabanaPD::Solver solver( inputs, particles, force_model );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init();
-    cabana_pd->run();
+    solver.init();
+    solver.run();
 
     // ====================================================
     //                      Outputs

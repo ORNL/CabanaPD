@@ -117,24 +117,23 @@ void powderSettlingExample( const std::string filename )
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd = CabanaPD::createSolver<memory_space>( inputs, particles,
-                                                           contact_model );
+    CabanaPD::Solver solver( inputs, particles, contact_model );
 
     // ====================================================
     //                   Simulation init
     // ====================================================
-    cabana_pd->init();
+    solver.init();
 
     // Use a force magnitude threshold to remove particles that are too close.
     // TODO: The force magnitude should be based on the maximum desired overlap
     // according to the properties of the contact model
-    cabana_pd->remove( 1e6 );
+    solver.remove( 1e6 );
 
     // ====================================================
     //                   Boundary condition
     // ====================================================
-    auto f = cabana_pd->particles.sliceForce();
-    rho = cabana_pd->particles.sliceDensity();
+    auto f = solver.particles.sliceForce();
+    rho = solver.particles.sliceDensity();
     auto body_functor = KOKKOS_LAMBDA( const int pid, const double )
     {
         f( pid, 2 ) -= 9.8 * rho( pid );
@@ -145,7 +144,7 @@ void powderSettlingExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->run( gravity );
+    solver.run( gravity );
 }
 
 // Initialize MPI+Kokkos.

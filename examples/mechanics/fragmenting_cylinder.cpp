@@ -129,11 +129,10 @@ void fragmentingCylinderExample( const std::string filename )
 
         contact_type contact_model( delta, r_c, r_extend, K );
 
-        auto cabana_pd = CabanaPD::createSolver<memory_space>(
-            inputs, particles, force_model, contact_model );
-
-        cabana_pd->init();
-        cabana_pd->run();
+        CabanaPD::Solver solver( inputs, particles, force_model,
+                                 contact_model );
+        solver.init();
+        solver.run();
     }
     // ====================================================
     //  Simulation run without contact
@@ -170,10 +169,9 @@ void fragmentingCylinderExample( const std::string filename )
         };
         particles.updateParticles( exec_space{}, init_functor );
 
-        auto cabana_pd = CabanaPD::createSolver<memory_space>(
-            inputs, particles, force_model );
-        cabana_pd->init();
-        cabana_pd->run();
+        CabanaPD::Solver solver( inputs, particles, force_model );
+        solver.init();
+        solver.run();
     }
 }
 
