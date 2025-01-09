@@ -1,0 +1,15 @@
+{
+    "num_cells"              : {"value": [187, 181, 15]},
+    "system_size"            : {"value": [0.12625, 0.1212, 0.01], "unit": "m"},
+    "density"                : {"value": 2440,    "unit": "kg/m^3"},
+    "elastic_modulus"        : {"value": 72.6e+9, "unit": "Pa"},
+    "fracture_energy"        : {"value": 16160,   "unit": "J/m^2"},
+    "horizon"                : {"value": 0.00203, "unit": "m"},   
+    "yield_stretch"          : {"value": 304e6,   "unit": "Pa"},
+    "pin_velocity"           : {"value": 7.15e6,  "unit": "m/s"},
+    "final_time"             : {"value": 43e-6,   "unit": "s"},
+    "timestep"               : {"value": 4.5e-8,  "unit": "s"},
+    "timestep_safety_factor" : {"value": 0.85},
+    "output_frequency"       : {"value": 5},
+    "output_reference"       : {"value": true}
+}

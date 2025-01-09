@@ -26,6 +26,9 @@ struct Fracture
 struct Elastic
 {
 };
+struct ElasticPerfectlyPlastic
+{
+};
 
 // Contact and DEM (contact without PD) tags.
 struct NoContact

@@ -464,7 +464,6 @@ class SolverNoFracture
     // Optional modules.
     std::shared_ptr<heat_transfer_type> heat_transfer;
     std::shared_ptr<contact_type> contact;
-    contact_model_type contact_model;
 
     // Output files.
     std::string output_file;

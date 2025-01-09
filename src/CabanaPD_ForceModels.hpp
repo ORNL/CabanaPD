@@ -21,11 +21,8 @@ struct BaseForceModel
 {
     double delta;
 
-    BaseForceModel(){};
     BaseForceModel( const double _delta )
         : delta( _delta ){};
-
-    BaseForceModel( const BaseForceModel& model ) { delta = model.delta; }
 
     // No-op for temperature.
     KOKKOS_INLINE_FUNCTION
@@ -55,12 +52,6 @@ struct BaseTemperatureModel
         temperature = model.temperature;
     }
 
-    void set_param( const double _alpha, const double _temp0 )
-    {
-        alpha = _alpha;
-        temp0 = _temp0;
-    }
-
     void update( const TemperatureType _temp ) { temperature = _temp; }
 
     // Update stretch with temperature effects.
@@ -87,12 +78,6 @@ struct BaseDynamicTemperatureModel
     BaseDynamicTemperatureModel( const double _delta, const double _kappa,
                                  const double _cp,
                                  const bool _constant_microconductivity = true )
-    {
-        set_param( _delta, _kappa, _cp, _constant_microconductivity );
-    }
-
-    void set_param( const double _delta, const double _kappa, const double _cp,
-                    const bool _constant_microconductivity )
     {
         delta = _delta;
         kappa = _kappa;
