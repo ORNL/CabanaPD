@@ -114,8 +114,8 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd =
-        CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
+    
+        CabanaPD::Solver solver( memory_space{}, inputs, particles, force_model );
 
     // ====================================================
     //                Boundary conditions
@@ -131,8 +131,8 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init( bc, prenotch );
-    cabana_pd->run( bc );
+    solver.init( bc, prenotch );
+    solver.run( bc );
 }
 
 // Initialize MPI+Kokkos.

@@ -92,8 +92,8 @@ void thermalCrackExample( const std::string filename )
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd =
-        CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
+    
+        CabanaPD::Solver solver( memory_space{}, inputs, particles, force_model );
 
     // --------------------------------------------
     //                Thermal shock
@@ -152,8 +152,8 @@ void thermalCrackExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init( body_term );
-    cabana_pd->run( body_term );
+    solver.init( body_term );
+    solver.run( body_term );
 }
 
 // Initialize MPI+Kokkos.

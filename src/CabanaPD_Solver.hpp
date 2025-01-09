@@ -107,7 +107,8 @@ class Solver
     using contact_type = Force<memory_space, ContactModelType>;
     using contact_model_type = ContactModelType;
 
-    Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
+    Solver( MemorySpace, input_type _inputs,
+            std::shared_ptr<particle_type> _particles,
             force_model_type force_model )
         : inputs( _inputs )
         , particles( _particles )
@@ -116,7 +117,8 @@ class Solver
         setup( force_model );
     }
 
-    Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
+    Solver( MemorySpace, input_type _inputs,
+            std::shared_ptr<particle_type> _particles,
             force_model_type force_model, contact_model_type contact_model )
         : inputs( _inputs )
         , particles( _particles )
@@ -509,26 +511,6 @@ class Solver
     double _total_time;
     bool print;
 };
-
-template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModelType>
-auto createSolver( InputsType inputs, std::shared_ptr<ParticleType> particles,
-                   ForceModelType model )
-{
-    return std::make_shared<
-        Solver<MemorySpace, InputsType, ParticleType, ForceModelType>>(
-        inputs, particles, model );
-}
-
-template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModelType, class ContactModelType>
-auto createSolver( InputsType inputs, std::shared_ptr<ParticleType> particles,
-                   ForceModelType model, ContactModelType contact_model )
-{
-    return std::make_shared<Solver<MemorySpace, InputsType, ParticleType,
-                                   ForceModelType, ContactModelType>>(
-        inputs, particles, model, contact_model );
-}
 
 } // namespace CabanaPD
 

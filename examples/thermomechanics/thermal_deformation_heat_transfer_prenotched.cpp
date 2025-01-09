@@ -139,8 +139,8 @@ void thermalDeformationHeatTransferPrenotchedExample(
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd =
-        CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
+    
+        CabanaPD::Solver solver( memory_space{}, inputs, particles, force_model );
 
     // ====================================================
     //                   Boundary condition
@@ -167,8 +167,8 @@ void thermalDeformationHeatTransferPrenotchedExample(
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init( bc, prenotch );
-    cabana_pd->run( bc );
+    solver.init( bc, prenotch );
+    solver.run( bc );
 
     // ====================================================
     //                      Outputs
