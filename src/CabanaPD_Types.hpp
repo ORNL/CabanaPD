@@ -141,18 +141,22 @@ struct is_temperature<DynamicTemperature> : public std::true_type
 struct PMB
 {
     using base_type = Pair;
+    using base_model = PMB;
 };
 struct LinearPMB
 {
     using base_type = Pair;
+    using base_model = PMB;
 };
 struct LPS
 {
     using base_type = State;
+    using base_model = LPS;
 };
 struct LinearLPS
 {
     using base_type = State;
+    using base_model = LPS;
 };
 
 struct BaseOutput

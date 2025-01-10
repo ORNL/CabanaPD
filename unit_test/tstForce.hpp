@@ -395,7 +395,7 @@ double computeReferenceForceX(
 template <class ModelType>
 CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
                     typename ModelType::thermal_type, CabanaPD::EnergyOutput>
-createParticles( ModelType, LinearTag, const double dx, const double s0 )
+createParticles( ModelType model, LinearTag, const double dx, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -403,11 +403,8 @@ createParticles( ModelType, LinearTag, const double dx, const double s0 )
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    using ptype =
-        CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
-                            typename ModelType::thermal_type,
-                            CabanaPD::EnergyOutput>;
-    ptype particles( TEST_EXECSPACE{}, box_min, box_max, num_cells, 0 );
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, model, box_min, box_max,
+                                   num_cells, 0, TEST_EXECSPACE{} );
 
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
@@ -427,7 +424,8 @@ createParticles( ModelType, LinearTag, const double dx, const double s0 )
 template <class ModelType>
 CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
                     typename ModelType::thermal_type, CabanaPD::EnergyOutput>
-createParticles( ModelType, QuadraticTag, const double dx, const double s0 )
+createParticles( ModelType model, QuadraticTag, const double dx,
+                 const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -435,11 +433,8 @@ createParticles( ModelType, QuadraticTag, const double dx, const double s0 )
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    using ptype =
-        CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
-                            typename ModelType::thermal_type,
-                            CabanaPD::EnergyOutput>;
-    ptype particles( TEST_EXECSPACE{}, box_min, box_max, num_cells, 0 );
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, model, box_min, box_max,
+                                   num_cells, 0, TEST_EXECSPACE{} );
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto v = particles.sliceVelocity();

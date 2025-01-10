@@ -69,15 +69,15 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     //                 Particle generation
     // ====================================================
     // Does not set displacements, velocities, etc.
-    auto particles =
-        CabanaPD::createParticles<memory_space, model_type, thermal_type>(
-            exec_space(), low_corner, high_corner, num_cells, halo_width );
+    CabanaPD::Particles particles( memory_space{}, model_type{}, thermal_type{},
+                                   low_corner, high_corner, num_cells,
+                                   halo_width, exec_space{} );
 
     // ====================================================
     //            Custom particle initialization
     // ====================================================
-    auto rho = particles->sliceDensity();
-    auto temp = particles->sliceTemperature();
+    auto rho = particles.sliceDensity();
+    auto temp = particles.sliceTemperature();
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
@@ -85,13 +85,13 @@ void thermalDeformationHeatTransferExample( const std::string filename )
         // Temperature
         temp( pid ) = temp0;
     };
-    particles->updateParticles( exec_space{}, init_functor );
+    particles.updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                    Force model
     // ====================================================
     auto force_model = CabanaPD::createForceModel(
-        model_type{}, CabanaPD::NoFracture{}, *particles, delta, K, kappa, cp,
+        model_type{}, CabanaPD::NoFracture{}, particles, delta, K, kappa, cp,
         alpha, temp0 );
 
     // ====================================================
@@ -104,7 +104,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     //                   Boundary condition
     // ====================================================
     // Temperature profile imposed on top and bottom surfaces
-    double dy = particles->dx[1];
+    double dy = particles.dx[1];
     using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
 
     // Top surface
@@ -117,14 +117,14 @@ void thermalDeformationHeatTransferExample( const std::string filename )
 
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
-    temp = particles->sliceTemperature();
+    temp = particles.sliceTemperature();
     auto temp_bc = KOKKOS_LAMBDA( const int pid, const double )
     {
         temp( pid ) = 0.0;
     };
 
     auto bc = CabanaPD::createBoundaryCondition(
-        temp_bc, exec_space{}, *particles, false, plane1, plane2 );
+        temp_bc, exec_space{}, particles, false, plane1, plane2 );
 
     // ====================================================
     //                   Simulation run
@@ -140,7 +140,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     auto value = KOKKOS_LAMBDA( const int pid ) { return temp( pid ); };
     std::string file_name = "temperature_yaxis_profile.txt";
     createOutputProfile( MPI_COMM_WORLD, num_cells[1], profile_dim, file_name,
-                         *particles, value );
+                         particles, value );
 }
 
 // Initialize MPI+Kokkos.

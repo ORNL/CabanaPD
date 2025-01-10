@@ -32,6 +32,8 @@ struct ContactModel
     // Extend neighbor search radius to reuse lists.
     double radius_extend;
 
+    ContactModel() {}
+
     // PD horizon
     // Contact radius
     ContactModel( const double _radius, const double _radius_extend )
@@ -54,6 +56,7 @@ struct NormalRepulsionModel : public ContactModel
     double c;
     double K;
 
+    NormalRepulsionModel() {}
     NormalRepulsionModel( const double _delta, const double radius,
                           const double radius_extend, const double _K )
         : ContactModel( radius, radius_extend )

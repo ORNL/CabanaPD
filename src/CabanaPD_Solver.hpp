@@ -115,7 +115,7 @@ class Solver
         VelocityVerlet<typename either_contact<force_model_type,
                                                contact_model_type>::base_type>;
 
-    Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
+    Solver( input_type _inputs, particle_type _particles,
             force_model_type force_model )
         : particles( _particles )
         , inputs( _inputs )
@@ -124,7 +124,7 @@ class Solver
         setup( force_model );
     }
 
-    Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
+    Solver( input_type _inputs, particle_type _particles,
             force_model_type force_model, contact_model_type contact_model )
         : particles( _particles )
         , inputs( _inputs )
@@ -134,7 +134,7 @@ class Solver
 
         _neighbor_timer.start();
         contact = std::make_shared<contact_type>( inputs["half_neigh"],
-                                                  *particles, contact_model );
+                                                  particles, contact_model );
         _neighbor_timer.stop();
     }
 
@@ -153,7 +153,7 @@ class Solver
         integrator = std::make_shared<integrator_type>( dt );
 
         // Add ghosts from other MPI ranks.
-        comm = std::make_shared<comm_type>( *particles );
+        comm = std::make_shared<comm_type>( particles );
 
         if constexpr ( is_contact<contact_model_type>::value )
         {
@@ -165,11 +165,11 @@ class Solver
         // Update temperature ghost size if needed.
         if constexpr ( is_temperature_dependent<
                            typename force_model_type::thermal_type>::value )
-            force_model.update( particles->sliceTemperature() );
+            force_model.update( particles.sliceTemperature() );
 
         _neighbor_timer.start();
         // This will either be PD or DEM forces.
-        force = std::make_shared<force_type>( inputs["half_neigh"], *particles,
+        force = std::make_shared<force_type>( inputs["half_neigh"], particles,
                                               force_model );
         _neighbor_timer.stop();
 
@@ -191,7 +191,7 @@ class Solver
         print = print_rank();
         if ( print )
         {
-            log( std::cout, "Local particles: ", particles->numLocal(),
+            log( std::cout, "Local particles: ", particles.numLocal(),
                  ", Maximum neighbors: ", max_neighbors );
             log( std::cout, "#Timestep/Total-steps Simulation-time" );
 
@@ -206,8 +206,8 @@ class Solver
             exec_space().print_configuration( out );
 
             log( out, "Local particles, Ghosted particles, Global particles\n",
-                 particles->numLocal(), ", ", particles->numGhost(), ", ",
-                 particles->numGlobal() );
+                 particles.numLocal(), ", ", particles.numGhost(), ", ",
+                 particles.numGlobal() );
             log( out, "Maximum neighbors: ", max_neighbors,
                  ", Total neighbors: ", total_neighbors, "\n" );
             out.close();
@@ -223,15 +223,15 @@ class Solver
         if constexpr ( !is_fracture<
                            typename force_model_type::fracture_type>::value )
         {
-            force->computeWeightedVolume( *particles, neigh_iter_tag{} );
+            force->computeWeightedVolume( particles, neigh_iter_tag{} );
             comm->gatherWeightedVolume();
         }
         // Compute initial internal forces and energy.
         updateForce();
-        computeEnergy( *force, *particles, neigh_iter_tag() );
+        computeEnergy( *force, particles, neigh_iter_tag() );
 
         if ( initial_output )
-            particles->output( 0, 0.0, output_reference );
+            particles.output( 0, 0.0, output_reference );
     }
 
     template <typename BoundaryType>
@@ -240,7 +240,7 @@ class Solver
     {
         // Add non-force boundary condition.
         if ( !boundary_condition.forceUpdate() )
-            boundary_condition.apply( exec_space(), *particles, 0.0 );
+            boundary_condition.apply( exec_space(), particles, 0.0 );
 
         // Communicate temperature.
         if constexpr ( is_temperature_dependent<
@@ -252,10 +252,10 @@ class Solver
 
         // Add force boundary condition.
         if ( boundary_condition.forceUpdate() )
-            boundary_condition.apply( exec_space(), *particles, 0.0 );
+            boundary_condition.apply( exec_space(), particles, 0.0 );
 
         if ( initial_output )
-            particles->output( 0, 0.0, output_reference );
+            particles.output( 0, 0.0, output_reference );
     }
 
     // Initialize with prenotch, but no BC.
@@ -281,10 +281,10 @@ class Solver
     {
         // Remove any points that are too close.
         Kokkos::View<int*, memory_space> keep( "keep_points",
-                                               particles->numLocal() );
+                                               particles.numLocal() );
         Kokkos::deep_copy( keep, 1 );
-        auto f = particles->sliceForce();
-        std::size_t min_particle = particles->numFrozen();
+        auto f = particles.sliceForce();
+        std::size_t min_particle = particles.numFrozen();
         if ( use_frozen )
             min_particle = 0;
         auto remove_functor = KOKKOS_LAMBDA( const int pid, int& k )
@@ -298,11 +298,11 @@ class Solver
 
         int num_keep;
         Kokkos::RangePolicy<exec_space> policy( min_particle,
-                                                particles->localOffset() );
+                                                particles.localOffset() );
         Kokkos::parallel_reduce( "remove", policy, remove_functor,
                                  Kokkos::Sum<int>( num_keep ) );
 
-        particles->remove( num_keep, keep );
+        particles.remove( num_keep, keep );
         // FIXME: Will need to rebuild ghosts.
     }
 
@@ -319,7 +319,7 @@ class Solver
             _step_timer.start();
 
             // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( exec_space{}, *particles );
+            integrator->initialHalfStep( exec_space{}, particles );
 
             // Update ghost particles.
             comm->gatherDisplacement();
@@ -328,14 +328,14 @@ class Solver
                                typename force_model_type::thermal_type>::value )
             {
                 if ( step % thermal_subcycle_steps == 0 )
-                    computeHeatTransfer( *heat_transfer, *particles,
+                    computeHeatTransfer( *heat_transfer, particles,
                                          neigh_iter_tag{},
                                          thermal_subcycle_steps * dt );
             }
 
             // Add non-force boundary condition.
             if ( !boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space(), *particles, step * dt );
+                boundary_condition.apply( exec_space(), particles, step * dt );
 
             if constexpr ( is_temperature_dependent<
                                typename force_model_type::thermal_type>::value )
@@ -345,14 +345,14 @@ class Solver
             updateForce();
 
             if constexpr ( is_contact<contact_model_type>::value )
-                computeForce( *contact, *particles, neigh_iter_tag{}, false );
+                computeForce( *contact, particles, neigh_iter_tag{}, false );
 
             // Add force boundary condition.
             if ( boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space(), *particles, step * dt );
+                boundary_condition.apply( exec_space(), particles, step * dt );
 
             // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( exec_space{}, *particles );
+            integrator->finalHalfStep( exec_space{}, particles );
 
             output( step );
         }
@@ -371,7 +371,7 @@ class Solver
             _step_timer.start();
 
             // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( exec_space{}, *particles );
+            integrator->initialHalfStep( exec_space{}, particles );
 
             // Update ghost particles.
             comm->gatherDisplacement();
@@ -380,14 +380,14 @@ class Solver
             updateForce();
 
             if constexpr ( is_contact<contact_model_type>::value )
-                computeForce( *contact, *particles, neigh_iter_tag{}, false );
+                computeForce( *contact, particles, neigh_iter_tag{}, false );
 
             if constexpr ( is_temperature_dependent<
                                typename force_model_type::thermal_type>::value )
                 comm->gatherTemperature();
 
             // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( exec_space{}, *particles );
+            integrator->finalHalfStep( exec_space{}, particles );
 
             output( step );
         }
@@ -405,15 +405,15 @@ class Solver
         if constexpr ( is_fracture<
                            typename force_model_type::fracture_type>::value )
         {
-            force->computeWeightedVolume( *particles, neigh_iter_tag{} );
+            force->computeWeightedVolume( particles, neigh_iter_tag{} );
             comm->gatherWeightedVolume();
         }
         // Compute and communicate dilatation for LPS (does nothing for PMB).
-        force->computeDilatation( *particles, neigh_iter_tag{} );
+        force->computeDilatation( particles, neigh_iter_tag{} );
         comm->gatherDilatation();
 
         // Compute internal forces.
-        computeForce( *force, *particles, neigh_iter_tag{} );
+        computeForce( *force, particles, neigh_iter_tag{} );
     }
 
     void output( const int step )
@@ -421,10 +421,10 @@ class Solver
         // Print output.
         if ( step % output_frequency == 0 )
         {
-            auto W = computeEnergy( *force, *particles, neigh_iter_tag() );
+            auto W = computeEnergy( *force, particles, neigh_iter_tag() );
 
-            particles->output( step / output_frequency, step * dt,
-                               output_reference );
+            particles.output( step / output_frequency, step * dt,
+                              output_reference );
             _step_timer.stop();
             step_output( step, W );
         }
@@ -439,7 +439,7 @@ class Solver
         // Output after construction and initial forces.
         std::ofstream out( output_file, std::ofstream::app );
         _init_time += _init_timer.time() + _neighbor_timer.time() +
-                      particles->timeInit() + comm->timeInit() +
+                      particles.timeInit() + comm->timeInit() +
                       integrator->timeInit() + boundary_init_time;
         log( out, "Init-Time(s): ", _init_time );
         log( out, "Init-Neighbor-Time(s): ", _neighbor_timer.time(), "\n" );
@@ -462,11 +462,11 @@ class Solver
             double force_time = force->time();
             double energy_time = force->timeEnergy();
             double neigh_time = force->timeNeighbor();
-            double output_time = particles->timeOutput();
+            double output_time = particles.timeOutput();
             _total_time += step_time;
             // Instantaneous rate.
             double p_steps_per_sec =
-                static_cast<double>( particles->numGlobal() ) / step_time;
+                static_cast<double>( particles.numGlobal() ) / step_time;
 
             _step_timer.reset();
             log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
@@ -488,24 +488,24 @@ class Solver
             double integrate_time = integrator->time();
             double force_time = force->time();
             double energy_time = force->timeEnergy();
-            double output_time = particles->timeOutput();
+            double output_time = particles.timeOutput();
             double neighbor_time = _neighbor_timer.time();
             _total_time = _init_time + comm_time + integrate_time + force_time +
-                          energy_time + output_time + particles->time();
+                          energy_time + output_time + particles.time();
 
-            // Rates over the whole simulation.s
+            // Rates over the whole simulation.
             double steps_per_sec =
                 static_cast<double>( num_steps ) / _total_time;
             double p_steps_per_sec =
-                static_cast<double>( particles->numGlobal() ) * steps_per_sec;
+                static_cast<double>( particles.numGlobal() ) * steps_per_sec;
             log( out, std::fixed, std::setprecision( 2 ),
                  "\n#Procs Particles | Total Force Comm Integrate Energy "
                  "Output Init Init_Neighbor |\n",
-                 comm->mpi_size, " ", particles->numGlobal(), " | \t",
+                 comm->mpi_size, " ", particles.numGlobal(), " | \t",
                  _total_time, " ", force_time, " ", comm_time, " ",
                  integrate_time, " ", energy_time, " ", output_time, " ",
                  _init_time, " ", neighbor_time, " | PERFORMANCE\n", std::fixed,
-                 comm->mpi_size, " ", particles->numGlobal(), " | \t", 1.0, " ",
+                 comm->mpi_size, " ", particles.numGlobal(), " | \t", 1.0, " ",
                  force_time / _total_time, " ", comm_time / _total_time, " ",
                  integrate_time / _total_time, " ", energy_time / _total_time,
                  " ", output_time / _total_time, " ", _init_time / _total_time,
@@ -523,7 +523,7 @@ class Solver
     double dt;
     int thermal_subcycle_steps;
     // Sometimes necessary to update particles after solver creation.
-    std::shared_ptr<particle_type> particles;
+    ParticleType particles;
 
   protected:
     template <std::size_t NumPrenotch>
@@ -534,7 +534,7 @@ class Solver
             "Cannot create prenotch in system without fracture." );
 
         // Create prenotch.
-        force->prenotch( exec_space{}, *particles, prenotch );
+        force->prenotch( exec_space{}, particles, prenotch );
         _init_time += prenotch.time();
     }
 
@@ -562,7 +562,7 @@ class Solver
 
 template <class MemorySpace, class InputsType, class ParticleType,
           class ForceModelType>
-auto createSolver( InputsType inputs, std::shared_ptr<ParticleType> particles,
+auto createSolver( InputsType inputs, ParticleType particles,
                    ForceModelType model )
 {
     return std::make_shared<
@@ -572,7 +572,7 @@ auto createSolver( InputsType inputs, std::shared_ptr<ParticleType> particles,
 
 template <class MemorySpace, class InputsType, class ParticleType,
           class ForceModelType, class ContactModelType>
-auto createSolver( InputsType inputs, std::shared_ptr<ParticleType> particles,
+auto createSolver( InputsType inputs, ParticleType particles,
                    ForceModelType model, ContactModelType contact_model )
 {
     return std::make_shared<Solver<MemorySpace, InputsType, ParticleType,
