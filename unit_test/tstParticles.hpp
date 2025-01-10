@@ -71,9 +71,9 @@ void testCreateParticles()
     std::array<int, 3> num_cells = { 10, 10, 10 };
 
     // Frozen or all particles first.
-    CabanaPD::Particles<TEST_MEMSPACE, CabanaPD::PMB,
-                        CabanaPD::TemperatureIndependent>
-        particles( exec_space(), box_min, box_max, num_cells, 0 );
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, CabanaPD::PMB{},
+                                   CabanaPD::TemperatureIndependent{}, box_min,
+                                   box_max, num_cells, 0, exec_space{} );
 
     // Check expected values for each block of particles.
     std::size_t expected_local = num_cells[0] * num_cells[1] * num_cells[2];
@@ -99,10 +99,9 @@ void testCreateFrozenParticles()
             return true;
         return false;
     };
-    CabanaPD::Particles<TEST_MEMSPACE, CabanaPD::PMB,
-                        CabanaPD::TemperatureIndependent>
-        particles( exec_space(), box_min, box_max, num_cells, 0, init_bottom, 0,
-                   true );
+    CabanaPD::Particles particles(
+        TEST_MEMSPACE{}, CabanaPD::PMB{}, CabanaPD::TemperatureIndependent{},
+        box_min, box_max, num_cells, 0, init_bottom, exec_space{}, true );
 
     // Unfrozen in top half.
     auto init_top = KOKKOS_LAMBDA( const int, const double x[3] )
@@ -154,10 +153,9 @@ void testCreateCustomParticles()
             volume( p ) = 10.2;
         } );
 
-    CabanaPD::Particles<TEST_MEMSPACE, CabanaPD::PMB,
-                        CabanaPD::TemperatureIndependent>
-        particles( exec_space{}, position, volume, box_min, box_max, num_cells,
-                   0, 0, true );
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, CabanaPD::PMB{},
+                                   CabanaPD::TemperatureIndependent{}, box_min,
+                                   box_max, num_cells, 0, exec_space{}, true );
 
     // Overwrite the previous particles and put them on top instead.
     Kokkos::parallel_for(

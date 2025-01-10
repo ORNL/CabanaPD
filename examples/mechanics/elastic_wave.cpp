@@ -62,16 +62,17 @@ void elasticWaveExample( const std::string filename )
     // ====================================================
     //                 Particle generation
     // ====================================================
-    auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space(), low_corner, high_corner, num_cells, halo_width );
+    CabanaPD::Particles particles( memory_space{}, force_model, low_corner,
+                                   high_corner, num_cells, halo_width,
+                                   exec_space{} );
 
     // ====================================================
     //            Custom particle initialization
     // ====================================================
-    auto rho = particles->sliceDensity();
-    auto x = particles->sliceReferencePosition();
-    auto u = particles->sliceDisplacement();
-    auto v = particles->sliceVelocity();
+    auto rho = particles.sliceDensity();
+    auto x = particles.sliceReferencePosition();
+    auto u = particles.sliceDisplacement();
+    auto v = particles.sliceVelocity();
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
@@ -96,7 +97,7 @@ void elasticWaveExample( const std::string filename )
             v( pid, d ) = 0.0;
         }
     };
-    particles->updateParticles( exec_space{}, init_functor );
+    particles.updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver
@@ -113,8 +114,9 @@ void elasticWaveExample( const std::string filename )
     //                      Outputs
     // ====================================================
     // Output x-displacement along the x-axis
-    createDisplacementProfile( MPI_COMM_WORLD, "displacement_profile.txt",
-                               *particles, num_cells[0], 0 );
+    CabanaPD::createDisplacementProfile( MPI_COMM_WORLD,
+                                         "displacement_profile.txt", particles,
+                                         num_cells[0], 0 );
 }
 
 // Initialize MPI+Kokkos.
