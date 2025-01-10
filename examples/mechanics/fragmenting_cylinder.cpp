@@ -85,16 +85,15 @@ void fragmentingCylinderExample( const std::string filename )
         return true;
     };
 
-    auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space(), low_corner, high_corner, num_cells, Cabana::InitRandom{},
-        halo_width, init_op );
+    CabanaPD::Particles particles(
+        memory_space{}, force_model, low_corner, high_corner, num_cells,
+        halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
 
-    auto rho = particles->sliceDensity();
-    auto x = particles->sliceReferencePosition();
-    auto v = particles->sliceVelocity();
-    auto f = particles->sliceForce();
-    auto dx = particles->dx;
-
+    auto rho = particles.sliceDensity();
+    auto x = particles.sliceReferencePosition();
+    auto v = particles.sliceVelocity();
+    auto f = particles.sliceForce();
+    auto dx = particles.dx;
     double vrmax = inputs["max_radial_velocity"];
     double vrmin = inputs["min_radial_velocity"];
     double vzmax = inputs["max_vertical_velocity"];
@@ -114,7 +113,7 @@ void fragmentingCylinderExample( const std::string filename )
             vr * Kokkos::sin( Kokkos::atan2( x( pid, 1 ), x( pid, 0 ) ) );
         v( pid, 2 ) = vzmax * zfactor;
     };
-    particles->updateParticles( exec_space{}, init_functor );
+    particles.updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //  Simulation run with contact physics
