@@ -41,11 +41,11 @@ KOKKOS_INLINE_FUNCTION void getRelativeNormalVelocityComponents(
   Normal repulsion forces
 ******************************************************************************/
 template <class MemorySpace>
-class Force<MemorySpace, NormalRepulsionModel>
-    : public Force<MemorySpace, BaseForceModel>
+class Force<MemorySpace, NormalRepulsionModel, NormalRepulsionModel, NoFracture>
+    : public BaseForce<MemorySpace>
 {
   public:
-    using base_type = Force<MemorySpace, BaseForceModel>;
+    using base_type = BaseForce<MemorySpace>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
 
     template <class ParticleType>
@@ -69,16 +69,15 @@ class Force<MemorySpace, NormalRepulsionModel>
                            const ParticleType& particles,
                            ParallelType& neigh_op_tag )
     {
-        auto delta = _model.delta;
-        auto Rc = _model.Rc;
-        auto c = _model.c;
+        auto model = _model;
         const auto vol = particles.sliceVolume();
         const auto y = particles.sliceCurrentPosition();
         const int n_frozen = particles.frozenOffset();
         const int n_local = particles.localOffset();
 
         _neigh_timer.start();
-        _neigh_list.build( y, n_frozen, n_local, Rc, 1.0, mesh_min, mesh_max );
+        _neigh_list.build( y, n_frozen, n_local, model.Rc, 1.0, mesh_min,
+                           mesh_max );
         _neigh_timer.stop();
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
@@ -91,11 +90,7 @@ class Force<MemorySpace, NormalRepulsionModel>
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-            // Contact "stretch"
-            const double sc = ( r - Rc ) / delta;
-
-            // Normal repulsion uses a 15 factor compared to the PMB force
-            const double coeff = 15 * c * sc * vol( j );
+            const double coeff = model.forceCoeff( r, vol( j ) );
             fcx_i = coeff * rx / r;
             fcy_i = coeff * ry / r;
             fcz_i = coeff * rz / r;

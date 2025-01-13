@@ -12,6 +12,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <type_traits>
+
 namespace CabanaPD
 {
 // Fracture tags.
@@ -27,12 +29,11 @@ struct Elastic
 {
 };
 
-// Contact and DEM (contact without PD) tags.
-struct NoContact
+// Material option tags.
+struct SingleMaterial
 {
 };
-template <class>
-struct is_contact : public std::false_type
+struct MultiMaterial
 {
 };
 
@@ -70,6 +71,19 @@ struct is_heat_transfer : public std::false_type
 };
 template <>
 struct is_heat_transfer<DynamicTemperature> : public std::true_type
+{
+};
+
+// Contact and DEM (contact without PD) tags.
+struct NoContact
+{
+    using base_model = std::false_type;
+    using model_type = std::false_type;
+    using thermal_type = TemperatureIndependent;
+    using fracture_type = NoFracture;
+};
+template <class>
+struct is_contact : public std::false_type
 {
 };
 

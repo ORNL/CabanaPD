@@ -78,17 +78,16 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type = CabanaPD::ForceModel<CabanaPD::PMB>;
-    model_type force_model( delta, K, G0 );
-    // using model_type =
-    //     CabanaPD::ForceModel<CabanaPD::LPS>;
-    // model_type force_model( delta, K, G, G0 );
+    using model_type1 = CabanaPD::ForceModel<CabanaPD::PMB>;
+    model_type1 force_model1( delta, K, G0 );
+    using model_type2 = CabanaPD::ForceModel<CabanaPD::LinearPMB>;
+    model_type2 force_model2( delta, K / 10.0, G0 / 10.0 );
 
     // ====================================================
     //                 Particle generation
     // ====================================================
     // Does not set displacements, velocities, etc.
-    auto particles = CabanaPD::createParticles<memory_space, model_type>(
+    auto particles = CabanaPD::createParticles<memory_space, model_type2>(
         exec_space(), low_corner, high_corner, num_cells, halo_width );
 
     // ====================================================
@@ -98,6 +97,7 @@ void kalthoffWinklerExample( const std::string filename )
     auto x = particles->sliceReferencePosition();
     auto v = particles->sliceVelocity();
     auto f = particles->sliceForce();
+    auto type = particles->sliceType();
 
     double dx = particles->dx[0];
     double v0 = inputs["impactor_velocity"];
@@ -109,14 +109,19 @@ void kalthoffWinklerExample( const std::string filename )
         if ( x( pid, 1 ) > y_prenotch1 && x( pid, 1 ) < y_prenotch2 &&
              x( pid, 0 ) < -0.5 * height + dx )
             v( pid, 0 ) = v0;
+
+        if ( x( pid, 1 ) > 0.0 )
+            type( pid ) = 1;
     };
     particles->updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver
     // ====================================================
+    auto models = CabanaPD::createMultiForceModel(
+        *particles, CabanaPD::AverageTag{}, force_model1, force_model2 );
     auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
-        inputs, particles, force_model );
+        inputs, particles, models );
 
     // ====================================================
     //                Boundary conditions
