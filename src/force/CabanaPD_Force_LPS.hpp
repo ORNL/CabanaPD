@@ -179,8 +179,9 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-            const double coeff = model.forceCoeff(
-                i, j, s, xi, vol( j ), m( i ), m( j ), theta( i ), theta( j ) );
+            const double coeff =
+                model( ForceCoeffTag{}, i, j, s, xi, vol( j ), m( i ), m( j ),
+                       theta( i ), theta( j ) );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -224,8 +225,8 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
                 Cabana::NeighborList<neighbor_list_type>::numNeighbor(
                     neigh_list, i ) );
 
-            double w = model.energy( i, j, s, xi, vol( j ), m( i ), theta( i ),
-                                     num_neighbors );
+            double w = model( EnergyTag{}, i, j, s, xi, vol( j ), m( i ),
+                              theta( i ), num_neighbors );
             W( i ) += w;
             Phi += w * vol( i );
         };
@@ -379,7 +380,6 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
     {
         _timer.start();
 
-        auto break_coeff = _model.bond_break_coeff;
         auto model = _model;
         auto neigh_list = _neigh_list;
         auto mu = _mu;
@@ -409,8 +409,8 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                 getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
                 // Break if beyond critical stretch unless in no-fail zone.
-                if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
-                     !nofail( i ) )
+                if ( model( CriticalStretchTag{}, i, j, r, xi ) &&
+                     !nofail( i ) && !nofail( i ) )
                 {
                     mu( i, n ) = 0;
                 }
@@ -420,8 +420,8 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                 else if ( mu( i, n ) > 0 )
                 {
                     const double coeff =
-                        model.forceCoeff( i, j, s, xi, vol( j ), m( i ), m( j ),
-                                          theta( i ), theta( j ) );
+                        model( ForceCoeffTag{}, i, j, s, xi, vol( j ), m( i ),
+                               m( j ), theta( i ), theta( j ) );
                     double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;
                     fy_i = muij * coeff * ry / r;
@@ -479,8 +479,8 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                 getDistance( x, u, i, j, xi, r, s );
 
                 double w =
-                    mu( i, n ) * model.energy( i, j, s, xi, vol( j ), m( i ),
-                                               theta( i ), num_bonds );
+                    mu( i, n ) * model( EnergyTag{}, i, j, s, xi, vol( j ),
+                                        m( i ), theta( i ), num_bonds );
                 W( i ) += w;
 
                 phi_i += mu( i, n ) * vol( j );
@@ -554,8 +554,8 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
                                              xi_y, xi_z );
 
             const double coeff =
-                model.forceCoeff( i, j, linear_s, xi, vol( j ), m( i ), m( j ),
-                                  theta( i ), theta( j ) );
+                model( ForceCoeffTag{}, i, j, linear_s, xi, vol( j ), m( i ),
+                       m( j ), theta( i ), theta( j ) );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
             fz_i = coeff * xi_z / xi;
@@ -600,8 +600,8 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
                 Cabana::NeighborList<neighbor_list_type>::numNeighbor(
                     neigh_list, i ) );
 
-            double w = model.energy( i, j, linear_s, xi, vol( j ), m( i ),
-                                     theta( i ), num_neighbors );
+            double w = model( EnergyTag{}, i, j, linear_s, xi, vol( j ), m( i ),
+                              theta( i ), num_neighbors );
             W( i ) += w;
             Phi += w * vol( i );
         };
