@@ -147,8 +147,7 @@ void thermalCrackExample( const std::string filename )
         // Compute particle temperature
         temp( pid ) = temp_infinity + ( temp0 - temp_infinity ) * fx * fy;
     };
-    auto body_term =
-        CabanaPD::createBodyTerm( temp_func, particles.size(), false );
+    CabanaPD::BodyTerm body_term( temp_func, particles.size(), false );
 
     // ====================================================
     //                   Simulation run

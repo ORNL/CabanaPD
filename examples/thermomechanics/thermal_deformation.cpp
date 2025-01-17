@@ -102,8 +102,7 @@ void thermalDeformationExample( const std::string filename )
     {
         temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
     };
-    auto body_term =
-        CabanaPD::createBodyTerm( temp_func, particles.size(), false );
+    CabanaPD::BodyTerm body_term( temp_func, particles.size(), false );
 
     // ====================================================
     //                   Simulation run
