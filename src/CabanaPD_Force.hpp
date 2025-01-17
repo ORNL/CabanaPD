@@ -179,6 +179,9 @@ class Force<MemorySpace, BaseForceModel>
     {
     }
 
+    // FIXME: should it be possible to update this list?
+    void update( const int, const int, const double, const bool = false ) {}
+
     unsigned getMaxLocalNeighbors()
     {
         auto neigh = _neigh_list;
@@ -276,6 +279,7 @@ class BaseFracture
 ******************************************************************************/
 template <class ForceType, class ParticleType, class ParallelType>
 void computeForce( ForceType& force, ParticleType& particles,
+                   const double max_displacement,
                    const ParallelType& neigh_op_tag, const bool reset = true )
 {
     auto x = particles.sliceReferencePosition();
@@ -294,9 +298,11 @@ void computeForce( ForceType& force, ParticleType& particles,
 
     // Forces only atomic if using team threading.
     if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
-        force.computeForceFull( f_a, x, u, particles, neigh_op_tag );
+        force.computeForceFull( f_a, x, u, particles, max_displacement,
+                                neigh_op_tag );
     else
-        force.computeForceFull( f, x, u, particles, neigh_op_tag );
+        force.computeForceFull( f, x, u, particles, max_displacement,
+                                neigh_op_tag );
     Kokkos::fence();
 }
 

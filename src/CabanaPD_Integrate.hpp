@@ -85,7 +85,7 @@ class Integrator
     ~Integrator() {}
 
     template <class ParticlesType>
-    void initialHalfStep( ParticlesType& p )
+    double initialHalfStep( ParticlesType& p )
     {
         _timer.start();
 
@@ -96,8 +96,11 @@ class Integrator
 
         auto dt = _dt;
         auto half_dt = _half_dt;
-        auto init_func = KOKKOS_LAMBDA( const int i )
+        auto init_func = KOKKOS_LAMBDA( const int i, double& max_u )
         {
+            Kokkos::Array<double, 3> u_init = { u( i, 0 ), u( i, 1 ),
+                                                u( i, 2 ) };
+
             const double half_dt_m = half_dt / rho( i );
             v( i, 0 ) += half_dt_m * f( i, 0 );
             v( i, 1 ) += half_dt_m * f( i, 1 );
@@ -105,13 +108,22 @@ class Integrator
             u( i, 0 ) += dt * v( i, 0 );
             u( i, 1 ) += dt * v( i, 1 );
             u( i, 2 ) += dt * v( i, 2 );
+
+            auto u_mag =
+                Kokkos::hypot( u( i, 0 ) - u_init[0], u( i, 1 ) - u_init[1],
+                               u( i, 2 ) - u_init[2] );
+            if ( u_mag > max_u )
+                max_u = u_mag;
         };
         Kokkos::RangePolicy<exec_space> policy( p.frozenOffset(),
                                                 p.localOffset() );
-        Kokkos::parallel_for( "CabanaPD::Integrator::Initial", policy,
-                              init_func );
+        double max_displacement;
+        Kokkos::parallel_reduce( "CabanaPD::Integrator::Initial", policy,
+                                 init_func,
+                                 Kokkos::Max<double>( max_displacement ) );
 
         _timer.stop();
+        return max_displacement;
     }
 
     template <class ParticlesType>
