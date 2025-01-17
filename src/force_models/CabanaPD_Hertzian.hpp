@@ -28,6 +28,7 @@ struct HertzianModel : public ContactModel
     using thermal_type = TemperatureIndependent;
 
     using ContactModel::Rc; // Contact horizon (should be > 2*radius)
+    using ContactModel::Rc_extend;
 
     double nu;     // Poisson's ratio
     double radius; // Actual radius
@@ -35,13 +36,13 @@ struct HertzianModel : public ContactModel
     double Es;     // Equivalent Young's modulus
     double e;      // Coefficient of restitution
     double beta;   // Damping coefficient
-
     double coeff_h_n;
     double coeff_h_d;
 
-    HertzianModel( const double _Rc, const double _radius, const double _nu,
-                   const double _E, const double _e )
-        : ContactModel( 1.0, _Rc )
+    HertzianModel( const double _Rc, const double _Rc_extend,
+                   const double _radius, const double _nu, const double _E,
+                   const double _e )
+        : ContactModel( 1.0, _Rc, _Rc_extend )
     {
         nu = _nu;
         radius = _radius;

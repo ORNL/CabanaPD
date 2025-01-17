@@ -88,7 +88,7 @@ void testHertzianContact( const std::string filename )
     //            Force model
     // ====================================================
     using model_type = CabanaPD::HertzianModel;
-    model_type contact_model( delta, radius, nu, E, e );
+    model_type contact_model( delta, 0.0, radius, nu, E, e );
 
     // ====================================================
     //                 Particle generation
