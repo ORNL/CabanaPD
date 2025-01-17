@@ -1,0 +1,18 @@
+{
+    "num_cells"              : {"value": [400, 400, 200]},
+    "system_size"            : {"value": [0.25, 0.25, 0.125], "unit": "m"},
+    "density_temp"           : {"value": [8000, 4000], "unit": "kg/m^3"},
+    "density"                : {"value": 8000, "unit": "kg/m^3"},
+    "elastic_modulus_temp"   : {"value": [191e+9, 191e+9], "unit": "Pa"},
+    "elastic_modulus"        : {"value": 191e+9, "unit": "Pa"},
+    "fracture_energy"        : {"value": [42408, 42408], "unit": "J/m^2"},
+    "horizon"                : {"value": 8.3334e-04, "unit": "m"}, 
+    "fiber_volume_fraction"  : {"value": 0.30},
+    "fiber_diameter"         : {"value": 0.005, "unit": "m"},
+    "stacking_sequence"      : {"value": [0, 45, 90]},
+    "final_time"             : {"value": 2e-7, "unit": "s"},
+    "timestep"               : {"value": 1e-7, "unit": "s"},
+    "timestep_safety_factor" : {"value": 0.85},
+    "output_frequency"       : {"value": 1},
+    "output_reference"       : {"value": true}
+}
