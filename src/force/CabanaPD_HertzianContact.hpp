@@ -58,8 +58,12 @@ struct HertzianModel : public ContactModel
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto normalForceCoeff( const double delta_n, const double vol ) const
+    auto forceCoeff( const double r, const double vn, const double vol,
+                     const double rho ) const
     {
+        // Contact "overlap"
+        const double delta_n = ( r - 2.0 * radius );
+
         // Hertz normal force coefficient
         double coeff = 0.0;
         if ( delta_n < 0.0 )
@@ -68,20 +72,14 @@ struct HertzianModel : public ContactModel
                 0.0,
                 -coeff_h_n * Kokkos::pow( Kokkos::abs( delta_n ), 3.0 / 2.0 ) );
         }
-
         coeff /= vol;
-        return coeff;
-    }
 
-    KOKKOS_INLINE_FUNCTION
-    auto dampingForceCoeff( const double delta_n, const double vn,
-                            const double vol, const double rho ) const
-    {
+        // Damping force coefficient
         double Sn = 0.0;
         if ( delta_n < 0.0 )
             Sn = 2.0 * Es * Kokkos::sqrt( Rs * Kokkos::abs( delta_n ) );
         double ms = ( rho * vol ) / 2.0;
-        double coeff = coeff_h_d * Kokkos::sqrt( Sn * ms ) * vn / vol;
+        coeff += coeff_h_d * Kokkos::sqrt( Sn * ms ) * vn / vol;
         return coeff;
     }
 };

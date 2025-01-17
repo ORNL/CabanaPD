@@ -73,25 +73,16 @@ class Force<MemorySpace, HertzianModel>
             double xi, r, s;
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-            // Contact "overlap"
-            const double delta_n = ( r - 2.0 * model.radius );
-
-            const double coeff_normal =
-                model.normalForceCoeff( delta_n, vol( i ) );
-            fc( i, 0 ) += coeff_normal * rx / r;
-            fc( i, 1 ) += coeff_normal * ry / r;
-            fc( i, 2 ) += coeff_normal * rz / r;
 
             // Hertz normal force damping component
             double vx, vy, vz, vn;
             getRelativeNormalVelocityComponents( vel, i, j, rx, ry, rz, r, vx,
                                                  vy, vz, vn );
 
-            const double coeff_damp =
-                model.dampingForceCoeff( delta_n, vn, vol( i ), rho( i ) );
-            fc( i, 0 ) += coeff_damp * rx / r;
-            fc( i, 1 ) += coeff_damp * ry / r;
-            fc( i, 2 ) += coeff_damp * rz / r;
+            const double coeff = model.forceCoeff( r, vn, vol( i ), rho( i ) );
+            fc( i, 0 ) += coeff * rx / r;
+            fc( i, 1 ) += coeff * ry / r;
+            fc( i, 2 ) += coeff * rz / r;
         };
 
         _timer.start();
