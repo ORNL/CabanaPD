@@ -266,8 +266,7 @@ class Solver
         init( boundary_condition, initial_output );
     }
 
-    // FIXME: bad name
-    void update() { force->update( *particles, 0, true ); }
+    void updateNeighbors() { force->update( *particles, 0.0, true ); }
 
     template <typename BoundaryType>
     void run( BoundaryType boundary_condition )
@@ -424,6 +423,7 @@ class Solver
             double integrate_time = integrator->time();
             double force_time = force->time();
             double energy_time = force->timeEnergy();
+            double neigh_time = force->timeNeighbor();
             double output_time = particles->timeOutput();
             _total_time += step_time;
             auto rate = static_cast<double>( particles->numGlobal() *
@@ -433,7 +433,7 @@ class Solver
                  " ", std::scientific, std::setprecision( 2 ), step * dt, " ",
                  W, " ", std::fixed, _total_time, " ", force_time, " ",
                  comm_time, " ", integrate_time, " ", energy_time, " ",
-                 output_time, " ", std::scientific, rate );
+                 neigh_time, " ", output_time, " ", std::scientific, rate );
             out.close();
         }
     }

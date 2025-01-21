@@ -108,7 +108,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     // no-fail.
     using int_type = Cabana::MemberTypes<int>;
     // v, rho, type.
-    using other_types = Cabana::MemberTypes<double[dim], double, int>;
+    using other_types = Cabana::MemberTypes<double[dim], double>;
 
     // FIXME: add vector length.
     // FIXME: enable variable aosoa.
@@ -116,6 +116,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     using aosoa_y_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_vol_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
     using aosoa_nofail_type = Cabana::AoSoA<int_type, memory_space, 1>;
+    using aosoa_u_neigh_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_other_type = Cabana::AoSoA<other_types, memory_space>;
     // Using grid here for the particle init.
     using plist_x_type =
@@ -284,11 +285,11 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         auto x = sliceReferencePosition();
         auto v = sliceVelocity();
         auto f = sliceForce();
-        auto type = sliceType();
+        // auto type = sliceType();
         auto rho = sliceDensity();
         auto u = sliceDisplacement();
         auto vol = sliceVolume();
-        auto nofail = sliceNoFail();
+        auto u_neigh = sliceDisplacementNeighborBuild();
 
         // Initialize particles.
         auto create_functor =
@@ -307,6 +308,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 Cabana::get( particle, CabanaPD::Field::ReferencePosition(),
                              d ) = px[d];
                 u( pid, d ) = 0.0;
+                u_neigh( pid, d ) = 0;
                 v( pid, d ) = 0.0;
                 f( pid, d ) = 0.0;
             }
@@ -314,8 +316,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             vol( pid ) = pv;
 
             // FIXME: hardcoded.
-            type( pid ) = 0;
-            nofail( pid ) = 0;
+            // type( pid ) = 0;
             rho( pid ) = 1.0;
 
             return create;
@@ -353,10 +354,10 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         auto p_vol = sliceVolume();
         auto v = sliceVelocity();
         auto f = sliceForce();
-        auto type = sliceType();
+        // auto type = sliceType();
         auto rho = sliceDensity();
         auto u = sliceDisplacement();
-        auto nofail = sliceNoFail();
+        auto u_neigh = sliceDisplacementNeighborBuild();
 
         static_assert(
             Cabana::is_accessible_from<
@@ -374,11 +375,11 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 {
                     p_x( pid, d ) = x( pid_offset, d );
                     u( pid, d ) = 0.0;
+                    u_neigh( pid, d ) = 0;
                     v( pid, d ) = 0.0;
                     f( pid, d ) = 0.0;
                 }
-                type( pid ) = 0;
-                nofail( pid ) = 0;
+                // type( pid ) = 0;
                 rho( pid ) = 1.0;
             } );
 
@@ -447,6 +448,14 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     {
         return Cabana::slice<0>( _aosoa_u, "displacements" );
     }
+    auto sliceDisplacementNeighborBuild()
+    {
+        return Cabana::slice<0>( _aosoa_u, "displacement_since_rebuild" );
+    }
+    auto sliceDisplacementNeighborBuild() const
+    {
+        return Cabana::slice<0>( _aosoa_u, "displacement_since_rebuild" );
+    }
     auto sliceForce() { return _plist_f.slice( CabanaPD::Field::Force() ); }
     auto sliceForceAtomic()
     {
@@ -474,8 +483,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     {
         return Cabana::slice<1>( _aosoa_other, "density" );
     }
-    auto sliceType() { return Cabana::slice<2>( _aosoa_other, "type" ); }
-    auto sliceType() const { return Cabana::slice<2>( _aosoa_other, "type" ); }
+    // auto sliceType() { return Cabana::slice<2>( _aosoa_other, "type" ); }
+    // auto sliceType() const { return Cabana::slice<2>( _aosoa_other, "type" );
+    // }
 
     auto sliceNoFail()
     {
@@ -524,9 +534,44 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         _plist_f.aosoa().resize( localOffset() );
         _aosoa_other.resize( localOffset() );
         _aosoa_nofail.resize( referenceOffset() );
+        _aosoa_u_neigh.resize( localOffset() );
+
         size = _plist_x.size();
         _timer.stop();
     };
+
+    void shrink()
+    {
+        _timer.start();
+        _plist_x.aosoa().shrinkToFit();
+        _aosoa_u.shrinkToFit();
+        _aosoa_y.shrinkToFit();
+        _aosoa_vol.shrinkToFit();
+        _plist_f.aosoa().shrinkToFit();
+        _aosoa_other.shrinkToFit();
+        _aosoa_u_neigh.shrinkToFit();
+        _timer.stop();
+    };
+
+    template <typename KeepType>
+    void remove( const int num_keep, const KeepType& keep )
+    {
+        Cabana::remove( execution_space(), num_keep, keep, _plist_x.aosoa(),
+                        numFrozen() );
+        Cabana::remove( execution_space(), num_keep, keep, _plist_f.aosoa(),
+                        numFrozen() );
+        Cabana::remove( execution_space(), num_keep, keep, _aosoa_u,
+                        numFrozen() );
+        Cabana::remove( execution_space(), num_keep, keep, _aosoa_vol,
+                        numFrozen() );
+        Cabana::remove( execution_space(), num_keep, keep, _aosoa_y,
+                        numFrozen() );
+        Cabana::remove( execution_space(), num_keep, keep, _aosoa_other,
+                        numFrozen() );
+        Cabana::remove( execution_space(), num_keep, keep, _aosoa_u_neigh,
+                        numFrozen() );
+        resize( frozen_offset + num_keep, 0 );
+    }
 
     auto getPosition( const bool use_reference )
     {
@@ -577,6 +622,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
   protected:
     aosoa_u_type _aosoa_u;
+    aosoa_u_neigh_type _aosoa_u_neigh;
     aosoa_y_type _aosoa_y;
     aosoa_vol_type _aosoa_vol;
     aosoa_nofail_type _aosoa_nofail;
