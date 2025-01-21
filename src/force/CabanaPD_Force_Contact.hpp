@@ -48,9 +48,10 @@ class BaseForceContact : public Force<MemorySpace, BaseForceModel>
     template <class ParticleType, class ModelType>
     BaseForceContact( const bool half_neigh, const ParticleType& particles,
                       const ModelType model )
-        : base_type( half_neigh, model.Rc, particles.sliceCurrentPosition(),
-                     particles.frozenOffset(), particles.localOffset(),
-                     particles.ghost_mesh_lo, particles.ghost_mesh_hi )
+        : base_type( half_neigh, model.Rc + model.Rc_extend,
+                     particles.sliceCurrentPosition(), particles.frozenOffset(),
+                     particles.localOffset(), particles.ghost_mesh_lo,
+                     particles.ghost_mesh_hi )
         , Rc( model.Rc )
         , Rc_extend( model.Rc_extend )
     {
@@ -66,14 +67,25 @@ class BaseForceContact : public Force<MemorySpace, BaseForceModel>
     void update( const ParticleType& particles, const double max_displacement,
                  const bool require_update = false )
     {
-        _neigh_timer.start();
-        const auto y = particles.sliceCurrentPosition();
+        auto max_neighbors = base_type::getMaxLocalNeighbors();
+        std::cout << Rc_extend << " " << max_displacement << " "
+                  << _neigh_timer.numCalls() << " " << _neigh_timer.time()
+                  << " " << max_neighbors << std::endl;
         if ( max_displacement > Rc_extend || require_update )
+        {
+            _neigh_timer.start();
+            const auto y = particles.sliceCurrentPosition();
             _neigh_list.build( y, particles.frozenOffset(),
-                               particles.localOffset(), Rc, 1.0, mesh_min,
-                               mesh_max );
-        _neigh_timer.stop();
+                               particles.localOffset(), Rc + Rc_extend, 1.0,
+                               mesh_min, mesh_max );
+            // Reset neighbor update displacement.
+            const auto u_neigh = particles.sliceDisplacementNeighborBuild();
+            Cabana::deep_copy( u_neigh, 0.0 );
+            _neigh_timer.stop();
+        }
     }
+
+    auto timeNeighbor() { return _neigh_timer.time(); };
 
   protected:
     double Rc;

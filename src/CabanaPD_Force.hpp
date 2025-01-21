@@ -180,7 +180,10 @@ class Force<MemorySpace, BaseForceModel>
     }
 
     // FIXME: should it be possible to update this list?
-    void update( const int, const int, const double, const bool = false ) {}
+    template <class ParticleType>
+    void update( const ParticleType&, const double, const bool = false )
+    {
+    }
 
     unsigned getMaxLocalNeighbors()
     {
@@ -237,6 +240,7 @@ class Force<MemorySpace, BaseForceModel>
 
     auto time() { return _timer.time(); };
     auto timeEnergy() { return _energy_timer.time(); };
+    auto timeNeighbor() { return 0.0; };
 };
 
 template <class MemorySpace>

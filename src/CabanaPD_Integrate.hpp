@@ -93,14 +93,12 @@ class Integrator
         auto v = p.sliceVelocity();
         auto f = p.sliceForce();
         auto rho = p.sliceDensity();
+        auto u_neigh = p.sliceDisplacementNeighborBuild();
 
         auto dt = _dt;
         auto half_dt = _half_dt;
         auto init_func = KOKKOS_LAMBDA( const int i, double& max_u )
         {
-            Kokkos::Array<double, 3> u_init = { u( i, 0 ), u( i, 1 ),
-                                                u( i, 2 ) };
-
             const double half_dt_m = half_dt / rho( i );
             v( i, 0 ) += half_dt_m * f( i, 0 );
             v( i, 1 ) += half_dt_m * f( i, 1 );
@@ -109,9 +107,13 @@ class Integrator
             u( i, 1 ) += dt * v( i, 1 );
             u( i, 2 ) += dt * v( i, 2 );
 
-            auto u_mag =
-                Kokkos::hypot( u( i, 0 ) - u_init[0], u( i, 1 ) - u_init[1],
-                               u( i, 2 ) - u_init[2] );
+            // FIXME: only used for contact: get displacement since last
+            // neighbor update.
+            u_neigh( i, 0 ) += u( i, 0 );
+            u_neigh( i, 1 ) += u( i, 1 );
+            u_neigh( i, 2 ) += u( i, 2 );
+            auto u_mag = Kokkos::hypot( u_neigh( i, 0 ), u_neigh( i, 1 ),
+                                        u_neigh( i, 2 ) );
             if ( u_mag > max_u )
                 max_u = u_mag;
         };
