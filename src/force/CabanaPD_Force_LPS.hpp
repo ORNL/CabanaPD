@@ -268,15 +268,13 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-            const double coeff =
-                ( model.theta_coeff *
-                      ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
-                  model.s_coeff * s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                model.influence_function( xi ) * xi * vol( j ) * vol( j );
+            double coeff = model.forceCoeff( s, xi, vol( j ), m( i ), m( j ),
+                                             theta( i ), theta( j ) );
+            coeff *= vol( j );
 
-            double fx_i = coeff * rx / r;
-            double fy_i = coeff * ry / r;
-            double fz_i = coeff * rz / r;
+            const double fx_i = coeff * rx / r;
+            const double fy_i = coeff * ry / r;
+            const double fz_i = coeff * rz / r;
 
             // Update stress tensor components
             stress( i, 0, 0 ) += fx_i * rx;
@@ -592,18 +590,15 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
                     double rx, ry, rz;
                     getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-                    const double coeff =
-                        ( model.theta_coeff *
-                              ( theta( i ) / m( i ) + theta( j ) / m( j ) ) +
-                          model.s_coeff * s *
-                              ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                        model.influence_function( xi ) * xi * vol( j ) *
-                        vol( j );
+                    double coeff =
+                        model.forceCoeff( s, xi, vol( j ), m( i ), m( j ),
+                                          theta( i ), theta( j ) );
+                    coeff *= vol( j );
 
-                    double muij = mu( i, n );
-                    double fx_i = muij * coeff * rx / r;
-                    double fy_i = muij * coeff * ry / r;
-                    double fz_i = muij * coeff * rz / r;
+                    const double muij = mu( i, n );
+                    const double fx_i = muij * coeff * rx / r;
+                    const double fy_i = muij * coeff * ry / r;
+                    const double fz_i = muij * coeff * rz / r;
 
                     // Update stress tensor components
                     stress( i, 0, 0 ) += fx_i * rx;
@@ -761,7 +756,7 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
         const auto x = particles.sliceReferencePosition();
         const auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();
-        const auto linear_theta = particles.sliceDilatation();
+        const auto theta = particles.sliceDilatation();
         const auto m = particles.sliceWeightedVolume();
         auto stress = particles.sliceStress();
 
@@ -773,15 +768,13 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
             getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
                                              xi_y, xi_z );
 
-            const double coeff =
-                ( model.theta_coeff * ( linear_theta( i ) / m( i ) +
-                                        linear_theta( j ) / m( j ) ) +
-                  model.s_coeff * linear_s * ( 1.0 / m( i ) + 1.0 / m( j ) ) ) *
-                model.influence_function( xi ) * xi * vol( j ) * vol( j );
+            double coeff = model.forceCoeff( linear_s, xi, vol( j ), m( i ),
+                                             m( j ), theta( i ), theta( j ) );
+            coeff *= vol( j );
 
-            double fx_i = coeff * xi_x / xi;
-            double fy_i = coeff * xi_y / xi;
-            double fz_i = coeff * xi_z / xi;
+            const double fx_i = coeff * xi_x / xi;
+            const double fy_i = coeff * xi_y / xi;
+            const double fz_i = coeff * xi_z / xi;
 
             // Update stress tensor components
             stress( i, 0, 0 ) += fx_i * xi_x;

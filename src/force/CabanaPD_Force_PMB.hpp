@@ -200,10 +200,11 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, NoFracture, ModelParams...>>
 
             model.thermalStretch( s, i, j );
 
-            const double coeff = 0.5 * model.c * s * vol( j ) * vol( j );
-            double fx_i = coeff * rx / r;
-            double fy_i = coeff * ry / r;
-            double fz_i = coeff * rz / r;
+            double coeff = model.forceCoeff( s, vol( j ) );
+            coeff *= 0.5 * vol( j );
+            const double fx_i = coeff * rx / r;
+            const double fy_i = coeff * ry / r;
+            const double fz_i = coeff * rz / r;
 
             stress( i, 0, 0 ) += fx_i * rx;
             stress( i, 1, 1 ) += fy_i * ry;
@@ -420,11 +421,12 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
 
                 model.thermalStretch( s, i, j );
 
-                const double coeff =
-                    mu( i, n ) * 0.5 * model.c * s * vol( j ) * vol( j );
-                double fx_i = coeff * rx / r;
-                double fy_i = coeff * ry / r;
-                double fz_i = coeff * rz / r;
+                double coeff = mu( i, n ) * model.forceCoeff( s, vol( j ) );
+                coeff *= 0.5 * vol( j );
+
+                const double fx_i = coeff * rx / r;
+                const double fy_i = coeff * ry / r;
+                const double fz_i = coeff * rz / r;
 
                 stress( i, 0, 0 ) += fx_i * rx;
                 stress( i, 1, 1 ) += fy_i * ry;
@@ -577,17 +579,20 @@ class Force<MemorySpace,
         auto stress_full = KOKKOS_LAMBDA( const int i, const int j )
         {
             // Get the bond distance, displacement, and stretch
-            double xi, r, s;
+            double xi, r, linear_s;
             double rx, ry, rz;
-            getLinearizedDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+            getLinearizedDistanceComponents( x, u, i, j, xi, r, linear_s, rx,
+                                             ry, rz );
 
-            model.thermalStretch( s, i, j );
+            model.thermalStretch( linear_s, i, j );
 
             // Linear PMB specific coefficient
-            const double coeff = 0.5 * model.c * s * vol( j ) * vol( j );
-            double fx_i = coeff * rx / r;
-            double fy_i = coeff * ry / r;
-            double fz_i = coeff * rz / r;
+            double coeff = 0.5 * model.forceCoeff( linear_s, vol( j ) );
+            coeff *= vol( j );
+
+            const double fx_i = coeff * rx / r;
+            const double fy_i = coeff * ry / r;
+            const double fz_i = coeff * rz / r;
 
             // Update stress tensor components
             stress( i, 0, 0 ) += fx_i * rx;
