@@ -11,8 +11,16 @@ endif(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CXX_FLAGS)
 
 option(CMAKE_VERBOSE_MAKEFILE "Generate verbose Makefiles" OFF)
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
+write_basic_package_version_file("CabanaPDConfigVersion.cmake"
+  VERSION ${PROJECT_VERSION} COMPATIBILITY SameMajorVersion)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CabanaPD_Config.cmakein
+  ${CMAKE_CURRENT_BINARY_DIR}/CabanaPDConfig.cmake @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/CabanaPDConfig.cmake ${CMAKE_CURRENT_BINARY_DIR}/CabanaPDConfigVersion.cmake
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/cmake/CabanaPD)
 
 ##---------------------------------------------------------------------------##
 # Set up main options (inherit from Kokkos and Cabana CMake)
@@ -34,6 +42,9 @@ if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.24")
 endif()
 find_package(nlohmann_json 3.10.0 QUIET)
 if(NOT NLOHMANN_JSON_FOUND)
+  set(CabanaPD_INTERNAL_JSON ON)
+  # Install for downstream packages.
+  set(JSON_Install ON)
   include(FetchContent)
   # Using most recent release here
   FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.2/json.tar.xz)
