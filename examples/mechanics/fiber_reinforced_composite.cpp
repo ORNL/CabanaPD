@@ -18,9 +18,10 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate the Kalthoff-Winkler experiment of crack propagation in
-// a pre-notched steel plate due to impact.
-void kalthoffWinklerExample( const std::string filename )
+#include <CabanaPD_Constants.hpp>
+
+// Generate a unidirectional fiber-reinforced composite geometry
+void fiberReinforcedCompositeExample( const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
@@ -57,25 +58,6 @@ void kalthoffWinklerExample( const std::string filename )
     int halo_width = m + 1; // Just to be safe.
 
     // ====================================================
-    //                   Pre-notches
-    // ====================================================
-    std::array<double, 3> system_size = inputs["system_size"];
-    double height = system_size[0];
-    double width = system_size[1];
-    double thickness = system_size[2];
-    double L_prenotch = height / 2.0;
-    double y_prenotch1 = -width / 8.0;
-    double y_prenotch2 = width / 8.0;
-    double low_x = low_corner[0];
-    double low_z = low_corner[2];
-    Kokkos::Array<double, 3> p01 = { low_x, y_prenotch1, low_z };
-    Kokkos::Array<double, 3> p02 = { low_x, y_prenotch2, low_z };
-    Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
-    Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-    Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { p01, p02 };
-    CabanaPD::Prenotch<2> prenotch( v1, v2, notch_positions );
-
-    // ====================================================
     //                    Force model
     // ====================================================
     using model_type1 = CabanaPD::ForceModel<CabanaPD::PMB>;
@@ -93,24 +75,106 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     //            Custom particle initialization
     // ====================================================
+
+    std::array<double, 3> system_size = inputs["system_size"];
+
     auto rho = particles->sliceDensity();
     auto x = particles->sliceReferencePosition();
-    auto v = particles->sliceVelocity();
-    auto f = particles->sliceForce();
     auto type = particles->sliceType();
 
-    double dx = particles->dx[0];
-    double v0 = inputs["impactor_velocity"];
+    // Fiber-reinforced composite geometry parameters
+    double Vf = inputs["fiber_volume_fraction"];
+    double Df = inputs["fiber_diameter"];
+    std::vector<double> stacking_sequence = inputs["stacking_sequence"];
+
+    // Fiber radius
+    double Rf = 0.5 * Df;
+
+    // System sizes
+    double Lx = system_size[0];
+    double Ly = system_size[1];
+    double Lz = system_size[2];
+
+    // Number of plies
+    auto Nplies = stacking_sequence.size();
+    // Ply thickness (in z-direction)
+    double dzply = Lz / Nplies;
+
+    // Single-fiber volume (assume a 0° fiber orientation)
+    double Vfs = CabanaPD::pi * Rf * Rf * Lx;
+    // Domain volume
+    double Vd = Lx * Ly * Lz;
+    // Total fiber volume
+    double Vftotal = Vf * Vd;
+    // Total number of fibers
+    int Nf = std::floor( Vftotal / Vfs );
+    // Cross section corresponding to a single fiber in the YZ-plane
+    // (assume all plies have 0° fiber orientation)
+    double Af = Ly * Lz / Nf;
+    // Number of fibers in y-direction (assume Af is a square area)
+    int Nfy = std::round( Ly / std::sqrt( Af ) );
+    // Ensure Nfy is even
+    if ( Nfy % 2 == 1 )
+        Nfy = Nfy + 1;
+
+    // Number of fibers in z-direction
+    int Nfz = std::round( Nf / Nfy );
+    // Ensure number of fibers in z-direction within each ply is even
+    int nfz = std::round( Nfz / Nplies );
+    if ( nfz % 2 == 0 )
+    {
+        Nfz = nfz * Nplies;
+    }
+    else
+    {
+        Nfz = ( nfz + 1 ) * Nplies;
+    };
+
+    // Fiber grid spacings (assume all plies have 0° fiber orientation)
+    double dyf = Ly / Nfy;
+    double dzf = Lz / Nfz;
+
+    // Domain center
+    double Xc = 0.5 * ( low_corner[0] + high_corner[0] );
+    double Yc = 0.5 * ( low_corner[1] + high_corner[1] );
+
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
-        // x velocity between the pre-notches
-        if ( x( pid, 1 ) > y_prenotch1 && x( pid, 1 ) < y_prenotch2 &&
-             x( pid, 0 ) < -0.5 * height + dx )
-            v( pid, 0 ) = v0;
 
-        if ( x( pid, 1 ) > 0.0 )
+        // Particle position
+        double xi = x( pid, 0 );
+        double yi = x( pid, 1 );
+        double zi = x( pid, 2 );
+
+        // Find ply number of particle (counting from 0)
+        double nply = std::floor( ( zi - low_corner[2] ) / dzply );
+
+        // Ply fiber orientation (in radians)
+        double theta = stacking_sequence[nply] * CabanaPD::pi / 180;
+
+        // Translate then rotate y-coordinate of particle in XY-plane
+        double yinew =
+            -std::sin( theta ) * ( xi - Xc ) + std::cos( theta ) * ( yi - Yc );
+
+        // Find center of ply in z-direction (recall first ply has nply = 0)
+        double Zply_bot = low_corner[2] + nply * dzply;
+        double Zply_top = Zply_bot + dzply;
+        double Zcply = 0.5 * ( Zply_bot + Zply_top );
+
+        // Translate point in z-direction
+        double zinew = zi - Zcply;
+
+        // Find nearest fiber grid center point in YZ plane
+        double Iyf = std::floor( yinew / dyf );
+        double Izf = std::floor( zinew / dzf );
+        double YI = 0.5 * dyf + dyf * Iyf;
+        double ZI = 0.5 * dzf + dzf * Izf;
+
+        // Check if point belongs to fiber
+        if ( ( yinew - YI ) * ( yinew - YI ) + ( zinew - ZI ) * ( zinew - ZI ) <
+             Rf * Rf + 1e-8 )
             type( pid ) = 1;
     };
     particles->updateParticles( exec_space{}, init_functor );
@@ -124,21 +188,10 @@ void kalthoffWinklerExample( const std::string filename )
         inputs, particles, models );
 
     // ====================================================
-    //                Boundary conditions
-    // ====================================================
-    // Create BC last to ensure ghost particles are included.
-    double x_bc = -0.5 * height;
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane(
-        x_bc - dx, x_bc + dx, y_prenotch1 - 0.25 * dx, y_prenotch2 + 0.25 * dx,
-        -thickness, thickness );
-    auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
-                                       exec_space{}, *particles, plane );
-
-    // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init( bc, prenotch );
-    cabana_pd->run( bc );
+    cabana_pd->init();
+    cabana_pd->run();
 }
 
 // Initialize MPI+Kokkos.
@@ -147,7 +200,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    kalthoffWinklerExample( argv[1] );
+    fiberReinforcedCompositeExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();

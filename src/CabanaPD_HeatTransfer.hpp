@@ -20,10 +20,10 @@ namespace CabanaPD
 // Peridynamic heat transfer with forward-Euler time integration.
 // Inherits only because this is a similar neighbor-based kernel.
 template <class MemorySpace, class ModelType>
-class HeatTransfer : public Force<MemorySpace, BaseForceModel>
+class HeatTransfer : public BaseForce<MemorySpace>
 {
   protected:
-    using base_type = Force<MemorySpace, BaseForceModel>;
+    using base_type = BaseForce<MemorySpace>;
     using base_type::_half_neigh;
     using base_type::_timer;
 

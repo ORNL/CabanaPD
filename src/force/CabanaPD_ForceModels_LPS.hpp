@@ -23,9 +23,11 @@ template <>
 struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModel
 {
     using base_type = BaseForceModel;
+    using model_type = LPS;
     using base_model = LPS;
     using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
+    using material_type = typename base_type::material_type;
 
     using base_type::delta;
 
@@ -36,6 +38,8 @@ struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModel
     double theta_coeff;
     double s_coeff;
 
+    double c;
+
     ForceModel( const double _delta, const double _K, const double _G,
                 const int _influence = 0 )
         : base_type( _delta )
@@ -45,6 +49,9 @@ struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModel
     {
         theta_coeff = 3.0 * K - 5.0 * G;
         s_coeff = 15.0 * G;
+
+        // Equivalent PMB inputs.
+        c = 18.0 * K / ( pi * delta * delta * delta * delta );
     }
 
     KOKKOS_INLINE_FUNCTION double influenceFunction( double xi ) const
@@ -69,11 +76,10 @@ struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModel
         return 3.0 * theta_i / m_i;
     }
 
-    KOKKOS_INLINE_FUNCTION auto forceCoeff( const double s, const double xi,
-                                            const double vol, const double m_i,
-                                            const double m_j,
-                                            const double theta_i,
-                                            const double theta_j ) const
+    KOKKOS_INLINE_FUNCTION auto
+    forceCoeff( const int, const int, const double s, const double xi,
+                const double vol, const double m_i, const double m_j,
+                const double theta_i, const double theta_j ) const
     {
         return ( theta_coeff * ( theta_i / m_i + theta_j / m_j ) +
                  s_coeff * s * ( 1.0 / m_i + 1.0 / m_j ) ) *
@@ -81,8 +87,8 @@ struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModel
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto energy( const double s, const double xi, const double vol,
-                 const double m_i, const double theta_i,
+    auto energy( const int, const int, const double s, const double xi,
+                 const double vol, const double m_i, const double theta_i,
                  const double num_bonds ) const
     {
         return 1.0 / num_bonds * 0.5 * theta_coeff / 3.0 *
@@ -97,6 +103,7 @@ struct ForceModel<LPS, Elastic, Fracture>
     : public ForceModel<LPS, Elastic, NoFracture>
 {
     using base_type = ForceModel<LPS, Elastic, NoFracture>;
+    using model_type = LPS;
     using base_model = typename base_type::base_model;
     using fracture_type = Fracture;
     using thermal_type = base_type::thermal_type;
@@ -110,6 +117,8 @@ struct ForceModel<LPS, Elastic, Fracture>
     double G0;
     double s0;
     double bond_break_coeff;
+
+    using base_type::c;
 
     ForceModel( const double _delta, const double _K, const double _G,
                 const double _G0, const int _influence = 0 )
@@ -133,6 +142,7 @@ struct ForceModel<LinearLPS, Elastic, NoFracture>
     : public ForceModel<LPS, Elastic, NoFracture>
 {
     using base_type = ForceModel<LPS, Elastic, NoFracture>;
+    using model_type = LinearLPS;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = base_type::thermal_type;
@@ -152,6 +162,7 @@ struct ForceModel<LinearLPS, Elastic, Fracture>
     : public ForceModel<LPS, Elastic, Fracture>
 {
     using base_type = ForceModel<LPS, Elastic, Fracture>;
+    using model_type = LinearLPS;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = base_type::thermal_type;

@@ -19,6 +19,7 @@ namespace CabanaPD
 {
 struct BaseForceModel
 {
+    using material_type = SingleMaterial;
     double delta;
 
     BaseForceModel( const double _delta )
@@ -26,8 +27,152 @@ struct BaseForceModel
 
     // No-op for temperature.
     KOKKOS_INLINE_FUNCTION
-    void thermalStretch( double&, const int, const int ) const {}
+    void thermalStretch( const int, const int, double& ) const {}
 };
+
+struct AverageTag
+{
+};
+
+// Wrap multiple models in a single object.
+// TODO: this currently only supports bi-material systems.
+template <typename MaterialType, typename... ModelType>
+struct ForceModels
+{
+    using material_type = MultiMaterial;
+
+    using tuple_type = std::tuple<ModelType...>;
+    using first_model = typename std::tuple_element<0, tuple_type>::type;
+    using model_type = typename first_model::model_type;
+    using base_model = typename first_model::base_model;
+    using thermal_type = typename first_model::thermal_type;
+    using fracture_type = typename first_model::fracture_type;
+
+    ForceModels( MaterialType t, const ModelType... m )
+        : delta( 0.0 )
+        , type( t )
+        , models( std::make_tuple( m... ) )
+    {
+        setHorizon();
+    }
+
+    ForceModels( MaterialType t, const tuple_type m )
+        : delta( 0.0 )
+        , type( t )
+        , models( m )
+    {
+        setHorizon();
+    }
+
+    void setHorizon()
+    {
+        std::apply( [this]( auto&&... m ) { ( this->maxDelta( m ), ... ); },
+                    models );
+    }
+
+    template <typename Model>
+    auto maxDelta( Model m )
+    {
+        if ( m.delta > delta )
+            delta = m.delta;
+    }
+
+    template <typename... Args>
+    KOKKOS_INLINE_FUNCTION auto forceCoeff( const int i, const int j,
+                                            Args... args ) const
+    {
+        const int type_i = type( i );
+        const int type_j = type( j );
+        if ( type_i == type_j )
+            if ( type_i == 0 )
+                return std::get<0>( models ).forceCoeff( i, j, args... );
+            else
+                return std::get<1>( models ).forceCoeff( i, j, args... );
+        else
+            return std::get<2>( models ).forceCoeff( i, j, args... );
+    }
+
+    template <typename... Args>
+    KOKKOS_INLINE_FUNCTION auto energy( const int i, const int j,
+                                        Args... args ) const
+    {
+        const int type_i = type( i );
+        const int type_j = type( j );
+        if ( type_i == type_j )
+            if ( type_i == 0 )
+                return std::get<0>( models ).energy( i, j, args... );
+            else
+                return std::get<1>( models ).energy( i, j, args... );
+        else
+            return std::get<2>( models ).energy( i, j, args... );
+    }
+
+    template <typename... Args>
+    KOKKOS_INLINE_FUNCTION auto thermalStretch( const int i, const int j,
+                                                Args... args ) const
+    {
+        const int type_i = type( i );
+        const int type_j = type( j );
+        if ( type_i == type_j )
+            if ( type_i == 0 )
+                return std::get<0>( models ).thermalStretch( i, j, args... );
+            else
+                return std::get<1>( models ).thermalStretch( i, j, args... );
+        else
+            return std::get<2>( models ).thermalStretch( i, j, args... );
+    }
+
+    template <typename... Args>
+    KOKKOS_INLINE_FUNCTION auto criticalStretch( const int i, const int j,
+                                                 Args... args ) const
+    {
+        const int type_i = type( i );
+        const int type_j = type( j );
+        if ( type_i == type_j )
+            if ( type_i == 0 )
+                return std::get<0>( models ).criticalStretch( i, j, args... );
+            else
+                return std::get<1>( models ).criticalStretch( i, j, args... );
+        else
+            return std::get<2>( models ).criticalStretch( i, j, args... );
+    }
+
+    auto horizon( const int ) { return delta; }
+    auto maxHorizon() { return delta; }
+
+    void update( const MaterialType _type ) { type = _type; }
+
+    double delta;
+    MaterialType type;
+    tuple_type models;
+};
+
+template <typename ParticleType, typename... ModelType>
+auto createMultiForceModel( ParticleType particles, ModelType... models )
+{
+    auto type = particles.sliceType();
+    using material_type = decltype( type );
+    return ForceModels<material_type, ModelType...>( type, models... );
+}
+
+template <typename ParticleType, typename... ModelType>
+auto createMultiForceModel( ParticleType particles, AverageTag,
+                            ModelType... models )
+{
+    auto tuple = std::make_tuple( models... );
+    auto m1 = std::get<0>( tuple );
+    auto m2 = std::get<1>( tuple );
+
+    using first_model =
+        typename std::tuple_element<0, std::tuple<ModelType...>>::type;
+    auto m12 = std::make_tuple( first_model( m1, m2 ) );
+    auto all_models = std::tuple_cat( tuple, m12 );
+
+    auto type = particles.sliceType();
+    using material_type = decltype( type );
+    return ForceModels<material_type, ModelType..., first_model>( type,
+                                                                  all_models );
+}
 
 template <typename TemperatureType>
 struct BaseTemperatureModel
@@ -38,25 +183,25 @@ struct BaseTemperatureModel
     // Temperature field
     TemperatureType temperature;
 
-    BaseTemperatureModel(){};
     BaseTemperatureModel( const TemperatureType _temp, const double _alpha,
                           const double _temp0 )
         : alpha( _alpha )
         , temp0( _temp0 )
         , temperature( _temp ){};
 
-    BaseTemperatureModel( const BaseTemperatureModel& model )
+    // Average from existing models.
+    BaseTemperatureModel( const BaseTemperatureModel& model1,
+                          const BaseTemperatureModel& model2 )
     {
-        alpha = model.alpha;
-        temp0 = model.temp0;
-        temperature = model.temperature;
+        alpha = ( model1.alpha + model2.alpha ) / 2.0;
+        temp0 = ( model1.temp0 + model2.temp0 ) / 2.0;
     }
 
     void update( const TemperatureType _temp ) { temperature = _temp; }
 
     // Update stretch with temperature effects.
     KOKKOS_INLINE_FUNCTION
-    void thermalStretch( double& s, const int i, const int j ) const
+    void thermalStretch( const int i, const int j, double& s ) const
     {
         double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
         s -= alpha * temp_avg;
@@ -85,6 +230,16 @@ struct BaseDynamicTemperatureModel
         const double d3 = _delta * _delta * _delta;
         thermal_coeff = 9.0 / 2.0 * _kappa / pi / d3;
         constant_microconductivity = _constant_microconductivity;
+    }
+
+    // Average from existing models.
+    BaseDynamicTemperatureModel( const BaseDynamicTemperatureModel& model1,
+                                 const BaseDynamicTemperatureModel& model2 )
+    {
+        delta = ( model1.delta + model2.delta ) / 2.0;
+        kappa = ( model1.kappa + model2.kappa ) / 2.0;
+        cp = ( model1.cp + model2.cp ) / 2.0;
+        constant_microconductivity = model1.constant_microconductivity;
     }
 
     KOKKOS_INLINE_FUNCTION double microconductivity_function( double r ) const

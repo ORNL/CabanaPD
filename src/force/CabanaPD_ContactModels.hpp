@@ -25,6 +25,8 @@ namespace CabanaPD
 ******************************************************************************/
 struct ContactModel
 {
+    using material_type = SingleMaterial;
+
     double delta;
     double Rc;
 
@@ -40,6 +42,7 @@ struct ContactModel
 struct NormalRepulsionModel : public ContactModel
 {
     // FIXME: This is for use as the primary force model.
+    using model_type = NormalRepulsionModel;
     using base_model = PMB;
     using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
