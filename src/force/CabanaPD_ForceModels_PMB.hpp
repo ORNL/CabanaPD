@@ -34,24 +34,25 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
     double c;
     double K;
 
-    ForceModel( const double delta, const double K )
+    ForceModel( const double delta, const double _K )
         : base_type( delta )
+        , K( _K )
     {
-        set_param( delta, K );
-    }
-
-    ForceModel( const ForceModel& model )
-        : base_type( model )
-    {
-        c = model.c;
-        K = model.K;
-    }
-
-    void set_param( const double _delta, const double _K )
-    {
-        delta = _delta;
-        K = _K;
         c = 18.0 * K / ( pi * delta * delta * delta * delta );
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto forceCoeff( const double s, const double vol ) const
+    {
+        return c * s * vol;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto energy( const double s, const double xi, const double vol ) const
+    {
+        // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
+        // the integrand (pairwise potential).
+        return 0.25 * c * s * s * xi * vol;
     }
 };
 
@@ -71,24 +72,10 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
     double s0;
     double bond_break_coeff;
 
-    ForceModel( const double delta, const double K, const double G0 )
+    ForceModel( const double delta, const double K, const double _G0 )
         : base_type( delta, K )
+        , G0( _G0 )
     {
-        set_param( delta, K, G0 );
-    }
-
-    ForceModel( const ForceModel& model )
-        : base_type( model )
-    {
-        G0 = model.G0;
-        s0 = model.s0;
-        bond_break_coeff = model.bond_break_coeff;
-    }
-
-    void set_param( const double _delta, const double _K, const double _G0 )
-    {
-        base_type::set_param( _delta, _K );
-        G0 = _G0;
         s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / K / delta );
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
@@ -167,14 +154,6 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
         : base_type( _delta, _K )
         , base_temperature_type( _temp, _alpha, _temp0 )
     {
-        set_param( _delta, _K, _alpha, _temp0 );
-    }
-
-    void set_param( const double _delta, const double _K, const double _alpha,
-                    const double _temp0 )
-    {
-        base_type::set_param( _delta, _K );
-        base_temperature_type::set_param( _alpha, _temp0 );
     }
 };
 
@@ -232,14 +211,6 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
         : base_type( _delta, _K, _G0 )
         , base_temperature_type( _temp, _alpha, _temp0 )
     {
-        set_param( _delta, _K, _G0, _alpha, _temp0 );
-    }
-
-    void set_param( const double _delta, const double _K, const double _G0,
-                    const double _alpha, const double _temp0 )
-    {
-        base_type::set_param( _delta, _K, _G0 );
-        base_temperature_type::set_param( _alpha, _temp0 );
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -301,17 +272,6 @@ struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
         , base_temperature_type( _delta, _kappa, _cp,
                                  _constant_microconductivity )
     {
-        set_param( _delta, _K, _kappa, _cp, _alpha, _temp0,
-                   _constant_microconductivity );
-    }
-
-    void set_param( const double _delta, const double _K, const double _kappa,
-                    const double _cp, const double _alpha, const double _temp0,
-                    const bool _constant_microconductivity )
-    {
-        base_type::set_param( _delta, _K, _alpha, _temp0 );
-        base_temperature_type::set_param( _delta, _kappa, _cp,
-                                          _constant_microconductivity );
     }
 };
 
@@ -364,20 +324,9 @@ struct ForceModel<PMB, Fracture, DynamicTemperature, TemperatureType>
                 const double _temp0 = 0.0,
                 const bool _constant_microconductivity = true )
         : base_type( _delta, _K, _G0, _temp, _alpha, _temp0 )
+        , base_temperature_type( _delta, _kappa, _cp,
+                                 _constant_microconductivity )
     {
-        set_param( _delta, _K, _G0, _kappa, _cp, _alpha, _temp0 );
-        base_temperature_type::set_param( _delta, _kappa, _cp,
-                                          _constant_microconductivity );
-    }
-
-    void set_param( const double _delta, const double _K, const double _G0,
-                    const double _kappa, const double _cp, const double _alpha,
-                    const double _temp0,
-                    const bool _constant_microconductivity )
-    {
-        base_type::set_param( _delta, _K, _G0, _alpha, _temp0 );
-        base_temperature_type::set_param( _delta, _kappa, _cp,
-                                          _constant_microconductivity );
     }
 };
 

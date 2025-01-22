@@ -54,75 +54,35 @@ class Force<MemorySpace, HertzianModel>
                            const ParticleType& particles,
                            ParallelType& neigh_op_tag )
     {
-        auto Rc = _model.Rc;
-        auto radius = _model.radius;
-        auto Es = _model.Es;
-        auto Rs = _model.Rs;
-        auto beta = _model.beta;
         const int n_frozen = particles.frozenOffset();
         const int n_local = particles.localOffset();
 
-        const double coeff_h_n = 4.0 / 3.0 * Es * Kokkos::sqrt( Rs );
-        const double coeff_h_d = -2.0 * Kokkos::sqrt( 5.0 / 6.0 ) * beta;
-
+        auto model = _model;
         const auto vol = particles.sliceVolume();
         const auto rho = particles.sliceDensity();
         const auto y = particles.sliceCurrentPosition();
         const auto vel = particles.sliceVelocity();
 
         _neigh_timer.start();
-        _neigh_list.build( y, n_frozen, n_local, Rc, 1.0, mesh_min, mesh_max );
+        _neigh_list.build( y, n_frozen, n_local, model.Rc, 1.0, mesh_min,
+                           mesh_max );
         _neigh_timer.stop();
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {
-            double fcx_i = 0.0;
-            double fcy_i = 0.0;
-            double fcz_i = 0.0;
-
             double xi, r, s;
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-
-            // Contact "overlap"
-            const double delta_n = ( r - 2.0 * radius );
-
-            // Hertz normal force coefficient
-            double coeff = 0.0;
-            double Sn = 0.0;
-            if ( delta_n < 0.0 )
-            {
-                coeff = Kokkos::min(
-                    0.0, -coeff_h_n *
-                             Kokkos::pow( Kokkos::abs( delta_n ), 3.0 / 2.0 ) );
-                Sn = 2.0 * Es * Kokkos::sqrt( Rs * Kokkos::abs( delta_n ) );
-            }
-
-            coeff /= vol( i );
-
-            fcx_i = coeff * rx / r;
-            fcy_i = coeff * ry / r;
-            fcz_i = coeff * rz / r;
-
-            fc( i, 0 ) += fcx_i;
-            fc( i, 1 ) += fcy_i;
-            fc( i, 2 ) += fcz_i;
 
             // Hertz normal force damping component
             double vx, vy, vz, vn;
             getRelativeNormalVelocityComponents( vel, i, j, rx, ry, rz, r, vx,
                                                  vy, vz, vn );
 
-            double ms = ( rho( i ) * vol( i ) ) / 2.0;
-            double fnd = coeff_h_d * Kokkos::sqrt( Sn * ms ) * vn / vol( i );
-
-            fcx_i = fnd * rx / r;
-            fcy_i = fnd * ry / r;
-            fcz_i = fnd * rz / r;
-
-            fc( i, 0 ) += fcx_i;
-            fc( i, 1 ) += fcy_i;
-            fc( i, 2 ) += fcz_i;
+            const double coeff = model.forceCoeff( r, vn, vol( i ), rho( i ) );
+            fc( i, 0 ) += coeff * rx / r;
+            fc( i, 1 ) += coeff * ry / r;
+            fc( i, 2 ) += coeff * rz / r;
         };
 
         _timer.start();

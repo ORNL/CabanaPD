@@ -36,15 +36,12 @@ struct HertzianModel : public ContactModel
     double e;      // Coefficient of restitution
     double beta;   // Damping coefficient
 
+    double coeff_h_n;
+    double coeff_h_d;
+
     HertzianModel( const double _Rc, const double _radius, const double _nu,
                    const double _E, const double _e )
         : ContactModel( 1.0, _Rc )
-    {
-        set_param( _radius, _nu, _E, _e );
-    }
-
-    void set_param( const double _radius, const double _nu, const double _E,
-                    const double _e )
     {
         nu = _nu;
         radius = _radius;
@@ -54,6 +51,36 @@ struct HertzianModel : public ContactModel
         double ln_e = Kokkos::log( e );
         beta = -ln_e / Kokkos::sqrt( Kokkos::pow( ln_e, 2.0 ) +
                                      Kokkos::pow( pi, 2.0 ) );
+
+        // Derived constants.
+        coeff_h_n = 4.0 / 3.0 * Es * Kokkos::sqrt( Rs );
+        coeff_h_d = -2.0 * Kokkos::sqrt( 5.0 / 6.0 ) * beta;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto forceCoeff( const double r, const double vn, const double vol,
+                     const double rho ) const
+    {
+        // Contact "overlap"
+        const double delta_n = ( r - 2.0 * radius );
+
+        // Hertz normal force coefficient
+        double coeff = 0.0;
+        if ( delta_n < 0.0 )
+        {
+            coeff = Kokkos::min(
+                0.0,
+                -coeff_h_n * Kokkos::pow( Kokkos::abs( delta_n ), 3.0 / 2.0 ) );
+        }
+        coeff /= vol;
+
+        // Damping force coefficient
+        double Sn = 0.0;
+        if ( delta_n < 0.0 )
+            Sn = 2.0 * Es * Kokkos::sqrt( Rs * Kokkos::abs( delta_n ) );
+        double ms = ( rho * vol ) / 2.0;
+        coeff += coeff_h_d * Kokkos::sqrt( Sn * ms ) * vn / vol;
+        return coeff;
     }
 };
 

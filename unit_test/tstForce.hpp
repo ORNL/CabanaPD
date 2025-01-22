@@ -174,7 +174,7 @@ double computeReferenceWeightedVolume( ModelType model, const int m,
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                     weighted_volume +=
-                        model.influence_function( xi ) * xi * xi * vol;
+                        model.influenceFunction( xi ) * xi * xi * vol;
             }
     return weighted_volume;
 }
@@ -198,8 +198,7 @@ double computeReferenceDilatation( ModelType model, const int m,
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                     theta += 3.0 / weighted_volume *
-                             model.influence_function( xi ) * s0 * xi * xi *
-                             vol;
+                             model.influenceFunction( xi ) * s0 * xi * xi * vol;
             }
     return theta;
 }
@@ -231,7 +230,7 @@ double computeReferenceDilatation( ModelType model, const int m,
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                     theta += 3.0 / weighted_volume *
-                             model.influence_function( xi ) * s * xi * xi * vol;
+                             model.influenceFunction( xi ) * s * xi * xi * vol;
             }
     return theta;
 }
@@ -287,8 +286,8 @@ double computeReferenceStrainEnergyDensity(
                     W += ( 1.0 / num_neighbors ) * 0.5 * model.theta_coeff /
                              3.0 * ( theta * theta ) +
                          0.5 * ( model.s_coeff / weighted_volume ) *
-                             model.influence_function( xi ) * s0 * s0 * xi *
-                             xi * vol;
+                             model.influenceFunction( xi ) * s0 * s0 * xi * xi *
+                             vol;
                 }
             }
     return W;
@@ -335,7 +334,7 @@ double computeReferenceStrainEnergyDensity(
                     W += ( 1.0 / num_neighbors ) * 0.5 * model.theta_coeff /
                              3.0 * ( theta_i * theta_j ) +
                          0.5 * ( model.s_coeff / weighted_volume ) *
-                             model.influence_function( xi ) * s * s * xi * xi *
+                             model.influenceFunction( xi ) * s * s * xi * xi *
                              vol;
                 }
             }
@@ -384,7 +383,7 @@ double computeReferenceForceX(
                             model.s_coeff * s *
                                 ( 1.0 / weighted_volume +
                                   1.0 / weighted_volume ) ) *
-                          model.influence_function( xi ) * xi * vol * rx / r;
+                          model.influenceFunction( xi ) * xi * vol * rx / r;
                 }
             }
     return fx;
