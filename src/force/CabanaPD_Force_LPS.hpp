@@ -249,9 +249,13 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
 
 template <class MemorySpace>
 class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
-    : public Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
+    : public Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>,
+      public BaseFracture<MemorySpace>
 {
   protected:
+    using fracture_type = BaseFracture<MemorySpace>;
+    using fracture_type::_mu;
+
     using base_type = Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>;
     using base_type::_half_neigh;
     using model_type = ForceModel<LPS, Elastic, Fracture>;
@@ -270,12 +274,21 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
     Force( const bool half_neigh, const ParticleType& particles,
            const model_type model )
         : base_type( half_neigh, particles, model )
+        , fracture_type( particles.localOffset(),
+                         base_type::getMaxLocalNeighbors() )
         , _model( model )
     {
     }
 
-    template <class ParticleType, class MuView>
-    void computeWeightedVolume( ParticleType& particles, const MuView& mu )
+    template <class ExecSpace, class ParticleType, class PrenotchType>
+    void prenotch( ExecSpace exec_space, const ParticleType& particles,
+                   PrenotchType& prenotch )
+    {
+        fracture_type::prenotch( exec_space, particles, prenotch, _neigh_list );
+    }
+
+    template <class ParticleType, class ParallelType>
+    void computeWeightedVolume( ParticleType& particles, ParallelType )
     {
         _timer.start();
 
@@ -286,6 +299,7 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
         Cabana::deep_copy( m, 0.0 );
         auto model = _model;
         auto neigh_list = _neigh_list;
+        auto mu = _mu;
 
         auto weighted_volume = KOKKOS_LAMBDA( const int i )
         {
@@ -314,8 +328,8 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
         _timer.stop();
     }
 
-    template <class ParticleType, class MuView>
-    void computeDilatation( ParticleType& particles, const MuView& mu )
+    template <class ParticleType, class ParallelType>
+    void computeDilatation( ParticleType& particles, ParallelType )
     {
         _timer.start();
 
@@ -326,6 +340,7 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
         auto theta = particles.sliceDilatation();
         auto model = _model;
         auto neigh_list = _neigh_list;
+        auto mu = _mu;
         Cabana::deep_copy( theta, 0.0 );
 
         auto dilatation = KOKKOS_LAMBDA( const int i )
@@ -361,17 +376,17 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
         _timer.stop();
     }
 
-    template <class ForceType, class PosType, class ParticleType, class MuView,
+    template <class ForceType, class PosType, class ParticleType,
               class ParallelType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
-                           const ParticleType& particles, MuView& mu,
-                           ParallelType& )
+                           const ParticleType& particles, ParallelType )
     {
         _timer.start();
 
         auto break_coeff = _model.bond_break_coeff;
         auto model = _model;
         auto neigh_list = _neigh_list;
+        auto mu = _mu;
 
         const auto vol = particles.sliceVolume();
         auto theta = particles.sliceDilatation();
@@ -431,20 +446,21 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
         _timer.stop();
     }
 
-    template <class PosType, class WType, class DamageType, class ParticleType,
-              class MuView, class ParallelType>
+    template <class PosType, class WType, class ParticleType,
+              class ParallelType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              DamageType& phi, const ParticleType& particles,
-                              MuView& mu, ParallelType& )
+                              ParticleType& particles, ParallelType& )
     {
         _energy_timer.start();
 
         auto model = _model;
         auto neigh_list = _neigh_list;
+        auto mu = _mu;
 
         const auto vol = particles.sliceVolume();
         const auto theta = particles.sliceDilatation();
         auto m = particles.sliceWeightedVolume();
+        auto phi = particles.sliceDamage();
 
         auto energy_full = KOKKOS_LAMBDA( const int i, double& Phi )
         {
