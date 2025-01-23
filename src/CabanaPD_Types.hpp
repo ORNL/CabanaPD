@@ -85,6 +85,22 @@ template <>
 struct is_heat_transfer<DynamicTemperature> : public std::true_type
 {
 };
+template <class>
+struct is_temperature : public std::false_type
+{
+};
+template <>
+struct is_temperature<TemperatureIndependent> : public std::true_type
+{
+};
+template <>
+struct is_temperature<TemperatureDependent> : public std::true_type
+{
+};
+template <>
+struct is_temperature<DynamicTemperature> : public std::true_type
+{
+};
 
 // Force model tags.
 struct PMB

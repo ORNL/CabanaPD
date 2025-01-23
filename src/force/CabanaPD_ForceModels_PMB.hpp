@@ -42,7 +42,8 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto forceCoeff( const double s, const double vol ) const
+    auto forceCoeff( const int, const int, const double s,
+                     const double vol ) const
     {
         return c * s * vol;
     }
@@ -56,20 +57,24 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
     }
 };
 
-template <>
+template <typename MemorySpace>
 struct ForceModel<PMB, ElasticPerfectlyPlastic, NoFracture,
-                  TemperatureIndependent>
-    : public ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
+                  TemperatureIndependent, MemorySpace>
+    : public ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>,
+      public BasePlasticity<MemorySpace>
 {
     using base_type = ForceModel<PMB, Elastic, NoFracture>;
+    using base_plasticity_type = BasePlasticity<MemorySpace>;
     using base_model = PMB;
     using fracture_type = NoFracture;
-    using plasticity_type = ElasticPerfectlyPlastic;
+    using mechanics_type = ElasticPerfectlyPlastic;
     using thermal_type = TemperatureIndependent;
 
+    using base_plasticity_type::_s_0;
     using base_type::c;
     using base_type::delta;
     using base_type::K;
+
     // FIXME: hardcoded
     const double s_Y = 0.0014;
 
@@ -79,8 +84,11 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, NoFracture,
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto forceCoeff( const double s, const double vol ) const
+    auto forceCoeff( const int, const int, const double s,
+                     const double vol ) const
     {
+        // FIXME: doesn't work because this kernel doesn't use n.
+        // auto s_0 = _s_0( i, n );
         if ( s < s_Y )
             return c * s * vol;
         else
@@ -135,12 +143,14 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
     }
 };
 
-template <>
+template <typename MemorySpace>
 struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
-                  TemperatureIndependent>
-    : public ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
+                  TemperatureIndependent, MemorySpace>
+    : public ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>,
+      public BasePlasticity<MemorySpace>
 {
     using base_type = ForceModel<PMB, Elastic>;
+    using base_plasticity_type = BasePlasticity<MemorySpace>;
     using base_model = typename base_type::base_model;
     using fracture_type = Fracture;
     using mechanics_type = ElasticPerfectlyPlastic;
@@ -153,22 +163,33 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     using base_type::K;
     using base_type::s0;
 
+    using base_plasticity_type::_s_0;
     // FIXME: hardcoded
     const double s_Y = 0.0014;
 
-    ForceModel( const double delta, const double K, const double G0 )
+    ForceModel( const double delta, const double K, const double G0,
+                const int n_local, const int max_neigh_guess = 0 )
         : base_type( delta, K, G0 )
+        , base_plasticity_type( n_local, max_neigh_guess )
     {
     }
 
     // FIXME: avoiding multiple inheritance..
     KOKKOS_INLINE_FUNCTION
-    auto forceCoeff( const double s, const double vol ) const
+    auto forceCoeff( const int i, const int n, const double s,
+                     const double vol ) const
     {
-        if ( s < s_Y )
-            return c * s * vol;
-        else
-            return c * s_Y * vol;
+        auto s_0 = _s_0( i, n );
+        // Yield in tension.
+        if ( s >= s_0 + s_Y )
+            _s_0( i, n ) = s - s_Y;
+        // Yield in compression.
+        else if ( s <= s_0 - s_Y )
+            _s_0( i, n ) = s + s_Y;
+        // else: Elastic (in between), do not modify.
+        s_0 = _s_0( i, n );
+
+        return c * ( s - s_0 ) * vol;
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -256,6 +277,17 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
     {
     }
 };
+
+template <typename ModelType, typename ParticleType>
+auto createForceModel( ModelType, ElasticPerfectlyPlastic,
+                       ParticleType particles, const double delta,
+                       const double K, const double G0 )
+{
+    using memory_space = typename ParticleType::memory_space;
+    return ForceModel<ModelType, ElasticPerfectlyPlastic, Fracture,
+                      TemperatureIndependent, memory_space>(
+        delta, K, G0, particles.localOffset() );
+}
 
 // Default to Fracture.
 template <typename ParticleType>

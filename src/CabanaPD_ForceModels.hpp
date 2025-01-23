@@ -29,6 +29,30 @@ struct BaseForceModel
     void thermalStretch( double&, const int, const int ) const {}
 };
 
+template <class MemorySpace>
+class BasePlasticity
+{
+  protected:
+    using memory_space = MemorySpace;
+    using NeighborView = typename Kokkos::View<int**, memory_space>;
+    NeighborView _s_0;
+
+  public:
+    BasePlasticity( const int local_particles, const int max_neighbors )
+    {
+        // Create View to track permanent deformation per bond.
+        // TODO: this could be optimized to ignore frozen particle bonds.
+        // Purposely using zero-init here.
+        _s_0 =
+            NeighborView( "permanent_stretch", local_particles, max_neighbors );
+    }
+
+    void update( const int n_local, const int max_neigh )
+    {
+        Kokkos::resize( _s_0, n_local, max_neigh );
+    }
+};
+
 template <typename TemperatureType>
 struct BaseTemperatureModel
 {
