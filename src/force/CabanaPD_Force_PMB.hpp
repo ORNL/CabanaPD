@@ -123,7 +123,7 @@ class Force<MemorySpace,
 
             model.thermalStretch( s, i, j );
 
-            const double coeff = model.forceCoeff( s, vol( j ) );
+            const double coeff = model.forceCoeff( i, j, s, vol( j ) );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -267,7 +267,7 @@ class Force<MemorySpace,
                 // Else if statement is only for performance.
                 else if ( mu( i, n ) > 0 )
                 {
-                    const double coeff = model.forceCoeff( s, vol( j ) );
+                    const double coeff = model.forceCoeff( i, n, s, vol( j ) );
 
                     double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;

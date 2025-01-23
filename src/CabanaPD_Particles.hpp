@@ -994,7 +994,7 @@ auto createParticles(
     const ExecSpace& exec_space, std::array<double, Dim> low_corner,
     std::array<double, Dim> high_corner, const std::array<int, Dim> num_cells,
     const int max_halo_width, OutputType,
-    typename std::enable_if<( is_temperature_dependent<ThermalType>::value &&
+    typename std::enable_if<( is_temperature<ThermalType>::value &&
                               is_output<OutputType>::value ),
                             int>::type* = 0 )
 {
@@ -1057,7 +1057,7 @@ auto createParticles(
     const ExecSpace& exec_space, std::array<double, Dim> low_corner,
     std::array<double, Dim> high_corner, const std::array<int, Dim> num_cells,
     const int max_halo_width,
-    typename std::enable_if<( is_temperature_dependent<ThermalType>::value ),
+    typename std::enable_if<( is_temperature<ThermalType>::value ),
                             int>::type* = 0 )
 {
     return createParticles<MemorySpace, ModelType, ThermalType, ExecSpace, Dim>(
@@ -1088,7 +1088,7 @@ auto createParticles(
     const ExecSpace& exec_space, const PositionType& x, const VolumeType& vol,
     std::array<double, Dim> low_corner, std::array<double, Dim> high_corner,
     const std::array<int, Dim> num_cells, const int max_halo_width, OutputType,
-    typename std::enable_if<( is_temperature_dependent<ThermalType>::value &&
+    typename std::enable_if<( is_temperature<ThermalType>::value &&
                               is_output<OutputType>::value ),
                             int>::type* = 0 )
 {
