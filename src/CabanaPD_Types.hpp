@@ -12,6 +12,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <type_traits>
+
 namespace CabanaPD
 {
 // Fracture tags.
