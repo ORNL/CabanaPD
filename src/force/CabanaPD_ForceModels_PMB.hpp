@@ -288,12 +288,13 @@ auto createForceModel( PMB, NoFracture, ParticleType particles,
 }
 
 template <typename TemperatureType>
-struct ForceModel<PMB, Fracture, DynamicTemperature, TemperatureType>
-    : public ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>,
+struct ForceModel<PMB, Elastic, Fracture, DynamicTemperature, TemperatureType>
+    : public ForceModel<PMB, Elastic, Fracture, TemperatureDependent,
+                        TemperatureType>,
       BaseDynamicTemperatureModel
 {
-    using base_type =
-        ForceModel<PMB, Fracture, TemperatureDependent, TemperatureType>;
+    using base_type = ForceModel<PMB, Elastic, Fracture, TemperatureDependent,
+                                 TemperatureType>;
     using base_temperature_type = BaseDynamicTemperatureModel;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;

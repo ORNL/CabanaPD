@@ -132,18 +132,19 @@ class Force;
 template <class MemorySpace>
 class Force<MemorySpace, BaseForceModel>
 {
+  public:
+    using neighbor_list_type =
+        Cabana::VerletList<MemorySpace, Cabana::FullNeighborTag,
+                           Cabana::VerletLayout2D, Cabana::TeamOpTag>;
+
   protected:
     bool _half_neigh;
+    neighbor_list_type _neigh_list;
 
     Timer _timer;
     Timer _energy_timer;
 
   public:
-    using neighbor_list_type =
-        Cabana::VerletList<MemorySpace, Cabana::FullNeighborTag,
-                           Cabana::VerletLayout2D, Cabana::TeamOpTag>;
-    neighbor_list_type _neigh_list;
-
     // Primary constructor: use positions and construct neighbors.
     template <class ParticleType>
     Force( const bool half_neigh, const double delta,
@@ -229,6 +230,8 @@ class Force<MemorySpace, BaseForceModel>
     {
     }
 
+    auto getNeighbors() const { return _neigh_list; }
+
     auto time() { return _timer.time(); };
     auto timeEnergy() { return _energy_timer.time(); };
 };
@@ -252,6 +255,11 @@ class BaseFracture
         Kokkos::deep_copy( _mu, 1 );
     }
 
+    BaseFracture( NeighborView mu )
+        : _mu( mu )
+    {
+    }
+
     template <class ExecSpace, class ParticleType, class PrenotchType,
               class NeighborList>
     void prenotch( ExecSpace exec_space, const ParticleType& particles,
@@ -260,7 +268,7 @@ class BaseFracture
         prenotch.create( exec_space, _mu, particles, neigh_list );
     }
 
-    auto getBrokenBonds() { return _mu; }
+    auto getBrokenBonds() const { return _mu; }
 };
 
 /******************************************************************************

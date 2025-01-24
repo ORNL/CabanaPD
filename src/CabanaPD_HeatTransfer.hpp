@@ -12,37 +12,44 @@
 #ifndef HEATTRANSFER_H
 #define HEATTRANSFER_H
 
+#include <CabanaPD_Force.hpp>
 #include <CabanaPD_Timer.hpp>
+#include <CabanaPD_Types.hpp>
 
 namespace CabanaPD
 {
 
+template <class MemorySpace, class ModelType>
+class HeatTransfer;
+
 // Peridynamic heat transfer with forward-Euler time integration.
 // Inherits only because this is a similar neighbor-based kernel.
-template <class MemorySpace, class ModelType>
-class HeatTransfer : public Force<MemorySpace, BaseForceModel>
+template <class MemorySpace, class MechanicsType, class... ModelParams>
+class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, NoFracture,
+                                           DynamicTemperature, ModelParams...>>
+    : public Force<MemorySpace, BaseForceModel>
 {
-  protected:
-    using base_type = Force<MemorySpace, BaseForceModel>;
-    using base_type::_half_neigh;
-    using base_type::_timer;
-
-    Timer _euler_timer = base_type::_energy_timer;
-    ModelType _model;
+  public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
+    using model_type = ForceModel<PMB, MechanicsType, NoFracture,
+                                  DynamicTemperature, ModelParams...>;
+    using base_type = Force<MemorySpace, BaseForceModel>;
+    using neighbor_list_type = typename base_type::neighbor_list_type;
+
+  protected:
+    using base_type::_half_neigh;
+    using base_type::_neigh_list;
+    using base_type::_timer;
+    Timer _euler_timer = base_type::_energy_timer;
+    model_type _model;
 
   public:
-    using base_type::_neigh_list;
-    using model_type = ModelType;
-    static_assert(
-        std::is_same_v<typename model_type::fracture_type, NoFracture> );
-
     // Running with mechanics as well; no reason to rebuild neighbors.
-    template <class NeighborType>
-    HeatTransfer( const bool half_neigh, const NeighborType& neighbors,
-                  const ModelType model )
-        : base_type( half_neigh, neighbors )
+    template <class ForceType>
+    HeatTransfer( const bool half_neigh, const ForceType& force,
+                  const model_type model )
+        : base_type( half_neigh, force.getNeighbors() )
         , _model( model )
     {
     }
@@ -99,7 +106,102 @@ class HeatTransfer : public Force<MemorySpace, BaseForceModel>
     }
 };
 
-// Heat transfer free function.
+template <class MemorySpace, class MechanicsType, class... ModelParams>
+class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, Fracture,
+                                           DynamicTemperature, ModelParams...>>
+    : public HeatTransfer<MemorySpace,
+                          ForceModel<PMB, MechanicsType, NoFracture,
+                                     DynamicTemperature, ModelParams...>>,
+      BaseFracture<MemorySpace>
+
+{
+  public:
+    // Using the default exec_space.
+    using exec_space = typename MemorySpace::execution_space;
+    using model_type = ForceModel<PMB, MechanicsType, Fracture,
+                                  DynamicTemperature, ModelParams...>;
+    using base_type =
+        HeatTransfer<MemorySpace,
+                     ForceModel<PMB, MechanicsType, NoFracture,
+                                DynamicTemperature, ModelParams...>>;
+    using neighbor_list_type = typename base_type::neighbor_list_type;
+
+  protected:
+    using base_type::_euler_timer;
+    using base_type::_half_neigh;
+    using base_type::_neigh_list;
+    using base_type::_timer;
+    model_type _model;
+
+    using fracture_type = BaseFracture<MemorySpace>;
+    using fracture_type::_mu;
+
+  public:
+    // Explicit base model construction is necessary because of the indirect
+    // model inheritance. This could be avoided with a BaseHeatTransfer object.
+    template <class ForceType>
+    HeatTransfer( const bool half_neigh, const ForceType& force,
+                  const model_type model )
+        : base_type( half_neigh, force,
+                     typename base_type::model_type(
+                         model.delta, model.K, model.temperature, model.kappa,
+                         model.cp, model.alpha, model.temp0,
+                         model.constant_microconductivity ) )
+        , fracture_type( force.getBrokenBonds() )
+        , _model( model )
+    {
+    }
+
+    template <class TemperatureType, class PosType, class ParticleType,
+              class ParallelType>
+    void computeHeatTransferFull( TemperatureType& conduction, const PosType& x,
+                                  const PosType& u,
+                                  const ParticleType& particles, ParallelType& )
+    {
+        _timer.start();
+
+        auto model = _model;
+        const auto neigh_list = _neigh_list;
+        const auto vol = particles.sliceVolume();
+        const auto temp = particles.sliceTemperature();
+        const auto mu = _mu;
+
+        auto temp_func = KOKKOS_LAMBDA( const int i )
+        {
+            std::size_t num_neighbors =
+                Cabana::NeighborList<neighbor_list_type>::numNeighbor(
+                    neigh_list, i );
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            {
+                std::size_t j =
+                    Cabana::NeighborList<neighbor_list_type>::getNeighbor(
+                        neigh_list, i, n );
+
+                // Get the reference positions and displacements.
+                double xi, r, s;
+                getDistance( x, u, i, j, xi, r, s );
+
+                model.thermalStretch( s, i, j );
+
+                // Only include unbroken bonds.
+                if ( mu( i, n ) > 0 )
+                {
+                    const double coeff = model.microconductivity_function( xi );
+                    conduction( i ) +=
+                        coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
+                }
+            }
+        };
+
+        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
+                                                particles.localOffset() );
+        Kokkos::parallel_for( "CabanaPD::HeatTransfer::computeFull", policy,
+                              temp_func );
+        _timer.stop();
+    }
+};
+
+// Heat transfer free functions.
 template <class HeatTransferType, class ParticleType, class ParallelType>
 void computeHeatTransfer( HeatTransferType& heat_transfer,
                           ParticleType& particles,
