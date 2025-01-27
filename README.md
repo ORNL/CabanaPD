@@ -109,17 +109,20 @@ ctest
 
 CabanaPD currently includes the following:
   - Force models
-    - Bond-based (pairwise): prototype microelastic brittle (PMB)
-    - State-based (many-body): linear peridynamic solid (LPS)
+    - PD Bond-based (pairwise): prototype microelastic brittle (PMB)
+    - PD State-based (many-body): linear peridynamic solid (LPS)
+    - DEM contact: normal repulsion, Hertzian 
+    - Hybrid DEM-PD
  - Mechanical response:
-   - Elastic (no failure)
+   - Elastic only (no failure)
    - Brittle fracture
  - Thermomechanics (bond-based only)
-   - Optional heat transfer (elastic only)
+   - Optional heat transfer
  - Time integration
    - Velocity Verlet
  - Pre-crack creation
  - Particle boundary conditions
+   - Body terms which apply to all particles
  - Grid-based particle generation supporting custom geometry
 
 ## Examples
