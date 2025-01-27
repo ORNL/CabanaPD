@@ -41,6 +41,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     double nu = 0.25;
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double delta = inputs["horizon"];
+    delta += 1e-10;
     double alpha = inputs["thermal_expansion_coeff"];
     double kappa = inputs["thermal_conductivity"];
     double cp = inputs["specific_heat_capacity"];
