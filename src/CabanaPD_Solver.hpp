@@ -175,7 +175,7 @@ class Solver
         {
             thermal_subcycle_steps = inputs["thermal_subcycle_steps"];
             heat_transfer = std::make_shared<heat_transfer_type>(
-                inputs["half_neigh"], force->_neigh_list, force_model );
+                inputs["half_neigh"], *force, force_model );
         }
 
         print = print_rank();

@@ -5,13 +5,15 @@
     "elastic_modulus"               : {"value": 370e+9, "unit": "Pa"},
     "fracture_energy"               : {"value": 24.32, "unit": "J/m^2"},
     "thermal_expansion_coeff"       : {"value": 7.5E-6, "unit": "oC^{-1}"},
+    "thermal_conductivity"          : {"value": 31, "unit": "W/(m.K)"},
+    "specific_heat_capacity"        : {"value": 880, "unit": "J/(kg.K)"},
     "reference_temperature"         : {"value": 300.0, "unit": "oC"},
     "background_temperature"        : {"value": 20.0, "unit": "oC"},
     "surface_temperature_ramp_time" : {"value": 0.001, "unit": "s"},
     "horizon"                       : {"value": 3.0e-4, "unit": "m"},  
     "final_time"                    : {"value": 7.5e-4, "unit": "s"},
     "timestep"                      : {"value": 7.5E-9, "unit": "s"},
-    "thermal_subcycle_steps"        : {"value": 100},
-    "output_frequency"              : {"value": 200},
+    "thermal_subcycle_steps"        : {"value": 8e+4},
+    "output_frequency"              : {"value": 500},
     "output_reference"              : {"value": true}
 }

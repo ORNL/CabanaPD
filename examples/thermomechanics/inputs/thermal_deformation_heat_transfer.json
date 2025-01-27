@@ -3,6 +3,7 @@
     "system_size"             : {"value": [0.1, 0.1, 0.1], "unit": "m"},
     "density"                 : {"value": 8915,  "unit": "kg/m^3"},
     "elastic_modulus"         : {"value": 115e+9, "unit": "Pa"},
+    "fracture_energy"         : {"value": 1.3913e+04, "unit": "J/m^2"},
     "thermal_expansion_coeff" : {"value": 17e-6, "unit": "oC^{-1}"},
     "thermal_conductivity"    : {"value": 387, "unit": "W/(m.K)"},
     "specific_heat_capacity"  : {"value": 385, "unit": "J/(kg.K)"},
