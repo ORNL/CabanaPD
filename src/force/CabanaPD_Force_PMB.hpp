@@ -183,7 +183,8 @@ class Force<MemorySpace,
 template <class MemorySpace, class MechanicsType, class... ModelParams>
 class Force<MemorySpace,
             ForceModel<PMB, MechanicsType, Fracture, ModelParams...>>
-    : public Force<MemorySpace, BaseForceModel>, BaseFracture<MemorySpace>
+    : public Force<MemorySpace, BaseForceModel>,
+      public BaseFracture<MemorySpace>
 {
   public:
     // Using the default exec_space.
