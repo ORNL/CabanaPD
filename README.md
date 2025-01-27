@@ -132,7 +132,7 @@ information is output to file and particle output is written to files (if enable
 New examples can be created by using any of the current cases as a template. All inputs are specified in the example JSON files within the relevant `inputs/` subdirectory.
 
 ### Mechanics
-Examples which only include mechanics and fracture are with `examples/mechanics`.
+Examples which only include mechanics and fracture are within `examples/mechanics`.
 
 The first example is an elastic wave propagating through a cube from an initial Gaussian radial displacement profile from [1]. Assuming the build paths above, the example can be run with:
 
@@ -167,7 +167,7 @@ The fourth example is a fragmenting cylinder due to internal pressure [4]. The e
 ```
 
 ### Thermomechanics
-Examples which demonstrate temperature-dependent mechanics and fracture are with `examples/thermomechanics`.
+Examples which demonstrate temperature-dependent mechanics and fracture are within `examples/thermomechanics`.
 
 The first example is thermoelastic deformation in a homogeneous plate due to linear thermal loading [5]. The example can be run with:
 
@@ -179,6 +179,20 @@ The second example is crack initiation and propagation in an alumina ceramic pla
 
 ```
 ./CabanaPD/build/install/bin/ThermalCrack CabanaPD/examples/thermomechanics/thermal_crack.json
+```
+
+### Thermomechanics with heat transfer
+Examples with heat transfer are within `examples/thermomechanics`.
+
+The first example is pseudo-1d heat transfer (no mechanics) in a cube. The example can be run with: 
+```
+./CabanaPD/build/install/bin/ThermalDeformationHeatTransfer CabanaPD/examples/thermomechanics/heat_transfer.json
+```
+The same example with fully coupled thermomechanics can be run (with a much smaller timestep) using `thermal_deformation_heat_transfer.json`.
+
+The second example is pseudo-1d heat transfer (no mechanics) in a pre-notched cube. The example can be run with: 
+```
+./CabanaPD/build/install/bin/ThermalDeformationHeatTransferPrenotched CabanaPD/examples/thermomechanics/heat_transfer.json
 ```
 
 ## References
