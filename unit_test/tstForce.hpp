@@ -31,10 +31,10 @@
 #include <CabanaPD_ForceModels.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Particles.hpp>
-#include <force/CabanaPD_ForceModels_LPS.hpp>
-#include <force/CabanaPD_ForceModels_PMB.hpp>
-#include <force/CabanaPD_Force_LPS.hpp>
-#include <force/CabanaPD_Force_PMB.hpp>
+#include <force/CabanaPD_LPS.hpp>
+#include <force/CabanaPD_PMB.hpp>
+#include <force_models/CabanaPD_LPS.hpp>
+#include <force_models/CabanaPD_PMB.hpp>
 
 #include <type_traits>
 
