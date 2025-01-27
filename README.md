@@ -124,6 +124,11 @@ CabanaPD currently includes the following:
  - Particle boundary conditions
    - Body terms which apply to all particles
  - Grid-based particle generation supporting custom geometry
+ - Output options
+   - Total strain energy density
+   - Per particle output using HDF5 or SILO
+     - Base fields: position (reference or current), velocity, force
+     - Strain energy density, damage
 
 ## Examples
 
