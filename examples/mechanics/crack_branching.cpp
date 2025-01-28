@@ -22,7 +22,7 @@
 void crackBranchingExample( const std::string filename )
 {
     // ====================================================
-    //             Use default Kokkos spaces
+    //               Choose Kokkos spaces
     // ====================================================
     using exec_space = Kokkos::DefaultExecutionSpace;
     using memory_space = typename exec_space::memory_space;
@@ -46,7 +46,6 @@ void crackBranchingExample( const std::string filename )
     // ====================================================
     //                  Discretization
     // ====================================================
-    // FIXME: set halo width based on delta
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
 

@@ -22,7 +22,7 @@
 void elasticWaveExample( const std::string filename )
 {
     // ====================================================
-    //             Use default Kokkos spaces
+    //               Choose Kokkos spaces
     // ====================================================
     using exec_space = Kokkos::DefaultExecutionSpace;
     using memory_space = typename exec_space::memory_space;
