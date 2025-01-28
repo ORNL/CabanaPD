@@ -46,9 +46,12 @@ void compactTensionTestExample( const std::string filename )
     // ====================================================
     //                  Discretization
     // ====================================================
-    // FIXME: set halo width based on delta
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
+    std::array<int, 3> num_cells = inputs["num_cells"];
+    int m = std::floor( delta /
+                        ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
+    int halo_width = m + 1; // Just to be safe.
 
     // ====================================================
     //                    Pre-notch
@@ -66,16 +69,19 @@ void compactTensionTestExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type =
-        CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::ElasticPerfectlyPlastic>;
-    model_type force_model( delta, K, G0 );
+    using model_type = CabanaPD::PMB;
+    using thermal_type = CabanaPD::TemperatureIndependent;
+    using mechanics_type = CabanaPD::ElasticPerfectlyPlastic;
 
     // ====================================================
     //                 Particle generation
     // ====================================================
-    // Note that individual inputs can be passed instead (see other examples).
-    auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space{}, inputs );
+    auto particles =
+        CabanaPD::createParticles<memory_space, model_type, thermal_type>(
+            exec_space{}, low_corner, high_corner, num_cells, halo_width );
+
+    auto force_model = CabanaPD::createForceModel(
+        model_type{}, mechanics_type{}, *particles, delta, K, G0 );
 
     // ====================================================
     //    Custom particle generation and initialization
