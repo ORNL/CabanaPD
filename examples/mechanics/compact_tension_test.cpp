@@ -22,7 +22,7 @@
 void compactTensionTestExample( const std::string filename )
 {
     // ====================================================
-    //             Use default Kokkos spaces
+    //               Choose Kokkos spaces
     // ====================================================
     using exec_space = Kokkos::DefaultExecutionSpace;
     using memory_space = typename exec_space::memory_space;
@@ -67,21 +67,11 @@ void compactTensionTestExample( const std::string filename )
     CabanaPD::Prenotch<1> prenotch( v1, v2, notch_position );
 
     // ====================================================
-    //                    Force model
+    //                Force model type
     // ====================================================
     using model_type = CabanaPD::PMB;
     using thermal_type = CabanaPD::TemperatureIndependent;
     using mechanics_type = CabanaPD::ElasticPerfectlyPlastic;
-
-    // ====================================================
-    //                 Particle generation
-    // ====================================================
-    auto particles =
-        CabanaPD::createParticles<memory_space, model_type, thermal_type>(
-            exec_space{}, low_corner, high_corner, num_cells, halo_width );
-
-    auto force_model = CabanaPD::createForceModel(
-        model_type{}, mechanics_type{}, *particles, delta, K, G0 );
 
     // ====================================================
     //    Custom particle generation and initialization
@@ -90,8 +80,6 @@ void compactTensionTestExample( const std::string filename )
     CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane(
         low_corner[0], high_corner[0], low_corner[1], high_corner[1],
         low_corner[2], high_corner[2] );
-    std::vector<CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>> planes = {
-        plane };
 
     // Geometric parameters of specimen
     double L = inputs["system_size"][1];
@@ -99,7 +87,7 @@ void compactTensionTestExample( const std::string filename )
     double a = 0.45 * W;
 
     // Grid spacing in y-direction
-    double dy = particles->dx[1];
+    double dy = inputs["dx"][1];
 
     // Remove particles from original geometry
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
@@ -122,7 +110,10 @@ void compactTensionTestExample( const std::string filename )
         }
     };
 
-    particles->createParticles( exec_space(), init_op );
+    auto particles =
+        CabanaPD::createParticles<memory_space, model_type, thermal_type>(
+            exec_space(), low_corner, high_corner, num_cells, halo_width,
+            init_op );
 
     auto rho = particles->sliceDensity();
     auto x = particles->sliceReferencePosition();
@@ -160,6 +151,12 @@ void compactTensionTestExample( const std::string filename )
     particles->updateParticles( exec_space{}, init_functor );
 
     // ====================================================
+    //                    Force model
+    // ====================================================
+    auto force_model = CabanaPD::createForceModel(
+        model_type{}, mechanics_type{}, *particles, delta, K, G0 );
+
+    // ====================================================
     //                   Create solver
     // ====================================================
     auto cabana_pd =
@@ -182,8 +179,8 @@ void compactTensionTestExample( const std::string filename )
              R * R )
             f( pid, 1 ) = 0;
     };
-    auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, planes,
-                                       true );
+    auto bc =
+        createBoundaryCondition( bc_op, exec_space{}, *particles, plane, true );
 
     // ====================================================
     //                   Simulation run
