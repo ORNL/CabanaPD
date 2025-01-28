@@ -81,21 +81,20 @@ void thermalDeformationExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    auto force_model =
-        CabanaPD::createForceModel( model_type{}, CabanaPD::NoFracture{},
-                                    particles, delta, K, alpha, temp0 );
+    auto temp = particles.sliceTemperature();
+    CabanaPD::ForceModel force_model( model_type{}, CabanaPD::NoFracture{},
+                                      delta, K, temp, alpha, temp0 );
 
     // ====================================================
     //                   Create solver
     // ====================================================
-    CabanaPD::Solver solver( memory_space{}, inputs, particles,
-                                          force_model );
+    CabanaPD::Solver solver( memory_space{}, inputs, particles, force_model );
 
     // ====================================================
     //                   Imposed field
     // ====================================================
     auto x = particles.sliceReferencePosition();
-    auto temp = particles.sliceTemperature();
+    temp = particles.sliceTemperature();
     const double low_corner_y = low_corner[1];
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.

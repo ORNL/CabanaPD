@@ -34,7 +34,7 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
     double c;
     double K;
 
-    ForceModel( const double delta, const double _K )
+    ForceModel( PMB, NoFracture, const double delta, const double _K )
         : base_type( delta )
         , K( _K )
     {
@@ -72,8 +72,9 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
     double s0;
     double bond_break_coeff;
 
-    ForceModel( const double delta, const double K, const double _G0 )
-        : base_type( delta, K )
+    ForceModel( PMB model, const double delta, const double K,
+                const double _G0 )
+        : base_type( model, NoFracture{}, delta, K )
         , G0( _G0 )
     {
         s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / K / delta );
@@ -124,6 +125,15 @@ struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
     using base_type::s0;
 };
 
+template <typename ModelType>
+ForceModel( ModelType, NoFracture, const double delta, const double K )
+    -> ForceModel<ModelType, Elastic, NoFracture>;
+
+// Default to fracture.
+template <typename ModelType>
+ForceModel( ModelType, const double delta, const double K, const double _G0 )
+    -> ForceModel<ModelType, Elastic>;
+
 template <typename TemperatureType>
 struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
                   TemperatureType>
@@ -148,34 +158,14 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
     // Explicitly use the temperature-dependent stretch.
     using base_temperature_type::thermalStretch;
 
-    ForceModel( const double _delta, const double _K,
-                const TemperatureType _temp, const double _alpha,
-                const double _temp0 = 0.0 )
-        : base_type( _delta, _K )
+    ForceModel( PMB model, NoFracture fracture, const double _delta,
+                const double _K, const TemperatureType _temp,
+                const double _alpha, const double _temp0 = 0.0 )
+        : base_type( model, fracture, _delta, _K )
         , base_temperature_type( _temp, _alpha, _temp0 )
     {
     }
 };
-
-// Default to Fracture.
-template <typename ParticleType>
-auto createForceModel( PMB model, ParticleType particles, const double delta,
-                       const double K, const double alpha, const double temp0 )
-{
-    return createForceModel( model, Fracture{}, particles, delta, K, alpha,
-                             temp0 );
-}
-
-template <typename ParticleType>
-auto createForceModel( PMB, NoFracture, ParticleType particles,
-                       const double delta, const double K, const double alpha,
-                       const double temp0 )
-{
-    auto temp = particles.sliceTemperature();
-    using temp_type = decltype( temp );
-    return ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
-                      temp_type>( delta, K, temp, alpha, temp0 );
-}
 
 template <typename TemperatureType>
 struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
@@ -205,10 +195,10 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
     // Explicitly use the temperature-dependent stretch.
     using base_temperature_type::thermalStretch;
 
-    ForceModel( const double _delta, const double _K, const double _G0,
-                const TemperatureType _temp, const double _alpha,
-                const double _temp0 = 0.0 )
-        : base_type( _delta, _K, _G0 )
+    ForceModel( PMB model, const double _delta, const double _K,
+                const double _G0, const TemperatureType _temp,
+                const double _alpha, const double _temp0 = 0.0 )
+        : base_type( model, _delta, _K, _G0 )
         , base_temperature_type( _temp, _alpha, _temp0 )
     {
     }
@@ -224,16 +214,19 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
     }
 };
 
-template <typename ParticleType>
-auto createForceModel( PMB, Fracture, ParticleType particles,
-                       const double delta, const double K, const double G0,
-                       const double alpha, const double temp0 )
-{
-    auto temp = particles.sliceTemperature();
-    using temp_type = decltype( temp );
-    return ForceModel<PMB, Elastic, Fracture, TemperatureDependent, temp_type>(
-        delta, K, G0, temp, alpha, temp0 );
-}
+template <typename ModelType, typename TemperatureType>
+ForceModel( ModelType, NoFracture, const double delta, const double K,
+            const TemperatureType& temp, const double alpha,
+            const double temp0 = 0.0 )
+    -> ForceModel<ModelType, Elastic, NoFracture, TemperatureDependent,
+                  TemperatureType>;
+
+template <typename ModelType, typename TemperatureType>
+ForceModel( ModelType, const double delta, const double K, const double _G0,
+            const TemperatureType& temp, const double alpha,
+            const double temp0 = 0.0 )
+    -> ForceModel<ModelType, Elastic, Fracture, TemperatureDependent,
+                  TemperatureType>;
 
 template <typename TemperatureType>
 struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
@@ -263,33 +256,30 @@ struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
     // Explicitly use the temperature-dependent stretch.
     using base_type::thermalStretch;
 
-    ForceModel( const double _delta, const double _K,
-                const TemperatureType _temp, const double _kappa,
-                const double _cp, const double _alpha,
+    ForceModel( PMB model, NoFracture fracture, const double _delta,
+                const double _K, const TemperatureType& _temp,
+                const double _kappa, const double _cp, const double _alpha,
                 const double _temp0 = 0.0,
                 const bool _constant_microconductivity = true )
-        : base_type( _delta, _K, _temp, _alpha, _temp0 )
+        : base_type( model, fracture, _delta, _K, _temp, _alpha, _temp0 )
         , base_temperature_type( _delta, _kappa, _cp,
                                  _constant_microconductivity )
     {
     }
 };
 
-template <typename ParticleType>
-auto createForceModel( PMB, NoFracture, ParticleType particles,
-                       const double delta, const double K, const double kappa,
-                       const double cp, const double alpha, const double temp0,
-                       const bool constant_microconductivity = true )
-{
-    auto temp = particles.sliceTemperature();
-    using temp_type = decltype( temp );
-    return ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, temp_type>(
-        delta, K, temp, kappa, cp, alpha, temp0, constant_microconductivity );
-}
+template <typename ModelType, typename TemperatureType>
+ForceModel( ModelType, NoFracture, const double delta, const double K,
+            const TemperatureType& temp, const double kappa, const double cp,
+            const double alpha, const double temp0 = 0.0,
+            const bool constant_microconductivity = true )
+    -> ForceModel<ModelType, Elastic, NoFracture, DynamicTemperature,
+                  TemperatureType>;
 
-template <typename TemperatureType>
-struct ForceModel<PMB, Elastic, Fracture, DynamicTemperature, TemperatureType>
-    : public ForceModel<PMB, Elastic, Fracture, TemperatureDependent,
+template <typename ModelType, typename TemperatureType>
+struct ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
+                  TemperatureType>
+    : public ForceModel<ModelType, Elastic, Fracture, TemperatureDependent,
                         TemperatureType>,
       BaseDynamicTemperatureModel
 {
@@ -319,31 +309,25 @@ struct ForceModel<PMB, Elastic, Fracture, DynamicTemperature, TemperatureType>
     // Explicitly use the temperature-dependent stretch.
     using base_type::thermalStretch;
 
-    ForceModel( const double _delta, const double _K, const double _G0,
-                const TemperatureType _temp, const double _kappa,
-                const double _cp, const double _alpha,
+    ForceModel( PMB model, const double _delta, const double _K,
+                const double _G0, const TemperatureType _temp,
+                const double _kappa, const double _cp, const double _alpha,
                 const double _temp0 = 0.0,
                 const bool _constant_microconductivity = true )
-        : base_type( _delta, _K, _G0, _temp, _alpha, _temp0 )
+        : base_type( model, _delta, _K, _G0, _temp, _alpha, _temp0 )
         , base_temperature_type( _delta, _kappa, _cp,
                                  _constant_microconductivity )
     {
     }
 };
 
-template <typename ParticleType>
-auto createForceModel( PMB, Fracture, ParticleType particles,
-                       const double delta, const double K, const double G0,
-                       const double kappa, const double cp, const double alpha,
-                       const double temp0,
-                       const bool constant_microconductivity = true )
-{
-    auto temp = particles.sliceTemperature();
-    using temp_type = decltype( temp );
-    return ForceModel<PMB, Elastic, Fracture, DynamicTemperature, temp_type>(
-        delta, K, G0, temp, kappa, cp, alpha, temp0,
-        constant_microconductivity );
-}
+template <typename ModelType, typename TemperatureType>
+ForceModel( ModelType, const double delta, const double K, const double G0,
+            const TemperatureType& temp, const double kappa, const double cp,
+            const double alpha, const double temp0 = 0.0,
+            const bool constant_microconductivity = true )
+    -> ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
+                  TemperatureType>;
 
 } // namespace CabanaPD
 

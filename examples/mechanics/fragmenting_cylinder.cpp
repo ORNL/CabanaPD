@@ -59,11 +59,8 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type = CabanaPD::ForceModel<CabanaPD::PMB>;
-    model_type force_model( delta, K, G0 );
-    // using model_type =
-    //      CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
-    // model_type force_model( delta, K, G, G0 );
+    CabanaPD::ForceModel force_model( CabanaPD::PMB{}, delta, K, G0 );
+    // CabanaPD::ForceModel force_model( CabanaPD::LPS{}, delta, K, G, G0 );
 
     // ====================================================
     //    Custom particle generation and initialization
@@ -142,8 +139,8 @@ void fragmentingCylinderExample( const std::string filename )
         r_c *= dx[0];
         CabanaPD::NormalRepulsionModel contact_model( delta, r_c, K );
 
-        CabanaPD::Solver solver( memory_space{},
-            inputs, particles, force_model, contact_model );
+        CabanaPD::Solver solver( memory_space{}, inputs, particles, force_model,
+                                 contact_model );
         solver.init();
         solver.run();
     }
@@ -152,8 +149,8 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     else
     {
-        CabanaPD::Solver solver( memory_space{},
-            inputs, particles, force_model );
+        CabanaPD::Solver solver( memory_space{}, inputs, particles,
+                                 force_model );
         solver.init();
         solver.run();
     }

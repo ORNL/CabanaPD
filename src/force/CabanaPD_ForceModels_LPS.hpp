@@ -36,8 +36,8 @@ struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModel
     double theta_coeff;
     double s_coeff;
 
-    ForceModel( const double _delta, const double _K, const double _G,
-                const int _influence = 0 )
+    ForceModel( LPS, NoFracture, const double _delta, const double _K,
+                const double _G, const int _influence = 0 )
         : base_type( _delta )
         , influence_type( _influence )
         , K( _K )
@@ -111,9 +111,10 @@ struct ForceModel<LPS, Elastic, Fracture>
     double s0;
     double bond_break_coeff;
 
-    ForceModel( const double _delta, const double _K, const double _G,
-                const double _G0, const int _influence = 0 )
-        : base_type( _delta, _K, _G, _influence )
+    ForceModel( LPS model, NoFracture fracture, const double _delta,
+                const double _K, const double _G, const double _G0,
+                const int _influence = 0 )
+        : base_type( model, fracture, _delta, _K, _G, _influence )
         , G0( _G0 )
     {
         if ( influence_type == 1 )
@@ -137,7 +138,11 @@ struct ForceModel<LinearLPS, Elastic, NoFracture>
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = base_type::thermal_type;
 
-    using base_type::base_type;
+    template <typename... Args>
+    ForceModel( LinearLPS, Args&&... args )
+        : base_type( base_model{}, std::forward<Args>( args )... )
+    {
+    }
 
     using base_type::delta;
     using base_type::G;
@@ -156,7 +161,11 @@ struct ForceModel<LinearLPS, Elastic, Fracture>
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = base_type::thermal_type;
 
-    using base_type::base_type;
+    template <typename... Args>
+    ForceModel( LinearLPS, Args&&... args )
+        : base_type( base_model{}, std::forward<Args>( args )... )
+    {
+    }
 
     using base_type::delta;
     using base_type::G;
@@ -169,6 +178,16 @@ struct ForceModel<LinearLPS, Elastic, Fracture>
     using base_type::G0;
     using base_type::s0;
 };
+
+template <typename ModelType>
+ForceModel( ModelType, NoFracture, const double delta, const double K,
+            const double G, const int influence = 0 )
+    -> ForceModel<ModelType, Elastic, NoFracture>;
+
+template <typename ModelType>
+ForceModel( ModelType, const double _delta, const double _K, const double _G,
+            const double _G0, const int _influence = 0 )
+    -> ForceModel<ModelType, Elastic>;
 
 } // namespace CabanaPD
 
