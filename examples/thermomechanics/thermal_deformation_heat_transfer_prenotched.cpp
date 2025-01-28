@@ -132,9 +132,8 @@ void thermalDeformationHeatTransferPrenotchedExample(
     // ====================================================
     //                    Force model
     // ====================================================
-    auto force_model = CabanaPD::createForceModel(
-        model_type{}, CabanaPD::Fracture{}, particles, delta, K, G0, kappa, cp,
-        alpha, temp0 );
+    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0, temp, kappa,
+                                      cp, alpha, temp0 );
 
     // ====================================================
     //                   Create solver
