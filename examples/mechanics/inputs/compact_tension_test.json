@@ -10,6 +10,6 @@
     "final_time"             : {"value": 1e-2, "unit": "s"},
     "timestep"               : {"value": 4.7e-8, "unit": "s"},
     "timestep_safety_factor" : {"value": 0.85},
-    "output_frequency"       : {"value": 50},
+    "output_frequency"       : {"value": 5},
     "output_reference"       : {"value": true}
 }
