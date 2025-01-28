@@ -395,7 +395,7 @@ class Force<MemorySpace,
 
             model.thermalStretch( linear_s, i, j );
 
-            const double coeff = model.forceCoeff( linear_s, vol( j ) );
+            const double coeff = model.forceCoeff( i, j, linear_s, vol( j ) );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
             fz_i = coeff * xi_z / xi;
