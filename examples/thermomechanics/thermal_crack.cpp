@@ -85,9 +85,9 @@ void thermalCrackExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    auto force_model =
-        CabanaPD::createForceModel( model_type{}, CabanaPD::Fracture{},
-                                    particles, delta, K, G0, alpha, temp0 );
+    auto temp = particles.sliceTemperature();
+    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0, temp, alpha,
+                                      temp0 );
 
     // ====================================================
     //                   Create solver
@@ -99,7 +99,7 @@ void thermalCrackExample( const std::string filename )
     //                Thermal shock
     // --------------------------------------------
     auto x = particles.sliceReferencePosition();
-    auto temp = particles.sliceTemperature();
+    temp = particles.sliceTemperature();
 
     // Plate limits
     double X0 = low_corner[0];
