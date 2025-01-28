@@ -145,7 +145,7 @@ void compactTensionTestExample( const std::string filename )
             v( pid, 1 ) = sign * v0;
 
         // No-fail zone
-        if ( distsq < ( 2 * R ) * ( 2 * R ) )
+        if ( distsq < ( 2.0 * R ) * ( 2.0 * R ) )
             nofail( pid ) = 1;
     };
     particles->updateParticles( exec_space{}, init_functor );
