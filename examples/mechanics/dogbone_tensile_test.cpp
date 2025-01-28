@@ -174,8 +174,8 @@ void tensileTestExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    auto force_model = CabanaPD::createForceModel(
-        model_type{}, mechanics_type{}, particles, delta, K, G0, sigma_y );
+    CabanaPD::ForceModel force_model( model_type{}, mechanics_type{},
+                                      memory_space{}, delta, K, G0, sigma_y );
 
     // ====================================================
     //                   Create solver

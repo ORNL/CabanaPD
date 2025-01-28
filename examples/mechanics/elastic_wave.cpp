@@ -55,8 +55,8 @@ void elasticWaveExample( const std::string filename )
     //                    Force model
     // ====================================================
     using model_type = CabanaPD::LinearLPS;
-    CabanaPD::ForceModel<model_type, CabanaPD::Elastic, CabanaPD::NoFracture>
-        force_model( delta, K, G );
+    CabanaPD::ForceModel force_model( model_type{}, CabanaPD::NoFracture{},
+                                      delta, K, G );
 
     // ====================================================
     //                 Particle generation
