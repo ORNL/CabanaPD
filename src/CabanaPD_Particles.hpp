@@ -1118,6 +1118,36 @@ auto createParticles( const ExecSpace& exec_space, const PositionType& x,
                                              max_halo_width, EnergyOutput{} );
 }
 
+template <typename MemorySpace, typename ModelType, typename ThermalType,
+          typename ExecSpace, class UserFunctor, std::size_t Dim,
+          typename OutputType>
+auto createParticles(
+    const ExecSpace& exec_space, std::array<double, Dim> low_corner,
+    std::array<double, Dim> high_corner, const std::array<int, Dim> num_cells,
+    const int max_halo_width, UserFunctor user, OutputType,
+    typename std::enable_if<( is_temperature<ThermalType>::value &&
+                              is_output<OutputType>::value ),
+                            int>::type* = 0 )
+{
+    return std::make_shared<
+        CabanaPD::Particles<MemorySpace, ModelType, ThermalType, OutputType>>(
+        exec_space, low_corner, high_corner, num_cells, max_halo_width, user );
+}
+
+template <typename MemorySpace, typename ModelType, typename ThermalType,
+          typename ExecSpace, class UserFunctor, std::size_t Dim>
+auto createParticles( const ExecSpace& exec_space,
+                      std::array<double, Dim> low_corner,
+                      std::array<double, Dim> high_corner,
+                      const std::array<int, Dim> num_cells,
+                      const int max_halo_width, UserFunctor user )
+{
+    return createParticles<MemorySpace, ModelType, ThermalType, ExecSpace,
+                           UserFunctor, Dim>(
+        exec_space, low_corner, high_corner, num_cells, max_halo_width, user,
+        EnergyOutput{} );
+}
+
 } // namespace CabanaPD
 
 #endif
