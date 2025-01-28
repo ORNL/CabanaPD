@@ -162,7 +162,7 @@ class Force<MemorySpace,
 
             model.thermalStretch( s, i, j );
 
-            double w = model.energy( s, xi, vol( j ) );
+            double w = model.energy( i, j, s, xi, vol( j ) );
             W( i ) += w;
             Phi += w * vol( i );
         };
@@ -320,7 +320,7 @@ class Force<MemorySpace,
 
                 model.thermalStretch( s, i, j );
 
-                double w = mu( i, n ) * model.energy( s, xi, vol( j ) );
+                double w = mu( i, n ) * model.energy( i, n, s, xi, vol( j ) );
                 W( i ) += w;
 
                 phi_i += mu( i, n ) * vol( j );
@@ -434,7 +434,7 @@ class Force<MemorySpace,
 
             model.thermalStretch( linear_s, i, j );
 
-            double w = model.energy( linear_s, xi, vol( j ) );
+            double w = model.energy( i, j, linear_s, xi, vol( j ) );
             W( i ) += w;
             Phi += w * vol( i );
         };

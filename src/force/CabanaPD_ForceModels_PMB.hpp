@@ -49,7 +49,8 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto energy( const double s, const double xi, const double vol ) const
+    auto energy( const int, const int, const double s, const double xi,
+                 const double vol ) const
     {
         // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
         // the integrand (pairwise potential).
@@ -96,8 +97,11 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, NoFracture,
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto energy( const double s, const double xi, const double vol ) const
+    auto energy( const int, const int, const double s, const double xi,
+                 const double vol ) const
     {
+        // FIXME: doesn't work because this kernel doesn't use n.
+        // auto s_0 = _s_0( i, n );
         double stretch_term = 0.0;
         if ( s < s_Y )
             stretch_term = s * s;
@@ -193,17 +197,11 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto energy( const double s, const double xi, const double vol ) const
+    auto energy( const int i, const int n, const double s, const double xi,
+                 const double vol ) const
     {
-        double stretch_term = 0.0;
-        if ( s < s_Y )
-            stretch_term = s * s;
-        else
-            stretch_term = s_Y * ( 2 * s - s_Y );
-
-        // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
-        // the integrand (pairwise potential).
-        return 0.25 * c * stretch_term * xi * vol;
+        auto s_0 = _s_0( i, n );
+        return 0.25 * c * ( s - s_0 ) * xi * vol;
     }
 };
 
