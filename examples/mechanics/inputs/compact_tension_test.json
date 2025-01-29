@@ -5,7 +5,7 @@
     "elastic_modulus"        : {"value": 72.6e+9, "unit": "Pa"},
     "fracture_energy"        : {"value": 16160, "unit": "J/m^2"},
     "horizon"                : {"value": 0.001035, "unit": "m"},   
-    "yield_stretch"          : {"value": 304e6, "unit": "Pa"},
+    "yield_stress"           : {"value": 304e6, "unit": "Pa"},
     "pin_velocity"           : {"value": 7.15e-2, "unit": "m/s"},
     "final_time"             : {"value": 1e-2, "unit": "s"},
     "timestep"               : {"value": 4.7e-8, "unit": "s"},
