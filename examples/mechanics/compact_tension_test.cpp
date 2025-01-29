@@ -154,8 +154,9 @@ void compactTensionTestExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
+    double ys = inputs["yield_stress"];
     auto force_model = CabanaPD::createForceModel(
-        model_type{}, mechanics_type{}, *particles, delta, K, G0 );
+        model_type{}, mechanics_type{}, *particles, delta, K, G0, ys );
 
     // ====================================================
     //                   Create solver
