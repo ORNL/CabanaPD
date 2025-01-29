@@ -35,7 +35,7 @@ class BasePlasticity
   protected:
     using memory_space = MemorySpace;
     using NeighborView = typename Kokkos::View<double**, memory_space>;
-    NeighborView _s_0;
+    NeighborView _s_p;
 
   public:
     BasePlasticity( const int local_particles, const int max_neighbors )
@@ -43,13 +43,13 @@ class BasePlasticity
         // Create View to track permanent stretch per bond.
         // TODO: this could be optimized to ignore bonds of frozen particles.
         // Purposely using zero-init here.
-        _s_0 =
+        _s_p =
             NeighborView( "permanent_stretch", local_particles, max_neighbors );
     }
 
     void update( const int n_local, const int max_neigh )
     {
-        Kokkos::resize( _s_0, n_local, max_neigh );
+        Kokkos::resize( _s_p, n_local, max_neigh );
     }
 };
 
