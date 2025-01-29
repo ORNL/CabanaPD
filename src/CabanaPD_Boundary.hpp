@@ -30,18 +30,18 @@ struct ForceUpdateBCTag
 };
 
 // Custom boundary condition.
-template <class BCIndexSpace, class UserFunctor>
+template <class BCSteeringVector, class UserFunctor>
 struct BoundaryCondition
 {
-    BCIndexSpace _index_space;
+    BCSteeringVector _indices;
     UserFunctor _user_functor;
     bool _force_update;
 
     Timer _timer;
 
-    BoundaryCondition( BCIndexSpace bc_index_space, UserFunctor user,
+    BoundaryCondition( BCSteeringVector bc_indices, UserFunctor user,
                        const bool force )
-        : _index_space( bc_index_space )
+        : _indices( bc_indices )
         , _user_functor( user )
         , _force_update( force )
     {
@@ -50,12 +50,12 @@ struct BoundaryCondition
     template <class ExecSpace, class ParticleType>
     void apply( ExecSpace, ParticleType& particles, double time )
     {
-        checkParticleCount( _index_space.particle_count,
+        checkParticleCount( _indices.particle_count,
                             particles.referenceOffset(), "BoundaryCondition" );
         _timer.start();
 
         auto user = _user_functor;
-        auto index_space = _index_space._view;
+        auto index_space = _indices._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
@@ -68,34 +68,34 @@ struct BoundaryCondition
     auto forceUpdate() { return _force_update; }
 
     auto time() { return _timer.time(); };
-    auto timeInit() { return _index_space.time(); };
+    auto timeInit() { return _indices.time(); };
 };
 
-template <class BCIndexSpace>
-struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
+template <class BCSteeringVector>
+struct BoundaryCondition<BCSteeringVector, ForceValueBCTag>
 {
     double _value;
-    BCIndexSpace _index_space;
+    BCSteeringVector _indices;
     const bool _force_update = true;
 
     Timer _timer;
 
     BoundaryCondition( ForceValueBCTag, const double value,
-                       BCIndexSpace bc_index_space )
+                       BCSteeringVector bc_indices )
         : _value( value )
-        , _index_space( bc_index_space )
+        , _indices( bc_indices )
     {
     }
 
     template <class ExecSpace, class ParticleType>
     void apply( ExecSpace, ParticleType& particles, double )
     {
-        checkParticleCount( _index_space.particle_count,
+        checkParticleCount( _indices.particle_count,
                             particles.referenceOffset(), "BoundaryCondition" );
 
         _timer.start();
         auto f = particles.sliceForce();
-        auto index_space = _index_space._view;
+        auto index_space = _indices._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         auto value = _value;
         Kokkos::parallel_for(
@@ -110,34 +110,34 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     auto forceUpdate() { return _force_update; }
 
     auto time() { return _timer.time(); };
-    auto timeInit() { return _index_space.time(); };
+    auto timeInit() { return _indices.time(); };
 };
 
-template <class BCIndexSpace>
-struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
+template <class BCSteeringVector>
+struct BoundaryCondition<BCSteeringVector, ForceUpdateBCTag>
 {
     double _value;
-    BCIndexSpace _index_space;
+    BCSteeringVector _indices;
     const bool _force_update = true;
 
     Timer _timer;
 
     BoundaryCondition( ForceUpdateBCTag, const double value,
-                       BCIndexSpace bc_index_space )
+                       BCSteeringVector bc_indices )
         : _value( value )
-        , _index_space( bc_index_space )
+        , _indices( bc_indices )
     {
     }
 
     template <class ExecSpace, class ParticleType>
     void apply( ExecSpace, ParticleType& particles, double )
     {
-        checkParticleCount( _index_space.particle_count,
+        checkParticleCount( _indices.particle_count,
                             particles.referenceOffset(), "BoundaryCondition" );
 
         _timer.start();
         auto f = particles.sliceForce();
-        auto index_space = _index_space._view;
+        auto index_space = _indices._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         auto value = _value;
         Kokkos::parallel_for(
@@ -152,7 +152,7 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     auto forceUpdate() { return _force_update; }
 
     auto time() { return _timer.time(); };
-    auto timeInit() { return _index_space.time(); };
+    auto timeInit() { return _indices.time(); };
 };
 
 template <class BCTag, class BCIndexSpace>
@@ -164,7 +164,7 @@ auto createBoundaryCondition( BCTag tag, const double value,
                               ExecSpace exec_space, Particles particles,
                               RegionType... regions )
 {
-    BoundaryIndexSpace bc_indices( exec_space, particles, regions... );
+    ParticleSteeringVector bc_indices( exec_space, particles, regions... );
     return BoundaryCondition( tag, value, bc_indices );
 }
 
@@ -174,7 +174,7 @@ auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
                               Particles particles, const bool force_update,
                               RegionType... regions )
 {
-    BoundaryIndexSpace bc_indices( exec_space, particles, regions... );
+    ParticleSteeringVector bc_indices( exec_space, particles, regions... );
     return BoundaryCondition( bc_indices, user_functor, force_update );
 }
 
@@ -183,7 +183,7 @@ template <class BCTag, class ExecSpace, class BoundaryParticles>
 auto createBoundaryCondition( BCTag, const double value,
                               BoundaryParticles particles )
 {
-    BoundaryIndexSpaceCustom bc_indices( particles );
+    ParticleSteeringVectorCustom bc_indices( particles );
     return BoundaryCondition( value, bc_indices );
 }
 
@@ -192,7 +192,7 @@ auto createBoundaryCondition( UserFunctor user_functor,
                               BoundaryParticles particles,
                               const bool force_update )
 {
-    BoundaryIndexSpaceCustom bc_indices( particles );
+    ParticleSteeringVectorCustom bc_indices( particles );
     return BoundaryCondition( bc_indices, user_functor, force_update );
 }
 

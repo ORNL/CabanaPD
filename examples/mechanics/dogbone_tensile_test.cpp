@@ -150,10 +150,10 @@ void dogboneTensileTestExample( const std::string filename )
     double v0 = inputs["grip_velocity"];
 
     // Create region for each grip.
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> left_grip(
+    CabanaPD::Region<CabanaPD::RectangularPrism> left_grip(
         low_corner[0], midx - 0.5 * D, low_corner[1], high_corner[1],
         low_corner[2], high_corner[2] );
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> right_grip(
+    CabanaPD::Region<CabanaPD::RectangularPrism> right_grip(
         midx + 0.5 * D, high_corner[0], low_corner[1], high_corner[1],
         low_corner[2], high_corner[2] );
 
