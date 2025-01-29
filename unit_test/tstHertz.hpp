@@ -52,8 +52,6 @@ void testHertzianContact( const std::string filename )
     // ====================================================
     double rho0 = inputs["density"];
     double vol = inputs["volume"];
-    double delta = inputs["horizon"];
-    delta += 1e-10;
     double radius = inputs["radius"];
     double nu = inputs["poisson_ratio"];
     double E = inputs["elastic_modulus"];
@@ -88,7 +86,8 @@ void testHertzianContact( const std::string filename )
     //            Force model
     // ====================================================
     using model_type = CabanaPD::HertzianModel;
-    model_type contact_model( delta, 0.0, radius, nu, E, e );
+    // No search radius extension.
+    model_type contact_model( radius, 0.0, nu, E, e );
 
     // ====================================================
     //                 Particle generation

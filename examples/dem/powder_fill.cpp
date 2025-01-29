@@ -37,8 +37,6 @@ void powderSettlingExample( const std::string filename )
     // ====================================================
     double rho0 = inputs["density"];
     double vol0 = inputs["volume"];
-    double delta = inputs["horizon"];
-    delta += 1e-10;
     double radius = inputs["radius"];
     double radius_extend = inputs["radius_extend"];
     double nu = inputs["poisson_ratio"];
@@ -51,9 +49,7 @@ void powderSettlingExample( const std::string filename )
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
-    int m = std::floor( delta /
-                        ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
-    int halo_width = m + 1; // Just to be safe.
+    int halo_width = 1;
 
     // ====================================================
     //                    Force model
