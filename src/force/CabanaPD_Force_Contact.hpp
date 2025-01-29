@@ -67,10 +67,6 @@ class BaseForceContact : public Force<MemorySpace, BaseForceModel>
     void update( const ParticleType& particles, const double max_displacement,
                  const bool require_update = false )
     {
-        auto max_neighbors = base_type::getMaxLocalNeighbors();
-        std::cout << Rc_extend << " " << max_displacement << " "
-                  << _neigh_timer.numCalls() << " " << _neigh_timer.time()
-                  << " " << max_neighbors << std::endl;
         if ( max_displacement > Rc_extend || require_update )
         {
             _neigh_timer.start();

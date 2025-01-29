@@ -120,6 +120,7 @@ class SolverNoFracture
         : particles( _particles )
         , inputs( _inputs )
         , _init_time( 0.0 )
+        , _total_time(0.0)
     {
         setup( force_model );
     }
@@ -131,6 +132,7 @@ class SolverNoFracture
         : particles( _particles )
         , inputs( _inputs )
         , _init_time( 0.0 )
+	, _total_time(0.0)
     {
         setup( force_model );
 
@@ -388,7 +390,7 @@ class SolverNoFracture
         log( out, "Init-Neighbor-Time(s): ", _neighbor_timer.time(), "\n" );
         log( out, "#Timestep/Total-steps Simulation-time Total-strain-energy "
                   "Step-Time(s) Force-Time(s) Comm-Time(s) Integrate-Time(s) "
-                  "Energy-Time(s) Output-Time(s) Particle*steps/s" );
+                  "Energy-Time(s) Neigh-Time(s) Output-Time(s) Particle*steps/s" );
     }
 
     void step_output( const int step, const double W )
