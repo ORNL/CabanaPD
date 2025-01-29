@@ -450,11 +450,11 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     }
     auto sliceDisplacementNeighborBuild()
     {
-        return Cabana::slice<0>( _aosoa_u, "displacement_since_rebuild" );
+        return Cabana::slice<0>( _aosoa_u_neigh, "displacement_since_rebuild" );
     }
     auto sliceDisplacementNeighborBuild() const
     {
-        return Cabana::slice<0>( _aosoa_u, "displacement_since_rebuild" );
+        return Cabana::slice<0>( _aosoa_u_neigh, "displacement_since_rebuild" );
     }
     auto sliceForce() { return _plist_f.slice( CabanaPD::Field::Force() ); }
     auto sliceForceAtomic()
