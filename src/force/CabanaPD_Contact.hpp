@@ -49,12 +49,12 @@ class BaseForceContact : public Force<MemorySpace, BaseForceModel>
     template <class ParticleType, class ModelType>
     BaseForceContact( const bool half_neigh, const ParticleType& particles,
                       const ModelType model )
-        : base_type( half_neigh, model.Rc + model.Rc_extend,
+        : base_type( half_neigh, model.radius + model.radius_extend,
                      particles.sliceCurrentPosition(), particles.frozenOffset(),
                      particles.localOffset(), particles.ghost_mesh_lo,
                      particles.ghost_mesh_hi )
-        , Rc( model.Rc )
-        , Rc_extend( model.Rc_extend )
+        , radius( model.radius )
+        , radius_extend( model.radius_extend )
     {
         for ( int d = 0; d < particles.dim; d++ )
         {
@@ -68,17 +68,13 @@ class BaseForceContact : public Force<MemorySpace, BaseForceModel>
     void update( const ParticleType& particles, const double max_displacement,
                  const bool require_update = false )
     {
-        auto max_neighbors = base_type::getMaxLocalNeighbors();
-        std::cout << Rc_extend << " " << max_displacement << " "
-                  << _neigh_timer.numCalls() << " " << _neigh_timer.time()
-                  << " " << max_neighbors << std::endl;
-        if ( max_displacement > Rc_extend || require_update )
+        if ( max_displacement > radius_extend || require_update )
         {
             _neigh_timer.start();
             const auto y = particles.sliceCurrentPosition();
             _neigh_list.build( y, particles.frozenOffset(),
-                               particles.localOffset(), Rc + Rc_extend, 1.0,
-                               mesh_min, mesh_max );
+                               particles.localOffset(), radius + radius_extend,
+                               1.0, mesh_min, mesh_max );
             // Reset neighbor update displacement.
             const auto u = particles.sliceDisplacement();
             auto u_neigh = particles.sliceDisplacementNeighborBuild();
@@ -90,8 +86,8 @@ class BaseForceContact : public Force<MemorySpace, BaseForceModel>
     auto timeNeighbor() { return _neigh_timer.time(); };
 
   protected:
-    double Rc;
-    double Rc_extend;
+    double radius;
+    double radius_extend;
     Timer _neigh_timer;
 
     using base_type::_half_neigh;
