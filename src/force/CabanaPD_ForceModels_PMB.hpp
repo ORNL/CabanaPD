@@ -83,6 +83,16 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 
+    // Constructor to work with plasticity.
+    ForceModel( const double delta, const double K, const double _G0,
+                const double _s0 )
+        : base_type( delta, K )
+        , G0( _G0 )
+        , s0( _s0 )
+    {
+        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+    }
+
     KOKKOS_INLINE_FUNCTION
     bool criticalStretch( const int, const int, const double r,
                           const double xi ) const
@@ -104,7 +114,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     using mechanics_type = ElasticPerfectlyPlastic;
     using thermal_type = base_type::thermal_type;
 
-    // Purposely not using the (static) base class bond_break_coeff
+    using base_type::bond_break_coeff;
     using base_type::c;
     using base_type::delta;
     using base_type::G0;
@@ -117,10 +127,11 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     ForceModel( const double delta, const double K, const double G0,
                 const double sigma_y, const int n_local,
                 const int max_neigh_guess = 0 )
-        : base_type( delta, K, G0 )
+        : base_type( delta, K, G0,
+                     // s0
+                     ( 5.0 * G0 / sigma_y / delta + sigma_y / K ) / 6.0 )
         , base_plasticity_type( n_local, max_neigh_guess )
     {
-        s_Y = sigma_y / 3.0 / K;
     }
 
     // FIXME: avoiding multiple inheritance.
