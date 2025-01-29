@@ -34,7 +34,7 @@ class BasePlasticity
 {
   protected:
     using memory_space = MemorySpace;
-    using NeighborView = typename Kokkos::View<int**, memory_space>;
+    using NeighborView = typename Kokkos::View<double**, memory_space>;
     NeighborView _s_0;
 
   public:
