@@ -112,7 +112,7 @@ class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, Fracture,
     : public HeatTransfer<MemorySpace,
                           ForceModel<PMB, MechanicsType, NoFracture,
                                      DynamicTemperature, ModelParams...>>,
-      public BaseFracture<MemorySpace>
+      BaseFracture<MemorySpace>
 
 {
   public:
