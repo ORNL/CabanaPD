@@ -76,11 +76,6 @@ void compactTensionTestExample( const std::string filename )
     // ====================================================
     //    Custom particle generation and initialization
     // ====================================================
-    // Rectangular prism containing the full specimen: original geometry
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane(
-        low_corner[0], high_corner[0], low_corner[1], high_corner[1],
-        low_corner[2], high_corner[2] );
-
     // Geometric parameters of specimen
     double L = inputs["system_size"][1];
     double W = L / 1.25;
@@ -128,24 +123,30 @@ void compactTensionTestExample( const std::string filename )
     // Pin velocity magnitude
     double v0 = inputs["pin_velocity"];
 
+    // Create region for each pin.
+    CabanaPD::RegionBoundary<CabanaPD::Cylinder> cylinder1(
+        0.0, R, low_corner[2], high_corner[2], x_pin, y_pin );
+    CabanaPD::RegionBoundary<CabanaPD::Cylinder> cylinder2(
+        0.0, R, low_corner[2], high_corner[2], x_pin, -y_pin );
+    // Create regions only for setting no-fail condition.
+    CabanaPD::RegionBoundary<CabanaPD::Cylinder> nofail_cylinder1(
+        0.0, 2.0 * R, low_corner[2], high_corner[2], x_pin, y_pin );
+    CabanaPD::RegionBoundary<CabanaPD::Cylinder> nofail_cylinder2(
+        0.0, 2.0 * R, low_corner[2], high_corner[2], x_pin, -y_pin );
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
 
-        auto xpos = x( pid, 0 );
-        auto ypos = x( pid, 1 );
-        auto distsq =
-            ( xpos - x_pin ) * ( xpos - x_pin ) +
-            ( Kokkos::abs( ypos ) - y_pin ) * ( Kokkos::abs( ypos ) - y_pin );
-        auto sign = Kokkos::abs( ypos ) / ypos;
-
         // pins' y-velocity
-        if ( distsq < R * R )
-            v( pid, 1 ) = sign * v0;
+        if ( cylinder1.inside( x, pid ) )
+            v( pid, 1 ) = v0;
+        else if ( cylinder2.inside( x, pid ) )
+            v( pid, 1 ) = -v0;
 
         // No-fail zone
-        if ( distsq < ( 2.0 * R ) * ( 2.0 * R ) )
+        if ( nofail_cylinder1.inside( x, pid ) ||
+             nofail_cylinder2.inside( x, pid ) )
             nofail( pid ) = 1;
     };
     particles->updateParticles( exec_space{}, init_functor );
@@ -165,22 +166,12 @@ void compactTensionTestExample( const std::string filename )
     // ====================================================
     //                Boundary conditions
     // ====================================================
-
-    // Create BC last to ensure ghost particles are included.
-    auto f = particles->sliceForce();
-    // Create a symmetric force BC in the y-direction.
-    auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
-    {
-        auto xpos = x( pid, 0 );
-        auto ypos = x( pid, 1 );
-        if ( ( xpos - x_pin ) * ( xpos - x_pin ) +
-                 ( Kokkos::abs( ypos ) - y_pin ) *
-                     ( Kokkos::abs( ypos ) - y_pin ) <
-             R * R )
-            f( pid, 1 ) = 0;
-    };
+    // Reset forces on both pins.
+    std::vector<CabanaPD::RegionBoundary<CabanaPD::Cylinder>> cylinders = {
+        cylinder1, cylinder2 };
     auto bc =
-        createBoundaryCondition( bc_op, exec_space{}, *particles, plane, true );
+        createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0, exec_space{},
+                                 *particles, cylinders, true );
 
     // ====================================================
     //                   Simulation run
