@@ -109,18 +109,26 @@ ctest
 
 CabanaPD currently includes the following:
   - Force models
-    - Bond-based (pairwise): prototype microelastic brittle (PMB)
-    - State-based (many-body): linear peridynamic solid (LPS)
+    - PD Bond-based (pairwise): prototype microelastic brittle (PMB)
+    - PD State-based (many-body): linear peridynamic solid (LPS)
+    - DEM contact: normal repulsion, Hertzian 
+    - Hybrid DEM-PD
  - Mechanical response:
-   - Elastic (no failure)
+   - Elastic only (no failure)
    - Brittle fracture
  - Thermomechanics (bond-based only)
-   - Optional heat transfer (elastic only)
+   - Optional heat transfer
  - Time integration
    - Velocity Verlet
  - Pre-crack creation
  - Particle boundary conditions
+   - Body terms which apply to all particles
  - Grid-based particle generation supporting custom geometry
+ - Output options
+   - Total strain energy density
+   - Per particle output using HDF5 or SILO
+     - Base fields: position (reference or current), velocity, force
+     - Strain energy density, damage
 
 ## Examples
 
@@ -129,7 +137,7 @@ information is output to file and particle output is written to files (if enable
 New examples can be created by using any of the current cases as a template. All inputs are specified in the example JSON files within the relevant `inputs/` subdirectory.
 
 ### Mechanics
-Examples which only include mechanics and fracture are with `examples/mechanics`.
+Examples which only include mechanics and fracture are within `examples/mechanics`.
 
 The first example is an elastic wave propagating through a cube from an initial Gaussian radial displacement profile from [1]. Assuming the build paths above, the example can be run with:
 
@@ -164,7 +172,7 @@ The fourth example is a fragmenting cylinder due to internal pressure [4]. The e
 ```
 
 ### Thermomechanics
-Examples which demonstrate temperature-dependent mechanics and fracture are with `examples/thermomechanics`.
+Examples which demonstrate temperature-dependent mechanics and fracture are within `examples/thermomechanics`.
 
 The first example is thermoelastic deformation in a homogeneous plate due to linear thermal loading [5]. The example can be run with:
 
@@ -176,6 +184,20 @@ The second example is crack initiation and propagation in an alumina ceramic pla
 
 ```
 ./CabanaPD/build/install/bin/ThermalCrack CabanaPD/examples/thermomechanics/thermal_crack.json
+```
+
+### Thermomechanics with heat transfer
+Examples with heat transfer are within `examples/thermomechanics`.
+
+The first example is pseudo-1d heat transfer (no mechanics) in a cube. The example can be run with: 
+```
+./CabanaPD/build/install/bin/ThermalDeformationHeatTransfer CabanaPD/examples/thermomechanics/heat_transfer.json
+```
+The same example with fully coupled thermomechanics can be run (with a much smaller timestep) using `thermal_deformation_heat_transfer.json`.
+
+The second example is pseudo-1d heat transfer (no mechanics) in a pre-notched cube. The example can be run with: 
+```
+./CabanaPD/build/install/bin/ThermalDeformationHeatTransferPrenotched CabanaPD/examples/thermomechanics/heat_transfer.json
 ```
 
 ## References
