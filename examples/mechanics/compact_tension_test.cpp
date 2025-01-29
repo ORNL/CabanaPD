@@ -40,6 +40,7 @@ void compactTensionTestExample( const std::string filename )
     double nu = 0.25; // Use bond-based model
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double G0 = inputs["fracture_energy"];
+    double sigma_y = inputs["yield_stress"];
     double delta = inputs["horizon"];
     delta += 1e-10;
 
@@ -156,7 +157,7 @@ void compactTensionTestExample( const std::string filename )
     // ====================================================
     double ys = inputs["yield_stress"];
     auto force_model = CabanaPD::createForceModel(
-        model_type{}, mechanics_type{}, *particles, delta, K, G0, ys );
+        model_type{}, mechanics_type{}, *particles, delta, K, G0, sigma_y );
 
     // ====================================================
     //                   Create solver
