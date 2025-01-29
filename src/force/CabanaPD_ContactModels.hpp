@@ -28,17 +28,17 @@ struct ContactModel
     // PD neighbor search radius.
     double delta;
     // Contact neighbor search radius.
-    double Rc;
+    double radius;
     // Extend neighbor search radius to reuse lists.
-    double Rc_extend;
+    double radius_extend;
 
     // PD horizon
     // Contact radius
-    ContactModel( const double _delta, const double _Rc,
-                  const double _Rc_extend )
+    ContactModel( const double _delta, const double _radius,
+                  const double _radius_extend )
         : delta( _delta )
-        , Rc( _Rc )
-        , Rc_extend( _Rc_extend ){};
+        , radius( _radius )
+        , radius_extend( _radius_extend ){};
 };
 
 /* Normal repulsion */
@@ -50,15 +50,15 @@ struct NormalRepulsionModel : public ContactModel
     using thermal_type = TemperatureIndependent;
 
     using ContactModel::delta;
-    using ContactModel::Rc;
-    using ContactModel::Rc_extend;
+    using ContactModel::radius;
+    using ContactModel::radius_extend;
 
     double c;
     double K;
 
-    NormalRepulsionModel( const double delta, const double Rc,
-                          const double Rc_extend, const double _K )
-        : ContactModel( delta, Rc, Rc_extend )
+    NormalRepulsionModel( const double delta, const double radius,
+                          const double radius_extend, const double _K )
+        : ContactModel( delta, radius, radius_extend )
         , K( _K )
     {
         K = _K;
@@ -70,7 +70,7 @@ struct NormalRepulsionModel : public ContactModel
     auto forceCoeff( const double r, const double vol ) const
     {
         // Contact "stretch"
-        const double sc = ( r - Rc ) / delta;
+        const double sc = ( r - radius ) / delta;
         // Normal repulsion uses a 15 factor compared to the PMB force
         return 15.0 * c * sc * vol;
     }

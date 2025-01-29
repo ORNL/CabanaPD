@@ -40,6 +40,7 @@ void powderSettlingExample( const std::string filename )
     double delta = inputs["horizon"];
     delta += 1e-10;
     double radius = inputs["radius"];
+    double radius_extend = inputs["radius_extend"];
     double nu = inputs["poisson_ratio"];
     double E = inputs["elastic_modulus"];
     double e = inputs["restitution"];
@@ -58,7 +59,7 @@ void powderSettlingExample( const std::string filename )
     //                    Force model
     // ====================================================
     using model_type = CabanaPD::HertzianModel;
-    model_type contact_model( delta / m * 0.9, radius, nu, E, e );
+    model_type contact_model( radius, radius_extend, nu, E, e );
 
     // ====================================================
     //            Custom particle initialization
