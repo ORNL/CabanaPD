@@ -137,8 +137,9 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
         else if ( s <= s_p - s_Y )
             _s_p( i, n ) = s + s_Y;
         // else: Elastic (in between), do not modify.
-        s_p = _s_p( i, n );
 
+        // Must extract again if in the plastic regime.
+        s_p = _s_p( i, n );
         return c * ( s - s_p ) * vol;
     }
 
