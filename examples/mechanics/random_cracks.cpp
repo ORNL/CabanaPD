@@ -138,8 +138,6 @@ void randomCracksExample( const std::string filename )
     CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane2(
         low_corner[0], high_corner[0], high_corner[1] - dy, high_corner[1] + dy,
         low_corner[2], high_corner[2] );
-    std::vector<CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>> planes = {
-        plane1, plane2 };
 
     // ====================================================
     //            Custom particle initialization
@@ -182,8 +180,8 @@ void randomCracksExample( const std::string filename )
         auto sign = std::abs( ypos ) / ypos;
         f( pid, 1 ) += b0 * sign;
     };
-    auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, planes,
-                                       true );
+    auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, true,
+                                       plane1, plane2 );
 
     // ====================================================
     //                   Simulation run

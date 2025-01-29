@@ -189,10 +189,9 @@ void tensileTestExample( const std::string filename )
     //                Boundary conditions
     // ====================================================
     // Reset forces on both grips.
-    std::vector<CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>> grips = {
-        left_grip, right_grip };
-    auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
-                                       exec_space{}, *particles, grips, true );
+    auto bc =
+        createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0, exec_space{},
+                                 *particles, left_grip, right_grip );
 
     // ====================================================
     //                   Simulation run
