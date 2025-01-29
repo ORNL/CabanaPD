@@ -340,6 +340,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         auto u = sliceDisplacement();
         auto vol = sliceVolume();
         auto nofail = sliceNoFail();
+        int rank = local_grid->globalGrid().blockId();
 
         // Initialize particles.
         auto create_functor =
@@ -365,7 +366,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             vol( pid ) = pv;
 
             // FIXME: hardcoded.
-            type( pid ) = 0;
+            type( pid ) = rank;
             nofail( pid ) = 0;
             rho( pid ) = 1.0;
 
@@ -468,7 +469,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     auto localOffset() const { return local_offset; }
     auto numGhost() const { return num_ghost; }
     auto referenceOffset() const { return reference_offset; }
-    auto size() const { return size; }
+    auto totalSize() const { return size; }
     auto numGlobal() const { return num_global; }
 
     auto sliceReferencePosition()
@@ -577,10 +578,10 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         num_contact_ghost = new_contact_ghost;
         size = reference_offset + num_contact_ghost;
 
-        _plist_x.aosoa().resize( size() );
-        _aosoa_u.resize( size() );
-        _aosoa_y.resize( size() );
-        _aosoa_vol.resize( size() );
+        _plist_x.aosoa().resize( totalSize() );
+        _aosoa_u.resize( totalSize() );
+        _aosoa_y.resize( totalSize() );
+        _aosoa_vol.resize( totalSize() );
         _plist_f.aosoa().resize( localOffset() );
         _aosoa_other.resize( localOffset() );
         _aosoa_nofail.resize( referenceOffset() );
@@ -643,7 +644,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
             localOffset(), getPosition( use_reference ), sliceForce(),
-            sliceDisplacement(), sliceVelocity(),
+            sliceDisplacement(), sliceVelocity(), sliceType(),
             std::forward<OtherFields>( other )... );
 #else
 #ifdef Cabana_ENABLE_SILO

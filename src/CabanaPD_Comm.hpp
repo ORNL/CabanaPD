@@ -420,14 +420,15 @@ class Comm<ParticleType, Contact, TemperatureIndependent>
     {
         auto topology = Cabana::Grid::getTopology( *particles.local_grid );
         halo = std::make_shared<halo_type>(
-            particles.local_grid->globalGrid().comm(), particles.n_reference,
-            halo_ids._ids, halo_ids._destinations, topology );
+            particles.local_grid->globalGrid().comm(),
+            particles.referenceOffset(), halo_ids._ids, halo_ids._destinations,
+            topology );
         std::cout << "halo " << halo->numLocal() << " " << halo->numGhost()
                   << std::endl;
         // We use n_ghost here as the "local" halo count because these current
         // frame ghosts are built on top of the existing, static, reference
         // frame ghosts.
-        particles.resize( particles.n_local, particles.n_ghost, false,
+        particles.resize( particles.localOffset(), particles.numGhost(), false,
                           halo->numGhost() );
 
         gather_u = std::make_shared<gather_u_type>( *halo, particles._aosoa_y );

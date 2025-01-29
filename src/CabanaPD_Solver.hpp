@@ -144,7 +144,7 @@ class Solver
         dt = inputs["timestep"];
         integrator = std::make_shared<integrator_type>( dt );
 
-        std::cout << particles->n_local << " " << particles->n_ghost
+        std::cout << particles->numLocal() << " " << particles->numGhost()
                   << std::endl;
         // Add ghosts from other MPI ranks.
         comm = std::make_shared<comm_type>( *particles );
@@ -180,8 +180,8 @@ class Solver
         if constexpr ( is_contact<contact_model_type>::value )
             contact_comm = std::make_shared<contact_comm_type>( *particles );
 
-        std::cout << particles->n_local << " " << particles->n_ghost << " "
-                  << particles->n_contact_ghost << std::endl;
+        std::cout << particles->numLocal() << " " << particles->numGhost()
+                  << particles->numC << std::endl;
 
         print = print_rank();
         if ( print )
