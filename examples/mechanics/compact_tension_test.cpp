@@ -84,7 +84,7 @@ void compactTensionTestExample( const std::string filename )
     // Grid spacing in y-direction
     double dy = inputs["dx"][1];
 
-    // Remove particles from original geometry
+    // Do not create particles outside compact tension test specimen region
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
     {
         // Thin rectangle

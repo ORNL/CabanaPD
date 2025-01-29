@@ -122,7 +122,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     {
     }
 
-    // FIXME: avoiding multiple inheritance..
+    // FIXME: avoiding multiple inheritance.
     KOKKOS_INLINE_FUNCTION
     auto forceCoeff( const int i, const int n, const double s,
                      const double vol ) const
