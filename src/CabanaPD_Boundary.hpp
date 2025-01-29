@@ -30,18 +30,18 @@ struct ForceUpdateBCTag
 };
 
 // Custom boundary condition.
-template <class BCIndexSpace, class UserFunctor>
+template <class BCSteeringVector, class UserFunctor>
 struct BoundaryCondition
 {
-    BCIndexSpace _index_space;
+    BCSteeringVector _indices;
     UserFunctor _user_functor;
     bool _force_update;
 
     Timer _timer;
 
-    BoundaryCondition( BCIndexSpace bc_index_space, UserFunctor user,
+    BoundaryCondition( BCSteeringVector bc_indices, UserFunctor user,
                        const bool force )
-        : _index_space( bc_index_space )
+        : _indices( bc_indices )
         , _user_functor( user )
         , _force_update( force )
     {
@@ -50,7 +50,7 @@ struct BoundaryCondition
     template <class ExecSpace, class Particles, class BoundaryType>
     void update( ExecSpace exec_space, Particles particles, BoundaryType plane )
     {
-        _index_space.update( exec_space, particles, plane );
+        _indices.update( exec_space, particles, plane );
     }
 
     template <class ExecSpace, class ParticleType>
@@ -58,7 +58,7 @@ struct BoundaryCondition
     {
         _timer.start();
         auto user = _user_functor;
-        auto index_space = _index_space._view;
+        auto index_space = _indices._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
@@ -71,28 +71,28 @@ struct BoundaryCondition
     auto forceUpdate() { return _force_update; }
 
     auto time() { return _timer.time(); };
-    auto timeInit() { return _index_space.time(); };
+    auto timeInit() { return _indices.time(); };
 };
 
-template <class BCIndexSpace>
-struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
+template <class BCSteeringVector>
+struct BoundaryCondition<BCSteeringVector, ForceValueBCTag>
 {
     double _value;
-    BCIndexSpace _index_space;
+    BCSteeringVector _indices;
     const bool _force_update = true;
 
     Timer _timer;
 
-    BoundaryCondition( const double value, BCIndexSpace bc_index_space )
+    BoundaryCondition( const double value, BCSteeringVector bc_indices )
         : _value( value )
-        , _index_space( bc_index_space )
+        , _indices( bc_indices )
     {
     }
 
     template <class ExecSpace, class Particles, class BoundaryType>
     void update( ExecSpace exec_space, Particles particles, BoundaryType plane )
     {
-        _index_space.update( exec_space, particles, plane );
+        _indices.update( exec_space, particles, plane );
     }
 
     template <class ExecSpace, class ParticleType>
@@ -100,7 +100,7 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     {
         _timer.start();
         auto f = particles.sliceForce();
-        auto index_space = _index_space._view;
+        auto index_space = _indices._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         auto value = _value;
         Kokkos::parallel_for(
@@ -115,28 +115,28 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     auto forceUpdate() { return _force_update; }
 
     auto time() { return _timer.time(); };
-    auto timeInit() { return _index_space.time(); };
+    auto timeInit() { return _indices.time(); };
 };
 
-template <class BCIndexSpace>
-struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
+template <class BCSteeringVector>
+struct BoundaryCondition<BCSteeringVector, ForceUpdateBCTag>
 {
     double _value;
-    BCIndexSpace _index_space;
+    BCSteeringVector _indices;
     const bool _force_update = true;
 
     Timer _timer;
 
-    BoundaryCondition( const double value, BCIndexSpace bc_index_space )
+    BoundaryCondition( const double value, BCSteeringVector bc_indices )
         : _value( value )
-        , _index_space( bc_index_space )
+        , _indices( bc_indices )
     {
     }
 
     template <class ExecSpace, class Particles, class BoundaryType>
     void update( ExecSpace exec_space, Particles particles, BoundaryType plane )
     {
-        _index_space.update( exec_space, particles, plane );
+        _indices.update( exec_space, particles, plane );
     }
 
     template <class ExecSpace, class ParticleType>
@@ -145,7 +145,7 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
         _timer.start();
 
         auto f = particles.sliceForce();
-        auto index_space = _index_space._view;
+        auto index_space = _indices._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
         auto value = _value;
         Kokkos::parallel_for(
@@ -161,7 +161,7 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     auto forceUpdate() { return _force_update; }
 
     auto time() { return _timer.time(); };
-    auto timeInit() { return _index_space.time(); };
+    auto timeInit() { return _indices.time(); };
 };
 
 // FIXME: relatively large initial guess for allocation.
@@ -172,8 +172,8 @@ auto createBoundaryCondition( BCTag, const double value, ExecSpace exec_space,
                               const double initial_guess = 0.5 )
 {
     using memory_space = typename Particles::memory_space;
-    using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;
-    bc_index_type bc_indices = createBoundaryIndexSpace(
+    using bc_index_type = ParticleSteeringVector<memory_space, BoundaryType>;
+    bc_index_type bc_indices = createParticleSteeringVector(
         exec_space, particles, planes, initial_guess );
     return BoundaryCondition<bc_index_type, BCTag>( value, bc_indices );
 }
@@ -188,8 +188,8 @@ auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
                               const double initial_guess = 0.5 )
 {
     using memory_space = typename Particles::memory_space;
-    using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;
-    bc_index_type bc_indices = createBoundaryIndexSpace(
+    using bc_index_type = ParticleSteeringVector<memory_space, BoundaryType>;
+    bc_index_type bc_indices = createParticleSteeringVector(
         exec_space, particles, planes, initial_guess );
     return BoundaryCondition<bc_index_type, UserFunctor>(
         bc_indices, user_functor, force_update );
@@ -201,8 +201,8 @@ auto createBoundaryCondition( BCTag, const double value,
                               BoundaryParticles particles )
 {
     using memory_space = typename BoundaryParticles::memory_space;
-    using bc_index_type = BoundaryIndexSpace<memory_space, Custom>;
-    bc_index_type bc_indices = createBoundaryIndexSpace( particles );
+    using bc_index_type = ParticleSteeringVector<memory_space, Custom>;
+    bc_index_type bc_indices = createParticleSteeringVector( particles );
     return BoundaryCondition<bc_index_type, BCTag>( value, bc_indices );
 }
 
@@ -212,8 +212,8 @@ auto createBoundaryCondition( UserFunctor user_functor,
                               const bool force_update )
 {
     using memory_space = typename BoundaryParticles::memory_space;
-    using bc_index_type = BoundaryIndexSpace<memory_space, Custom>;
-    bc_index_type bc_indices = createBoundaryIndexSpace( particles );
+    using bc_index_type = ParticleSteeringVector<memory_space, Custom>;
+    bc_index_type bc_indices = createParticleSteeringVector( particles );
     return BoundaryCondition<bc_index_type, UserFunctor>(
         bc_indices, user_functor, force_update );
 }

@@ -105,7 +105,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // ====================================================
     // Temperature profile imposed on top and bottom surfaces
     double dy = particles->dx[1];
-    using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
+    using plane_type = CabanaPD::Region<CabanaPD::RectangularPrism>;
 
     // Top surface
     plane_type plane1( low_corner[0], high_corner[0], high_corner[1] - dy,

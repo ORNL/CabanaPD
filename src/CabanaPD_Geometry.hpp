@@ -34,11 +34,11 @@ struct Custom
 // User-specifed custom region. Must use the signature:
 //    bool operator()(PositionType&, const int)
 template <typename UserFunctor>
-struct RegionBoundary
+struct Region
 {
     UserFunctor _user_functor;
 
-    RegionBoundary( UserFunctor user )
+    Region( UserFunctor user )
         : _user_functor( user )
     {
     }
@@ -51,9 +51,9 @@ struct RegionBoundary
     }
 };
 
-// Define a subset of the system as the boundary with a rectangular prism.
+// Define a subset of the system with a rectangular prism.
 template <>
-struct RegionBoundary<RectangularPrism>
+struct Region<RectangularPrism>
 {
     double low_x;
     double high_x;
@@ -62,9 +62,8 @@ struct RegionBoundary<RectangularPrism>
     double low_z;
     double high_z;
 
-    RegionBoundary( const double _low_x, const double _high_x,
-                    const double _low_y, const double _high_y,
-                    const double _low_z, const double _high_z )
+    Region( const double _low_x, const double _high_x, const double _low_y,
+            const double _high_y, const double _low_z, const double _high_z )
         : low_x( _low_x )
         , high_x( _high_x )
         , low_y( _low_y )
@@ -82,9 +81,9 @@ struct RegionBoundary<RectangularPrism>
     }
 };
 
-// Define a subset of the system as the boundary with a cylinder.
+// Define a subset of the system with a cylinder.
 template <>
-struct RegionBoundary<Cylinder>
+struct Region<Cylinder>
 {
     double radius_in;
     double radius_out;
@@ -93,9 +92,9 @@ struct RegionBoundary<Cylinder>
     double x_center;
     double y_center;
 
-    RegionBoundary( const double _radius_in, const double _radius_out,
-                    const double _low_z, const double _high_z,
-                    double _x_center = 0.0, double _y_center = 0.0 )
+    Region( const double _radius_in, const double _radius_out,
+            const double _low_z, const double _high_z, double _x_center = 0.0,
+            double _y_center = 0.0 )
         : radius_in( _radius_in )
         , radius_out( _radius_out )
         , low_z( _low_z )
@@ -115,12 +114,12 @@ struct RegionBoundary<Cylinder>
     }
 };
 
-template <class MemorySpace, class BoundaryType>
-struct BoundaryIndexSpace;
+template <class MemorySpace, class RegionType>
+struct ParticleSteeringVector;
 
 // FIXME: fails for some cases if initial guess is not sufficient.
 template <class MemorySpace, class GeometryType>
-struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
+struct ParticleSteeringVector<MemorySpace, Region<GeometryType>>
 {
     using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
     index_view_type _view;
@@ -128,14 +127,11 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
 
     Timer _timer;
 
-    // Default for empty case.
-    BoundaryIndexSpace() {}
-
     // Construct from region (search for boundary particles).
     template <class ExecSpace, class Particles>
-    BoundaryIndexSpace( ExecSpace exec_space, Particles particles,
-                        std::vector<RegionBoundary<GeometryType>> planes,
-                        const double initial_guess )
+    ParticleSteeringVector( ExecSpace exec_space, Particles particles,
+                            std::vector<Region<GeometryType>> regions,
+                            const double initial_guess )
     {
         _timer.start();
 
@@ -143,11 +139,11 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
                                  particles.localOffset() * initial_guess );
         _count = index_view_type( "count", 1 );
 
-        for ( RegionBoundary plane : planes )
+        for ( Region region : regions )
         {
-            update( exec_space, particles, plane );
+            update( exec_space, particles, region );
         }
-        // Resize after all planes searched.
+        // Resize after all regions searched.
         auto count_host =
             Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, _count );
         if ( count_host( 0 ) < _view.size() )
@@ -159,8 +155,7 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
     }
 
     template <class ExecSpace, class Particles>
-    void update( ExecSpace, Particles particles,
-                 RegionBoundary<GeometryType> region )
+    void update( ExecSpace, Particles particles, Region<GeometryType> region )
     {
         auto count_host =
             Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, _count );
@@ -199,33 +194,33 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
 };
 
 template <class MemorySpace>
-struct BoundaryIndexSpace<MemorySpace, Custom>
+struct ParticleSteeringVector<MemorySpace, Custom>
 {
     using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
     index_view_type _view;
 
     // Construct from a View of boundary particles.
-    BoundaryIndexSpace( index_view_type input_view )
+    ParticleSteeringVector( index_view_type input_view )
         : _view( input_view )
     {
     }
 };
 
-template <class ExecSpace, class Particles, class BoundaryType>
-auto createBoundaryIndexSpace( ExecSpace exec_space, Particles particles,
-                               std::vector<BoundaryType> planes,
-                               const double initial_guess )
+template <class ExecSpace, class Particles, class RegionType>
+auto createParticleSteeringVector( ExecSpace exec_space, Particles particles,
+                                   std::vector<RegionType> regions,
+                                   const double initial_guess )
 {
     using memory_space = typename Particles::memory_space;
-    return BoundaryIndexSpace<memory_space, BoundaryType>(
-        exec_space, particles, planes, initial_guess );
+    return ParticleSteeringVector<memory_space, RegionType>(
+        exec_space, particles, regions, initial_guess );
 }
 
-template <class BoundaryParticles>
-auto createBoundaryIndexSpace( BoundaryParticles particles )
+template <class IndexSpaceView>
+auto createParticleSteeringVector( IndexSpaceView view )
 {
-    using memory_space = typename BoundaryParticles::memory_space;
-    return BoundaryIndexSpace<memory_space, Custom>( particles );
+    using memory_space = typename IndexSpaceView::memory_space;
+    return ParticleSteeringVector<memory_space, Custom>( view );
 }
 
 } // namespace CabanaPD

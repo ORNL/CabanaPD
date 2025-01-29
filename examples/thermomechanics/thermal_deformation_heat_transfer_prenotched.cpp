@@ -146,7 +146,7 @@ void thermalDeformationHeatTransferPrenotchedExample(
     //                   Boundary condition
     // ====================================================
     // Temperature profile imposed on top surface
-    using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
+    using plane_type = CabanaPD::Region<CabanaPD::RectangularPrism>;
 
     // Top surface
     plane_type plane( low_corner[0], high_corner[0], high_corner[1] - dy,
