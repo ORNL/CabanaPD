@@ -25,8 +25,6 @@ namespace CabanaPD
 ******************************************************************************/
 struct ContactModel
 {
-    // PD neighbor search radius.
-    double delta;
     // Contact neighbor search radius.
     double radius;
     // Extend neighbor search radius to reuse lists.
@@ -34,10 +32,8 @@ struct ContactModel
 
     // PD horizon
     // Contact radius
-    ContactModel( const double _delta, const double _radius,
-                  const double _radius_extend )
-        : delta( _delta )
-        , radius( _radius )
+    ContactModel( const double _radius, const double _radius_extend )
+        : radius( _radius )
         , radius_extend( _radius_extend ){};
 };
 
@@ -49,16 +45,17 @@ struct NormalRepulsionModel : public ContactModel
     using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
 
-    using ContactModel::delta;
+    double delta;
     using ContactModel::radius;
     using ContactModel::radius_extend;
 
     double c;
     double K;
 
-    NormalRepulsionModel( const double delta, const double radius,
+    NormalRepulsionModel( const double _delta, const double radius,
                           const double radius_extend, const double _K )
-        : ContactModel( delta, radius, radius_extend )
+        : ContactModel( radius, radius_extend )
+        , delta( _delta )
         , K( _K )
     {
         K = _K;
