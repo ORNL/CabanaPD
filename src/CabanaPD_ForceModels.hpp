@@ -40,8 +40,8 @@ class BasePlasticity
   public:
     BasePlasticity( const int local_particles, const int max_neighbors )
     {
-        // Create View to track permanent deformation per bond.
-        // TODO: this could be optimized to ignore frozen particle bonds.
+        // Create View to track permanent stretch per bond.
+        // TODO: this could be optimized to ignore bonds of frozen particles.
         // Purposely using zero-init here.
         _s_0 =
             NeighborView( "permanent_stretch", local_particles, max_neighbors );
