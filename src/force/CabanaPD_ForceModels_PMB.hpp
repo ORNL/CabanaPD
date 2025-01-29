@@ -58,62 +58,6 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
     }
 };
 
-template <typename MemorySpace>
-struct ForceModel<PMB, ElasticPerfectlyPlastic, NoFracture,
-                  TemperatureIndependent, MemorySpace>
-    : public ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>,
-      public BasePlasticity<MemorySpace>
-{
-    using base_type = ForceModel<PMB, Elastic, NoFracture>;
-    using base_plasticity_type = BasePlasticity<MemorySpace>;
-    using base_model = PMB;
-    using fracture_type = NoFracture;
-    using mechanics_type = ElasticPerfectlyPlastic;
-    using thermal_type = TemperatureIndependent;
-
-    using base_plasticity_type::_s_0;
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    // FIXME: hardcoded
-    const double s_Y = 0.0014;
-
-    ForceModel( const double delta, const double K )
-        : base_type( delta, K )
-    {
-    }
-
-    KOKKOS_INLINE_FUNCTION
-    auto forceCoeff( const int, const int, const double s,
-                     const double vol ) const
-    {
-        // FIXME: doesn't work because this kernel doesn't use n.
-        // auto s_0 = _s_0( i, n );
-        if ( s < s_Y )
-            return c * s * vol;
-        else
-            return c * s_Y * vol;
-    }
-
-    KOKKOS_INLINE_FUNCTION
-    auto energy( const int, const int, const double s, const double xi,
-                 const double vol ) const
-    {
-        // FIXME: doesn't work because this kernel doesn't use n.
-        // auto s_0 = _s_0( i, n );
-        double stretch_term = 0.0;
-        if ( s < s_Y )
-            stretch_term = s * s;
-        else
-            stretch_term = s_Y * ( 2 * s - s_Y );
-
-        // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
-        // the integrand (pairwise potential).
-        return 0.25 * c * stretch_term * xi * vol;
-    }
-};
-
 template <>
 struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
     : public ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
