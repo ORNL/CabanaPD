@@ -111,7 +111,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     using base_type::K;
     using base_type::s0;
 
-    using base_plasticity_type::_s_0;
+    using base_plasticity_type::_s_p;
     // FIXME: hardcoded
     const double s_Y = 0.0014;
 
@@ -127,25 +127,26 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     auto forceCoeff( const int i, const int n, const double s,
                      const double vol ) const
     {
-        auto s_0 = _s_0( i, n );
+        // Update bond plastic stretch
+        auto s_p = _s_p( i, n );
         // Yield in tension.
-        if ( s >= s_0 + s_Y )
-            _s_0( i, n ) = s - s_Y;
+        if ( s >= s_p + s_Y )
+            _s_p( i, n ) = s - s_Y;
         // Yield in compression.
-        else if ( s <= s_0 - s_Y )
-            _s_0( i, n ) = s + s_Y;
+        else if ( s <= s_p - s_Y )
+            _s_p( i, n ) = s + s_Y;
         // else: Elastic (in between), do not modify.
-        s_0 = _s_0( i, n );
+        s_p = _s_p( i, n );
 
-        return c * ( s - s_0 ) * vol;
+        return c * ( s - s_p ) * vol;
     }
 
     KOKKOS_INLINE_FUNCTION
     auto energy( const int i, const int n, const double s, const double xi,
                  const double vol ) const
     {
-        auto s_0 = _s_0( i, n );
-        return 0.25 * c * ( s - s_0 ) * xi * vol;
+        auto s_p = _s_p( i, n );
+        return 0.25 * c * ( s - s_p ) * xi * vol;
     }
 };
 
