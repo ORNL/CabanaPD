@@ -57,12 +57,16 @@ void compactTensionTestExample( const std::string filename )
     // ====================================================
     //                    Pre-notch
     // ====================================================
-    double height = inputs["system_size"][0];
+    // Geometric parameters of specimen
+    double L = inputs["system_size"][1];
+    double W = L / 1.25;
+    double a = 0.45 * W;
+
+    double prenotch_length = low_corner[0] + 0.25 * W + a;
     double thickness = inputs["system_size"][2];
-    double L_prenotch = height / 2.0;
     double y_prenotch = 0.0;
     Kokkos::Array<double, 3> p0 = { low_corner[0], y_prenotch, low_corner[2] };
-    Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
+    Kokkos::Array<double, 3> v1 = { prenotch_length, 0, 0 };
     Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
     Kokkos::Array<Kokkos::Array<double, 3>, 1> notch_position = { p0 };
     CabanaPD::Prenotch<1> prenotch( v1, v2, notch_position );
@@ -77,10 +81,6 @@ void compactTensionTestExample( const std::string filename )
     // ====================================================
     //    Custom particle generation and initialization
     // ====================================================
-    // Geometric parameters of specimen
-    double L = inputs["system_size"][1];
-    double W = L / 1.25;
-    double a = 0.45 * W;
 
     // Grid spacing in y-direction
     double dy = inputs["dx"][1];
@@ -89,8 +89,7 @@ void compactTensionTestExample( const std::string filename )
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
     {
         // Thin rectangle
-        if ( x[0] < low_corner[1] + 0.25 * W + a &&
-             Kokkos::abs( x[1] ) < 0.5 * dy )
+        if ( x[0] < prenotch_length && Kokkos::abs( x[1] ) < 0.5 * dy )
         {
             return false;
         }
