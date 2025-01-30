@@ -124,13 +124,14 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     using base_plasticity_type::_s_p;
     double s_Y;
 
+    using base_plasticity_type::updateBonds;
+
     ForceModel( const double delta, const double K, const double G0,
-                const double sigma_y, const int n_local,
-                const int max_neigh_guess = 0 )
+                const double sigma_y )
         : base_type( delta, K, G0,
                      // s0
                      ( 5.0 * G0 / sigma_y / delta + sigma_y / K ) / 6.0 )
-        , base_plasticity_type( n_local, max_neigh_guess )
+        , base_plasticity_type()
     {
     }
 
@@ -246,14 +247,14 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
 };
 
 template <typename ModelType, typename ParticleType>
-auto createForceModel( ModelType, ElasticPerfectlyPlastic,
-                       ParticleType particles, const double delta,
-                       const double K, const double G0, const double sigma_y )
+auto createForceModel( ModelType, ElasticPerfectlyPlastic, ParticleType,
+                       const double delta, const double K, const double G0,
+                       const double sigma_y )
 {
     using memory_space = typename ParticleType::memory_space;
     return ForceModel<ModelType, ElasticPerfectlyPlastic, Fracture,
-                      TemperatureIndependent, memory_space>(
-        delta, K, G0, sigma_y, particles.localOffset() );
+                      TemperatureIndependent, memory_space>( delta, K, G0,
+                                                             sigma_y );
 }
 
 // Default to Fracture.

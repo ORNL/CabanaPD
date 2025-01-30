@@ -214,6 +214,9 @@ class Force<MemorySpace,
                          base_type::getMaxLocalNeighbors() )
         , _model( model )
     {
+        // Needed only for models which store per-bond information.
+        _model.updateBonds( particles.localOffset(),
+                            base_type::getMaxLocalNeighbors() );
     }
 
     template <class ExecSpace, class ParticleType, class PrenotchType>
