@@ -109,8 +109,8 @@ class Solver
 
     Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
             force_model_type force_model )
-        : inputs( _inputs )
-        , particles( _particles )
+        : particles( _particles )
+        , inputs( _inputs )
         , _init_time( 0.0 )
     {
         setup( force_model );
@@ -118,8 +118,8 @@ class Solver
 
     Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
             force_model_type force_model, contact_model_type contact_model )
-        : inputs( _inputs )
-        , particles( _particles )
+        : particles( _particles )
+        , inputs( _inputs )
         , _init_time( 0.0 )
     {
         setup( force_model );
@@ -473,6 +473,8 @@ class Solver
     bool output_reference;
     double dt;
     int thermal_subcycle_steps;
+    // Sometimes necessary to update particles after solver creation.
+    std::shared_ptr<particle_type> particles;
 
   protected:
     template <std::size_t NumPrenotch>
@@ -489,7 +491,6 @@ class Solver
 
     // Core modules.
     input_type inputs;
-    std::shared_ptr<particle_type> particles;
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
