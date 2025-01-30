@@ -132,6 +132,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
                      // s0
                      ( 5.0 * G0 / sigma_y / delta + sigma_y / K ) / 6.0 )
         , base_plasticity_type()
+        , s_Y( sigma_y / 3.0 / K )
     {
     }
 
