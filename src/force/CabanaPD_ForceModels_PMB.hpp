@@ -159,7 +159,18 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
                  const double vol ) const
     {
         auto s_p = _s_p( i, n );
-        return 0.25 * c * ( s - s_p ) * xi * vol;
+        double stretch_term;
+        // Yield in tension.
+        if ( s >= s_p + s_Y )
+            stretch_term = s_p * ( 2.0 * s - s_p );
+        // Yield in compression.
+        else if ( s <= s_p - s_Y )
+            stretch_term = s_p * ( s_p - 2.0 * s );
+        else
+            // Elastic (in between).
+            stretch_term = s * s;
+
+        return 0.25 * c * stretch_term * xi * vol;
     }
 };
 
