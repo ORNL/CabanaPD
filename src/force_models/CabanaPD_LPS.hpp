@@ -76,8 +76,8 @@ struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModel
         return influenceFunction( xi ) * xi * xi * vol;
     }
 
-    KOKKOS_INLINE_FUNCTION auto dilatation( const double s, const double xi,
-                                            const double vol,
+    KOKKOS_INLINE_FUNCTION auto dilatation( const int, const double s,
+                                            const double xi, const double vol,
                                             const double m_i ) const
     {
         double theta_i = influenceFunction( xi ) * s * xi * xi * vol;
