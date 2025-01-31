@@ -58,6 +58,7 @@ struct BaseForceModel
     }
 
     auto cutoff() const { return delta; }
+    auto extend() const { return 0.0; }
 
     // Only needed for models which store bond properties.
     void updateBonds( const int, const int ) {}
@@ -145,8 +146,8 @@ class BasePlasticity
 {
   protected:
     using memory_space = MemorySpace;
-    using NeighborView = typename Kokkos::View<double**, memory_space>;
-    NeighborView _s_p;
+    using neighbor_view = typename Kokkos::View<double**, memory_space>;
+    neighbor_view _s_p;
 
   public:
     // Must update later because number of neighbors not known at construction.
