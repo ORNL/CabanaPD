@@ -153,6 +153,204 @@ class BaseForce
 };
 
 /******************************************************************************
+  Dilatation.
+******************************************************************************/
+template <class MemorySpace, class ModelType>
+class Dilatation;
+
+template <class MemorySpace,
+          template <class, class, class, class...> class ModelType,
+          class PDModelType, class MechanicsType, class... ModelParams>
+class Dilatation<MemorySpace, ModelType<PDModelType, MechanicsType, NoFracture,
+                                        ModelParams...>>
+{
+  protected:
+    using model_type =
+        ModelType<PDModelType, MechanicsType, NoFracture, ModelParams...>;
+    model_type _model;
+
+    Timer _timer;
+
+  public:
+    // Using the default exec_space.
+    using exec_space = typename MemorySpace::execution_space;
+
+    Dilatation( const model_type model )
+        : _model( model )
+    {
+    }
+
+    template <class ParticleType, class NeighborType>
+    void computeWeightedVolume( ParticleType& particles,
+                                const NeighborType& neighbor )
+    {
+        _timer.start();
+
+        auto x = particles.sliceReferencePosition();
+        auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        auto m = particles.sliceWeightedVolume();
+        Cabana::deep_copy( m, 0.0 );
+        auto model = _model;
+
+        auto weighted_volume = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            // Get the reference positions and displacements.
+            double xi, r, s;
+            getDistance( x, u, i, j, xi, r, s );
+            m( i ) += model.weightedVolume( xi, vol( j ) );
+        };
+        neighbor.iterate( exec_space{}, weighted_volume, particles,
+                          "CabanaPD::Dilatation::computeWeightedVolume" );
+        _timer.stop();
+    }
+
+    template <class ParticleType, class NeighborType>
+    void computeDilatation( ParticleType& particles,
+                            const NeighborType neighbor )
+    {
+        _timer.start();
+
+        const auto x = particles.sliceReferencePosition();
+        auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        auto m = particles.sliceWeightedVolume();
+        auto theta = particles.sliceDilatation();
+        auto model = _model;
+        Cabana::deep_copy( theta, 0.0 );
+
+        auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            // Get the bond distance, displacement, and stretch.
+            double xi, r, s;
+            getDistance( x, u, i, j, xi, r, s );
+            theta( i ) += model.dilatation( s, xi, vol( j ), m( i ) );
+        };
+
+        neighbor.iterate( exec_space{}, dilatation, particles,
+                          "CabanaPD::Dilatation::compute" );
+
+        _timer.stop();
+    }
+
+    auto time() { return _timer.time(); };
+};
+
+template <class MemorySpace,
+          template <class, class, class, class...> class ModelType,
+          class PDModelType, class MechanicsType, class... ModelParams>
+class Dilatation<MemorySpace, ModelType<PDModelType, MechanicsType, Fracture,
+                                        ModelParams...>>
+{
+  protected:
+    using model_type =
+        ModelType<PDModelType, MechanicsType, Fracture, ModelParams...>;
+    model_type _model;
+
+    Timer _timer;
+
+  public:
+    // Using the default exec_space.
+    using exec_space = typename MemorySpace::execution_space;
+
+    Dilatation( const model_type model )
+        : _model( model )
+    {
+    }
+
+    template <class ParticleType, class NeighborType>
+    void computeWeightedVolume( ParticleType& particles,
+                                const NeighborType& neighbor )
+    {
+        _timer.start();
+
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
+
+        auto x = particles.sliceReferencePosition();
+        auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        auto m = particles.sliceWeightedVolume();
+        Cabana::deep_copy( m, 0.0 );
+        auto model = _model;
+
+        auto weighted_volume = KOKKOS_LAMBDA( const int i )
+        {
+            std::size_t num_neighbors =
+                Cabana::NeighborList<neighbor_list_type>::numNeighbor(
+                    neigh_list, i );
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            {
+                std::size_t j =
+                    Cabana::NeighborList<neighbor_list_type>::getNeighbor(
+                        neigh_list, i, n );
+
+                // Get the reference positions and displacements.
+                double xi, r, s;
+                getDistance( x, u, i, j, xi, r, s );
+                // mu is included to account for bond breaking.
+                m( i ) += mu( i, n ) * model.weightedVolume( xi, vol( j ) );
+            }
+        };
+
+        neighbor.iterateLinear( exec_space{}, weighted_volume, particles,
+                                "CabanaPD::Dilatation::computeWeightedVolume" );
+
+        _timer.stop();
+    }
+
+    template <class ParticleType, class NeighborType>
+    void computeDilatation( ParticleType& particles,
+                            const NeighborType& neighbor )
+    {
+        _timer.start();
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
+
+        const auto x = particles.sliceReferencePosition();
+        auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        auto m = particles.sliceWeightedVolume();
+        auto theta = particles.sliceDilatation();
+        auto model = _model;
+
+        Cabana::deep_copy( theta, 0.0 );
+
+        auto dilatation = KOKKOS_LAMBDA( const int i )
+        {
+            std::size_t num_neighbors =
+                Cabana::NeighborList<neighbor_list_type>::numNeighbor(
+                    neigh_list, i );
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            {
+                std::size_t j =
+                    Cabana::NeighborList<neighbor_list_type>::getNeighbor(
+                        neigh_list, i, n );
+
+                // Get the bond distance, displacement, and stretch.
+                double xi, r, s;
+                getDistance( x, u, i, j, xi, r, s );
+
+                // Check if all bonds are broken (m=0) to avoid dividing by
+                // zero. Alternatively, one could check if this bond mu(i,n) is
+                // broken, because m=0 only occurs when all bonds are broken.
+                // mu is still included to account for individual bond breaking.
+                if ( m( i ) > 0 )
+                    theta( i ) += mu( i, n ) *
+                                  model.dilatation( s, xi, vol( j ), m( i ) );
+            }
+        };
+
+        neighbor.iterateLinear( exec_space{}, dilatation, particles,
+                                "CabanaPD::Dilatation::compute" );
+
+        _timer.stop();
+    }
+};
+
+/******************************************************************************
   Force free functions.
 ******************************************************************************/
 template <class ForceType, class ParticleType, class NeighborType>

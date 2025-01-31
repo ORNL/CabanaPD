@@ -71,76 +71,24 @@ namespace CabanaPD
 {
 template <class MemorySpace>
 class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
-    : public BaseForce<MemorySpace>
+    : public Dilatation<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
 {
   protected:
-    using base_type = BaseForce<MemorySpace>;
-    using model_type = ForceModel<LPS, Elastic, NoFracture>;
-    model_type _model;
+    using base_type =
+        Dilatation<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>;
+    using model_type = typename base_type::model_type;
+    using base_type::_model;
 
-    using base_type::_energy_timer;
     using base_type::_timer;
+    Timer _energy_timer;
 
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
 
     Force( const model_type model )
-        : _model( model )
+        : base_type( model )
     {
-    }
-
-    template <class ParticleType, class NeighborType>
-    void computeWeightedVolume( ParticleType& particles,
-                                const NeighborType& neighbor )
-    {
-        _timer.start();
-
-        auto x = particles.sliceReferencePosition();
-        auto u = particles.sliceDisplacement();
-        const auto vol = particles.sliceVolume();
-        auto m = particles.sliceWeightedVolume();
-        Cabana::deep_copy( m, 0.0 );
-        auto model = _model;
-
-        auto weighted_volume = KOKKOS_LAMBDA( const int i, const int j )
-        {
-            // Get the reference positions and displacements.
-            double xi, r, s;
-            getDistance( x, u, i, j, xi, r, s );
-            m( i ) += model.weightedVolume( xi, vol( j ) );
-        };
-        neighbor.iterate( exec_space{}, weighted_volume, particles,
-                          "CabanaPD::Dilatation::computeWeightedVolume" );
-        _timer.stop();
-    }
-
-    template <class ParticleType, class NeighborType>
-    void computeDilatation( ParticleType& particles,
-                            const NeighborType neighbor )
-    {
-        _timer.start();
-
-        const auto x = particles.sliceReferencePosition();
-        auto u = particles.sliceDisplacement();
-        const auto vol = particles.sliceVolume();
-        auto m = particles.sliceWeightedVolume();
-        auto theta = particles.sliceDilatation();
-        auto model = _model;
-        Cabana::deep_copy( theta, 0.0 );
-
-        auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
-        {
-            // Get the bond distance, displacement, and stretch.
-            double xi, r, s;
-            getDistance( x, u, i, j, xi, r, s );
-            theta( i ) += model.dilatation( s, xi, vol( j ), m( i ) );
-        };
-
-        neighbor.iterate( exec_space{}, dilatation, particles,
-                          "CabanaPD::Dilatation::compute" );
-
-        _timer.stop();
     }
 
     template <class ForceType, class PosType, class ParticleType,
@@ -221,21 +169,21 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
         return strain_energy;
     }
 
-    auto time() { return _timer.time(); };
     auto timeEnergy() { return _energy_timer.time(); };
 };
 
 template <class MemorySpace>
 class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
-    : public Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
+    : public Dilatation<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
 {
   protected:
-    using base_type = Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>;
-    using model_type = ForceModel<LPS, Elastic, Fracture>;
-    model_type _model;
+    using base_type =
+        Dilatation<MemorySpace, ForceModel<LPS, Elastic, Fracture>>;
+    using model_type = typename base_type::model_type;
+    using base_type::_model;
 
-    using base_type::_energy_timer;
     using base_type::_timer;
+    Timer _energy_timer;
 
   public:
     // Using the default exec_space.
@@ -243,100 +191,7 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
 
     Force( const model_type model )
         : base_type( model )
-        , _model( model )
     {
-    }
-
-    template <class ParticleType, class NeighborType>
-    void computeWeightedVolume( ParticleType& particles,
-                                const NeighborType& neighbor )
-    {
-        _timer.start();
-
-        using neighbor_list_type = typename NeighborType::list_type;
-        auto neigh_list = neighbor.list();
-        const auto mu = neighbor.brokenBonds();
-
-        auto x = particles.sliceReferencePosition();
-        auto u = particles.sliceDisplacement();
-        const auto vol = particles.sliceVolume();
-        auto m = particles.sliceWeightedVolume();
-        Cabana::deep_copy( m, 0.0 );
-        auto model = _model;
-
-        auto weighted_volume = KOKKOS_LAMBDA( const int i )
-        {
-            std::size_t num_neighbors =
-                Cabana::NeighborList<neighbor_list_type>::numNeighbor(
-                    neigh_list, i );
-            for ( std::size_t n = 0; n < num_neighbors; n++ )
-            {
-                std::size_t j =
-                    Cabana::NeighborList<neighbor_list_type>::getNeighbor(
-                        neigh_list, i, n );
-
-                // Get the reference positions and displacements.
-                double xi, r, s;
-                getDistance( x, u, i, j, xi, r, s );
-                // mu is included to account for bond breaking.
-                m( i ) += mu( i, n ) * model.weightedVolume( xi, vol( j ) );
-            }
-        };
-
-        neighbor.iterateLinear(
-            exec_space{}, weighted_volume, particles,
-            "CabanaPD::ForceLPSDamage::computeWeightedVolume" );
-
-        _timer.stop();
-    }
-
-    template <class ParticleType, class NeighborType>
-    void computeDilatation( ParticleType& particles,
-                            const NeighborType& neighbor )
-    {
-        _timer.start();
-        using neighbor_list_type = typename NeighborType::list_type;
-        auto neigh_list = neighbor.list();
-        const auto mu = neighbor.brokenBonds();
-
-        const auto x = particles.sliceReferencePosition();
-        auto u = particles.sliceDisplacement();
-        const auto vol = particles.sliceVolume();
-        auto m = particles.sliceWeightedVolume();
-        auto theta = particles.sliceDilatation();
-        auto model = _model;
-
-        Cabana::deep_copy( theta, 0.0 );
-
-        auto dilatation = KOKKOS_LAMBDA( const int i )
-        {
-            std::size_t num_neighbors =
-                Cabana::NeighborList<neighbor_list_type>::numNeighbor(
-                    neigh_list, i );
-            for ( std::size_t n = 0; n < num_neighbors; n++ )
-            {
-                std::size_t j =
-                    Cabana::NeighborList<neighbor_list_type>::getNeighbor(
-                        neigh_list, i, n );
-
-                // Get the bond distance, displacement, and stretch.
-                double xi, r, s;
-                getDistance( x, u, i, j, xi, r, s );
-
-                // Check if all bonds are broken (m=0) to avoid dividing by
-                // zero. Alternatively, one could check if this bond mu(i,n) is
-                // broken, because m=0 only occurs when all bonds are broken.
-                // mu is still included to account for individual bond breaking.
-                if ( m( i ) > 0 )
-                    theta( i ) += mu( i, n ) *
-                                  model.dilatation( s, xi, vol( j ), m( i ) );
-            }
-        };
-
-        neighbor.iterateLinear( exec_space{}, dilatation, particles,
-                                "CabanaPD::ForceLPSDamage::computeDilatation" );
-
-        _timer.stop();
     }
 
     template <class ForceType, class PosType, class ParticleType,
@@ -465,19 +320,22 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
         _energy_timer.stop();
         return strain_energy;
     }
+
+    auto timeEnergy() { return _energy_timer.time(); };
 };
 
 template <class MemorySpace>
 class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
-    : public Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
+    : public Dilatation<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
 {
   protected:
-    using base_type = Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>;
-    using model_type = ForceModel<LinearLPS, Elastic, NoFracture>;
+    using base_type =
+        Dilatation<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>;
+    using model_type = typename base_type::model_type;
     model_type _model;
 
-    using base_type::_energy_timer;
     using base_type::_timer;
+    Timer _energy_timer;
 
   public:
     // Using the default exec_space.
@@ -572,6 +430,8 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
         _energy_timer.stop();
         return strain_energy;
     }
+
+    auto timeEnergy() { return _energy_timer.time(); };
 };
 
 } // namespace CabanaPD
