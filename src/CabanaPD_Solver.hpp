@@ -275,48 +275,53 @@ class Solver
         for ( int step = 1; step <= num_steps; step++ )
         {
             _step_timer.start();
-
-            // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( *particles );
-
-            // Update ghost particles.
-            comm->gatherDisplacement();
-
-            if constexpr ( is_heat_transfer<
-                               typename force_model_type::thermal_type>::value )
-            {
-                if ( step % thermal_subcycle_steps == 0 )
-                    computeHeatTransfer( *heat_transfer, *particles,
-                                         neigh_iter_tag{},
-                                         thermal_subcycle_steps * dt );
-            }
-
-            // Add non-force boundary condition.
-            if ( !boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space(), *particles, step * dt );
-
-            if constexpr ( is_temperature_dependent<
-                               typename force_model_type::thermal_type>::value )
-                comm->gatherTemperature();
-
-            // Compute internal forces.
-            updateForce();
-
-            if constexpr ( is_contact<contact_model_type>::value )
-                computeForce( *contact, *particles, neigh_iter_tag{}, false );
-
-            // Add force boundary condition.
-            if ( boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space(), *particles, step * dt );
-
-            // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( *particles );
-
-            output( step );
+            runStep( step, boundary_condition );
         }
 
         // Final output and timings.
         final_output();
+    }
+
+    template <typename BoundaryType>
+    void runStep( const int step, BoundaryType boundary_condition )
+    {
+        // Integrate - velocity Verlet first half.
+        integrator->initialHalfStep( *particles );
+
+        // Update ghost particles.
+        comm->gatherDisplacement();
+
+        if constexpr ( is_heat_transfer<
+                           typename force_model_type::thermal_type>::value )
+        {
+            if ( step % thermal_subcycle_steps == 0 )
+                computeHeatTransfer( *heat_transfer, *particles,
+                                     neigh_iter_tag{},
+                                     thermal_subcycle_steps * dt );
+        }
+
+        // Add non-force boundary condition.
+        if ( !boundary_condition.forceUpdate() )
+            boundary_condition.apply( exec_space(), *particles, step * dt );
+
+        if constexpr ( is_temperature_dependent<
+                           typename force_model_type::thermal_type>::value )
+            comm->gatherTemperature();
+
+        // Compute internal forces.
+        updateForce();
+
+        if constexpr ( is_contact<contact_model_type>::value )
+            computeForce( *contact, *particles, neigh_iter_tag{}, false );
+
+        // Add force boundary condition.
+        if ( boundary_condition.forceUpdate() )
+            boundary_condition.apply( exec_space(), *particles, step * dt );
+
+        // Integrate - velocity Verlet second half.
+        integrator->finalHalfStep( *particles );
+
+        output( step );
     }
 
     void run()
@@ -327,31 +332,53 @@ class Solver
         for ( int step = 1; step <= num_steps; step++ )
         {
             _step_timer.start();
-
-            // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( *particles );
-
-            // Update ghost particles.
-            comm->gatherDisplacement();
-
-            // Compute internal forces.
-            updateForce();
-
-            if constexpr ( is_contact<contact_model_type>::value )
-                computeForce( *contact, *particles, neigh_iter_tag{}, false );
-
-            if constexpr ( is_temperature_dependent<
-                               typename force_model_type::thermal_type>::value )
-                comm->gatherTemperature();
-
-            // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( *particles );
-
-            output( step );
+            runStep( step );
         }
 
         // Final output and timings.
         final_output();
+    }
+
+    void runStep( const int step )
+    {
+        // Integrate - velocity Verlet first half.
+        integrator->initialHalfStep( *particles );
+
+        // Update ghost particles.
+        comm->gatherDisplacement();
+
+        // Compute internal forces.
+        updateForce();
+
+        if constexpr ( is_contact<contact_model_type>::value )
+            computeForce( *contact, *particles, neigh_iter_tag{}, false );
+
+        if constexpr ( is_temperature_dependent<
+                           typename force_model_type::thermal_type>::value )
+            comm->gatherTemperature();
+
+        // Integrate - velocity Verlet second half.
+        integrator->finalHalfStep( *particles );
+
+        output( step );
+    }
+
+    template <typename BoundaryType, typename OutputType>
+    void run( BoundaryType boundary_condition, OutputType region_output )
+    {
+        init_output( boundary_condition.timeInit() );
+
+        // Main timestep loop.
+        for ( int step = 1; step <= num_steps; step++ )
+        {
+            _step_timer.start();
+            runStep( step, boundary_condition );
+            // FIXME: not included in timing
+            region_output.update( *particles );
+        }
+
+        // Final output and timings.
+        final_output( region_output );
     }
 
     // Compute and communicate fields needed for force computation and update
@@ -468,6 +495,13 @@ class Solver
         }
     }
 
+    template <typename OutputType>
+    void final_output( OutputType region_output )
+    {
+        final_output();
+        region_output.print( comm->rank() );
+    }
+
     int num_steps;
     int output_frequency;
     bool output_reference;
@@ -522,8 +556,11 @@ auto createSolver( InputsType inputs, std::shared_ptr<ParticleType> particles,
 
 template <class MemorySpace, class InputsType, class ParticleType,
           class ForceModelType, class ContactModelType>
-auto createSolver( InputsType inputs, std::shared_ptr<ParticleType> particles,
-                   ForceModelType model, ContactModelType contact_model )
+auto createSolver(
+    InputsType inputs, std::shared_ptr<ParticleType> particles,
+    ForceModelType model, ContactModelType contact_model,
+    typename std::enable_if<( is_contact<ContactModelType>::value ),
+                            int>::type* = 0 )
 {
     return std::make_shared<Solver<MemorySpace, InputsType, ParticleType,
                                    ForceModelType, ContactModelType>>(
