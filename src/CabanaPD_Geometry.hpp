@@ -71,6 +71,15 @@ struct Region<RectangularPrism>
         , low_z( _low_z )
         , high_z( _high_z ){};
 
+    template <class ArrayType>
+    Region( const ArrayType _low, const ArrayType _high )
+        : low_x( _low[0] )
+        , high_x( _high[0] )
+        , low_y( _low[1] )
+        , high_y( _high[1] )
+        , low_z( _low[2] )
+        , high_z( _high[2] ){};
+
     template <class PositionType>
     KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
                                         const int pid ) const
