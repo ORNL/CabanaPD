@@ -30,16 +30,17 @@ struct ForceUpdateBCTag
 };
 
 // Custom boundary condition.
-template <class BCSteeringVector, class UserFunctor>
+template <class MemorySpace, class UserFunctor>
 struct BoundaryCondition
 {
-    BCSteeringVector _indices;
+    using steering_vector_type = ParticleSteeringVector<MemorySpace>;
+    steering_vector_type _indices;
     UserFunctor _user_functor;
     bool _force_update;
 
     Timer _timer;
 
-    BoundaryCondition( BCSteeringVector bc_indices, UserFunctor user,
+    BoundaryCondition( steering_vector_type bc_indices, UserFunctor user,
                        const bool force )
         : _indices( bc_indices )
         , _user_functor( user )
@@ -71,17 +72,18 @@ struct BoundaryCondition
     auto timeInit() { return _indices.time(); };
 };
 
-template <class BCSteeringVector>
-struct BoundaryCondition<BCSteeringVector, ForceValueBCTag>
+template <class MemorySpace>
+struct BoundaryCondition<MemorySpace, ForceValueBCTag>
 {
     double _value;
-    BCSteeringVector _indices;
+    using steering_vector_type = ParticleSteeringVector<MemorySpace>;
+    steering_vector_type _indices;
     const bool _force_update = true;
 
     Timer _timer;
 
     BoundaryCondition( ForceValueBCTag, const double value,
-                       BCSteeringVector bc_indices )
+                       steering_vector_type bc_indices )
         : _value( value )
         , _indices( bc_indices )
     {
@@ -113,17 +115,18 @@ struct BoundaryCondition<BCSteeringVector, ForceValueBCTag>
     auto timeInit() { return _indices.time(); };
 };
 
-template <class BCSteeringVector>
-struct BoundaryCondition<BCSteeringVector, ForceUpdateBCTag>
+template <class MemorySpace>
+struct BoundaryCondition<MemorySpace, ForceUpdateBCTag>
 {
     double _value;
-    BCSteeringVector _indices;
+    using steering_vector_type = ParticleSteeringVector<MemorySpace>;
+    steering_vector_type _indices;
     const bool _force_update = true;
 
     Timer _timer;
 
     BoundaryCondition( ForceUpdateBCTag, const double value,
-                       BCSteeringVector bc_indices )
+                       steering_vector_type bc_indices )
         : _value( value )
         , _indices( bc_indices )
     {
@@ -155,9 +158,9 @@ struct BoundaryCondition<BCSteeringVector, ForceUpdateBCTag>
     auto timeInit() { return _indices.time(); };
 };
 
-template <class BCTag, class BCIndexSpace>
-BoundaryCondition( BCTag, double, BCIndexSpace )
-    -> BoundaryCondition<BCIndexSpace, BCTag>;
+template <class BCTag, class SteeringVectorType>
+BoundaryCondition( BCTag, double, SteeringVectorType )
+    -> BoundaryCondition<typename SteeringVectorType::memory_space, BCTag>;
 
 template <class BCTag, class ExecSpace, class Particles, class... RegionType>
 auto createBoundaryCondition( BCTag tag, const double value,
@@ -178,12 +181,12 @@ auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
     return BoundaryCondition( bc_indices, user_functor, force_update );
 }
 
-// Custom index space cases
+// Custom boundary particle cases.
 template <class BCTag, class ExecSpace, class BoundaryParticles>
 auto createBoundaryCondition( BCTag, const double value,
                               BoundaryParticles particles )
 {
-    ParticleSteeringVectorCustom bc_indices( particles );
+    ParticleSteeringVector bc_indices( particles );
     return BoundaryCondition( value, bc_indices );
 }
 
@@ -192,7 +195,7 @@ auto createBoundaryCondition( UserFunctor user_functor,
                               BoundaryParticles particles,
                               const bool force_update )
 {
-    ParticleSteeringVectorCustom bc_indices( particles );
+    ParticleSteeringVector bc_indices( particles );
     return BoundaryCondition( bc_indices, user_functor, force_update );
 }
 

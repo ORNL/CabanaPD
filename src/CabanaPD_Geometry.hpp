@@ -115,6 +115,7 @@ struct Region<Cylinder>
 template <class MemorySpace>
 struct ParticleSteeringVector
 {
+    using memory_space = MemorySpace;
     using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
     index_view_type _view;
     index_view_type _count;
@@ -147,6 +148,12 @@ struct ParticleSteeringVector
         }
 
         _timer.stop();
+    }
+
+    // Construct from a View of boundary particles (custom).
+    ParticleSteeringVector( index_view_type input_view )
+        : _view( input_view )
+    {
     }
 
     // Iterate over all regions.
@@ -196,20 +203,12 @@ struct ParticleSteeringVector
         }
     }
 
-    auto time() { return _timer.time(); };
-};
+    // Update from a View of boundary particles (custom).
+    void update( index_view_type input_view ) { _view = input_view; }
 
-template <class MemorySpace>
-struct ParticleSteeringVectorCustom
-{
-    using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
-    index_view_type _view;
+    auto size() { return _view.size(); }
 
-    // Construct from a View of boundary particles.
-    ParticleSteeringVectorCustom( index_view_type input_view )
-        : _view( input_view )
-    {
-    }
+    auto time() { return _timer.time(); }
 };
 
 template <class ExecSpace, class Particles, class... RegionType>
@@ -220,10 +219,6 @@ ParticleSteeringVector( ExecSpace exec_space, Particles particles,
 template <class BoundaryParticles>
 ParticleSteeringVector( BoundaryParticles particles )
     -> ParticleSteeringVector<typename BoundaryParticles::memory_space>;
-
-template <class BoundaryParticles>
-ParticleSteeringVectorCustom( BoundaryParticles boundary_particles )
-    -> ParticleSteeringVectorCustom<typename BoundaryParticles::memory_space>;
 
 } // namespace CabanaPD
 
