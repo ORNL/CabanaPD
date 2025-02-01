@@ -17,6 +17,7 @@
 #include <Cabana_Core.hpp>
 
 #include <CabanaPD_Geometry.hpp>
+#include <CabanaPD_Output.hpp>
 #include <CabanaPD_Timer.hpp>
 
 namespace CabanaPD
@@ -198,6 +199,17 @@ auto createBoundaryCondition( UserFunctor user_functor,
     ParticleSteeringVector bc_indices( particles );
     return BoundaryCondition( bc_indices, user_functor, force_update );
 }
+
+// Boundary conditions.
+template <class>
+struct is_bc : public std::false_type
+{
+};
+template <typename MemorySpace, typename BoundaryType>
+struct is_bc<BoundaryCondition<MemorySpace, BoundaryType>>
+    : public std::true_type
+{
+};
 
 } // namespace CabanaPD
 

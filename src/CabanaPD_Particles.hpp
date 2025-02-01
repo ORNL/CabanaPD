@@ -762,6 +762,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     }
 
     auto rank() { return local_grid->globalGrid().blockId(); }
+    auto comm() { return local_grid->globalGrid().comm(); }
 
     auto timeInit() { return _init_timer.time(); };
     auto timeOutput() { return _output_timer.time(); };

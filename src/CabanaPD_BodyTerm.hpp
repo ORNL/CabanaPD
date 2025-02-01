@@ -16,6 +16,7 @@
 
 #include <Cabana_Core.hpp>
 
+#include <CabanaPD_Boundary.hpp>
 #include <CabanaPD_Output.hpp>
 #include <CabanaPD_Timer.hpp>
 
@@ -67,6 +68,10 @@ struct BodyTerm
     auto timeInit() { return 0.0; };
 };
 
+template <typename BoundaryType>
+struct is_bc<BodyTerm<BoundaryType>> : public std::true_type
+{
+};
 } // namespace CabanaPD
 
 #endif
