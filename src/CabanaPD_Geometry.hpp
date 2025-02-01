@@ -27,6 +27,9 @@ struct RectangularPrism
 struct Cylinder
 {
 };
+struct Line
+{
+};
 
 // User-specifed custom boundary. Must use the signature:
 //    bool operator()(PositionType&, const int)
@@ -108,6 +111,42 @@ struct Region<Cylinder>
         return ( rsq >= radius_in * radius_in &&
                  rsq <= radius_out * radius_out && x( pid, 2 ) >= low_z &&
                  x( pid, 2 ) <= high_z );
+    }
+};
+
+// Define a subset of the system with a line at the center.
+// This is intended to be grid aligned, not a general line within the system.
+template <>
+struct Region<Line>
+{
+    Kokkos::Array<double, 2> _half_dx;
+    Kokkos::Array<int, 2> _dims;
+
+    template <typename ArrayType>
+    Region( const double profile_dim, const ArrayType dx )
+    {
+        _dims = getOtherDims( profile_dim );
+        _half_dx[0] = dx[_dims[0]] / 2.0;
+        _half_dx[1] = dx[_dims[1]] / 2.0;
+    }
+
+    // Given a dimension, returns the other two
+    Kokkos::Array<int, 2> getOtherDims( const int x )
+    {
+        Kokkos::Array<int, 2> yz;
+        yz[0] = ( x + 1 ) % 3;
+        yz[1] = ( x + 2 ) % 3;
+        return yz;
+    }
+
+    template <class PositionType>
+    KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
+                                        const int pid ) const
+    {
+        return x( pid, _dims[0] ) < _half_dx[0] &&
+               x( pid, _dims[0] ) > -_half_dx[0] &&
+               x( pid, _dims[1] ) < _half_dx[1] &&
+               x( pid, _dims[1] ) > -_half_dx[1];
     }
 };
 

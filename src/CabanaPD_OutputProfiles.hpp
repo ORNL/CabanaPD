@@ -16,58 +16,43 @@
 
 #include <Cabana_Core.hpp>
 
+#include <CabanaPD_Geometry.hpp>
+
 namespace CabanaPD
 {
 
-// Given a dimension, returns the other two
-auto getDim( const int dim )
-{
-    Kokkos::Array<int, 2> orthogonal;
-    orthogonal[0] = ( dim + 1 ) % 3;
-    orthogonal[1] = ( dim + 2 ) % 3;
-    return orthogonal;
-}
-
 template <typename ParticleType, typename UserFunctor>
-void createOutputProfile( MPI_Comm comm, const int num_cell,
-                          const int profile_dim, std::string file_name,
-                          ParticleType particles, UserFunctor user )
+void createOutputProfile( std::string file_name, ParticleType particles,
+                          const int profile_dim, UserFunctor user )
 {
     using memory_space = typename ParticleType::memory_space;
+    using exec_space = typename memory_space::execution_space;
+
+    Region<Line> line( profile_dim, particles.dx );
+    ParticleSteeringVector sv( exec_space{}, particles, line );
+
     auto profile = Kokkos::View<double* [2], memory_space>(
-        Kokkos::ViewAllocateWithoutInitializing( "displacement_profile" ),
-        num_cell );
-    int mpi_rank;
-    MPI_Comm_rank( comm, &mpi_rank );
-    Kokkos::View<int*, memory_space> count( "c", 1 );
-
-    auto dims = getDim( profile_dim );
-    double dx1 = particles.dx[dims[0]];
-    double dx2 = particles.dx[dims[1]];
-
+        Kokkos::ViewAllocateWithoutInitializing( "output_profile" ),
+        sv.size() );
+    auto indices = sv._view;
     auto x = particles.sliceReferencePosition();
-    auto measure_profile = KOKKOS_LAMBDA( const int pid )
+    // FIXME: not in order.
+    auto measure_profile = KOKKOS_LAMBDA( const int b )
     {
-        if ( x( pid, dims[0] ) < dx1 / 2.0 && x( pid, dims[0] ) > -dx1 / 2.0 &&
-             x( pid, dims[1] ) < dx2 / 2.0 && x( pid, dims[1] ) > -dx2 / 2.0 )
-        {
-            auto c = Kokkos::atomic_fetch_add( &count( 0 ), 1 );
-            profile( c, 0 ) = x( pid, profile_dim );
-            profile( c, 1 ) = user( pid );
-        }
+        auto p = indices( b );
+        profile( b, 0 ) = x( p, profile_dim );
+        profile( b, 1 ) = user( p );
     };
-    // TODO: enable ignoring frozen particles.
     Kokkos::RangePolicy<typename memory_space::execution_space> policy(
-        0, particles.localOffset() );
-    Kokkos::parallel_for( "displacement_profile", policy, measure_profile );
-    auto count_host =
-        Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, count );
+        0, indices.size() );
+    Kokkos::parallel_for( "output_profile", policy, measure_profile );
     auto profile_host =
         Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, profile );
-    std::fstream fout;
 
+    std::fstream fout;
     fout.open( file_name, std::ios::app );
-    for ( int p = 0; p < count_host( 0 ); p++ )
+    auto mpi_rank = particles.rank();
+    for ( std::size_t p = 0; p < indices.size(); p++ )
     {
         fout << mpi_rank << " " << profile_host( p, 0 ) << " "
              << profile_host( p, 1 ) << std::endl;
@@ -75,8 +60,7 @@ void createOutputProfile( MPI_Comm comm, const int num_cell,
 }
 
 template <typename ParticleType>
-void createDisplacementProfile( MPI_Comm comm, std::string file_name,
-                                ParticleType particles, const int num_cell,
+void createDisplacementProfile( std::string file_name, ParticleType particles,
                                 const int profile_dim,
                                 int displacement_dim = -1 )
 {
@@ -88,14 +72,12 @@ void createDisplacementProfile( MPI_Comm comm, std::string file_name,
     {
         return u( pid, displacement_dim );
     };
-    createOutputProfile( comm, num_cell, profile_dim, file_name, particles,
-                         value );
+    createOutputProfile( file_name, particles, profile_dim, value );
 }
 
 template <typename ParticleType>
-void createDisplacementMagnitudeProfile( MPI_Comm comm, std::string file_name,
+void createDisplacementMagnitudeProfile( std::string file_name,
                                          ParticleType particles,
-                                         const int num_cell,
                                          const int profile_dim )
 {
     auto u = particles.sliceDisplacement();
@@ -105,9 +87,9 @@ void createDisplacementMagnitudeProfile( MPI_Comm comm, std::string file_name,
                              u( pid, 1 ) * u( pid, 1 ) +
                              u( pid, 2 ) * u( pid, 2 ) );
     };
-    createOutputProfile( comm, num_cell, profile_dim, file_name, particles,
-                         magnitude );
+    createOutputProfile( file_name, particles, profile_dim, magnitude );
 }
+
 } // namespace CabanaPD
 
 #endif
