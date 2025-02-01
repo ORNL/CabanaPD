@@ -27,9 +27,6 @@ struct RectangularPrism
 struct Cylinder
 {
 };
-struct Custom
-{
-};
 
 // User-specifed custom region. Must use the signature:
 //    bool operator()(PositionType&, const int)
@@ -118,8 +115,8 @@ template <class MemorySpace, class RegionType>
 struct ParticleSteeringVector;
 
 // FIXME: fails for some cases if initial guess is not sufficient.
-template <class MemorySpace, class GeometryType>
-struct ParticleSteeringVector<MemorySpace, Region<GeometryType>>
+template <class MemorySpace>
+struct ParticleSteeringVector
 {
     using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
     index_view_type _view;
@@ -128,7 +125,7 @@ struct ParticleSteeringVector<MemorySpace, Region<GeometryType>>
     Timer _timer;
 
     // Construct from region (search for boundary particles).
-    template <class ExecSpace, class Particles>
+    template <class ExecSpace, class Particles, class GeometryType>
     ParticleSteeringVector( ExecSpace exec_space, Particles particles,
                             std::vector<Region<GeometryType>> regions,
                             const double initial_guess )
@@ -154,7 +151,14 @@ struct ParticleSteeringVector<MemorySpace, Region<GeometryType>>
         _timer.stop();
     }
 
-    template <class ExecSpace, class Particles>
+    // Construct from a View of boundary particles (custom).
+    ParticleSteeringVector( index_view_type input_view )
+        : _view( input_view )
+    {
+    }
+
+    // Update from region (search for boundary particles).
+    template <class ExecSpace, class Particles, class GeometryType>
     void update( ExecSpace, Particles particles, Region<GeometryType> region )
     {
         auto count_host =
@@ -190,20 +194,12 @@ struct ParticleSteeringVector<MemorySpace, Region<GeometryType>>
         }
     }
 
+    // Update from a View of boundary particles (custom).
+    void update( index_view_type input_view ) { _view = input_view; }
+
+    auto size() { return _view.size(); };
+
     auto time() { return _timer.time(); };
-};
-
-template <class MemorySpace>
-struct ParticleSteeringVector<MemorySpace, Custom>
-{
-    using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
-    index_view_type _view;
-
-    // Construct from a View of boundary particles.
-    ParticleSteeringVector( index_view_type input_view )
-        : _view( input_view )
-    {
-    }
 };
 
 template <class ExecSpace, class Particles, class RegionType>
@@ -212,15 +208,8 @@ auto createParticleSteeringVector( ExecSpace exec_space, Particles particles,
                                    const double initial_guess )
 {
     using memory_space = typename Particles::memory_space;
-    return ParticleSteeringVector<memory_space, RegionType>(
-        exec_space, particles, regions, initial_guess );
-}
-
-template <class IndexSpaceView>
-auto createParticleSteeringVector( IndexSpaceView view )
-{
-    using memory_space = typename IndexSpaceView::memory_space;
-    return ParticleSteeringVector<memory_space, Custom>( view );
+    return ParticleSteeringVector<memory_space>( exec_space, particles, regions,
+                                                 initial_guess );
 }
 
 } // namespace CabanaPD
