@@ -123,8 +123,8 @@ class OutputTimeSeries
     {
         double time = inputs["final_time"];
         double dt = inputs["timestep"];
-        double steps = inputs["output_frequency"];
-        int output_steps = static_cast<int>( time / dt / steps );
+        double freq = inputs["output_frequency"];
+        int output_steps = static_cast<int>( time / dt / freq );
         // Purposely using zero-init here.
         _profile = profile_type( "time_output", output_steps );
     }
