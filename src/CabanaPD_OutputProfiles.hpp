@@ -105,18 +105,18 @@ class OutputTimeSeries
 
     std::string file_name;
     profile_type _profile;
-    FunctorTypeX output_x;
-    FunctorTypeY output_y;
+    FunctorTypeX _output_x;
+    FunctorTypeY _output_y;
     int index;
 
   public:
     OutputTimeSeries( std::string name, Inputs inputs,
-                      const steering_vector_type indices, FunctorTypeX x,
-                      FunctorTypeY y )
+                      const steering_vector_type indices, FunctorTypeX output_x,
+                      FunctorTypeY output_y )
         : _indices( indices )
         , file_name( name )
-        , output_x( x )
-        , output_y( y )
+        , _output_x( output_x )
+        , _output_y( output_y )
         , index( 0 )
     {
         double time = inputs["final_time"];
@@ -127,20 +127,19 @@ class OutputTimeSeries
         _profile = profile_type( "time_output", output_steps );
     }
 
+    void operator()( const int b, double& px, double& py )
+    {
+        auto p = _indices._view( b );
+        px += _output_x( p );
+        py += _output_y( p );
+    }
+
     void update()
     {
-        auto profile = _profile;
-        auto index_space = _indices._view;
-        auto step_output = KOKKOS_LAMBDA( const int b, double& px, double& py )
-        {
-            auto p = index_space( b );
-            px += output_x( p );
-            py += output_y( p );
-        };
         Kokkos::RangePolicy<typename memory_space::execution_space> policy(
             0, _indices.size() );
-        Kokkos::parallel_reduce( "time_series", policy, step_output,
-                                 profile( index, 0 ), profile( index, 1 ) );
+        Kokkos::parallel_reduce( "time_series", policy, *this,
+                                 _profile( index, 0 ), _profile( index, 1 ) );
         index++;
     }
 
@@ -179,6 +178,23 @@ struct ForceDisplacementTag
 {
 };
 
+template <typename FieldType>
+struct updateField
+{
+    FieldType f;
+
+    updateField( const FieldType& field )
+        : f( field )
+    {
+    }
+
+    auto operator()( const int p )
+    {
+        return Kokkos::sqrt( f( p, 0 ) * f( p, 0 ) + f( p, 1 ) * f( p, 0 ) +
+                             f( p, 2 ) * f( p, 2 ) );
+    }
+};
+
 template <typename ExecSpace, typename ParticleType, typename GeometryType>
 auto createOutputTimeSeries( ForceDisplacementTag, std::string name,
                              const Inputs inputs, ExecSpace exec_space,
@@ -194,17 +210,9 @@ auto createOutputTimeSeries( ForceDisplacementTag, std::string name,
 
     auto f = particles.sliceForce();
     auto u = particles.sliceDisplacement();
-    auto update_x = KOKKOS_LAMBDA( const int p )
-    {
-        return Kokkos::sqrt( u( p, 0 ) * u( p, 0 ) + u( p, 1 ) * u( p, 0 ) +
-                             u( p, 2 ) * u( p, 2 ) );
-    };
-    auto update_y = KOKKOS_LAMBDA( const int p )
-    {
-        return Kokkos::sqrt( f( p, 0 ) * f( p, 0 ) + f( p, 1 ) * f( p, 0 ) +
-                             f( p, 2 ) * f( p, 2 ) );
-    };
-    return OutputTimeSeries( name, inputs, indices, update_x, update_y );
+    auto update_f = updateField( f );
+    auto update_u = updateField( u );
+    return OutputTimeSeries( name, inputs, indices, update_u, update_f );
 }
 
 } // namespace CabanaPD
