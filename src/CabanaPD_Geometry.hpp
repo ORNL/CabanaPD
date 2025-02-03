@@ -134,7 +134,6 @@ struct Region<Cylinder>
 template <>
 struct Region<Line>
 {
-    double dim;
     Kokkos::Array<double, 2> _dx;
     Kokkos::Array<int, 2> _dims;
 
