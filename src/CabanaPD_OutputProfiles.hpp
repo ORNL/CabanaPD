@@ -23,14 +23,16 @@ namespace CabanaPD
 
 template <typename ParticleType, typename UserFunctor>
 void createOutputProfile( std::string file_name, ParticleType particles,
-                          const int profile_dim, UserFunctor user )
+                          const int profile_dim, UserFunctor user,
+                          const double initial_guess = 0.25 )
 {
     using memory_space = typename ParticleType::memory_space;
 
     std::vector<Region<Line>> line = {
         Region<Line>( profile_dim, particles.dx ) };
-    auto sv = createParticleSteeringVector(
-        typename memory_space::execution_space{}, particles, line, 0.25 );
+    auto sv =
+        createParticleSteeringVector( typename memory_space::execution_space{},
+                                      particles, line, initial_guess );
 
     auto profile = Kokkos::View<double* [2], memory_space>(
         Kokkos::ViewAllocateWithoutInitializing( "output_profile" ),
