@@ -69,7 +69,9 @@ struct Region<RectangularPrism>
         , low_y( _low_y )
         , high_y( _high_y )
         , low_z( _low_z )
-        , high_z( _high_z ){};
+        , high_z( _high_z )
+    {
+    }
 
     template <class ArrayType>
     Region( const ArrayType _low, const ArrayType _high )
@@ -78,7 +80,9 @@ struct Region<RectangularPrism>
         , low_y( _low[1] )
         , high_y( _high[1] )
         , low_z( _low[2] )
-        , high_z( _high[2] ){};
+        , high_z( _high[2] )
+    {
+    }
 
     template <class PositionType>
     KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
@@ -109,7 +113,9 @@ struct Region<Cylinder>
         , low_z( _low_z )
         , high_z( _high_z )
         , x_center( _x_center )
-        , y_center( _y_center ){};
+        , y_center( _y_center )
+    {
+    }
 
     template <class PositionType>
     KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
@@ -138,7 +144,7 @@ struct Region<Line>
         _dims = getDim( profile_dim );
         _dx[0] = dx[_dims[0]] / 2.0;
         _dx[1] = dx[_dims[1]] / 2.0;
-    };
+    }
 
     // Given a dimension, returns the other two
     Kokkos::Array<int, 2> getDim( const int x )
@@ -241,9 +247,9 @@ struct ParticleSteeringVector
     // Update from a View of boundary particles (custom).
     void update( index_view_type input_view ) { _view = input_view; }
 
-    auto size() { return _view.size(); };
+    auto size() { return _view.size(); }
 
-    auto time() { return _timer.time(); };
+    auto time() { return _timer.time(); }
 };
 
 template <class ExecSpace, class Particles, class RegionType>
