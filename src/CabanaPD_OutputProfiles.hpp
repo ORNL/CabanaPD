@@ -138,22 +138,18 @@ class OutputTimeSeries<MemorySpace, ForceDisplacementTag>
 
         auto profile = _profile;
         auto index_space = _indices._view;
-        auto i = index;
-        auto step_output = KOKKOS_LAMBDA( const int b )
+        auto step_output = KOKKOS_LAMBDA( const int b, double& p1, double& p2 )
         {
             auto p = index_space( b );
-            profile( i, 0 ) +=
-                Kokkos::sqrt( u( p, 0 ) * u( p, 0 ) + u( p, 1 ) * u( p, 0 ) +
-                              u( p, 2 ) * u( p, 2 ) );
-            profile( i, 1 ) +=
-                Kokkos::sqrt( f( p, 0 ) * f( p, 0 ) + f( p, 1 ) * f( p, 0 ) +
-                              f( p, 2 ) * f( p, 2 ) );
-            std::cout << i << " " << p << " " << profile( i, 0 ) << " "
-                      << profile( i, 1 ) << std::endl;
+            p1 += Kokkos::sqrt( u( p, 0 ) * u( p, 0 ) + u( p, 1 ) * u( p, 0 ) +
+                                u( p, 2 ) * u( p, 2 ) );
+            p2 += Kokkos::sqrt( f( p, 0 ) * f( p, 0 ) + f( p, 1 ) * f( p, 0 ) +
+                                f( p, 2 ) * f( p, 2 ) );
         };
         Kokkos::RangePolicy<typename memory_space::execution_space> policy(
             0, _indices.size() );
-        Kokkos::parallel_for( "time_series", policy, step_output );
+        Kokkos::parallel_reduce( "time_series", policy, step_output,
+                                 profile( index, 0 ), profile( index, 1 ) );
 
         index++;
     }
