@@ -267,7 +267,9 @@ class Solver
     }
 
     template <typename BoundaryType>
-    void run( BoundaryType boundary_condition )
+    void
+    run( BoundaryType boundary_condition,
+         typename std::enable_if_t<( is_bc<BoundaryType>::value ), int>* = 0 )
     {
         init_output( boundary_condition.timeInit() );
 
@@ -363,6 +365,25 @@ class Solver
         output( step );
     }
 
+    template <typename OutputType>
+    void
+    run( OutputType region_output,
+         typename std::enable_if_t<( !is_bc<OutputType>::value ), int>* = 0 )
+    {
+        // Main timestep loop.
+        for ( int step = 1; step <= num_steps; step++ )
+        {
+            _step_timer.start();
+            runStep( step );
+            // FIXME: not included in timing
+            if ( step % output_frequency == 0 )
+                region_output.update();
+        }
+
+        // Final output and timings.
+        final_output( region_output );
+    }
+
     template <typename BoundaryType, typename OutputType>
     void run( BoundaryType boundary_condition, OutputType region_output )
     {
@@ -374,7 +395,8 @@ class Solver
             _step_timer.start();
             runStep( step, boundary_condition );
             // FIXME: not included in timing
-            region_output.update( *particles );
+            if ( step % output_frequency == 0 )
+                region_output.update();
         }
 
         // Final output and timings.

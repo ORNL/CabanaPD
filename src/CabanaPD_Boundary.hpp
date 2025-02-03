@@ -241,6 +241,17 @@ auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
                                     plane_vec, force_update, initial_guess );
 }
 
+// Boundary conditions.
+template <class>
+struct is_bc : public std::false_type
+{
+};
+template <typename MemorySpace, typename BoundaryType>
+struct is_bc<BoundaryCondition<MemorySpace, BoundaryType>>
+    : public std::true_type
+{
+};
+
 } // namespace CabanaPD
 
 #endif

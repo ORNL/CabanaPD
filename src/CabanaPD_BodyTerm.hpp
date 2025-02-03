@@ -16,6 +16,7 @@
 
 #include <Cabana_Core.hpp>
 
+#include <CabanaPD_Boundary.hpp>
 #include <CabanaPD_Timer.hpp>
 
 namespace CabanaPD
@@ -67,6 +68,10 @@ auto createBodyTerm( UserFunctor user_functor, const bool force_update,
     return BodyTerm<UserFunctor>( user_functor, force_update, update_frozen );
 }
 
+template <typename BoundaryType>
+struct is_bc<BodyTerm<BoundaryType>> : public std::true_type
+{
+};
 } // namespace CabanaPD
 
 #endif
