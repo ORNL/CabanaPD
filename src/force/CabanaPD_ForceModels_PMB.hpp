@@ -42,13 +42,15 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto forceCoeff( const double s, const double vol ) const
+    auto forceCoeff( const int, const int, const double s,
+                     const double vol ) const
     {
         return c * s * vol;
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto energy( const double s, const double xi, const double vol ) const
+    auto energy( const int, const int, const double s, const double xi,
+                 const double vol ) const
     {
         // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
         // the integrand (pairwise potential).
@@ -63,6 +65,7 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
     using base_type = ForceModel<PMB, Elastic, NoFracture>;
     using base_model = typename base_type::base_model;
     using fracture_type = Fracture;
+    using mechanics_type = Elastic;
     using thermal_type = base_type::thermal_type;
 
     using base_type::c;
@@ -80,11 +83,96 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 
+    // Constructor to work with plasticity.
+    ForceModel( const double delta, const double K, const double _G0,
+                const double _s0 )
+        : base_type( delta, K )
+        , G0( _G0 )
+        , s0( _s0 )
+    {
+        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+    }
+
     KOKKOS_INLINE_FUNCTION
     bool criticalStretch( const int, const int, const double r,
                           const double xi ) const
     {
         return r * r >= bond_break_coeff * xi * xi;
+    }
+};
+
+template <typename MemorySpace>
+struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                  TemperatureIndependent, MemorySpace>
+    : public ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>,
+      public BasePlasticity<MemorySpace>
+{
+    using base_type = ForceModel<PMB, Elastic>;
+    using base_plasticity_type = BasePlasticity<MemorySpace>;
+    using base_model = typename base_type::base_model;
+    using fracture_type = Fracture;
+    using mechanics_type = ElasticPerfectlyPlastic;
+    using thermal_type = base_type::thermal_type;
+
+    using base_type::bond_break_coeff;
+    using base_type::c;
+    using base_type::delta;
+    using base_type::G0;
+    using base_type::K;
+    using base_type::s0;
+
+    using base_plasticity_type::_s_p;
+    double s_Y;
+
+    using base_plasticity_type::updateBonds;
+
+    ForceModel( const double delta, const double K, const double G0,
+                const double sigma_y )
+        : base_type( delta, K, G0,
+                     // s0
+                     ( 5.0 * G0 / sigma_y / delta + sigma_y / K ) / 6.0 )
+        , base_plasticity_type()
+        , s_Y( sigma_y / 3.0 / K )
+    {
+    }
+
+    // FIXME: avoiding multiple inheritance.
+    KOKKOS_INLINE_FUNCTION
+    auto forceCoeff( const int i, const int n, const double s,
+                     const double vol ) const
+    {
+        // Update bond plastic stretch
+        auto s_p = _s_p( i, n );
+        // Yield in tension.
+        if ( s >= s_p + s_Y )
+            _s_p( i, n ) = s - s_Y;
+        // Yield in compression.
+        else if ( s <= s_p - s_Y )
+            _s_p( i, n ) = s + s_Y;
+        // else: Elastic (in between), do not modify.
+
+        // Must extract again if in the plastic regime.
+        s_p = _s_p( i, n );
+        return c * ( s - s_p ) * vol;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto energy( const int i, const int n, const double s, const double xi,
+                 const double vol ) const
+    {
+        auto s_p = _s_p( i, n );
+        double stretch_term;
+        // Yield in tension.
+        if ( s >= s_p + s_Y )
+            stretch_term = s_p * ( 2.0 * s - s_p );
+        // Yield in compression.
+        else if ( s <= s_p - s_Y )
+            stretch_term = s_p * ( s_p - 2.0 * s );
+        else
+            // Elastic (in between).
+            stretch_term = s * s;
+
+        return 0.25 * c * stretch_term * xi * vol;
     }
 };
 
@@ -95,6 +183,7 @@ struct ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>
     using base_type = ForceModel<PMB, Elastic, NoFracture>;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
+    using mechanics_type = Elastic;
     using thermal_type = base_type::thermal_type;
 
     using base_type::base_type;
@@ -111,6 +200,7 @@ struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
     using base_type = ForceModel<PMB>;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
+    using mechanics_type = Elastic;
     using thermal_type = base_type::thermal_type;
 
     using base_type::base_type;
@@ -157,6 +247,17 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
     }
 };
 
+template <typename ModelType, typename ParticleType>
+auto createForceModel( ModelType, ElasticPerfectlyPlastic, ParticleType,
+                       const double delta, const double K, const double G0,
+                       const double sigma_y )
+{
+    using memory_space = typename ParticleType::memory_space;
+    return ForceModel<ModelType, ElasticPerfectlyPlastic, Fracture,
+                      TemperatureIndependent, memory_space>( delta, K, G0,
+                                                             sigma_y );
+}
+
 // Default to Fracture.
 template <typename ParticleType>
 auto createForceModel( PMB model, ParticleType particles, const double delta,
@@ -187,6 +288,7 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
     using base_temperature_type = BaseTemperatureModel<TemperatureType>;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
+    using mechanics_type = Elastic;
     using thermal_type = TemperatureDependent;
 
     using base_type::c;
