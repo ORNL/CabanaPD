@@ -124,14 +124,14 @@ void compactTensionTestExample( const std::string filename )
     double v0 = inputs["pin_velocity"];
 
     // Create region for each pin.
-    CabanaPD::RegionBoundary<CabanaPD::Cylinder> cylinder1(
+    CabanaPD::Region<CabanaPD::Cylinder> cylinder1(
         0.0, R, low_corner[2], high_corner[2], x_pin, y_pin );
-    CabanaPD::RegionBoundary<CabanaPD::Cylinder> cylinder2(
+    CabanaPD::Region<CabanaPD::Cylinder> cylinder2(
         0.0, R, low_corner[2], high_corner[2], x_pin, -y_pin );
     // Create regions only for setting no-fail condition.
-    CabanaPD::RegionBoundary<CabanaPD::Cylinder> nofail_cylinder1(
+    CabanaPD::Region<CabanaPD::Cylinder> nofail_cylinder1(
         0.0, 2.0 * R, low_corner[2], high_corner[2], x_pin, y_pin );
-    CabanaPD::RegionBoundary<CabanaPD::Cylinder> nofail_cylinder2(
+    CabanaPD::Region<CabanaPD::Cylinder> nofail_cylinder2(
         0.0, 2.0 * R, low_corner[2], high_corner[2], x_pin, -y_pin );
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
@@ -167,8 +167,8 @@ void compactTensionTestExample( const std::string filename )
     //                Boundary conditions
     // ====================================================
     // Reset forces on both pins.
-    std::vector<CabanaPD::RegionBoundary<CabanaPD::Cylinder>> cylinders = {
-        cylinder1, cylinder2 };
+    std::vector<CabanaPD::Region<CabanaPD::Cylinder>> cylinders = { cylinder1,
+                                                                    cylinder2 };
     auto bc =
         createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0, exec_space{},
                                  *particles, cylinders, true );

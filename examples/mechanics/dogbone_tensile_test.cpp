@@ -155,10 +155,10 @@ void compactTensionTestExample( const std::string filename )
     double v0 = inputs["grip_velocity"];
 
     // Create region for each grip.
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> left_grip(
+    CabanaPD::Region<CabanaPD::RectangularPrism> left_grip(
         low_corner[0], low_corner[0] + 0.025, low_corner[1], high_corner[1],
         low_corner[2], high_corner[2] );
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> right_grip(
+    CabanaPD::Region<CabanaPD::RectangularPrism> right_grip(
         high_corner[0] - 0.025, high_corner[0], low_corner[1], high_corner[1],
         low_corner[2], high_corner[2] );
 
@@ -191,16 +191,25 @@ void compactTensionTestExample( const std::string filename )
     //                Boundary conditions
     // ====================================================
     // Reset forces on both grips.
-    std::vector<CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>> grips = {
+    std::vector<CabanaPD::Region<CabanaPD::RectangularPrism>> grips = {
         left_grip, right_grip };
     auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
                                        exec_space{}, *particles, grips, true );
 
     // ====================================================
+    //                      Outputs
+    // ====================================================
+
+    auto output = CabanaPD::createOutputTimeSeries(
+        CabanaPD::ForceDisplacementTag{}, "total_displacement.txt", inputs,
+        exec_space{}, *particles, right_grip );
+
+    // ====================================================
     //                   Simulation run
     // ====================================================
     cabana_pd->init();
-    cabana_pd->run( bc );
+    // cabana_pd->run( bc );
+    cabana_pd->run( bc, output );
 }
 
 // Initialize MPI+Kokkos.
