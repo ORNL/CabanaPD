@@ -129,7 +129,7 @@ class OutputTimeSeries
         _profile = profile_type( "time_output", output_steps );
     }
 
-    void operator()( const int b, double& px, double& py )
+    void operator()( const int b, double& px, double& py ) const
     {
         auto p = _indices._view( b );
         px += _output_x( p );
@@ -190,7 +190,7 @@ struct updateField
     {
     }
 
-    auto operator()( const int p )
+    auto operator()( const int p ) const
     {
         return Kokkos::sqrt( f( p, 0 ) * f( p, 0 ) + f( p, 1 ) * f( p, 1 ) +
                              f( p, 2 ) * f( p, 2 ) );
