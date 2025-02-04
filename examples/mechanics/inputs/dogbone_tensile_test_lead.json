@@ -11,9 +11,9 @@
     "horizon"                : {"value": 0.00199, "unit": "m"},   
     "yield_stress"           : {"value": 7e4, "unit": "Pa"},
     "grip_velocity"          : {"value": 0.01, "unit": "m/s"},
-    "final_time"             : {"value": 1.0, "unit": "s"},
+    "final_time"             : {"value": 5e-5, "unit": "s"},
     "timestep"               : {"value": 4.45e-7, "unit": "s"},
     "timestep_safety_factor" : {"value": 0.85},
-    "output_frequency"       : {"value": 10000},
+    "output_frequency"       : {"value": 10},
     "output_reference"       : {"value": false}
 }

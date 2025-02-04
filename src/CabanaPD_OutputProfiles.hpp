@@ -192,8 +192,10 @@ struct updateField
 
     auto operator()( const int p ) const
     {
-        return Kokkos::sqrt( f( p, 0 ) * f( p, 0 ) + f( p, 1 ) * f( p, 1 ) +
-                             f( p, 2 ) * f( p, 2 ) );
+        return f( p, 0 );
+        //    return Kokkos::sqrt( f( p, 0 ) * f( p, 0 ) + f( p, 1 ) * f( p, 1 )
+        //    +
+        //                         f( p, 2 ) * f( p, 2 ) );
     }
 };
 
