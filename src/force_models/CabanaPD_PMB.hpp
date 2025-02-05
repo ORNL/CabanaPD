@@ -229,6 +229,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     using base_type::K;
     using base_type::s0;
     using base_type::s_Y;
+    double coeff;
 
     double rho0;
     DensityType rho;
@@ -244,6 +245,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
         , rho0( _rho0 )
         , rho( _rho )
     {
+        coeff = 3.0 / pi / delta / delta / delta / delta;
     }
 
     // Fused density update using plastic dilatation.
@@ -251,11 +253,11 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
                                             const double xi, const double vol,
                                             const double ) const
     {
-        double theta_i =
-            3.0 / m_i * influenceFunction( xi ) * s * xi * xi * vol;
+        double theta_i = coeff * s * xi * vol;
 
-        // Update density using previous and current dilatation.
-        rho( i ) = rho0 * Kokkos::exp( theta_i ) / Kokkos::exp( theta_i_n );
+        // Update density using updated dilatation.
+        // Note that this assumes zero initial plastic dilatation.
+        rho( i ) = rho0 * Kokkos::exp( theta_i ); // exp(theta_i - theta_i_0)
 
         return theta_i;
     }
