@@ -653,20 +653,21 @@ void checkAnalyticalDilatation( ModelType, QuadraticTag, const double,
 {
 }
 
-template <class ForceType, class ParticleType>
+template <class ForceType, class ParticleType, class NeighborType>
 double computeEnergyAndForce( ForceType force, ParticleType& particles,
-                              const int )
+                              const NeighborType& neighbor )
 {
-    computeForce( force, particles, Cabana::SerialOpTag() );
-    double Phi = computeEnergy( force, particles, Cabana::SerialOpTag() );
+    computeForce( force, particles, neighbor );
+    double Phi = computeEnergy( force, particles, neighbor );
     return Phi;
 }
 
-template <class ForceType, class ParticleType>
-void initializeForce( ForceType& force, ParticleType& particles )
+template <class ForceType, class ParticleType, class NeighborType>
+void initializeForce( ForceType& force, ParticleType& particles,
+                      const NeighborType& neighbor )
 {
-    force.computeWeightedVolume( particles, Cabana::SerialOpTag{} );
-    force.computeDilatation( particles, Cabana::SerialOpTag{} );
+    force.computeWeightedVolume( particles, neighbor );
+    force.computeDilatation( particles, neighbor );
 }
 
 template <class ParticleType, class AoSoAType>
@@ -696,20 +697,18 @@ void testForce( ModelType model, const double dx, const double m,
 
     // This needs to exactly match the mesh spacing to compare with the single
     // particle calculation.
-    CabanaPD::Force<TEST_MEMSPACE, ModelType> force( true, particles, model );
-
+    CabanaPD::Force<TEST_MEMSPACE, ModelType> force( model );
+    CabanaPD::Neighbor<TEST_MEMSPACE, typename ModelType::fracture_type>
+        neighbor( false, model, particles );
     auto x = particles.sliceReferencePosition();
     auto f = particles.sliceForce();
     auto W = particles.sliceStrainEnergy();
     auto vol = particles.sliceVolume();
     //  No communication needed (as in the main solver) since this test is only
     //  intended for one rank.
-    initializeForce( force, particles );
+    initializeForce( force, particles, neighbor );
 
-    unsigned int max_neighbors;
-    unsigned long long total_neighbors;
-    force.getNeighborStatistics( max_neighbors, total_neighbors );
-    double Phi = computeEnergyAndForce( force, particles, max_neighbors );
+    double Phi = computeEnergyAndForce( force, particles, neighbor );
 
     // Make a copy of final results on the host
     std::size_t num_particle = x.size();

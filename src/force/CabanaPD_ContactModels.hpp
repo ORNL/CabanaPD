@@ -33,6 +33,8 @@ struct ContactModel
     ContactModel( const double _delta, const double _Rc )
         : delta( _delta )
         , Rc( _Rc ){};
+
+    void updateBonds( const int, const int ) {}
 };
 
 /* Normal repulsion */
@@ -58,6 +60,8 @@ struct NormalRepulsionModel : public ContactModel
         // This could inherit from PMB (same c)
         c = 18.0 * K / ( pi * delta * delta * delta * delta );
     }
+
+    auto cutoff() const { return Rc; }
 
     KOKKOS_INLINE_FUNCTION
     auto forceCoeff( const double r, const double vol ) const

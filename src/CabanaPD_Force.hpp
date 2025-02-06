@@ -63,6 +63,7 @@
 #include <Kokkos_Core.hpp>
 
 #include <CabanaPD_ForceModels.hpp>
+#include <CabanaPD_Neighbor.hpp>
 #include <CabanaPD_Particles.hpp>
 
 namespace CabanaPD
@@ -130,153 +131,231 @@ template <class MemorySpace, class ForceType>
 class Force;
 
 template <class MemorySpace>
-class Force<MemorySpace, BaseForceModel>
+class BaseForce
 {
-  public:
-    using neighbor_list_type =
-        Cabana::VerletList<MemorySpace, Cabana::FullNeighborTag,
-                           Cabana::VerletLayout2D, Cabana::TeamOpTag>;
-
   protected:
-    bool _half_neigh;
-    neighbor_list_type _neigh_list;
-
     Timer _timer;
     Timer _energy_timer;
 
   public:
-    // Primary constructor: use positions and construct neighbors.
-    template <class ParticleType>
-    Force( const bool half_neigh, const double delta,
-           const ParticleType& particles, const double tol = 1e-14 )
-        : _half_neigh( half_neigh )
-        , _neigh_list( neighbor_list_type(
-              particles.sliceReferencePosition(), particles.frozenOffset(),
-              particles.localOffset(), delta + tol, 1.0,
-              particles.ghost_mesh_lo, particles.ghost_mesh_hi ) )
+    // Default to no-op.
+    template <class ParticleType, class NeighborType>
+    void computeWeightedVolume( ParticleType&, const NeighborType ) const
     {
     }
-
-    // General constructor (necessary for contact, but could be used by any
-    // force routine).
-    template <class PositionType>
-    Force( const bool half_neigh, const double delta,
-           const PositionType& positions, const std::size_t frozen_offset,
-           const std::size_t local_offset, const double mesh_min[3],
-           const double mesh_max[3], const double tol = 1e-14 )
-        : _half_neigh( half_neigh )
-        , _neigh_list( neighbor_list_type( positions, frozen_offset,
-                                           local_offset, delta + tol, 1.0,
-                                           mesh_min, mesh_max ) )
+    template <class ParticleType, class NeighborType>
+    void computeDilatation( ParticleType&, const NeighborType ) const
     {
     }
-
-    // Constructor which stores existing neighbors.
-    template <class NeighborListType>
-    Force( const bool half_neigh, const NeighborListType& neighbors )
-        : _half_neigh( half_neigh )
-        , _neigh_list( neighbors )
-    {
-    }
-
-    unsigned getMaxLocalNeighbors()
-    {
-        auto neigh = _neigh_list;
-        unsigned local_max_neighbors;
-        auto neigh_max = KOKKOS_LAMBDA( const int, unsigned& max_n )
-        {
-            max_n =
-                Cabana::NeighborList<neighbor_list_type>::maxNeighbor( neigh );
-        };
-        using exec_space = typename MemorySpace::execution_space;
-        Kokkos::RangePolicy<exec_space> policy( 0, 1 );
-        Kokkos::parallel_reduce( policy, neigh_max, local_max_neighbors );
-        Kokkos::fence();
-        return local_max_neighbors;
-    }
-
-    void getNeighborStatistics( unsigned& max_neighbors,
-                                unsigned long long& total_neighbors )
-    {
-        auto neigh = _neigh_list;
-        unsigned local_max_neighbors;
-        unsigned long long local_total_neighbors;
-        auto neigh_stats = KOKKOS_LAMBDA( const int, unsigned& max_n,
-                                          unsigned long long& total_n )
-        {
-            max_n =
-                Cabana::NeighborList<neighbor_list_type>::maxNeighbor( neigh );
-            total_n = Cabana::NeighborList<neighbor_list_type>::totalNeighbor(
-                neigh );
-        };
-        using exec_space = typename MemorySpace::execution_space;
-        Kokkos::RangePolicy<exec_space> policy( 0, 1 );
-        Kokkos::parallel_reduce( policy, neigh_stats, local_max_neighbors,
-                                 local_total_neighbors );
-        Kokkos::fence();
-        MPI_Reduce( &local_max_neighbors, &max_neighbors, 1, MPI_UNSIGNED,
-                    MPI_MAX, 0, MPI_COMM_WORLD );
-        MPI_Reduce( &local_total_neighbors, &total_neighbors, 1,
-                    MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD );
-    }
-
-    // Default to no-op for pair models.
-    template <class ParticleType, class ParallelType>
-    void computeWeightedVolume( ParticleType&, const ParallelType ) const
-    {
-    }
-    template <class ParticleType, class ParallelType>
-    void computeDilatation( ParticleType&, const ParallelType ) const
-    {
-    }
-
-    auto getNeighbors() const { return _neigh_list; }
 
     auto time() { return _timer.time(); };
     auto timeEnergy() { return _energy_timer.time(); };
 };
 
-template <class MemorySpace>
-class BaseFracture
+/******************************************************************************
+  Dilatation.
+******************************************************************************/
+template <class MemorySpace, class ModelType>
+class Dilatation;
+
+template <class MemorySpace,
+          template <class, class, class, class...> class ModelType,
+          class PDModelType, class MechanicsType, class... ModelParams>
+class Dilatation<MemorySpace, ModelType<PDModelType, MechanicsType, NoFracture,
+                                        ModelParams...>>
 {
   protected:
-    using memory_space = MemorySpace;
-    using NeighborView = typename Kokkos::View<int**, memory_space>;
-    NeighborView _mu;
+    using model_type =
+        ModelType<PDModelType, MechanicsType, NoFracture, ModelParams...>;
+    model_type _model;
+
+    Timer _timer;
 
   public:
-    BaseFracture( const int local_particles, const int max_neighbors )
-    {
-        // Create View to track broken bonds.
-        // TODO: this could be optimized to ignore frozen particle bonds.
-        _mu = NeighborView(
-            Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
-            local_particles, max_neighbors );
-        Kokkos::deep_copy( _mu, 1 );
-    }
+    // Using the default exec_space.
+    using exec_space = typename MemorySpace::execution_space;
 
-    BaseFracture( NeighborView mu )
-        : _mu( mu )
+    Dilatation( const model_type model )
+        : _model( model )
     {
     }
 
-    template <class ExecSpace, class ParticleType, class PrenotchType,
-              class NeighborList>
-    void prenotch( ExecSpace exec_space, const ParticleType& particles,
-                   PrenotchType& prenotch, NeighborList& neigh_list )
+    template <class ParticleType, class NeighborType>
+    void computeWeightedVolume( ParticleType& particles,
+                                const NeighborType& neighbor )
     {
-        prenotch.create( exec_space, _mu, particles, neigh_list );
+        _timer.start();
+
+        auto x = particles.sliceReferencePosition();
+        auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        auto m = particles.sliceWeightedVolume();
+        Cabana::deep_copy( m, 0.0 );
+        auto model = _model;
+
+        auto weighted_volume = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            // Get the reference positions and displacements.
+            double xi, r, s;
+            getDistance( x, u, i, j, xi, r, s );
+            m( i ) += model.weightedVolume( xi, vol( j ) );
+        };
+        neighbor.iterate( exec_space{}, weighted_volume, particles,
+                          "CabanaPD::Dilatation::computeWeightedVolume" );
+        _timer.stop();
     }
 
-    auto getBrokenBonds() const { return _mu; }
+    template <class ParticleType, class NeighborType>
+    void computeDilatation( ParticleType& particles,
+                            const NeighborType neighbor )
+    {
+        _timer.start();
+
+        const auto x = particles.sliceReferencePosition();
+        auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        auto m = particles.sliceWeightedVolume();
+        auto theta = particles.sliceDilatation();
+        auto model = _model;
+        Cabana::deep_copy( theta, 0.0 );
+
+        auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            // Get the bond distance, displacement, and stretch.
+            double xi, r, s;
+            getDistance( x, u, i, j, xi, r, s );
+            theta( i ) += model.dilatation( i, s, xi, vol( j ), m( i ) );
+        };
+
+        neighbor.iterate( exec_space{}, dilatation, particles,
+                          "CabanaPD::Dilatation::compute" );
+
+        _timer.stop();
+    }
+
+    auto time() { return _timer.time(); };
+};
+
+template <class MemorySpace,
+          template <class, class, class, class...> class ModelType,
+          class PDModelType, class MechanicsType, class... ModelParams>
+class Dilatation<MemorySpace, ModelType<PDModelType, MechanicsType, Fracture,
+                                        ModelParams...>>
+{
+  protected:
+    using model_type =
+        ModelType<PDModelType, MechanicsType, Fracture, ModelParams...>;
+    model_type _model;
+
+    Timer _timer;
+
+  public:
+    // Using the default exec_space.
+    using exec_space = typename MemorySpace::execution_space;
+
+    Dilatation( const model_type model )
+        : _model( model )
+    {
+    }
+
+    template <class ParticleType, class NeighborType>
+    void computeWeightedVolume( ParticleType& particles,
+                                const NeighborType& neighbor )
+    {
+        _timer.start();
+
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
+
+        auto x = particles.sliceReferencePosition();
+        auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        auto m = particles.sliceWeightedVolume();
+        Cabana::deep_copy( m, 0.0 );
+        auto model = _model;
+
+        auto weighted_volume = KOKKOS_LAMBDA( const int i )
+        {
+            std::size_t num_neighbors =
+                Cabana::NeighborList<neighbor_list_type>::numNeighbor(
+                    neigh_list, i );
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            {
+                std::size_t j =
+                    Cabana::NeighborList<neighbor_list_type>::getNeighbor(
+                        neigh_list, i, n );
+
+                // Get the reference positions and displacements.
+                double xi, r, s;
+                getDistance( x, u, i, j, xi, r, s );
+                // mu is included to account for bond breaking.
+                m( i ) += mu( i, n ) * model.weightedVolume( xi, vol( j ) );
+            }
+        };
+
+        neighbor.iterateLinear( exec_space{}, weighted_volume, particles,
+                                "CabanaPD::Dilatation::computeWeightedVolume" );
+
+        _timer.stop();
+    }
+
+    template <class ParticleType, class NeighborType>
+    void computeDilatation( ParticleType& particles,
+                            const NeighborType& neighbor )
+    {
+        _timer.start();
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
+
+        const auto x = particles.sliceReferencePosition();
+        auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        auto m = particles.sliceWeightedVolume();
+        auto theta = particles.sliceDilatation();
+        auto model = _model;
+
+        Cabana::deep_copy( theta, 0.0 );
+
+        auto dilatation = KOKKOS_LAMBDA( const int i )
+        {
+            std::size_t num_neighbors =
+                Cabana::NeighborList<neighbor_list_type>::numNeighbor(
+                    neigh_list, i );
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            {
+                std::size_t j =
+                    Cabana::NeighborList<neighbor_list_type>::getNeighbor(
+                        neigh_list, i, n );
+
+                // Get the bond distance, displacement, and stretch.
+                double xi, r, s;
+                getDistance( x, u, i, j, xi, r, s );
+
+                // Check if all bonds are broken (m=0) to avoid dividing by
+                // zero. Alternatively, one could check if this bond mu(i,n) is
+                // broken, because m=0 only occurs when all bonds are broken.
+                // mu is still included to account for individual bond breaking.
+                if ( m( i ) > 0 )
+                    theta( i ) += mu( i, n ) * model.dilatation(
+                                                   i, s, xi, vol( j ), m( i ) );
+            }
+        };
+
+        neighbor.iterateLinear( exec_space{}, dilatation, particles,
+                                "CabanaPD::Dilatation::compute" );
+
+        _timer.stop();
+    }
 };
 
 /******************************************************************************
   Force free functions.
 ******************************************************************************/
-template <class ForceType, class ParticleType, class ParallelType>
+template <class ForceType, class ParticleType, class NeighborType>
 void computeForce( ForceType& force, ParticleType& particles,
-                   const ParallelType& neigh_op_tag, const bool reset = true )
+                   NeighborType& neighbor, const bool reset = true )
 {
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
@@ -293,16 +372,16 @@ void computeForce( ForceType& force, ParticleType& particles,
     //                    neigh_op_tag );
 
     // Forces only atomic if using team threading.
-    if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
-        force.computeForceFull( f_a, x, u, particles, neigh_op_tag );
+    if ( std::is_same<typename NeighborType::Tag, Cabana::TeamOpTag>::value )
+        force.computeForceFull( f_a, x, u, particles, neighbor );
     else
-        force.computeForceFull( f, x, u, particles, neigh_op_tag );
+        force.computeForceFull( f, x, u, particles, neighbor );
     Kokkos::fence();
 }
 
-template <class ForceType, class ParticleType, class ParallelType>
+template <class ForceType, class ParticleType, class NeighborType>
 double computeEnergy( ForceType& force, ParticleType& particles,
-                      const ParallelType& neigh_op_tag )
+                      const NeighborType& neighbor )
 {
     double energy = 0.0;
     if constexpr ( is_energy_output<typename ParticleType::output_type>::value )
@@ -320,7 +399,7 @@ double computeEnergy( ForceType& force, ParticleType& particles,
         //    energy = computeEnergy_half( force, x, u,
         //                                   neigh_op_tag );
         // else
-        energy = force.computeEnergyFull( W, x, u, particles, neigh_op_tag );
+        energy = force.computeEnergyFull( W, x, u, particles, neighbor );
         Kokkos::fence();
     }
     return energy;
