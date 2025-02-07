@@ -69,7 +69,12 @@ struct Region<RectangularPrism>
         , low_y( _low_y )
         , high_y( _high_y )
         , low_z( _low_z )
-        , high_z( _high_z ) {};
+        , high_z( _high_z )
+    {
+        assert( low_x < high_x );
+        assert( low_y < high_y );
+        assert( low_z < high_z );
+    }
 
     template <class ArrayType>
     Region( const ArrayType _low, const ArrayType _high )
@@ -78,7 +83,12 @@ struct Region<RectangularPrism>
         , low_y( _low[1] )
         , high_y( _high[1] )
         , low_z( _low[2] )
-        , high_z( _high[2] ){};
+        , high_z( _high[2] )
+    {
+        assert( low_x < high_x );
+        assert( low_y < high_y );
+        assert( low_z < high_z );
+    }
 
     template <class PositionType>
     KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
@@ -109,7 +119,11 @@ struct Region<Cylinder>
         , low_z( _low_z )
         , high_z( _high_z )
         , x_center( _x_center )
-        , y_center( _y_center ) {};
+        , y_center( _y_center )
+    {
+        assert( radius_in < _radius_out );
+        assert( low_z < high_z );
+    }
 
     template <class PositionType>
     KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
