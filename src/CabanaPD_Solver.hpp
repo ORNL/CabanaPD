@@ -521,7 +521,7 @@ class Solver
     void final_output( OutputType region_output )
     {
         final_output();
-        region_output.print( comm->rank() );
+        region_output.print( particles->comm() );
     }
 
     int num_steps;

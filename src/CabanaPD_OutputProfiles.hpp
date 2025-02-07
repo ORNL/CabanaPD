@@ -100,16 +100,17 @@ template <typename MemorySpace, typename FunctorTypeX, typename FunctorTypeY>
 class OutputTimeSeries
 {
     using memory_space = MemorySpace;
-    using profile_type = Kokkos::View<double* [2], memory_space>;
+    using profile_type = Kokkos::View<double*, memory_space>;
 
     using steering_vector_type = ParticleSteeringVector<MemorySpace>;
     steering_vector_type _indices;
 
     std::string file_name;
-    profile_type _profile;
+    profile_type _profile_x;
+    profile_type _profile_y;
     FunctorTypeX _output_x;
     FunctorTypeY _output_y;
-    int index;
+    std::size_t index;
 
   public:
     OutputTimeSeries( std::string name, Inputs inputs,
@@ -126,7 +127,8 @@ class OutputTimeSeries
         double freq = inputs["output_frequency"];
         int output_steps = static_cast<int>( time / dt / freq );
         // Purposely using zero-init here.
-        _profile = profile_type( "time_output", output_steps );
+        _profile_x = profile_type( "time_output_x", output_steps );
+        _profile_y = profile_type( "time_output_y", output_steps );
     }
 
     void operator()( const int b, double& px, double& py ) const
@@ -141,20 +143,33 @@ class OutputTimeSeries
         Kokkos::RangePolicy<typename memory_space::execution_space> policy(
             0, _indices.size() );
         Kokkos::parallel_reduce( "time_series", policy, *this,
-                                 _profile( index, 0 ), _profile( index, 1 ) );
+                                 _profile_x( index ), _profile_y( index ) );
         index++;
     }
 
-    void print( int rank )
+    void print( MPI_Comm comm )
     {
-        std::fstream fout;
-        fout.open( file_name, std::ios::app );
-        auto profile_host = Kokkos::create_mirror_view_and_copy(
-            Kokkos::HostSpace{}, _profile );
-        for ( std::size_t t = 0; t < profile_host.extent( 0 ); t++ )
+        auto profile_x_host = Kokkos::create_mirror_view_and_copy(
+            Kokkos::HostSpace{}, _profile_x );
+        MPI_Allreduce( MPI_IN_PLACE, profile_x_host.data(),
+                       profile_x_host.size(), MPI_DOUBLE, MPI_SUM, comm );
+        auto profile_y_host = Kokkos::create_mirror_view_and_copy(
+            Kokkos::HostSpace{}, _profile_y );
+        MPI_Allreduce( MPI_IN_PLACE, profile_y_host.data(),
+                       profile_y_host.size(), MPI_DOUBLE, MPI_SUM, comm );
+        auto num_particles = static_cast<int>( _indices.size() );
+        MPI_Allreduce( MPI_IN_PLACE, &num_particles, 1, MPI_INT, MPI_SUM,
+                       comm );
+
+        if ( print_rank() )
         {
-            fout << rank << " " << profile_host( t, 0 ) / _indices.size() << " "
-                 << profile_host( t, 1 ) / _indices.size() << std::endl;
+            std::fstream fout;
+            fout.open( file_name, std::ios::app );
+            for ( std::size_t t = 0; t < index; t++ )
+            {
+                fout << profile_x_host( t ) / num_particles << " "
+                     << profile_y_host( t ) / num_particles << std::endl;
+            }
         }
     }
 };
