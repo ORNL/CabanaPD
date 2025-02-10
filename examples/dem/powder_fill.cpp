@@ -147,8 +147,7 @@ void powderSettlingExample( const std::string filename )
                                             particles->localOffset() );
     Kokkos::parallel_reduce( "remove", policy, remove_functor,
                              Kokkos::Sum<int>( num_keep ) );
-    cabana_pd->particles->remove( num_keep, keep );
-    // FIXME: Will need to rebuild ghosts.
+    cabana_pd->remove( num_keep, keep );
 
     // ====================================================
     //                   Boundary condition

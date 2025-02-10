@@ -452,9 +452,10 @@ class Comm<ParticleType, Contact, TemperatureIndependent>
         auto topology = Cabana::Grid::getTopology( *particles.local_grid );
         // FIXME: missing a build() interface
         halo = std::make_shared<halo_type>(
-            particles.local_grid->globalGrid().comm(), particles.n_reference,
-            halo_ids._ids, halo_ids._destinations, topology );
-        particles.resize( particles.n_local, particles.n_ghost, false,
+            particles.local_grid->globalGrid().comm(),
+            particles.referenceOffset(), halo_ids._ids, halo_ids._destinations,
+            topology );
+        particles.resize( particles.localOffset(), particles.numGhost(), false,
                           halo->numGhost() );
 
         gather_u->reserve( *halo, particles._aosoa_u );

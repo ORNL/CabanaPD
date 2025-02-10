@@ -373,10 +373,10 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             return create;
         };
         // Fence inside create.
-        auto local_created = Cabana::Grid::createParticles(
+        auto local_current = Cabana::Grid::createParticles(
             init_type, exec_space, create_functor, _plist_x, particles_per_cell,
             *local_grid, num_previous, false );
-        resize( local_created, 0, create_frozen );
+        resize( local_current, 0, create_frozen );
 
         updateGlobal();
         _init_timer.stop();
@@ -469,6 +469,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     auto localOffset() const { return local_offset; }
     auto numGhost() const { return num_ghost; }
     auto referenceOffset() const { return reference_offset; }
+    auto numContactGhost() const { return num_contact_ghost; }
     auto totalSize() const { return size; }
     auto numGlobal() const { return num_global; }
 
@@ -571,7 +572,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             assert( create_frozen == false );
 
         if ( create_frozen )
-            frozen_offset = size;
+            frozen_offset = new_local;
         local_offset = new_local;
         num_ghost = new_ghost;
         reference_offset = new_local + new_ghost;
