@@ -370,6 +370,8 @@ class Comm<ParticleType, PMB, TemperatureDependent>
     using base_type = Comm<ParticleType, PMB, TemperatureIndependent>;
     using memory_space = typename base_type::memory_space;
     using halo_type = typename base_type::halo_type;
+    using base_type::_init_timer;
+    using base_type::_timer;
     using base_type::halo;
 
     using gather_temp_type =
@@ -379,12 +381,19 @@ class Comm<ParticleType, PMB, TemperatureDependent>
     Comm( ParticleType& particles, int max_export_guess = 100 )
         : base_type( particles, max_export_guess )
     {
+        _init_timer.start();
         gather_temp =
             std::make_shared<gather_temp_type>( *halo, particles._aosoa_temp );
         particles.resize( halo->numLocal(), halo->numGhost() );
+        _init_timer.stop();
     }
 
-    void gatherTemperature() { gather_temp->apply(); }
+    void gatherTemperature()
+    {
+        _timer.start();
+        gather_temp->apply();
+        _timer.stop();
+    }
 };
 
 // Does not inherit because it does not use the same reference halo
@@ -418,6 +427,7 @@ class Comm<ParticleType, Contact, TemperatureIndependent>
               *( particles.local_grid ), particles.sliceCurrentPosition(),
               halo_width, max_export_guess ) )
     {
+        _init_timer.start();
         auto topology = Cabana::Grid::getTopology( *particles.local_grid );
         halo = std::make_shared<halo_type>(
             particles.local_grid->globalGrid().comm(),
@@ -440,12 +450,15 @@ class Comm<ParticleType, Contact, TemperatureIndependent>
         gather_u->apply();
         gather_x->apply();
         gather_vol->apply();
+
+        _init_timer.stop();
     }
 
     // This is a dynamic gather step where the steering vector needs to be
     // recomputed.
     void gather( ParticleType& particles )
     {
+        _timer.start();
         // Get the current position. Note this is necessary to get the up to
         // date current position.
         auto y = particles.sliceCurrentPosition();
@@ -468,7 +481,15 @@ class Comm<ParticleType, Contact, TemperatureIndependent>
         gather_x->apply();
         gather_vol->reserve( *halo, particles._aosoa_vol );
         gather_vol->apply();
+        _timer.stop();
     }
+
+    auto timeInit() { return _init_timer.time(); };
+    auto time() { return _timer.time(); };
+
+  protected:
+    Timer _init_timer;
+    Timer _timer;
 };
 
 } // namespace CabanaPD

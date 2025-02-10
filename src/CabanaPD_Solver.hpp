@@ -437,9 +437,10 @@ class Solver
                       integrator->timeInit() + boundary_init_time;
         log( out, "Init-Time(s): ", _init_time );
         log( out, "Init-Neighbor-Time(s): ", _neighbor_timer.time(), "\n" );
-        log( out, "#Timestep/Total-steps Simulation-time Total-strain-energy "
-                  "Step-Time(s) Force-Time(s) Comm-Time(s) Integrate-Time(s) "
-                  "Energy-Time(s) Output-Time(s) Particle*steps/s" );
+        log( out,
+             "#Timestep/Total-steps Simulation-time Total-strain-energy "
+             "Step-Time(s) Force-Time(s) Comm-Time(s) Integrate-Time(s) "
+             "Energy-Time(s) Output-Time(s) Neigh-Time(s) Particle*steps/s" );
     }
 
     void step_output( const int step, const double W )
@@ -454,6 +455,7 @@ class Solver
             double comm_time = comm->time();
             double integrate_time = integrator->time();
             double force_time = force->time();
+            double neigh_time = force->neighTime();
             double energy_time = force->timeEnergy();
             double output_time = particles->timeOutput();
             _total_time += step_time;
@@ -464,7 +466,7 @@ class Solver
                  " ", std::scientific, std::setprecision( 2 ), step * dt, " ",
                  W, " ", std::fixed, _total_time, " ", force_time, " ",
                  comm_time, " ", integrate_time, " ", energy_time, " ",
-                 output_time, " ", std::scientific, rate );
+                 output_time, " ", neigh_time, " ", std::scientific, rate );
             out.close();
         }
     }
