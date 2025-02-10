@@ -37,34 +37,31 @@ void fiberReinforcedCompositeExample( const std::string filename )
     // ====================================================
     //                Material parameters
     // ====================================================
-
-    // FIXME: We need to modify CabanaPD_Inputs.hpp, so that we can use arrays
-    // for density and elastic_modulus in the JSON file.
-    //        We use "density_temp" and "elastic_modulus_temp" as placeholders.
-
     // Matrix material
-    double rho0_m = inputs["density_temp"][0];
-    double E_m = inputs["elastic_modulus_temp"][0];
+    double rho0_m = inputs["density"][0];
+    double E_m = inputs["elastic_modulus"][0];
     double nu_m = 1.0 / 3.0;
     double K_m = E_m / ( 3.0 * ( 1.0 - 2.0 * nu_m ) );
-    double G0_m = inputs["fracture_energy"][0];
+    double G0_m = inputs["fracture_energy_matrix"];
     // double G_m = E_m / ( 2.0 * ( 1.0 + nu_m ) ); // Only for LPS.
 
-    // Fiber material
-    double rho0_f = inputs["density_temp"][1];
-    double E_f = inputs["elastic_modulus_temp"][1];
-    double nu_f = 1.0 / 3.0;
-    double K_f = E_f / ( 3.0 * ( 1.0 - 2.0 * nu_f ) );
-    double G0_f = inputs["fracture_energy"][1];
-    // double G_f = E_f / ( 2.0 * ( 1.0 + nu_f ) ); // Only for LPS.
-
+    // Read horizon first because it is needed to compute the fiber fracture
+    // energy.
     double delta = inputs["horizon"];
     delta += 1e-10;
+
+    // Fiber material
+    double rho0_f = inputs["density"][1];
+    double E_f = inputs["elastic_modulus"][1];
+    double nu_f = 1.0 / 3.0;
+    double K_f = E_f / ( 3.0 * ( 1.0 - 2.0 * nu_f ) );
+    double sc_f = inputs["critical_stretch_fiber"];
+    double G0_f = 9 * K_f * delta * ( sc_f * sc_f ) / 5;
+    // double G_f = E_f / ( 2.0 * ( 1.0 + nu_f ) ); // Only for LPS.
 
     // ====================================================
     //                  Discretization
     // ====================================================
-    // FIXME: set halo width based on delta
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
