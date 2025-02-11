@@ -171,7 +171,7 @@ struct ForceModels
         if constexpr ( N + 1 < std::tuple_size_v<tuple_type> )
             return apply<N + 1>( t, tag, std::forward<Args>( args )... );
         else
-            throw std::runtime_error( "Invalid model index." );
+            Kokkos::abort( "Invalid model index." );
     }
 
     auto horizon( const int ) { return delta; }
