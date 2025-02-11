@@ -181,8 +181,6 @@ class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, Fracture,
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
 
-                model.thermalStretch( s, i, j );
-
                 // Only include unbroken bonds.
                 if ( mu( i, n ) > 0 )
                 {
