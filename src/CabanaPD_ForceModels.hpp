@@ -41,8 +41,6 @@ struct BaseForceModel
 
 struct BaseFractureModel
 {
-    using material_type = SingleMaterial;
-
     double G0;
     double s0;
     double bond_break_coeff;
@@ -222,8 +220,6 @@ auto createMultiForceModel( ParticleType particles, AverageTag,
 template <typename TemperatureType>
 struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
 {
-    using material_type = SingleMaterial;
-
     double alpha;
     double temp0;
 
