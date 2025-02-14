@@ -41,7 +41,7 @@ jobs:
             cmake_build_type: 'Debug'
             kokkos_ver: '4.1.00'
             output: 'BOTH'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     container: ghcr.io/ecp-copa/ci-containers/${{ matrix.distro }}
     steps:
       - name: Checkout kokkos
@@ -119,7 +119,7 @@ jobs:
         cmake_build_type: ['Release']
         # Using >4.1 because of kokkos build error without available device
         kokkos_ver: ['4.2.01']
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     container: ghcr.io/ecp-copa/ci-containers/rocm:latest
     steps:
       - name: Checkout json
@@ -200,7 +200,7 @@ jobs:
       matrix:
         cmake_build_type: ['Release']
         kokkos_ver: ['4.1.00']
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     container: ghcr.io/ecp-copa/ci-containers/cuda:12.2.0
     steps:
       - name: Checkout json
