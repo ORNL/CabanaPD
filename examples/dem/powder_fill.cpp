@@ -143,7 +143,25 @@ void powderSettlingExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
+    solver.updateNeighbors();
     solver.run( gravity );
+
+    // ====================================================
+    // Interpolate for consolidation
+    // ====================================================
+    // Do this first to get the coarser grid.
+    std::array<int, 3> coarse_cells{ num_cells[0] / 2, num_cells[1] / 2,
+                                     num_cells[2] / 2 };
+    CabanaPD::Particles pd_particles(
+        memory_space{}, model_type{}, CabanaPD::BaseOutput{}, low_corner,
+        high_corner, coarse_cells, halo_width, create_powder, exec_space{} );
+    // FIXME: missing container.
+
+    CabanaPD::interpolate( solver.particles, pd_particles );
+
+    // Output
+    std::string name = "particles_pd";
+    pd_particles.output( name, 0, 0.0, true );
 }
 
 // Initialize MPI+Kokkos.
