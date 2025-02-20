@@ -69,14 +69,14 @@
 
 namespace CabanaPD
 {
-template <class MemorySpace>
-class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
-    : public Force<MemorySpace, BaseForceModel>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, LPS, NoFracture>
+    : public BaseForce<MemorySpace>
 {
   protected:
-    using base_type = Force<MemorySpace, BaseForceModel>;
+    using base_type = BaseForce<MemorySpace>;
     using base_type::_half_neigh;
-    using model_type = ForceModel<LPS, Elastic, NoFracture>;
+    using model_type = ModelType;
     model_type _model;
 
     using base_type::_energy_timer;
@@ -179,8 +179,9 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-            const double coeff = model.forceCoeff(
-                s, xi, vol( j ), m( i ), m( j ), theta( i ), theta( j ) );
+            const double coeff =
+                model( ForceCoeffTag{}, i, j, s, xi, vol( j ), m( i ), m( j ),
+                       theta( i ), theta( j ) );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -224,8 +225,8 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
                 Cabana::NeighborList<neighbor_list_type>::numNeighbor(
                     neigh_list, i ) );
 
-            double w = model.energy( s, xi, vol( j ), m( i ), theta( i ),
-                                     num_neighbors );
+            double w = model( EnergyTag{}, i, j, s, xi, vol( j ), m( i ),
+                              theta( i ), num_neighbors );
             W( i ) += w;
             Phi += w * vol( i );
         };
@@ -242,23 +243,19 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
         _energy_timer.stop();
         return strain_energy;
     }
-
-    auto time() { return _timer.time(); };
-    auto timeEnergy() { return _energy_timer.time(); };
 };
 
-template <class MemorySpace>
-class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
-    : public Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>,
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, LPS, Fracture>
+    : public Force<MemorySpace, ModelType, LPS, NoFracture>,
       public BaseFracture<MemorySpace>
 {
   protected:
+    using base_type = Force<MemorySpace, ModelType, LPS, NoFracture>;
+    using base_type::_half_neigh;
     using fracture_type = BaseFracture<MemorySpace>;
     using fracture_type::_mu;
-
-    using base_type = Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>;
-    using base_type::_half_neigh;
-    using model_type = ForceModel<LPS, Elastic, Fracture>;
+    using model_type = ModelType;
     model_type _model;
 
     using base_type::_energy_timer;
@@ -383,7 +380,6 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
     {
         _timer.start();
 
-        auto break_coeff = _model.bond_break_coeff;
         auto model = _model;
         auto neigh_list = _neigh_list;
         auto mu = _mu;
@@ -413,8 +409,8 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
                 getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
                 // Break if beyond critical stretch unless in no-fail zone.
-                if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
-                     !nofail( i ) )
+                if ( model( CriticalStretchTag{}, i, j, r, xi ) &&
+                     !nofail( i ) && !nofail( i ) )
                 {
                     mu( i, n ) = 0;
                 }
@@ -424,8 +420,8 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
                 else if ( mu( i, n ) > 0 )
                 {
                     const double coeff =
-                        model.forceCoeff( s, xi, vol( j ), m( i ), m( j ),
-                                          theta( i ), theta( j ) );
+                        model( ForceCoeffTag{}, i, j, s, xi, vol( j ), m( i ),
+                               m( j ), theta( i ), theta( j ) );
                     double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;
                     fy_i = muij * coeff * ry / r;
@@ -482,8 +478,9 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
 
-                double w = mu( i, n ) * model.energy( s, xi, vol( j ), m( i ),
-                                                      theta( i ), num_bonds );
+                double w =
+                    mu( i, n ) * model( EnergyTag{}, i, j, s, xi, vol( j ),
+                                        m( i ), theta( i ), num_bonds );
                 W( i ) += w;
 
                 phi_i += mu( i, n ) * vol( j );
@@ -504,13 +501,13 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
     }
 };
 
-template <class MemorySpace>
-class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
-    : public Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
+    : public Force<MemorySpace, ModelType, LPS, NoFracture>
 {
   protected:
-    using base_type = Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>;
-    using model_type = ForceModel<LinearLPS, Elastic, NoFracture>;
+    using base_type = Force<MemorySpace, ModelType, LPS, NoFracture>;
+    using model_type = ModelType;
     model_type _model;
 
     using base_type::_energy_timer;
@@ -557,8 +554,8 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
                                              xi_y, xi_z );
 
             const double coeff =
-                model.forceCoeff( linear_s, xi, vol( j ), m( i ), m( j ),
-                                  theta( i ), theta( j ) );
+                model( ForceCoeffTag{}, i, j, linear_s, xi, vol( j ), m( i ),
+                       m( j ), theta( i ), theta( j ) );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
             fz_i = coeff * xi_z / xi;
@@ -603,8 +600,8 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
                 Cabana::NeighborList<neighbor_list_type>::numNeighbor(
                     neigh_list, i ) );
 
-            double w = model.energy( linear_s, xi, vol( j ), m( i ), theta( i ),
-                                     num_neighbors );
+            double w = model( EnergyTag{}, i, j, linear_s, xi, vol( j ), m( i ),
+                              theta( i ), num_neighbors );
             W( i ) += w;
             Phi += w * vol( i );
         };

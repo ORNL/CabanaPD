@@ -23,9 +23,11 @@ namespace CabanaPD
 struct HertzianModel : public ContactModel
 {
     // FIXME: This is for use as the primary force model.
+    using model_type = HertzianModel;
     using base_model = PMB;
     using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
+    using material_type = SingleMaterial;
 
     using ContactModel::Rc; // Contact horizon (should be > 2*radius)
 

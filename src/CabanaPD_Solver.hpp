@@ -96,16 +96,26 @@ class Solver
     using particle_type = ParticleType;
     using integrator_type = Integrator<exec_space>;
     using force_model_type = ForceModelType;
-    using force_type = Force<memory_space, force_model_type>;
-    using comm_type = Comm<particle_type, typename force_model_type::base_model,
-                           typename particle_type::thermal_type>;
+    using force_model_tag = typename force_model_type::model_type;
+    using force_fracture_type = typename force_model_type::fracture_type;
+    using force_type = Force<memory_space, force_model_type, force_model_tag,
+                             force_fracture_type>;
+    using force_thermal_type =
+        typename force_model_type::thermal_type::base_type;
+    using comm_type =
+        Comm<particle_type, typename force_model_type::base_model,
+             typename force_model_type::material_type, force_thermal_type>;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using input_type = InputType;
 
     // Optional module types.
     using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
-    using contact_type = Force<memory_space, ContactModelType>;
     using contact_model_type = ContactModelType;
+    using contact_model_tag = typename contact_model_type::model_type;
+    using contact_base_model_type = typename contact_model_type::base_model;
+    using contact_fracture_type = typename contact_model_type::fracture_type;
+    using contact_type = Force<memory_space, contact_model_type,
+                               contact_model_tag, contact_fracture_type>;
 
     Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
             force_model_type force_model )
@@ -152,6 +162,10 @@ class Solver
                     "Contact with MPI is currently disabled." );
         }
 
+        // Update optional property ghost sizes if needed.
+        if constexpr ( std::is_same<typename force_model_type::material_type,
+                                    MultiMaterial>::value )
+            force_model.update( particles->sliceType() );
         // Update temperature ghost size if needed.
         if constexpr ( is_temperature_dependent<
                            typename force_model_type::thermal_type>::value )
@@ -232,7 +246,10 @@ class Solver
         if ( !boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space(), *particles, 0.0 );
 
-        // Communicate temperature.
+        // Communicate optional properties.
+        if constexpr ( std::is_same<typename force_model_type::material_type,
+                                    MultiMaterial>::value )
+            comm->gatherMaterial();
         if constexpr ( is_temperature_dependent<
                            typename force_model_type::thermal_type>::value )
             comm->gatherTemperature();
@@ -281,6 +298,12 @@ class Solver
 
             // Update ghost particles.
             comm->gatherDisplacement();
+
+            // Communicate optional type.
+            if constexpr ( std::is_same<
+                               typename force_model_type::material_type,
+                               MultiMaterial>::value )
+                comm->gatherMaterial();
 
             if constexpr ( is_heat_transfer<
                                typename force_model_type::thermal_type>::value )
@@ -333,6 +356,12 @@ class Solver
 
             // Update ghost particles.
             comm->gatherDisplacement();
+
+            // Communicate optional properties.
+            if constexpr ( std::is_same<
+                               typename force_model_type::material_type,
+                               MultiMaterial>::value )
+                comm->gatherMaterial();
 
             // Compute internal forces.
             updateForce();
