@@ -64,13 +64,9 @@ void compactTensionTestExample( const std::string filename )
     // ====================================================
     //    Custom particle generation and initialization
     // ====================================================
-    double LO = inputs["system_size"][0]; // Length overall
-    double WO = inputs["system_size"][1]; // Width overall
-    double T = inputs["system_size"][2];  // Thickness
     double G = inputs["gage_length"];
     double W = inputs["width_narrow_section"];
     double R = inputs["fillet_radius"];
-    double D = inputs["distance_between_grips"];
 
     // Do not create particles outside dogbone tensile test specimen region
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
