@@ -143,6 +143,7 @@ class Force<MemorySpace, BaseForceModel>
 
     Timer _timer;
     Timer _energy_timer;
+    Timer _stress_timer;
 
   public:
     // Primary constructor: use positions and construct neighbors.
@@ -324,6 +325,22 @@ double computeEnergy( ForceType& force, ParticleType& particles,
         Kokkos::fence();
     }
     return energy;
+}
+
+template <class ForceType, class ParticleType, class ParallelType>
+void computeStress( ForceType& force, ParticleType& particles,
+                    const ParallelType& neigh_op_tag )
+{
+    if constexpr ( is_stress_output<typename ParticleType::output_type>::value )
+    {
+        auto stress = particles.sliceStress();
+
+        // Reset stress.
+        Cabana::deep_copy( stress, 0.0 );
+
+        force.computeStressFull( particles, neigh_op_tag );
+        Kokkos::fence();
+    }
 }
 
 } // namespace CabanaPD
