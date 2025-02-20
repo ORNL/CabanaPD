@@ -67,6 +67,7 @@ void thermalCrackExample( const std::string filename )
     // ====================================================
     using model_type = CabanaPD::PMB;
     using thermal_type = CabanaPD::TemperatureDependent;
+    using mechanics_type = CabanaPD::ElasticPerfectlyPlastic;
 
     // ====================================================
     //                 Particle generation
@@ -86,9 +87,10 @@ void thermalCrackExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    auto force_model =
-        CabanaPD::createForceModel( model_type{}, CabanaPD::Fracture{},
-                                    *particles, delta, K, G0, alpha, temp0 );
+    double sigma_y = 0.0;
+    auto force_model = CabanaPD::createForceModel(
+        model_type{}, mechanics_type{}, CabanaPD::Fracture{}, *particles, delta,
+        K, G0, sigma_y, alpha, temp0 );
 
     // ====================================================
     //                   Create solver
