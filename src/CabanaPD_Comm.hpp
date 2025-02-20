@@ -254,8 +254,8 @@ class Comm<ParticleType, PMB, TemperatureIndependent>
     {
         _init_timer.start();
         auto local_grid = particles.local_grid;
-        MPI_Comm_size( local_grid->globalGrid().comm(), &mpi_size );
-        MPI_Comm_rank( local_grid->globalGrid().comm(), &mpi_rank );
+        mpi_size = local_grid->globalGrid().totalNumBlock();
+        mpi_rank = local_grid->globalGrid().blockId();
 
         auto positions = particles.sliceReferencePosition();
         // Get all 26 neighbor ranks.
