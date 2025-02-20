@@ -26,47 +26,28 @@ namespace CabanaPD
   Normal repulsion forces
 ******************************************************************************/
 template <class MemorySpace>
-class Force<MemorySpace, HertzianModel>
-    : public Force<MemorySpace, BaseForceModel>
+class Force<MemorySpace, HertzianModel> : public BaseForce<MemorySpace>
 {
   public:
-    using base_type = Force<MemorySpace, BaseForceModel>;
-    using neighbor_list_type = typename base_type::neighbor_list_type;
+    using base_type = BaseForce<MemorySpace>;
 
-    template <class ParticleType>
-    Force( const bool half_neigh, const ParticleType& particles,
-           const HertzianModel model )
-        : base_type( half_neigh, model.Rc, particles.sliceCurrentPosition(),
-                     particles.frozenOffset(), particles.localOffset(),
-                     particles.ghost_mesh_lo, particles.ghost_mesh_hi )
-        , _model( model )
+    Force( const HertzianModel model )
+        : _model( model )
     {
-        for ( int d = 0; d < particles.dim; d++ )
-        {
-            mesh_min[d] = particles.ghost_mesh_lo[d];
-            mesh_max[d] = particles.ghost_mesh_hi[d];
-        }
     }
 
     template <class ForceType, class PosType, class ParticleType,
-              class ParallelType>
+              class NeighborType>
     void computeForceFull( ForceType& fc, const PosType& x, const PosType& u,
-                           const ParticleType& particles,
-                           ParallelType& neigh_op_tag )
+                           ParticleType& particles, NeighborType& neighbor )
     {
-        const int n_frozen = particles.frozenOffset();
-        const int n_local = particles.localOffset();
-
         auto model = _model;
         const auto vol = particles.sliceVolume();
         const auto rho = particles.sliceDensity();
         const auto y = particles.sliceCurrentPosition();
         const auto vel = particles.sliceVelocity();
 
-        _neigh_timer.start();
-        _neigh_list.build( y, n_frozen, n_local, model.Rc, 1.0, mesh_min,
-                           mesh_max );
-        _neigh_timer.stop();
+        neighbor.update( particles, model.Rc );
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -89,11 +70,8 @@ class Force<MemorySpace, HertzianModel>
 
         // FIXME: using default space for now.
         using exec_space = typename MemorySpace::execution_space;
-        Kokkos::RangePolicy<exec_space> policy( n_frozen, n_local );
-        Cabana::neighbor_parallel_for(
-            policy, contact_full, _neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::Contact::compute_full" );
-
+        neighbor.iterate( exec_space{}, contact_full, particles,
+                          "CabanaPD::Hertzian::compute" );
         _timer.stop();
     }
 
@@ -108,13 +86,7 @@ class Force<MemorySpace, HertzianModel>
 
   protected:
     HertzianModel _model;
-    using base_type::_half_neigh;
-    using base_type::_neigh_list;
     using base_type::_timer;
-    Timer _neigh_timer;
-
-    double mesh_max[3];
-    double mesh_min[3];
 };
 
 } // namespace CabanaPD

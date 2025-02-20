@@ -35,6 +35,15 @@ struct is_fracture<Fracture> : public std::true_type
 // Mechanics tags.
 struct Elastic
 {
+    using base_type = Elastic;
+};
+struct Plastic
+{
+    using base_type = Plastic;
+};
+struct ElasticPerfectlyPlastic
+{
+    using base_type = Plastic;
 };
 
 // Contact and DEM (contact without PD) tags.
@@ -82,6 +91,22 @@ template <>
 struct is_heat_transfer<DynamicTemperature> : public std::true_type
 {
 };
+template <class>
+struct is_temperature : public std::false_type
+{
+};
+template <>
+struct is_temperature<TemperatureIndependent> : public std::true_type
+{
+};
+template <>
+struct is_temperature<TemperatureDependent> : public std::true_type
+{
+};
+template <>
+struct is_temperature<DynamicTemperature> : public std::true_type
+{
+};
 
 // Force model tags.
 struct PMB
@@ -123,6 +148,10 @@ struct is_energy_output : public std::false_type
 };
 template <>
 struct is_energy_output<EnergyOutput> : public std::true_type
+{
+};
+
+struct DynamicDensity
 {
 };
 

@@ -57,6 +57,8 @@ struct HertzianModel : public ContactModel
         coeff_h_d = -2.0 * Kokkos::sqrt( 5.0 / 6.0 ) * beta;
     }
 
+    auto cutoff() const { return Rc; }
+
     KOKKOS_INLINE_FUNCTION
     auto forceCoeff( const double r, const double vn, const double vol,
                      const double rho ) const

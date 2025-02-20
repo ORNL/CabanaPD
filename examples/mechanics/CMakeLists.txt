@@ -13,4 +13,7 @@ target_link_libraries(FragmentingCylinder LINK_PUBLIC CabanaPD)
 add_executable(RandomCracks random_cracks.cpp)
 target_link_libraries(RandomCracks LINK_PUBLIC CabanaPD)
 
-install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(CompactTensionTest compact_tension_test.cpp)
+target_link_libraries(CompactTensionTest LINK_PUBLIC CabanaPD)
+
+install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks CompactTensionTest DESTINATION ${CMAKE_INSTALL_BINDIR})
