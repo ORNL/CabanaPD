@@ -329,7 +329,8 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
 template <typename TemperatureType>
 struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, TemperatureDependent,
                   TemperatureType>
-    : public ForceModel<PMB, Elastic, Fracture, TemperatureIndependent,
+    : public ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                        TemperatureIndependent,
                         typename TemperatureType::memory_space>,
       BaseTemperatureModel<TemperatureType>
 {
@@ -345,7 +346,6 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, TemperatureDependent,
     using base_type::c;
     using base_type::delta;
     using base_type::K;
-    using base_type::sigma_y;
 
     // Does not use the base bond_break_coeff.
     using base_type::G0;
@@ -390,10 +390,10 @@ auto createForceModel( PMB, Fracture, ParticleType particles,
 }
 
 template <typename ParticleType>
-auto createForceModel( PMB, Fracture, ParticleType particles,
-                       const double delta, const double K, const double G0,
-                       const double sigma_y, const double alpha,
-                       const double temp0 )
+auto createForceModel( PMB, ElasticPerfectlyPlastic, Fracture,
+                       ParticleType particles, const double delta,
+                       const double K, const double G0, const double sigma_y,
+                       const double alpha, const double temp0 )
 {
     auto temp = particles.sliceTemperature();
     using temp_type = decltype( temp );
