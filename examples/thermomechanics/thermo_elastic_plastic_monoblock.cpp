@@ -49,6 +49,7 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
 
     // Problem parameters
     double temp0 = inputs["reference_temperature"];
+    double temp_initial = inputs["initial_temperature"];
 
     // ====================================================
     //                  Discretization
@@ -96,25 +97,48 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
     // ====================================================
     auto rho = particles->sliceDensity();
     auto temp = particles->sliceTemperature();
+
+    auto dx = particles->dx;
+    double factor = inputs["grid_perturbation_factor"];
+    using pool_type = Kokkos::Random_XorShift64_Pool<exec_space>;
+    using random_type = Kokkos::Random_XorShift64<exec_space>;
+    pool_type pool;
+    int seed = 456854;
+    pool.init( seed, particles->localOffset() );
+
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
         // Temperature
-        temp( pid ) = temp0;
+        temp( pid ) = temp_initial;
+
+        // Perturb particle positions
+        auto gen = pool.get_state();
+        for ( std::size_t d = 0; d < 3; d++ )
+        {
+            auto rand =
+                Kokkos::rand<random_type, double>::draw( gen, 0.0, 1.0 );
+            x( pid, d ) += ( 2.0 * rand - 1.0 ) * factor * dx[d];
+        }
+        pool.free_state( gen );
     };
     particles->updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                    Force model
     // ====================================================
+    auto force_model =
+        CabanaPD::createForceModel( model_type{}, CabanaPD::NoFracture{},
+                                    *particles, delta, K, alpha, temp0 );
+
+    // auto force_model =
+    //    CabanaPD::createForceModel( model_type{}, CabanaPD::Fracture{},
+    //                                 *particles, delta, K, G0, alpha, temp0 );
+
     // auto force_model = CabanaPD::createForceModel(
     //    model_type{}, mechanics_type{}, CabanaPD::Fracture{}, *particles,
     //    delta, K, G0, sigma_y, alpha, temp0 );
-
-    auto force_model =
-        CabanaPD::createForceModel( model_type{}, CabanaPD::Fracture{},
-                                    *particles, delta, K, G0, alpha, temp0 );
 
     // ====================================================
     //                   Create solver
@@ -125,15 +149,62 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
     // ====================================================
     //                   Imposed field
     // ====================================================
+    x = particles->sliceReferencePosition();
+    temp = particles->sliceTemperature();
     const double low_corner_y = low_corner[1];
+    double coolant_tubing_width = inputs["coolant_tubing_width"];
+    double y_top_coolant = y_center + radius - coolant_tubing_width;
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
     auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
-        // temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
-        temp( pid ) = temp0;
+        if ( x( pid, 1 ) > y_top_coolant )
+        {
+            // temp( pid ) = temp_initial + 5000.0 * ( x( pid, 1 ) -
+            // y_top_coolant ) * t;
+            temp( pid ) =
+                temp_initial + 500000.0 * ( x( pid, 1 ) - y_top_coolant ) * t;
+        };
+
+        // temp( pid ) = temp_initial + 5000.0 * ( x( pid, 1 ) - low_corner_y )
+        // * t;
     };
     auto body_term = CabanaPD::createBodyTerm( temp_func, false );
+
+    /*
+        // ====================================================
+        //                    Force model
+        // ====================================================
+        // auto force_model = CabanaPD::createForceModel(
+        //    model_type{}, mechanics_type{}, CabanaPD::Fracture{}, *particles,
+        //    delta, K, G0, sigma_y, alpha, temp0 );
+
+        auto force_model =
+            CabanaPD::createForceModel( model_type{}, CabanaPD::Fracture{},
+                                        *particles, delta, K, G0, alpha, temp0
+       );
+
+        // ====================================================
+        //                   Create solver
+        // ====================================================
+        auto cabana_pd =
+            CabanaPD::createSolver<memory_space>( inputs, particles, force_model
+       );
+
+        // ====================================================
+        //                   Imposed field
+        // ====================================================
+        const double low_corner_y = low_corner[1];
+        // This is purposely delayed until after solver init so that ghosted
+        // particles are correctly taken into account for lambda capture here.
+        auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
+        {
+            // temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) *
+       t; temp( pid ) = temp0;
+        };
+        auto body_term = CabanaPD::createBodyTerm( temp_func, false );
+
+        */
 
     // ====================================================
     //                   Simulation run
