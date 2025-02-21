@@ -1,8 +1,8 @@
 add_executable(ThermalDeformation thermal_deformation.cpp)
 target_link_libraries(ThermalDeformation LINK_PUBLIC CabanaPD)
 
-add_executable(ThermalCrack thermal_crack.cpp)
-target_link_libraries(ThermalCrack LINK_PUBLIC CabanaPD)
+add_executable(ThermoElasticPlasticMonoblock thermo_elastic_plastic_monoblock.cpp)
+target_link_libraries(ThermoElasticPlasticMonoblock LINK_PUBLIC CabanaPD)
 
 add_executable(ThermalDeformationHeatTransfer thermal_deformation_heat_transfer.cpp)
 target_link_libraries(ThermalDeformationHeatTransfer LINK_PUBLIC CabanaPD)
@@ -10,4 +10,4 @@ target_link_libraries(ThermalDeformationHeatTransfer LINK_PUBLIC CabanaPD)
 add_executable(ThermalDeformationHeatTransferPrenotched thermal_deformation_heat_transfer_prenotched.cpp)
 target_link_libraries(ThermalDeformationHeatTransferPrenotched LINK_PUBLIC CabanaPD)
 
-install(TARGETS ThermalDeformation ThermalCrack ThermalDeformationHeatTransfer ThermalDeformationHeatTransferPrenotched DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS ThermalDeformation ThermoElasticPlasticMonoblock ThermalDeformationHeatTransfer ThermalDeformationHeatTransferPrenotched DESTINATION ${CMAKE_INSTALL_BINDIR})
