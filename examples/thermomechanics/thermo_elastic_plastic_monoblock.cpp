@@ -41,10 +41,13 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
     double E = inputs["elastic_modulus"];
     double nu = 0.25;
     double K = E / ( 3 * ( 1 - 2 * nu ) );
-    double G0 = inputs["fracture_energy"];
+    double sc = inputs["critical_stretch"];
+    // double G0 = inputs["fracture_energy"];
     double sigma_y = inputs["yield_stress"];
     double delta = inputs["horizon"];
     delta += 1e-10;
+    double G0 = 9 * K * delta * ( sc * sc ) / 5;
+    std::cout << "G0 = " << G0 << std::endl;
     double alpha = inputs["thermal_expansion_coeff"];
 
     // Problem parameters
@@ -100,6 +103,9 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
 
     auto dx = particles->dx;
     double factor = inputs["grid_perturbation_factor"];
+    // std::cout << "dx[0] = " << dx[0] << " ; factor = " << factor <<
+    // std::endl;
+
     using pool_type = Kokkos::Random_XorShift64_Pool<exec_space>;
     using random_type = Kokkos::Random_XorShift64<exec_space>;
     pool_type pool;
@@ -120,6 +126,8 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
             auto rand =
                 Kokkos::rand<random_type, double>::draw( gen, 0.0, 1.0 );
             x( pid, d ) += ( 2.0 * rand - 1.0 ) * factor * dx[d];
+            // std::cout<< "( 2.0 * rand - 1.0 ) = " << ( 2.0 * rand - 1.0 ) <<
+            // std::endl;
         }
         pool.free_state( gen );
     };
@@ -128,17 +136,18 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    auto force_model =
-        CabanaPD::createForceModel( model_type{}, CabanaPD::NoFracture{},
-                                    *particles, delta, K, alpha, temp0 );
+    // auto force_model =
+    //    CabanaPD::createForceModel( model_type{}, CabanaPD::NoFracture{},
+    //                                *particles, delta, K, alpha, temp0 );
 
     // auto force_model =
-    //    CabanaPD::createForceModel( model_type{}, CabanaPD::Fracture{},
-    //                                 *particles, delta, K, G0, alpha, temp0 );
+    //     CabanaPD::createForceModel( model_type{}, CabanaPD::Fracture{},
+    //                                  *particles, delta, K, G0, alpha, temp0
+    //                                  );
 
-    // auto force_model = CabanaPD::createForceModel(
-    //    model_type{}, mechanics_type{}, CabanaPD::Fracture{}, *particles,
-    //    delta, K, G0, sigma_y, alpha, temp0 );
+    auto force_model = CabanaPD::createForceModel(
+        model_type{}, mechanics_type{}, CabanaPD::Fracture{}, *particles, delta,
+        K, G0, sigma_y, alpha, temp0 );
 
     // ====================================================
     //                   Create solver
@@ -163,7 +172,9 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
             // temp( pid ) = temp_initial + 5000.0 * ( x( pid, 1 ) -
             // y_top_coolant ) * t;
             temp( pid ) =
-                temp_initial + 500000.0 * ( x( pid, 1 ) - y_top_coolant ) * t;
+                // temp_initial + 500000.0 * ( x( pid, 1 ) - y_top_coolant ) *
+                // t;
+                temp_initial + 50000000.0 * ( x( pid, 1 ) - y_top_coolant ) * t;
         };
 
         // temp( pid ) = temp_initial + 5000.0 * ( x( pid, 1 ) - low_corner_y )
