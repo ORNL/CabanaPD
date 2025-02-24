@@ -18,12 +18,12 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate crack initiation and propagation in a ceramic plate under thermal
-// shock caused by water quenching.
-void thermalCrackExample( const std::string filename )
+// Simulate thermo-elastic-plastic deformation in a divertor monoblock due to
+// imposed thermal field.
+void thermoElasticPlasticMonoblockExample( const std::string filename )
 {
     // ====================================================
-    //               Choose Kokkos spaces
+    //             Use default Kokkos spaces
     // ====================================================
     using exec_space = Kokkos::DefaultExecutionSpace;
     using memory_space = typename exec_space::memory_space;
@@ -41,19 +41,22 @@ void thermalCrackExample( const std::string filename )
     double E = inputs["elastic_modulus"];
     double nu = 0.25;
     double K = E / ( 3 * ( 1 - 2 * nu ) );
-    double G0 = inputs["fracture_energy"];
+    double sc = inputs["critical_stretch"];
+    // double G0 = inputs["fracture_energy"];
+    double sigma_y = inputs["yield_stress"];
     double delta = inputs["horizon"];
     delta += 1e-10;
+    double G0 = 9 * K * delta * ( sc * sc ) / 5;
     double alpha = inputs["thermal_expansion_coeff"];
 
     // Problem parameters
     double temp0 = inputs["reference_temperature"];
-    double temp_w = inputs["background_temperature"];
-    double t_ramp = inputs["surface_temperature_ramp_time"];
+    double temp_initial = inputs["initial_temperature"];
 
     // ====================================================
     //                  Discretization
     // ====================================================
+    // FIXME: set halo width based on delta
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
@@ -76,17 +79,67 @@ void thermalCrackExample( const std::string filename )
         CabanaPD::createParticles<memory_space, model_type, thermal_type>(
             exec_space(), low_corner, high_corner, num_cells, halo_width );
 
+    // Do not create particles within given cylindrical region
+    auto x = particles->sliceReferencePosition();
+    double x_center = inputs["cylindrical_hole"][0];
+    double y_center = inputs["cylindrical_hole"][1];
+    double radius = inputs["cylindrical_hole"][2];
+    auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
+    {
+        if ( ( ( x[0] - x_center ) * ( x[0] - x_center ) +
+               ( x[1] - y_center ) * ( x[1] - y_center ) ) < radius * radius )
+            return false;
+        return true;
+    };
+
+    particles->createParticles( exec_space(), init_op );
+
     // ====================================================
     //            Custom particle initialization
     // ====================================================
     auto rho = particles->sliceDensity();
-    auto init_functor = KOKKOS_LAMBDA( const int pid ) { rho( pid ) = rho0; };
+    auto temp = particles->sliceTemperature();
+    x = particles->sliceReferencePosition();
+    auto dx = particles->dx;
+    double factor = inputs["grid_perturbation_factor"];
+
+    using pool_type = Kokkos::Random_XorShift64_Pool<exec_space>;
+    using random_type = Kokkos::Random_XorShift64<exec_space>;
+    pool_type pool;
+    int seed = 456854;
+    pool.init( seed, particles->localOffset() );
+
+    auto init_functor = KOKKOS_LAMBDA( const int pid )
+    {
+        // Density
+        rho( pid ) = rho0;
+        // Temperature
+        temp( pid ) = temp_initial;
+
+        // Perturb particle positions
+        auto gen = pool.get_state();
+        for ( std::size_t d = 0; d < 3; d++ )
+        {
+            auto rand =
+                Kokkos::rand<random_type, double>::draw( gen, 0.0, 1.0 );
+            x( pid, d ) += ( 2.0 * rand - 1.0 ) * factor * dx[d];
+        }
+        pool.free_state( gen );
+    };
     particles->updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                    Force model
     // ====================================================
-    double sigma_y = 0.0;
+    // auto force_model =
+    //    CabanaPD::createForceModel( model_type{}, CabanaPD::NoFracture{},
+    //                                *particles, delta, K, alpha, temp0 );
+
+    // auto force_model =
+    //     CabanaPD::createForceModel( model_type{}, CabanaPD::Fracture{},
+    //                                  *particles, delta, K, G0, alpha, temp0
+    //                                  );
+
     auto force_model = CabanaPD::createForceModel(
         model_type{}, mechanics_type{}, CabanaPD::Fracture{}, *particles, delta,
         K, G0, sigma_y, alpha, temp0 );
@@ -97,57 +150,23 @@ void thermalCrackExample( const std::string filename )
     auto cabana_pd =
         CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
 
-    // --------------------------------------------
-    //                Thermal shock
-    // --------------------------------------------
-    auto x = particles->sliceReferencePosition();
-    auto temp = particles->sliceTemperature();
-
-    // Plate limits
-    double X0 = low_corner[0];
-    double Xn = high_corner[0];
-    double Y0 = low_corner[1];
-    double Yn = high_corner[1];
+    // ====================================================
+    //                   Imposed field
+    // ====================================================
+    x = particles->sliceReferencePosition();
+    temp = particles->sliceTemperature();
+    const double low_corner_y = low_corner[1];
+    double coolant_tubing_width = inputs["coolant_tubing_width"];
+    double y_top_coolant_hole = y_center + radius - coolant_tubing_width;
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
     auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
-        // Define a time-dependent surface temperature:
-        // An inverted triangular pulse over a 2*t_ramp period starting at temp0
-        // and linearly decreasing to temp_w within t_ramp, then linearly
-        // increasing back to temp0, and finally staying constant at temp0
-        double temp_infinity;
-        if ( t <= t_ramp )
+        if ( x( pid, 1 ) > y_top_coolant_hole )
         {
-            // Increasing pulse
-            temp_infinity = temp0 - ( temp0 - temp_w ) * ( t / t_ramp );
-        }
-        else if ( t < 2 * t_ramp )
-        {
-            // Decreasing pulse
-            temp_infinity =
-                temp_w + ( temp0 - temp_w ) * ( t - t_ramp ) / t_ramp;
-        }
-        else
-        {
-            // Constant value
-            temp_infinity = temp0;
-        }
-
-        // Rescale x and y particle position values
-        double xi = ( 2.0 * x( pid, 0 ) - ( X0 + Xn ) ) / ( Xn - X0 );
-        double eta = ( 2.0 * x( pid, 1 ) - ( Y0 + Yn ) ) / ( Yn - Y0 );
-
-        // Define profile powers in x- and y-directions
-        double sx = 1.0 / 50.0;
-        double sy = 1.0 / 10.0;
-
-        // Define profiles in x- and y-direcions
-        double fx = 1.0 - Kokkos::pow( Kokkos::abs( xi ), 1.0 / sx );
-        double fy = 1.0 - Kokkos::pow( Kokkos::abs( eta ), 1.0 / sy );
-
-        // Compute particle temperature
-        temp( pid ) = temp_infinity + ( temp0 - temp_infinity ) * fx * fy;
+            temp( pid ) = temp_initial +
+                          50000000.0 * ( x( pid, 1 ) - y_top_coolant_hole ) * t;
+        };
     };
     auto body_term = CabanaPD::createBodyTerm( temp_func, false );
 
@@ -164,7 +183,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    thermalCrackExample( argv[1] );
+    thermoElasticPlasticMonoblockExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();
