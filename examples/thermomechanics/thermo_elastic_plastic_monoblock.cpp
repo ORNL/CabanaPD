@@ -99,7 +99,7 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
     // ====================================================
     auto rho = particles->sliceDensity();
     auto temp = particles->sliceTemperature();
-
+    x = particles->sliceReferencePosition();
     auto dx = particles->dx;
     double factor = inputs["grid_perturbation_factor"];
 
