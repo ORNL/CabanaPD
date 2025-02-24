@@ -47,7 +47,6 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
     double delta = inputs["horizon"];
     delta += 1e-10;
     double G0 = 9 * K * delta * ( sc * sc ) / 5;
-    std::cout << "G0 = " << G0 << std::endl;
     double alpha = inputs["thermal_expansion_coeff"];
 
     // Problem parameters
@@ -103,8 +102,6 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
 
     auto dx = particles->dx;
     double factor = inputs["grid_perturbation_factor"];
-    // std::cout << "dx[0] = " << dx[0] << " ; factor = " << factor <<
-    // std::endl;
 
     using pool_type = Kokkos::Random_XorShift64_Pool<exec_space>;
     using random_type = Kokkos::Random_XorShift64<exec_space>;
@@ -126,8 +123,6 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
             auto rand =
                 Kokkos::rand<random_type, double>::draw( gen, 0.0, 1.0 );
             x( pid, d ) += ( 2.0 * rand - 1.0 ) * factor * dx[d];
-            // std::cout<< "( 2.0 * rand - 1.0 ) = " << ( 2.0 * rand - 1.0 ) <<
-            // std::endl;
         }
         pool.free_state( gen );
     };
@@ -162,60 +157,18 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
     temp = particles->sliceTemperature();
     const double low_corner_y = low_corner[1];
     double coolant_tubing_width = inputs["coolant_tubing_width"];
-    double y_top_coolant = y_center + radius - coolant_tubing_width;
+    double y_top_coolant_hole = y_center + radius - coolant_tubing_width;
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
     auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
-        if ( x( pid, 1 ) > y_top_coolant )
+        if ( x( pid, 1 ) > y_top_coolant_hole )
         {
-            // temp( pid ) = temp_initial + 5000.0 * ( x( pid, 1 ) -
-            // y_top_coolant ) * t;
-            temp( pid ) =
-                // temp_initial + 500000.0 * ( x( pid, 1 ) - y_top_coolant ) *
-                // t;
-                temp_initial + 50000000.0 * ( x( pid, 1 ) - y_top_coolant ) * t;
+            temp( pid ) = temp_initial +
+                          50000000.0 * ( x( pid, 1 ) - y_top_coolant_hole ) * t;
         };
-
-        // temp( pid ) = temp_initial + 5000.0 * ( x( pid, 1 ) - low_corner_y )
-        // * t;
     };
     auto body_term = CabanaPD::createBodyTerm( temp_func, false );
-
-    /*
-        // ====================================================
-        //                    Force model
-        // ====================================================
-        // auto force_model = CabanaPD::createForceModel(
-        //    model_type{}, mechanics_type{}, CabanaPD::Fracture{}, *particles,
-        //    delta, K, G0, sigma_y, alpha, temp0 );
-
-        auto force_model =
-            CabanaPD::createForceModel( model_type{}, CabanaPD::Fracture{},
-                                        *particles, delta, K, G0, alpha, temp0
-       );
-
-        // ====================================================
-        //                   Create solver
-        // ====================================================
-        auto cabana_pd =
-            CabanaPD::createSolver<memory_space>( inputs, particles, force_model
-       );
-
-        // ====================================================
-        //                   Imposed field
-        // ====================================================
-        const double low_corner_y = low_corner[1];
-        // This is purposely delayed until after solver init so that ghosted
-        // particles are correctly taken into account for lambda capture here.
-        auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
-        {
-            // temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) *
-       t; temp( pid ) = temp0;
-        };
-        auto body_term = CabanaPD::createBodyTerm( temp_func, false );
-
-        */
 
     // ====================================================
     //                   Simulation run
