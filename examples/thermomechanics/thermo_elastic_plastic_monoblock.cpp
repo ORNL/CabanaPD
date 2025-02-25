@@ -155,19 +155,99 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
     // ====================================================
     x = particles->sliceReferencePosition();
     temp = particles->sliceTemperature();
+
+    double dt_ramp_up_steady_state = inputs["time_ramp_up_steady_state"];
+    double dt_ramp_up_shock = inputs["time_ramp_up_shock"];
+    double dt_ramp_down_shock = inputs["time_ramp_down_shock"];
+
     const double low_corner_y = low_corner[1];
     double coolant_tubing_width = inputs["coolant_tubing_width"];
     double y_top_coolant_hole = y_center + radius - coolant_tubing_width;
+
+    double temp_max_steady_state = inputs["max_steady_state_temperature"];
+    double temp_max_shock = inputs["max_shock_temperature"];
+
+    double ramp_up_steady_state_rate =
+        ( temp_max_steady_state - temp_initial ) /
+        ( ( high_corner[1] - y_top_coolant_hole ) * dt_ramp_up_steady_state );
+    double ramp_up_shock_rate =
+        ( temp_max_shock - temp_initial ) /
+        ( ( high_corner[1] - y_top_coolant_hole ) * dt_ramp_up_shock );
+    double ramp_down_shock_rate =
+        ( temp_max_shock - temp_initial ) /
+        ( ( high_corner[1] - y_top_coolant_hole ) * dt_ramp_down_shock );
+
+    double pulse_width = inputs["pulse_width"];
+
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
     auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
         if ( x( pid, 1 ) > y_top_coolant_hole )
         {
-            temp( pid ) = temp_initial +
-                          50000000.0 * ( x( pid, 1 ) - y_top_coolant_hole ) * t;
+            // --------------------------------------------
+            //           Steady-state profile
+            // --------------------------------------------
+            if ( t < dt_ramp_up_steady_state )
+            {
+                temp( pid ) = temp_initial;
+                temp( pid ) += ramp_up_steady_state_rate *
+                               ( x( pid, 1 ) - y_top_coolant_hole ) * t;
+            }
+            // --------------------------------------------
+            //       Thermal shock profile (ramp up)
+            // --------------------------------------------
+            else if ( t < dt_ramp_up_steady_state + dt_ramp_up_shock )
+            {
+                if ( Kokkos::abs( x( pid, 0 ) - x_center ) < 0.5 * pulse_width )
+                {
+                    temp( pid ) = temp_initial;
+                    temp( pid ) += ramp_up_steady_state_rate *
+                                   ( x( pid, 1 ) - y_top_coolant_hole ) *
+                                   dt_ramp_up_steady_state;
+                    temp( pid ) += ramp_up_shock_rate *
+                                   ( x( pid, 1 ) - y_top_coolant_hole ) *
+                                   ( t - dt_ramp_up_steady_state );
+                };
+            }
+            // --------------------------------------------
+            //       Thermal shock profile (ramp down)
+            // --------------------------------------------
+            else if ( t < dt_ramp_up_steady_state + dt_ramp_up_shock +
+                              dt_ramp_down_shock )
+            {
+                if ( Kokkos::abs( x( pid, 0 ) - x_center ) < 0.5 * pulse_width )
+                {
+                    temp( pid ) = temp_initial;
+                    temp( pid ) += ramp_up_steady_state_rate *
+                                   ( x( pid, 1 ) - y_top_coolant_hole ) *
+                                   dt_ramp_up_steady_state;
+                    temp( pid ) += ramp_up_shock_rate *
+                                   ( x( pid, 1 ) - y_top_coolant_hole ) *
+                                   dt_ramp_up_shock;
+                    temp( pid ) -=
+                        ramp_down_shock_rate *
+                        ( x( pid, 1 ) - y_top_coolant_hole ) *
+                        ( t - ( dt_ramp_up_steady_state + dt_ramp_up_shock ) );
+                };
+            }
+            // --------------------------------------------
+            //             End of shock
+            // --------------------------------------------
+            else
+            {
+                temp( pid ) = temp_initial;
+                temp( pid ) += ramp_up_steady_state_rate *
+                               ( x( pid, 1 ) - y_top_coolant_hole ) *
+                               dt_ramp_up_steady_state;
+            };
         };
     };
+
+    // --------------------------------------------
+    //                Thermal shock
+    // --------------------------------------------
+
     auto body_term = CabanaPD::createBodyTerm( temp_func, false );
 
     // ====================================================
