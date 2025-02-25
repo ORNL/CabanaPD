@@ -84,30 +84,28 @@
 
 namespace CabanaPD
 {
-template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModelType, class ContactModelType = NoContact>
+template <class InputType, class ParticleType, class ForceModelType,
+          class ContactModelType = NoContact>
 class Solver
 {
   public:
-    using memory_space = MemorySpace;
+    using memory_space = typename ParticleType::memory_space;
     using exec_space = typename memory_space::execution_space;
 
     // Core module types - required for all problems.
-    using particle_type = ParticleType;
     using integrator_type = Integrator<exec_space>;
     using force_model_type = ForceModelType;
     using force_type = Force<memory_space, force_model_type>;
-    using comm_type = Comm<particle_type, typename force_model_type::base_model,
-                           typename particle_type::thermal_type>;
+    using comm_type = Comm<ParticleType, typename force_model_type::base_model,
+                           typename ParticleType::thermal_type>;
     using neigh_iter_tag = Cabana::SerialOpTag;
-    using input_type = InputType;
 
     // Optional module types.
     using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
     using contact_type = Force<memory_space, ContactModelType>;
     using contact_model_type = ContactModelType;
 
-    Solver( MemorySpace, input_type _inputs, particle_type _particles,
+    Solver( InputType _inputs, ParticleType _particles,
             force_model_type force_model )
         : inputs( _inputs )
         , particles( _particles )
@@ -116,7 +114,7 @@ class Solver
         setup( force_model );
     }
 
-    Solver( MemorySpace, input_type _inputs, particle_type _particles,
+    Solver( InputType _inputs, ParticleType _particles,
             force_model_type force_model, contact_model_type contact_model )
         : inputs( _inputs )
         , particles( _particles )
@@ -488,8 +486,8 @@ class Solver
     }
 
     // Core modules.
-    input_type inputs;
-    particle_type particles;
+    InputType inputs;
+    ParticleType particles;
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;

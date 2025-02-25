@@ -139,7 +139,7 @@ void fragmentingCylinderExample( const std::string filename )
         r_c *= dx[0];
         CabanaPD::NormalRepulsionModel contact_model( delta, r_c, K );
 
-        CabanaPD::Solver solver( memory_space{}, inputs, particles, force_model,
+        CabanaPD::Solver solver( inputs, particles, force_model,
                                  contact_model );
         solver.init();
         solver.run();
@@ -149,8 +149,7 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     else
     {
-        CabanaPD::Solver solver( memory_space{}, inputs, particles,
-                                 force_model );
+        CabanaPD::Solver solver( inputs, particles, force_model );
         solver.init();
         solver.run();
     }
