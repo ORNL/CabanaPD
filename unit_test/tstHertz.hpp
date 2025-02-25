@@ -122,8 +122,7 @@ void testHertzianContact( const std::string filename )
     // ====================================================
     //  Simulation run
     // ====================================================
-    CabanaPD::Solver solver( memory_space{}, inputs, particles,
-                                contact_model );
+    CabanaPD::Solver solver( memory_space{}, inputs, particles, contact_model );
     solver.init();
     solver.run();
 
