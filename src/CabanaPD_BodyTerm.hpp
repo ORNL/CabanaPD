@@ -30,7 +30,8 @@ struct BodyTerm
 
     Timer _timer;
 
-    BodyTerm( UserFunctor user, const bool force, const bool update_frozen )
+    BodyTerm( UserFunctor user, const bool force,
+              const bool update_frozen = false )
         : _user_functor( user )
         , _force_update( force )
         , _update_frozen( update_frozen )
@@ -59,13 +60,6 @@ struct BodyTerm
     auto time() { return _timer.time(); };
     auto timeInit() { return 0.0; };
 };
-
-template <class UserFunctor>
-auto createBodyTerm( UserFunctor user_functor, const bool force_update,
-                     const bool update_frozen = false )
-{
-    return BodyTerm<UserFunctor>( user_functor, force_update, update_frozen );
-}
 
 } // namespace CabanaPD
 
