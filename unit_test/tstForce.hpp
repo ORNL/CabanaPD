@@ -670,14 +670,15 @@ void initializeForce( ForceType& force, ParticleType& particles )
 }
 
 template <class ParticleType, class AoSoAType>
-void copyTheta( CabanaPD::PMB, ParticleType, AoSoAType aosoa_host )
+void copyTheta( CabanaPD::PMB, const ParticleType&, AoSoAType& aosoa_host )
 {
     auto theta_host = Cabana::slice<4>( aosoa_host );
     Cabana::deep_copy( theta_host, 0.0 );
 }
 
 template <class ParticleType, class AoSoAType>
-void copyTheta( CabanaPD::LPS, ParticleType particles, AoSoAType aosoa_host )
+void copyTheta( CabanaPD::LPS, const ParticleType& particles,
+                AoSoAType& aosoa_host )
 {
     auto theta_host = Cabana::slice<4>( aosoa_host );
     auto theta = particles.sliceDilatation();

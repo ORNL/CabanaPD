@@ -85,7 +85,8 @@ void fragmentingCylinderExample( const std::string filename )
     };
 
     auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space(), low_corner, high_corner, num_cells, halo_width, init_op );
+        exec_space(), low_corner, high_corner, num_cells, Cabana::InitRandom{},
+        halo_width, init_op );
 
     auto rho = particles->sliceDensity();
     auto x = particles->sliceReferencePosition();
@@ -99,27 +100,11 @@ void fragmentingCylinderExample( const std::string filename )
 
     auto dx = particles->dx;
     double height = inputs["system_size"][2];
-    double factor = inputs["grid_perturbation_factor"];
 
-    using pool_type = Kokkos::Random_XorShift64_Pool<exec_space>;
-    using random_type = Kokkos::Random_XorShift64<exec_space>;
-    pool_type pool;
-    int seed = 456854;
-    pool.init( seed, particles->localOffset() );
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
-
-        // Perturb particle positions
-        auto gen = pool.get_state();
-        for ( std::size_t d = 0; d < 3; d++ )
-        {
-            auto rand =
-                Kokkos::rand<random_type, double>::draw( gen, 0.0, 1.0 );
-            x( pid, d ) += ( 2.0 * rand - 1.0 ) * factor * dx[d];
-        }
-        pool.free_state( gen );
 
         // Velocity
         double zfactor = ( ( x( pid, 2 ) - zmin ) / ( 0.5 * height ) ) - 1;
