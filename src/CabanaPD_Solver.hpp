@@ -84,7 +84,7 @@
 
 namespace CabanaPD
 {
-template <class InputType, class ParticleType, class ForceModelType,
+template <class ParticleType, class ForceModelType,
           class ContactModelType = NoContact>
 class Solver
 {
@@ -105,7 +105,7 @@ class Solver
     using contact_type = Force<memory_space, ContactModelType>;
     using contact_model_type = ContactModelType;
 
-    Solver( InputType _inputs, ParticleType _particles,
+    Solver( Inputs _inputs, ParticleType _particles,
             force_model_type force_model )
         : inputs( _inputs )
         , particles( _particles )
@@ -114,7 +114,7 @@ class Solver
         setup( force_model );
     }
 
-    Solver( InputType _inputs, ParticleType _particles,
+    Solver( Inputs _inputs, ParticleType _particles,
             force_model_type force_model, contact_model_type contact_model )
         : inputs( _inputs )
         , particles( _particles )
@@ -486,7 +486,7 @@ class Solver
     }
 
     // Core modules.
-    InputType inputs;
+    Inputs inputs;
     ParticleType particles;
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
