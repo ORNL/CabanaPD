@@ -38,8 +38,17 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
         : base_type( delta )
         , K( _K )
     {
-        c = 18.0 * K / ( pi * delta * delta * delta * delta );
+        init();
     }
+
+    ForceModel( PMB, Elastic, NoFracture, const double delta, const double _K )
+        : base_type( delta )
+        , K( _K )
+    {
+        init();
+    }
+
+    void init() { c = 18.0 * K / ( pi * delta * delta * delta * delta ); }
 
     KOKKOS_INLINE_FUNCTION
     auto forceCoeff( const double s, const double vol ) const
@@ -77,6 +86,19 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
         : base_type( model, NoFracture{}, delta, K )
         , G0( _G0 )
     {
+        init();
+    }
+
+    ForceModel( PMB model, Elastic elastic, const double delta, const double K,
+                const double _G0 )
+        : base_type( model, elastic, NoFracture{}, delta, K )
+        , G0( _G0 )
+    {
+        init();
+    }
+
+    void init()
+    {
         s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / K / delta );
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
@@ -98,7 +120,11 @@ struct ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = base_type::thermal_type;
 
-    using base_type::base_type;
+    template <typename... Args>
+    ForceModel( LinearPMB, Args... args )
+        : base_type( base_model{}, args... )
+    {
+    }
 
     using base_type::c;
     using base_type::delta;
@@ -114,7 +140,11 @@ struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = base_type::thermal_type;
 
-    using base_type::base_type;
+    template <typename... Args>
+    ForceModel( LinearPMB, Args... args )
+        : base_type( base_model{}, std::forward<Args>( args )... )
+    {
+    }
 
     using base_type::c;
     using base_type::delta;
@@ -126,13 +156,22 @@ struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
 };
 
 template <typename ModelType>
-ForceModel( ModelType, NoFracture, const double delta, const double K )
+ForceModel( ModelType, Elastic, NoFracture, const double delta, const double K )
     -> ForceModel<ModelType, Elastic, NoFracture>;
 
 // Default to fracture.
 template <typename ModelType>
+ForceModel( ModelType, Elastic, const double delta, const double K,
+            const double _G0 ) -> ForceModel<ModelType, Elastic>;
+
+template <typename ModelType>
+ForceModel( ModelType, NoFracture, const double delta, const double K )
+    -> ForceModel<ModelType, Elastic, NoFracture>;
+
+// Default to elastic.
+template <typename ModelType>
 ForceModel( ModelType, const double delta, const double K, const double _G0 )
-    -> ForceModel<ModelType, Elastic>;
+    -> ForceModel<ModelType>;
 
 template <typename TemperatureType>
 struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
