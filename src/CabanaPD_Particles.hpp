@@ -157,7 +157,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         , _plist_f( "forces" )
     {
         create( low_corner, high_corner, num_cells, max_halo_width, exec_space,
-                create_frozen );
+                0, create_frozen );
     }
     template <class ModelType, class ExecSpace>
     Particles( MemorySpace, ModelType, std::array<double, dim> low_corner,
@@ -170,7 +170,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         , _plist_f( "forces" )
     {
         create( low_corner, high_corner, num_cells, max_halo_width, exec_space,
-                create_frozen );
+                0, create_frozen );
     }
 
     // Constructor which initializes particles on regular grid with
@@ -188,7 +188,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         , _plist_f( "forces" )
     {
         create( low_corner, high_corner, num_cells, max_halo_width, user_create,
-                exec_space, create_frozen );
+                exec_space, 0, create_frozen );
     }
     template <class ModelType, class ExecSpace, class UserFunctor>
     Particles( MemorySpace, ModelType, std::array<double, dim> low_corner,
@@ -202,7 +202,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         , _plist_f( "forces" )
     {
         create( low_corner, high_corner, num_cells, max_halo_width, user_create,
-                exec_space, create_frozen );
+                exec_space, 0, create_frozen );
     }
 
     // Constructor with existing particle data.
@@ -314,7 +314,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
     template <class ExecSpace>
     void createParticles( const ExecSpace& exec_space,
-                          const std::size_t num_previous = 0,
+                          const std::size_t num_previous,
                           const bool create_frozen = false )
     {
         createParticles( exec_space, *this, num_previous, create_frozen );
@@ -322,7 +322,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
     template <class ExecSpace, class UserFunctor>
     void createParticles( const ExecSpace& exec_space, UserFunctor user_create,
-                          const std::size_t num_previous = 0,
+                          const std::size_t num_previous,
                           const bool create_frozen = false )
     {
         _init_timer.start();
@@ -335,7 +335,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
         // Use default aosoa construction and resize.
         assert( num_previous <= referenceOffset() );
-        resize( num_particles + num_previous, 0 );
+        resize( num_particles + num_previous, 0, create_frozen );
 
         auto x = sliceReferencePosition();
         auto v = sliceVelocity();
@@ -379,12 +379,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         local_offset = Cabana::Grid::createParticles(
             Cabana::InitUniform{}, exec_space, create_functor, _plist_x, 1,
             *local_grid, num_previous );
-        resize( local_offset, 0 );
+        resize( local_offset, 0, create_frozen );
         size = _plist_x.size();
-
-        // Only set this value if this generation of particles should be frozen.
-        if ( create_frozen )
-            frozen_offset = size;
 
         updateGlobal();
         _init_timer.stop();
@@ -394,7 +390,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     template <class ExecSpace, class PositionType, class VolumeType>
     void createParticles(
         const ExecSpace, const PositionType& x, const VolumeType& vol,
-        const std::size_t num_previous = 0, const bool create_frozen = false,
+        const std::size_t num_previous, const bool create_frozen = false,
         typename std::enable_if<( Kokkos::is_view<PositionType>::value ||
                                   Cabana::is_slice<PositionType>::value ),
                                 int>::type* = 0 )
@@ -403,9 +399,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         assert( num_previous <= referenceOffset() );
         // Ensure matching input sizes.
         assert( vol.size() == x.extent( 0 ) );
-        resize( vol.size() + num_previous, 0 );
-        if ( create_frozen )
-            frozen_offset = size;
+        resize( vol.size() + num_previous, 0, create_frozen );
 
         auto p_x = sliceReferencePosition();
         auto p_vol = sliceVolume();
@@ -448,7 +442,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     create( std::array<double, dim> low_corner,
             std::array<double, dim> high_corner,
             const std::array<int, dim> num_cells, const int max_halo_width,
-            const ExecSpace exec_space, const std::size_t num_previous = 0,
+            const ExecSpace exec_space, const std::size_t num_previous,
             const bool create_frozen = false,
             typename std::enable_if<(Kokkos::is_execution_space_v<ExecSpace>),
                                     int>::type* = 0 )
@@ -458,13 +452,14 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     }
 
     template <class ExecSpace, class UserFunctor>
-    void create(
-        std::array<double, dim> low_corner, std::array<double, dim> high_corner,
-        const std::array<int, dim> num_cells, const int max_halo_width,
-        UserFunctor user_create, const ExecSpace exec_space,
-        const std::size_t num_previous = 0, const bool create_frozen = false,
-        typename std::enable_if<(Kokkos::is_execution_space_v<ExecSpace>),
-                                int>::type* = 0 )
+    void
+    create( std::array<double, dim> low_corner,
+            std::array<double, dim> high_corner,
+            const std::array<int, dim> num_cells, const int max_halo_width,
+            UserFunctor user_create, const ExecSpace exec_space,
+            const std::size_t num_previous, const bool create_frozen = false,
+            typename std::enable_if<(Kokkos::is_execution_space_v<ExecSpace>),
+                                    int>::type* = 0 )
     {
         createDomain( low_corner, high_corner, num_cells, max_halo_width );
         createParticles( exec_space, user_create, num_previous, create_frozen );
@@ -610,9 +605,13 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         //_timer.stop();
     }
 
-    void resize( int new_local, int new_ghost )
+    void resize( int new_local, int new_ghost,
+                 const bool create_frozen = false )
     {
         _timer.start();
+        if ( new_ghost > 0 )
+            assert( create_frozen == false );
+
         local_offset = new_local;
         num_ghost = new_ghost;
         size = new_local + new_ghost;
@@ -624,7 +623,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         _plist_f.aosoa().resize( localOffset() );
         _aosoa_other.resize( localOffset() );
         _aosoa_nofail.resize( referenceOffset() );
-        size = _plist_x.size();
+
+        if ( create_frozen )
+            frozen_offset = size;
         _timer.stop();
     };
 
@@ -1105,6 +1106,16 @@ Particles( MemorySpace, ModelType, OutputType, const PositionType&,
            const std::size_t = 0, const bool = false )
     -> Particles<MemorySpace, typename ModelType::base_model,
                  typename ModelType::thermal_type::base_type, EnergyOutput>;
+
+template <typename MemorySpace, typename ModelType, typename ThermalType,
+          typename ExecSpace, typename PositionType, typename VolumeType,
+          std::size_t Dim>
+Particles( MemorySpace, ModelType, ThermalType, const PositionType&,
+           const VolumeType&, std::array<double, Dim>, std::array<double, Dim>,
+           const std::array<int, Dim>, const int, const ExecSpace,
+           const std::size_t = 0, const bool = false )
+    -> Particles<MemorySpace, typename ModelType::base_model,
+                 typename ThermalType::base_type, EnergyOutput>;
 
 template <typename MemorySpace, typename ModelType, typename ThermalType,
           typename ExecSpace, typename PositionType, typename VolumeType,
