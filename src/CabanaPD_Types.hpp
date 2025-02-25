@@ -86,15 +86,19 @@ struct is_heat_transfer<DynamicTemperature> : public std::true_type
 // Force model tags.
 struct PMB
 {
+    using base_model = PMB;
 };
 struct LinearPMB
 {
+    using base_model = PMB;
 };
 struct LPS
 {
+    using base_model = LPS;
 };
 struct LinearLPS
 {
+    using base_model = LPS;
 };
 
 struct BaseOutput

@@ -133,9 +133,9 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
 
     // Construct from region (search for boundary particles).
     template <class ExecSpace, class Particles>
-    BoundaryIndexSpace( ExecSpace exec_space, Particles particles,
+    BoundaryIndexSpace( Particles particles,
                         std::vector<RegionBoundary<GeometryType>> planes,
-                        const double initial_guess )
+                        const double initial_guess, ExecSpace exec_space )
     {
         _timer.start();
 
@@ -212,21 +212,13 @@ struct BoundaryIndexSpace<MemorySpace, Custom>
 };
 
 template <class ExecSpace, class Particles, class BoundaryType>
-auto createBoundaryIndexSpace( ExecSpace exec_space, Particles particles,
-                               std::vector<BoundaryType> planes,
-                               const double initial_guess )
-{
-    using memory_space = typename Particles::memory_space;
-    return BoundaryIndexSpace<memory_space, BoundaryType>(
-        exec_space, particles, planes, initial_guess );
-}
+BoundaryIndexSpace( Particles particles, std::vector<BoundaryType> planes,
+                    const double initial_guess, ExecSpace exec_space )
+    -> BoundaryIndexSpace<typename Particles::memory_space, BoundaryType>;
 
 template <class BoundaryParticles>
-auto createBoundaryIndexSpace( BoundaryParticles particles )
-{
-    using memory_space = typename BoundaryParticles::memory_space;
-    return BoundaryIndexSpace<memory_space, Custom>( particles );
-}
+BoundaryIndexSpace( BoundaryParticles particles )
+    -> BoundaryIndexSpace<typename BoundaryParticles::memory_space, Custom>;
 
 struct ForceValueBCTag
 {
@@ -379,8 +371,8 @@ auto createBoundaryCondition( BCTag, const double value, ExecSpace exec_space,
 {
     using memory_space = typename Particles::memory_space;
     using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;
-    bc_index_type bc_indices = createBoundaryIndexSpace(
-        exec_space, particles, planes, initial_guess );
+    BoundaryIndexSpace bc_indices( particles, planes, initial_guess,
+                                   exec_space );
     return BoundaryCondition<bc_index_type, BCTag>( value, bc_indices );
 }
 
@@ -395,8 +387,8 @@ auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
 {
     using memory_space = typename Particles::memory_space;
     using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;
-    bc_index_type bc_indices = createBoundaryIndexSpace(
-        exec_space, particles, planes, initial_guess );
+    BoundaryIndexSpace bc_indices( particles, planes, initial_guess,
+                                   exec_space );
     return BoundaryCondition<bc_index_type, UserFunctor>(
         bc_indices, user_functor, force_update );
 }
@@ -408,7 +400,7 @@ auto createBoundaryCondition( BCTag, const double value,
 {
     using memory_space = typename BoundaryParticles::memory_space;
     using bc_index_type = BoundaryIndexSpace<memory_space, Custom>;
-    bc_index_type bc_indices = createBoundaryIndexSpace( particles );
+    BoundaryIndexSpace bc_indices( particles );
     return BoundaryCondition<bc_index_type, BCTag>( value, bc_indices );
 }
 
@@ -419,7 +411,7 @@ auto createBoundaryCondition( UserFunctor user_functor,
 {
     using memory_space = typename BoundaryParticles::memory_space;
     using bc_index_type = BoundaryIndexSpace<memory_space, Custom>;
-    bc_index_type bc_indices = createBoundaryIndexSpace( particles );
+    BoundaryIndexSpace bc_indices( particles );
     return BoundaryCondition<bc_index_type, UserFunctor>(
         bc_indices, user_functor, force_update );
 }

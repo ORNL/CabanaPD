@@ -59,11 +59,8 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type = CabanaPD::ForceModel<CabanaPD::PMB>;
-    model_type force_model( delta, K, G0 );
-    // using model_type =
-    //      CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
-    // model_type force_model( delta, K, G, G0 );
+    CabanaPD::ForceModel force_model( CabanaPD::PMB{}, delta, K, G0 );
+    // CabanaPD::ForceModel force_model( CabanaPD::LPS{}, delta, K, G, G0 );
 
     // ====================================================
     //    Custom particle generation and initialization
@@ -84,20 +81,21 @@ void fragmentingCylinderExample( const std::string filename )
         return true;
     };
 
-    auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space(), low_corner, high_corner, num_cells, halo_width, init_op );
+    CabanaPD::Particles particles( memory_space{}, force_model, low_corner,
+                                   high_corner, num_cells, halo_width, init_op,
+                                   exec_space{} );
 
-    auto rho = particles->sliceDensity();
-    auto x = particles->sliceReferencePosition();
-    auto v = particles->sliceVelocity();
-    auto f = particles->sliceForce();
+    auto rho = particles.sliceDensity();
+    auto x = particles.sliceReferencePosition();
+    auto v = particles.sliceVelocity();
+    auto f = particles.sliceForce();
 
     double vrmax = inputs["max_radial_velocity"];
     double vrmin = inputs["min_radial_velocity"];
     double vzmax = inputs["max_vertical_velocity"];
     double zmin = low_corner[2];
 
-    auto dx = particles->dx;
+    auto dx = particles.dx;
     double height = inputs["system_size"][2];
     double factor = inputs["grid_perturbation_factor"];
 
@@ -105,7 +103,7 @@ void fragmentingCylinderExample( const std::string filename )
     using random_type = Kokkos::Random_XorShift64<exec_space>;
     pool_type pool;
     int seed = 456854;
-    pool.init( seed, particles->localOffset() );
+    pool.init( seed, particles.localOffset() );
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
@@ -130,7 +128,7 @@ void fragmentingCylinderExample( const std::string filename )
             vr * Kokkos::sin( Kokkos::atan2( x( pid, 1 ), x( pid, 0 ) ) );
         v( pid, 2 ) = vzmax * zfactor;
     };
-    particles->updateParticles( exec_space{}, init_functor );
+    particles.updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //  Simulation run with contact physics
@@ -141,20 +139,20 @@ void fragmentingCylinderExample( const std::string filename )
         r_c *= dx[0];
         CabanaPD::NormalRepulsionModel contact_model( delta, r_c, K );
 
-        auto cabana_pd = CabanaPD::createSolver<memory_space>(
-            inputs, particles, force_model, contact_model );
-        cabana_pd->init();
-        cabana_pd->run();
+        CabanaPD::Solver solver( memory_space{}, inputs, particles, force_model,
+                                 contact_model );
+        solver.init();
+        solver.run();
     }
     // ====================================================
     //  Simulation run without contact
     // ====================================================
     else
     {
-        auto cabana_pd = CabanaPD::createSolver<memory_space>(
-            inputs, particles, force_model );
-        cabana_pd->init();
-        cabana_pd->run();
+        CabanaPD::Solver solver( memory_space{}, inputs, particles,
+                                 force_model );
+        solver.init();
+        solver.run();
     }
 }
 
