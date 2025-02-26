@@ -16,4 +16,7 @@ target_link_libraries(RandomCracks LINK_PUBLIC CabanaPD)
 add_executable(FiberReinforcedComposite fiber_reinforced_composite.cpp)
 target_link_libraries(FiberReinforcedComposite LINK_PUBLIC CabanaPD)
 
-install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks FiberReinforcedComposite DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(Monoblock monoblock.cpp)
+target_link_libraries(Monoblock LINK_PUBLIC CabanaPD)
+
+install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks FiberReinforcedComposite Monoblock DESTINATION ${CMAKE_INSTALL_BINDIR})
