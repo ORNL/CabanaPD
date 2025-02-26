@@ -193,7 +193,9 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
                 temp( pid ) = temp_initial;
                 temp( pid ) += ramp_up_steady_state_rate *
                                ( x( pid, 1 ) - y_top_coolant_hole ) * t;
-            }
+            };
+
+            /*
             // --------------------------------------------
             //       Thermal shock profile (ramp up)
             // --------------------------------------------
@@ -241,6 +243,7 @@ void thermoElasticPlasticMonoblockExample( const std::string filename )
                                ( x( pid, 1 ) - y_top_coolant_hole ) *
                                dt_ramp_up_steady_state;
             };
+            */
         };
     };
 
