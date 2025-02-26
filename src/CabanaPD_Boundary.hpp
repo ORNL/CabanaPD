@@ -16,6 +16,7 @@
 
 #include <Cabana_Core.hpp>
 
+#include <CabanaPD_Output.hpp>
 #include <CabanaPD_Timer.hpp>
 
 namespace CabanaPD
@@ -125,6 +126,7 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
     using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
     index_view_type _view;
     index_view_type _count;
+    std::size_t particle_count;
 
     Timer _timer;
 
@@ -136,6 +138,7 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
     BoundaryIndexSpace( ExecSpace exec_space, Particles particles,
                         std::vector<RegionBoundary<GeometryType>> planes,
                         const double initial_guess )
+        : particle_count( particles.referenceOffset() )
     {
         _timer.start();
 
@@ -162,6 +165,8 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
     void update( ExecSpace, Particles particles,
                  RegionBoundary<GeometryType> region )
     {
+        particle_count = particles.referenceOffset();
+
         auto count_host =
             Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, _count );
         auto init_count = count_host( 0 );
@@ -260,9 +265,12 @@ struct BoundaryCondition
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType&, double time )
+    void apply( ExecSpace, ParticleType& particles, double time )
     {
+        checkParticleCount( _index_space.particle_count,
+                            particles.referenceOffset(), "BoundaryCondition" );
         _timer.start();
+
         auto user = _user_functor;
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
@@ -304,6 +312,9 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
     template <class ExecSpace, class ParticleType>
     void apply( ExecSpace, ParticleType& particles, double )
     {
+        checkParticleCount( _index_space.particle_count,
+                            particles.referenceOffset(), "BoundaryCondition" );
+
         _timer.start();
         auto f = particles.sliceForce();
         auto index_space = _index_space._view;
@@ -348,8 +359,10 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     template <class ExecSpace, class ParticleType>
     void apply( ExecSpace, ParticleType& particles, double )
     {
-        _timer.start();
+        checkParticleCount( _index_space.particle_count,
+                            particles.referenceOffset(), "BoundaryCondition" );
 
+        _timer.start();
         auto f = particles.sliceForce();
         auto index_space = _index_space._view;
         Kokkos::RangePolicy<ExecSpace> policy( 0, index_space.size() );
@@ -360,7 +373,6 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
                 for ( int d = 0; d < 3; d++ )
                     f( pid, d ) += value;
             } );
-
         _timer.stop();
     }
 
