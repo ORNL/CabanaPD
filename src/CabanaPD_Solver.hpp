@@ -266,6 +266,36 @@ class Solver
         init( boundary_condition, initial_output );
     }
 
+    // Given a user functor, remove certain particles.
+    void remove( const double threshold, const bool use_frozen = false )
+    {
+        // Remove any points that are too close.
+        Kokkos::View<int*, memory_space> keep( "keep_points",
+                                               particles->numLocal() );
+        Kokkos::deep_copy( keep, 1 );
+        auto f = particles->sliceForce();
+        std::size_t min_particle = particles->numFrozen();
+        if ( use_frozen )
+            min_particle = 0;
+        auto remove_functor = KOKKOS_LAMBDA( const int pid, int& k )
+        {
+            auto f_mag = Kokkos::hypot( f( pid, 0 ), f( pid, 1 ), f( pid, 2 ) );
+            if ( f_mag > threshold )
+                keep( pid - min_particle ) = 0;
+            else
+                k++;
+        };
+
+        int num_keep;
+        Kokkos::RangePolicy<exec_space> policy( min_particle,
+                                                particles->localOffset() );
+        Kokkos::parallel_reduce( "remove", policy, remove_functor,
+                                 Kokkos::Sum<int>( num_keep ) );
+
+        particles->remove( num_keep, keep );
+        // FIXME: Will need to rebuild ghosts.
+    }
+
     template <typename BoundaryType>
     void run( BoundaryType boundary_condition )
     {

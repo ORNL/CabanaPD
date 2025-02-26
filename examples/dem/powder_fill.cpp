@@ -127,32 +127,13 @@ void powderSettlingExample( const std::string filename )
     // ====================================================
     cabana_pd->init();
 
-    // Remove any points that are too close.
-    Kokkos::View<int*, memory_space> keep( "keep_points",
-                                           particles->numLocal() );
-    Kokkos::deep_copy( keep, 1 );
-    int num_keep;
-    auto num_frozen = particles->numFrozen();
-    auto f = particles->sliceForce();
-    auto remove_functor = KOKKOS_LAMBDA( const int pid, int& k )
-    {
-        auto f_mag = Kokkos::hypot( f( pid, 0 ), f( pid, 1 ), f( pid, 2 ) );
-        if ( f_mag > 1e8 )
-            keep( pid - num_frozen ) = 0;
-        else
-            k++;
-    };
-    Kokkos::RangePolicy<exec_space> policy( num_frozen,
-                                            particles->localOffset() );
-    Kokkos::parallel_reduce( "remove", policy, remove_functor,
-                             Kokkos::Sum<int>( num_keep ) );
-    cabana_pd->particles->remove( num_keep, keep );
-    // FIXME: Will need to rebuild ghosts.
+    // Use a force magnitude threshold to remove particles that are too close.
+    cabana_pd->remove( 1e8 );
 
     // ====================================================
     //                   Boundary condition
     // ====================================================
-    f = cabana_pd->particles->sliceForce();
+    auto f = cabana_pd->particles->sliceForce();
     rho = cabana_pd->particles->sliceDensity();
     auto body_functor = KOKKOS_LAMBDA( const int pid, const double )
     {
