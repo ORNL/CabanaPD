@@ -130,9 +130,6 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
 
     Timer _timer;
 
-    // Default for empty case.
-    BoundaryIndexSpace() {}
-
     // Construct from region (search for boundary particles).
     template <class ExecSpace, class Particles>
     BoundaryIndexSpace( ExecSpace exec_space, Particles particles,
