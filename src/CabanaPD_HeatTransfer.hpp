@@ -27,14 +27,14 @@ class HeatTransfer;
 template <class MemorySpace, class MechanicsType, class... ModelParams>
 class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, NoFracture,
                                            DynamicTemperature, ModelParams...>>
-    : public Force<MemorySpace, BaseForceModel>
+    : public BaseForce<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
     using model_type = ForceModel<PMB, MechanicsType, NoFracture,
                                   DynamicTemperature, ModelParams...>;
-    using base_type = Force<MemorySpace, BaseForceModel>;
+    using base_type = BaseForce<MemorySpace>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
 
   protected:
@@ -180,8 +180,6 @@ class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, Fracture,
                 // Get the reference positions and displacements.
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
-
-                model.thermalStretch( s, i, j );
 
                 // Only include unbroken bonds.
                 if ( mu( i, n ) > 0 )
