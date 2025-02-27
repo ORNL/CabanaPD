@@ -484,10 +484,16 @@ class Comm<ParticleType, Contact, TemperatureIndependent>
         _timer.stop();
     }
 
+    auto size() { return mpi_size; }
+    auto rank() { return mpi_rank; }
+
     auto timeInit() { return _init_timer.time(); };
     auto time() { return _timer.time(); };
 
   protected:
+    int mpi_size;
+    int mpi_rank;
+
     Timer _init_timer;
     Timer _timer;
 };

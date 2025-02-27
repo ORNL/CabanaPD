@@ -153,7 +153,8 @@ class Solver
         integrator = std::make_shared<integrator_type>( dt );
 
         // Add ghosts from other MPI ranks.
-        comm = std::make_shared<comm_type>( particles );
+        if constexpr ( !is_contact<force_model_type>::value )
+            comm = std::make_shared<comm_type>( particles );
 
         // Update temperature ghost size if needed.
         if constexpr ( is_temperature_dependent<
@@ -223,7 +224,8 @@ class Solver
                            typename force_model_type::fracture_type>::value )
         {
             force->computeWeightedVolume( particles, neigh_iter_tag{} );
-            comm->gatherWeightedVolume();
+            if constexpr ( !is_contact<force_model_type>::value )
+                comm->gatherWeightedVolume();
         }
         // Compute initial internal forces and energy.
         updateForce();
@@ -321,7 +323,8 @@ class Solver
             integrator->initialHalfStep( exec_space{}, particles );
 
             // Update ghost particles.
-            comm->gatherDisplacement();
+            if constexpr ( !is_contact<force_model_type>::value )
+                comm->gatherDisplacement();
 
             if constexpr ( is_heat_transfer<
                                typename force_model_type::thermal_type>::value )
@@ -378,7 +381,8 @@ class Solver
             integrator->initialHalfStep( exec_space{}, particles );
 
             // Update ghost particles.
-            comm->gatherDisplacement();
+            if constexpr ( !is_contact<force_model_type>::value )
+                comm->gatherDisplacement();
 
             // Compute internal forces.
             updateForce();
@@ -410,11 +414,13 @@ class Solver
                            typename force_model_type::fracture_type>::value )
         {
             force->computeWeightedVolume( particles, neigh_iter_tag{} );
-            comm->gatherWeightedVolume();
+            if constexpr ( !is_contact<force_model_type>::value )
+                comm->gatherWeightedVolume();
         }
         // Compute and communicate dilatation for LPS (does nothing for PMB).
         force->computeDilatation( particles, neigh_iter_tag{} );
-        comm->gatherDilatation();
+        if constexpr ( !is_contact<force_model_type>::value )
+            comm->gatherDilatation();
 
         // Compute internal forces.
         computeForce( *force, particles, neigh_iter_tag{} );
@@ -442,8 +448,11 @@ class Solver
     {
         // Output after construction and initial forces.
         std::ofstream out( output_file, std::ofstream::app );
+        double comm_time = 0.0;
+        if constexpr ( !is_contact<force_model_type>::value )
+            comm_time = comm->timeInit();
         _init_time += _init_timer.time() + _neighbor_timer.time() +
-                      particles.timeInit() + comm->timeInit() +
+                      particles.timeInit() + comm_time +
                       integrator->timeInit() + boundary_init_time;
         log( out, "Init-Time(s): ", _init_time );
         log( out, "Init-Neighbor-Time(s): ", _neighbor_timer.time(), "\n" );
@@ -462,7 +471,9 @@ class Solver
                  std::setprecision( 2 ), step * dt );
 
             double step_time = _step_timer.time();
-            double comm_time = comm->time();
+            double comm_time = 0.0;
+            if constexpr ( !is_contact<force_model_type>::value )
+                comm_time = comm->time();
             double integrate_time = integrator->time();
             double force_time = force->time();
             double neigh_time = force->neighTime();
@@ -490,7 +501,22 @@ class Solver
         if ( print )
         {
             std::ofstream out( output_file, std::ofstream::app );
-            double comm_time = comm->time();
+            // No PD communication if doing DEM only; no contact comm if not
+            // using contact.
+            double comm_time = 0.0;
+            // Comm sizes will be equivalent for either case.
+            int mpi_size = 1;
+            if constexpr ( !is_contact<force_model_type>::value )
+            {
+                comm_time = comm->time();
+                mpi_size = comm->size();
+            }
+            if constexpr ( is_contact<force_model_type>::value ||
+                           is_contact<contact_model_type>::value )
+            {
+                comm_time += contact_comm->time();
+                mpi_size = contact_comm->size();
+            }
             double integrate_time = integrator->time();
             double force_time = force->time();
             double energy_time = force->timeEnergy();
@@ -507,18 +533,18 @@ class Solver
             log( out, std::fixed, std::setprecision( 2 ),
                  "\n#Procs Particles | Total Force Comm Integrate Energy "
                  "Output Init Init_Neighbor |\n",
-                 comm->mpi_size, " ", particles.numGlobal(), " | \t",
-                 _total_time, " ", force_time, " ", comm_time, " ",
-                 integrate_time, " ", energy_time, " ", output_time, " ",
-                 _init_time, " ", neighbor_time, " | PERFORMANCE\n", std::fixed,
-                 comm->mpi_size, " ", particles.numGlobal(), " | \t", 1.0, " ",
+                 mpi_size, " ", particles.numGlobal(), " | \t", _total_time,
+                 " ", force_time, " ", comm_time, " ", integrate_time, " ",
+                 energy_time, " ", output_time, " ", _init_time, " ",
+                 neighbor_time, " | PERFORMANCE\n", std::fixed, mpi_size, " ",
+                 particles.numGlobal(), " | \t", 1.0, " ",
                  force_time / _total_time, " ", comm_time / _total_time, " ",
                  integrate_time / _total_time, " ", energy_time / _total_time,
                  " ", output_time / _total_time, " ", _init_time / _total_time,
                  " ", neighbor_time / _total_time, " | FRACTION\n\n",
                  "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
                  std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
-                 p_steps_per_sec / comm->mpi_size );
+                 p_steps_per_sec / mpi_size );
             out.close();
         }
     }
@@ -527,9 +553,10 @@ class Solver
     void remove( const int num_keep, const KeepType& keep )
     {
         // Remove particles based on user View.
-        particles->remove( num_keep, keep );
+        particles.remove( num_keep, keep );
         // Recreate comm lists since they're out of date.
-        comm = std::make_shared<comm_type>( *particles );
+        if constexpr ( !is_contact<force_model_type>::value )
+            comm = std::make_shared<comm_type>( *particles );
         if constexpr ( is_contact<force_model_type>::value ||
                        is_contact<contact_model_type>::value )
             contact_comm = std::make_shared<contact_comm_type>( *particles );
