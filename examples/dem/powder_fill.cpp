@@ -128,7 +128,9 @@ void powderSettlingExample( const std::string filename )
     cabana_pd->init();
 
     // Use a force magnitude threshold to remove particles that are too close.
-    cabana_pd->remove( 1e8 );
+    // TODO: The force magnitude should be based on the maximum desired overlap
+    // according to the properties of the contact model
+    cabana_pd->remove( 1e6 );
 
     // ====================================================
     //                   Boundary condition
