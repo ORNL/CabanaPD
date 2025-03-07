@@ -136,44 +136,43 @@ class BasePlasticity
     }
 };
 
+/******************************************************************************
+  Multi-material models
+******************************************************************************/
 struct AverageTag
 {
 };
 
 // Wrap multiple models in a single object.
 // TODO: this currently only supports bi-material systems.
-template <typename MaterialType, typename... ModelType>
+template <typename MaterialType, typename ModelType1, typename ModelType2,
+          typename ModelType12>
 struct ForceModels
 {
     using material_type = MultiMaterial;
 
-    using tuple_type = std::tuple<ModelType...>;
-    using first_model = typename std::tuple_element<0, tuple_type>::type;
+    using first_model = ModelType1;
     using model_type = typename first_model::model_type;
     using base_model = typename first_model::base_model;
     using thermal_type = typename first_model::thermal_type;
     using fracture_type = typename first_model::fracture_type;
 
-    ForceModels( MaterialType t, const ModelType... m )
+    ForceModels( MaterialType t, const ModelType1 m1, ModelType2 m2,
+                 ModelType12 m12 )
         : delta( 0.0 )
         , type( t )
-        , models( std::make_tuple( m... ) )
-    {
-        setHorizon();
-    }
-
-    ForceModels( MaterialType t, const tuple_type m )
-        : delta( 0.0 )
-        , type( t )
-        , models( m )
+        , model1( m1 )
+        , model2( m2 )
+        , model12( m12 )
     {
         setHorizon();
     }
 
     void setHorizon()
     {
-        std::apply( [this]( auto&&... m ) { ( this->maxDelta( m ), ... ); },
-                    models );
+        maxDelta( model1 );
+        maxDelta( model2 );
+        maxDelta( model12 );
     }
 
     template <typename Model>
@@ -209,20 +208,13 @@ struct ForceModels
                                             Args... args ) const
     {
         auto t = getIndex( i, j );
-        return apply<0>( t, tag, i, j, std::forward<Args>( args )... );
-    }
-
-    template <std::size_t N, typename Tag, typename... Args>
-    KOKKOS_INLINE_FUNCTION auto apply( const int t, Tag tag,
-                                       Args... args ) const
-    {
         // Call individual model.
-        if ( N == t )
-            return std::get<N>( models )( tag, std::forward<Args>( args )... );
-
-        // Recurse to find the right index.
-        if constexpr ( N + 1 < std::tuple_size_v<tuple_type> )
-            return apply<N + 1>( t, tag, std::forward<Args>( args )... );
+        if ( t == 0 )
+            return model1( tag, i, j, std::forward<Args>( args )... );
+        else if ( t == 1 )
+            return model2( tag, i, j, std::forward<Args>( args )... );
+        else if ( t == 2 )
+            return model12( tag, i, j, std::forward<Args>( args )... );
         else
             Kokkos::abort( "Invalid model index." );
     }
@@ -234,40 +226,28 @@ struct ForceModels
 
     double delta;
     MaterialType type;
-    tuple_type models;
+    ModelType1 model1;
+    ModelType2 model2;
+    ModelType12 model12;
 };
 
-template <typename ParticleType, typename... ModelType>
-auto createMultiForceModel( ParticleType particles, ModelType... models )
+template <typename ParticleType, typename ModelType1, typename ModelType2,
+          typename ModelType12>
+auto createMultiForceModel( ParticleType particles, ModelType1 m1,
+                            ModelType2 m2, ModelType12 m12 )
 {
-    static_assert( std::tuple_size_v<std::tuple<ModelType...>> == 3,
-                   "Only binary material systems supported." );
-
     auto type = particles.sliceType();
-    using material_type = decltype( type );
-    return ForceModels<material_type, ModelType...>( type, models... );
+    return ForceModels( type, m1, m2, m12 );
 }
 
-template <typename ParticleType, typename... ModelType>
-auto createMultiForceModel( ParticleType particles, AverageTag,
-                            ModelType... models )
+template <typename ParticleType, typename ModelType1, typename ModelType2>
+auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
+                            ModelType2 m2 )
 {
-    static_assert( std::tuple_size_v<std::tuple<ModelType...>> == 2,
-                   "Only binary material systems supported." );
-
-    auto tuple = std::make_tuple( models... );
-    auto m1 = std::get<0>( tuple );
-    auto m2 = std::get<1>( tuple );
-
-    using first_model =
-        typename std::tuple_element<0, std::tuple<ModelType...>>::type;
-    auto m12 = std::make_tuple( first_model( m1, m2 ) );
-    auto all_models = std::tuple_cat( tuple, m12 );
+    ModelType1 m12( m1, m2 );
 
     auto type = particles.sliceType();
-    using material_type = decltype( type );
-    return ForceModels<material_type, ModelType..., first_model>( type,
-                                                                  all_models );
+    return ForceModels( type, m1, m2, m12 );
 }
 
 template <typename TemperatureType>
