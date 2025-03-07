@@ -496,6 +496,10 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         return Cabana::slice<0>( _aosoa_u, "displacements" );
     }
     auto sliceForce() { return _plist_f.slice( CabanaPD::Field::Force() ); }
+    auto sliceForce() const
+    {
+        return _plist_f.slice( CabanaPD::Field::Force() );
+    }
     auto sliceForceAtomic()
     {
         auto f = sliceForce();
@@ -655,6 +659,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
         _output_timer.stop();
     }
+
+    auto rank() { return local_grid->globalGrid().blockId(); }
+    auto comm() { return local_grid->globalGrid().comm(); }
 
     auto timeInit() { return _init_timer.time(); };
     auto timeOutput() { return _output_timer.time(); };
