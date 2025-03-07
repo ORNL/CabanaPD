@@ -141,8 +141,8 @@ void powderSettlingExample( const std::string filename )
     {
         f( pid, 2 ) -= 9.8 * rho( pid );
     };
-    auto gravity = CabanaPD::createBodyTerm(
-        body_functor, particles->referenceOffset(), true );
+    auto gravity =
+        CabanaPD::createBodyTerm( body_functor, particles->size(), true );
 
     // ====================================================
     //                   Simulation run
