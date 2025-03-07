@@ -109,8 +109,8 @@ class Solver
 
     Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
             force_model_type force_model )
-        : inputs( _inputs )
-        , particles( _particles )
+        : particles( _particles )
+        , inputs( _inputs )
         , _init_time( 0.0 )
     {
         setup( force_model );
@@ -118,8 +118,8 @@ class Solver
 
     Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
             force_model_type force_model, contact_model_type contact_model )
-        : inputs( _inputs )
-        , particles( _particles )
+        : particles( _particles )
+        , inputs( _inputs )
         , _init_time( 0.0 )
     {
         setup( force_model );
@@ -264,6 +264,36 @@ class Solver
     {
         init_prenotch( prenotch );
         init( boundary_condition, initial_output );
+    }
+
+    // Given a user functor, remove certain particles.
+    void remove( const double threshold, const bool use_frozen = false )
+    {
+        // Remove any points that are too close.
+        Kokkos::View<int*, memory_space> keep( "keep_points",
+                                               particles->numLocal() );
+        Kokkos::deep_copy( keep, 1 );
+        auto f = particles->sliceForce();
+        std::size_t min_particle = particles->numFrozen();
+        if ( use_frozen )
+            min_particle = 0;
+        auto remove_functor = KOKKOS_LAMBDA( const int pid, int& k )
+        {
+            auto f_mag = Kokkos::hypot( f( pid, 0 ), f( pid, 1 ), f( pid, 2 ) );
+            if ( f_mag > threshold )
+                keep( pid - min_particle ) = 0;
+            else
+                k++;
+        };
+
+        int num_keep;
+        Kokkos::RangePolicy<exec_space> policy( min_particle,
+                                                particles->localOffset() );
+        Kokkos::parallel_reduce( "remove", policy, remove_functor,
+                                 Kokkos::Sum<int>( num_keep ) );
+
+        particles->remove( num_keep, keep );
+        // FIXME: Will need to rebuild ghosts.
     }
 
     template <typename BoundaryType>
@@ -473,6 +503,8 @@ class Solver
     bool output_reference;
     double dt;
     int thermal_subcycle_steps;
+    // Sometimes necessary to update particles after solver creation.
+    std::shared_ptr<particle_type> particles;
 
   protected:
     template <std::size_t NumPrenotch>
@@ -489,7 +521,6 @@ class Solver
 
     // Core modules.
     input_type inputs;
-    std::shared_ptr<particle_type> particles;
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
