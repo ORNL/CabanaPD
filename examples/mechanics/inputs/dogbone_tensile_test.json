@@ -1,0 +1,19 @@
+{
+    "num_cells"              : {"value": [501, 57, 9]},
+    "system_size"            : {"value": [0.165, 0.019, 0.0032], "unit": "m"},
+    "gage_length"            : {"value": 0.050, "unit": "m"},
+    "width_narrow_section"   : {"value": 0.013, "unit": "m"},
+    "fillet_radius"          : {"value": 0.076, "unit": "m"},
+    "distance_between_grips" : {"value": 0.115, "unit": "m"},
+    "density"                : {"value": 2700, "unit": "kg/m^3"},
+    "elastic_modulus"        : {"value": 72.6e+9, "unit": "Pa"},
+    "fracture_energy"        : {"value": 16160, "unit": "J/m^2"},
+    "horizon"                : {"value": 9.881e-4, "unit": "m"},   
+    "yield_stress"           : {"value": 304e6, "unit": "Pa"},
+    "grip_velocity"          : {"value": 7.15e-2, "unit": "m/s"},
+    "final_time"             : {"value": 1e-4, "unit": "s"},
+    "timestep"               : {"value": 4.85e-8, "unit": "s"},
+    "timestep_safety_factor" : {"value": 0.85},
+    "output_frequency"       : {"value": 5},
+    "output_reference"       : {"value": false}
+}
