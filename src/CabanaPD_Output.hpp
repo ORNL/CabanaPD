@@ -26,6 +26,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 #include <mpi.h>
@@ -60,8 +61,7 @@ void log_err( t_stream& stream, t_last&& last )
     if ( print_rank() )
     {
         stream << last << std::endl;
-        throw std::runtime_error(
-            "Aborting after error from input. See error file." );
+        throw std::runtime_error( "Aborting after error." );
     }
 }
 
@@ -71,6 +71,16 @@ void log_err( t_stream& stream, t_head&& head, t_tail&&... tail )
     if ( print_rank() )
         stream << head;
     log_err( stream, std::forward<t_tail>( tail )... );
+}
+
+void checkParticleCount( std::size_t initial, std::size_t current,
+                         std::string name )
+{
+    if ( initial != current )
+        log_err( std::cout, "\nParticle size (", std::to_string( current ),
+                 ") does not match size when ", name, " was created (",
+                 std::to_string( initial ),
+                 ").\n Likely a slice() call is missing." );
 }
 
 } // namespace CabanaPD

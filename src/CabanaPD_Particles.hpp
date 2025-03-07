@@ -99,7 +99,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     std::size_t frozen_offset = 0;
     std::size_t local_offset = 0;
     std::size_t num_ghost = 0;
-    std::size_t size = 0;
+    std::size_t _size = 0;
 
     // x, u, f (vector matching system dimension).
     using vector_type = Cabana::MemberTypes<double[dim]>;
@@ -464,7 +464,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     auto numLocal() const { return local_offset - frozen_offset; }
     auto localOffset() const { return local_offset; }
     auto numGhost() const { return num_ghost; }
-    auto referenceOffset() const { return size; }
+    // This is currently size because contact ghosts are not added yet.
+    auto referenceOffset() const { return _size; }
+    auto size() const { return _size; }
     auto numGlobal() const { return num_global; }
 
     auto sliceReferencePosition()
@@ -567,7 +569,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
         local_offset = new_local;
         num_ghost = new_ghost;
-        size = new_local + new_ghost;
+        _size = new_local + new_ghost;
 
         _plist_x.aosoa().resize( referenceOffset() );
         _aosoa_u.resize( referenceOffset() );
@@ -577,9 +579,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         _aosoa_other.resize( localOffset() );
         _aosoa_nofail.resize( referenceOffset() );
 
-        size = _plist_x.size();
+        _size = _plist_x.size();
         if ( create_frozen )
-            frozen_offset = size;
+            frozen_offset = _size;
         _timer.stop();
     };
 

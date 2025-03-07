@@ -16,6 +16,7 @@
 
 #include <Cabana_Core.hpp>
 
+#include <CabanaPD_Output.hpp>
 #include <CabanaPD_Timer.hpp>
 
 namespace CabanaPD
@@ -25,13 +26,16 @@ template <class UserFunctor>
 struct BodyTerm
 {
     UserFunctor _user_functor;
+    std::size_t _particle_count;
     bool _force_update;
     bool _update_frozen;
 
     Timer _timer;
 
-    BodyTerm( UserFunctor user, const bool force, const bool update_frozen )
+    BodyTerm( UserFunctor user, const std::size_t particle_count,
+              const bool force, const bool update_frozen )
         : _user_functor( user )
+        , _particle_count( particle_count )
         , _force_update( force )
         , _update_frozen( update_frozen )
     {
@@ -42,6 +46,9 @@ struct BodyTerm
     template <class ExecSpace, class ParticleType>
     void apply( ExecSpace, ParticleType& particles, const double time )
     {
+        checkParticleCount( _particle_count, particles.referenceOffset(),
+                            "BodyTerm" );
+
         _timer.start();
         std::size_t start = particles.frozenOffset();
         if ( _update_frozen )
@@ -61,10 +68,11 @@ struct BodyTerm
 };
 
 template <class UserFunctor>
-auto createBodyTerm( UserFunctor user_functor, const bool force_update,
-                     const bool update_frozen = false )
+auto createBodyTerm( UserFunctor user_functor, const std::size_t particle_count,
+                     const bool force_update, const bool update_frozen = false )
 {
-    return BodyTerm<UserFunctor>( user_functor, force_update, update_frozen );
+    return BodyTerm<UserFunctor>( user_functor, particle_count, force_update,
+                                  update_frozen );
 }
 
 } // namespace CabanaPD
