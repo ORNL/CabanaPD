@@ -1,7 +1,6 @@
 {
     "dx"                       : {"value": [0.001, 0.001, 0.001], "unit": "m"},
     "system_size"              : {"value": [0.2, 0.2, 0.3], "unit": "m"},
-    "grid_perturbation_factor" : {"value": 0.1},
     "density"                  : {"value": 7800, "unit": "kg/m^3"},
     "bulk_modulus"             : {"value": 130e+9, "unit": "Pa"},
     "shear_modulus"            : {"value": 78e+9, "unit": "Pa"},
@@ -11,6 +10,7 @@
     "contact_horizon_factor"   : {"value": 0.9},  
     "cylinder_outer_radius"    : {"value": 0.025, "unit": "m"},
     "cylinder_inner_radius"    : {"value": 0.02, "unit": "m"},
+    "cylinder_height"          : {"value": 0.1, "unit": "m"},
     "max_radial_velocity"      : {"value": 200, "unit": "m/s"}, 
     "min_radial_velocity"      : {"value": 50, "unit": "m/s"},
     "max_vertical_velocity"    : {"value": 100, "unit": "m/s"}, 
