@@ -2,9 +2,11 @@ configure_file(CabanaPD_config.hpp.cmakein CabanaPD_config.hpp @ONLY)
 
 file(GLOB HEADERS GLOB *.hpp)
 file(GLOB FORCE_HEADERS GLOB force/*.hpp)
+file(GLOB FORCE_MODEL_HEADERS GLOB force_models/*.hpp)
 
 install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES ${FORCE_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/force)
+install(FILES ${FORCE_MODEL_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/force_models)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/CabanaPD_config.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 add_library(CabanaPD INTERFACE)
