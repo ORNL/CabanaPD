@@ -657,7 +657,7 @@ template <class ForceType, class ParticleType>
 double computeEnergyAndForce( ForceType force, ParticleType& particles,
                               const int )
 {
-    computeForce( force, particles, Cabana::SerialOpTag() );
+    computeForce( force, particles, 0.0, Cabana::SerialOpTag() );
     double Phi = computeEnergy( force, particles, Cabana::SerialOpTag() );
     return Phi;
 }
