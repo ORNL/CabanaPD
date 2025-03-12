@@ -59,7 +59,8 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    CabanaPD::ForceModel force_model( CabanaPD::LPS{}, delta, K, G, G0 );
+    using model_type = CabanaPD::LPS;
+    CabanaPD::ForceModel force_model( model_type{}, delta, K, G, G0 );
 
     // ====================================================
     //    Custom particle generation and initialization
@@ -83,7 +84,7 @@ void fragmentingCylinderExample( const std::string filename )
     };
 
     CabanaPD::Particles particles(
-        memory_space{}, force_model, low_corner, high_corner, num_cells,
+        memory_space{}, model_type{}, low_corner, high_corner, num_cells,
         halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
 
     auto rho = particles.sliceDensity();

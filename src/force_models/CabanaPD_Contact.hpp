@@ -28,6 +28,8 @@ struct ContactModel
     double delta;
     double Rc;
 
+    ContactModel() {}
+
     // PD horizon
     // Contact radius
     ContactModel( const double _delta, const double _Rc )

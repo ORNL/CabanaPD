@@ -77,14 +77,14 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    CabanaPD::ForceModel force_model( CabanaPD::PMB{}, delta, K, G0 );
+    using model_type = CabanaPD::PMB;
+    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0 );
     // CabanaPD::ForceModel force_model( CabanaPD::LPS{}, delta, K, G, G0 );
 
     // ====================================================
     //                 Particle generation
     // ====================================================
-    // Does not set displacements, velocities, etc.
-    CabanaPD::Particles particles( memory_space{}, force_model, low_corner,
+    CabanaPD::Particles particles( memory_space{}, model_type{}, low_corner,
                                    high_corner, num_cells, halo_width,
                                    exec_space{} );
 
