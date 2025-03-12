@@ -395,7 +395,7 @@ double computeReferenceForceX(
 template <class ModelType>
 CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
                     typename ModelType::thermal_type, CabanaPD::EnergyOutput>
-createParticles( ModelType, LinearTag, const double dx, const double s0 )
+createParticles( ModelType model, LinearTag, const double dx, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -403,11 +403,8 @@ createParticles( ModelType, LinearTag, const double dx, const double s0 )
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    using ptype =
-        CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
-                            typename ModelType::thermal_type,
-                            CabanaPD::EnergyOutput>;
-    ptype particles( TEST_EXECSPACE{}, box_min, box_max, num_cells, 0 );
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, model, box_min, box_max,
+                                   num_cells, 0, TEST_EXECSPACE{} );
 
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
@@ -427,7 +424,8 @@ createParticles( ModelType, LinearTag, const double dx, const double s0 )
 template <class ModelType>
 CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
                     typename ModelType::thermal_type, CabanaPD::EnergyOutput>
-createParticles( ModelType, QuadraticTag, const double dx, const double s0 )
+createParticles( ModelType model, QuadraticTag, const double dx,
+                 const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -435,11 +433,8 @@ createParticles( ModelType, QuadraticTag, const double dx, const double s0 )
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    using ptype =
-        CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
-                            typename ModelType::thermal_type,
-                            CabanaPD::EnergyOutput>;
-    ptype particles( TEST_EXECSPACE{}, box_min, box_max, num_cells, 0 );
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, model, box_min, box_max,
+                                   num_cells, 0, TEST_EXECSPACE{} );
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto v = particles.sliceVelocity();
@@ -749,8 +744,8 @@ TEST( TEST_CATEGORY, test_force_pmb )
     double dx = 2.0 / 11.0;
     double delta = dx * m;
     double K = 1.0;
-    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic, CabanaPD::NoFracture>
-        model( delta, K );
+    CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::Elastic{},
+                                CabanaPD::NoFracture{}, delta, K );
     testForce( model, dx, m, 1.1, LinearTag{}, 0.1 );
     testForce( model, dx, m, 1.1, QuadraticTag{}, 0.01 );
 }
@@ -760,9 +755,8 @@ TEST( TEST_CATEGORY, test_force_linear_pmb )
     double dx = 2.0 / 11.0;
     double delta = dx * m;
     double K = 1.0;
-    CabanaPD::ForceModel<CabanaPD::LinearPMB, CabanaPD::Elastic,
-                         CabanaPD::NoFracture>
-        model( delta, K );
+    CabanaPD::ForceModel model( CabanaPD::LinearPMB{}, CabanaPD::Elastic{},
+                                CabanaPD::NoFracture{}, delta, K );
     testForce( model, dx, m, 1.1, LinearTag{}, 0.1 );
 }
 TEST( TEST_CATEGORY, test_force_lps )
@@ -773,8 +767,8 @@ TEST( TEST_CATEGORY, test_force_lps )
     double delta = dx * m;
     double K = 1.0;
     double G = 0.5;
-    CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Elastic, CabanaPD::NoFracture>
-        model( delta, K, G, 1 );
+    CabanaPD::ForceModel model( CabanaPD::LPS{}, CabanaPD::Elastic{},
+                                CabanaPD::NoFracture{}, delta, K, G, 1 );
     testForce( model, dx, m, 2.1, LinearTag{}, 0.1 );
     testForce( model, dx, m, 2.1, QuadraticTag{}, 0.01 );
 }
@@ -785,9 +779,8 @@ TEST( TEST_CATEGORY, test_force_linear_lps )
     double delta = dx * m;
     double K = 1.0;
     double G = 0.5;
-    CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::Elastic,
-                         CabanaPD::NoFracture>
-        model( delta, K, G, 1 );
+    CabanaPD::ForceModel model( CabanaPD::LinearLPS{}, CabanaPD::NoFracture{},
+                                delta, K, G, 1 );
     testForce( model, dx, m, 2.1, LinearTag{}, 0.1 );
 }
 
@@ -800,7 +793,7 @@ TEST( TEST_CATEGORY, test_force_pmb_damage )
     double K = 1.0;
     // Large value to make sure no bonds break.
     double G0 = 1000.0;
-    CabanaPD::ForceModel<CabanaPD::PMB> model( delta, K, G0 );
+    CabanaPD::ForceModel model( CabanaPD::PMB{}, delta, K, G0 );
     testForce( model, dx, m, 1.1, LinearTag{}, 0.1 );
     testForce( model, dx, m, 1.1, QuadraticTag{}, 0.01 );
 }
@@ -812,7 +805,7 @@ TEST( TEST_CATEGORY, test_force_lps_damage )
     double K = 1.0;
     double G = 0.5;
     double G0 = 1000.0;
-    CabanaPD::ForceModel<CabanaPD::LPS> model( delta, K, G, G0, 1 );
+    CabanaPD::ForceModel model( CabanaPD::LPS{}, delta, K, G, G0, 1 );
     testForce( model, dx, m, 2.1, LinearTag{}, 0.1 );
     testForce( model, dx, m, 2.1, QuadraticTag{}, 0.01 );
 }

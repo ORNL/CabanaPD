@@ -67,35 +67,34 @@ void thermalDeformationExample( const std::string filename )
     //                 Particle generation
     // ====================================================
     // Does not set displacements, velocities, etc.
-    auto particles =
-        CabanaPD::createParticles<memory_space, model_type, thermal_type>(
-            exec_space(), low_corner, high_corner, num_cells, halo_width );
+    CabanaPD::Particles particles( memory_space{}, model_type{}, thermal_type{},
+                                   low_corner, high_corner, num_cells,
+                                   halo_width, exec_space{} );
 
     // ====================================================
     //            Custom particle initialization
     // ====================================================
-    auto rho = particles->sliceDensity();
+    auto rho = particles.sliceDensity();
     auto init_functor = KOKKOS_LAMBDA( const int pid ) { rho( pid ) = rho0; };
-    particles->updateParticles( exec_space{}, init_functor );
+    particles.updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                    Force model
     // ====================================================
-    auto force_model =
-        CabanaPD::createForceModel( model_type{}, CabanaPD::NoFracture{},
-                                    *particles, delta, K, alpha, temp0 );
+    auto temp = particles.sliceTemperature();
+    CabanaPD::ForceModel force_model( model_type{}, CabanaPD::NoFracture{},
+                                      delta, K, temp, alpha, temp0 );
 
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd =
-        CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
+    CabanaPD::Solver solver( inputs, particles, force_model );
 
     // ====================================================
     //                   Imposed field
     // ====================================================
-    auto x = particles->sliceReferencePosition();
-    auto temp = particles->sliceTemperature();
+    auto x = particles.sliceReferencePosition();
+    temp = particles.sliceTemperature();
     const double low_corner_y = low_corner[1];
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
@@ -103,36 +102,35 @@ void thermalDeformationExample( const std::string filename )
     {
         temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
     };
-    auto body_term =
-        CabanaPD::createBodyTerm( temp_func, particles->size(), false );
+    CabanaPD::BodyTerm body_term( temp_func, particles.size(), false );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init( body_term );
-    cabana_pd->run( body_term );
+    solver.init( body_term );
+    solver.run( body_term );
 
     // ====================================================
     //                      Outputs
     // ====================================================
     // Output y-displacement along the x-axis
     createDisplacementProfile( MPI_COMM_WORLD,
-                               "ydisplacement_xaxis_profile.txt", *particles,
+                               "ydisplacement_xaxis_profile.txt", particles,
                                num_cells[0], 0, 1 );
 
     // Output y-displacement along the y-axis
     createDisplacementProfile( MPI_COMM_WORLD,
-                               "ydisplacement_yaxis_profile.txt", *particles,
+                               "ydisplacement_yaxis_profile.txt", particles,
                                num_cells[1], 1, 1 );
 
     // Output displacement magnitude along the x-axis
     createDisplacementMagnitudeProfile(
-        MPI_COMM_WORLD, "displacement_magnitude_xaxis_profile.txt", *particles,
+        MPI_COMM_WORLD, "displacement_magnitude_xaxis_profile.txt", particles,
         num_cells[0], 0 );
 
     // Output displacement magnitude along the y-axis
     createDisplacementMagnitudeProfile(
-        MPI_COMM_WORLD, "displacement_magnitude_yaxis_profile.txt", *particles,
+        MPI_COMM_WORLD, "displacement_magnitude_yaxis_profile.txt", particles,
         num_cells[1], 1 );
 }
 

@@ -118,20 +118,20 @@ void randomCracksExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type = CabanaPD::ForceModel<CabanaPD::PMB>;
-    model_type force_model( delta, K, G0 );
+    using model_type = CabanaPD::PMB;
+    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0 );
 
     // ====================================================
     //                 Particle generation
     // ====================================================
     // Note that individual inputs can be passed instead (see other examples).
-    auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space{}, inputs );
+    CabanaPD::Particles particles( memory_space{}, model_type{}, inputs,
+                                   exec_space{} );
 
     // ====================================================
     //                Boundary conditions planes
     // ====================================================
-    double dy = particles->dx[1];
+    double dy = particles.dx[1];
     CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane1(
         low_corner[0], high_corner[0], low_corner[1] - dy, low_corner[1] + dy,
         low_corner[2], high_corner[2] );
@@ -144,11 +144,11 @@ void randomCracksExample( const std::string filename )
     // ====================================================
     //            Custom particle initialization
     // ====================================================
-    auto rho = particles->sliceDensity();
-    auto x = particles->sliceReferencePosition();
-    auto v = particles->sliceVelocity();
-    auto f = particles->sliceForce();
-    auto nofail = particles->sliceNoFail();
+    auto rho = particles.sliceDensity();
+    auto x = particles.sliceReferencePosition();
+    auto v = particles.sliceVelocity();
+    auto f = particles.sliceForce();
+    auto nofail = particles.sliceNoFail();
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
@@ -159,13 +159,13 @@ void randomCracksExample( const std::string filename )
              x( pid, 1 ) >= plane2.high_y - delta - 1e-10 )
             nofail( pid ) = 1;
     };
-    particles->updateParticles( exec_space{}, init_functor );
+    particles.updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd =
-        CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
+
+    CabanaPD::Solver solver( inputs, particles, force_model );
 
     // ====================================================
     //                Boundary conditions
@@ -173,8 +173,8 @@ void randomCracksExample( const std::string filename )
     // Create BC last to ensure ghost particles are included.
     double sigma0 = inputs["traction"];
     double b0 = sigma0 / dy;
-    f = particles->sliceForce();
-    x = particles->sliceReferencePosition();
+    f = particles.sliceForce();
+    x = particles.sliceReferencePosition();
     // Create a symmetric force BC in the y-direction.
     auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
     {
@@ -182,14 +182,14 @@ void randomCracksExample( const std::string filename )
         auto sign = std::abs( ypos ) / ypos;
         f( pid, 1 ) += b0 * sign;
     };
-    auto bc = createBoundaryCondition( bc_op, exec_space{}, *particles, planes,
-                                       true );
+    auto bc =
+        createBoundaryCondition( bc_op, exec_space{}, particles, planes, true );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init( bc, prenotch );
-    cabana_pd->run( bc );
+    solver.init( bc, prenotch );
+    solver.run( bc );
 }
 
 // Initialize MPI+Kokkos.
