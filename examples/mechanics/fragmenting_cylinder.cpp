@@ -123,7 +123,7 @@ void fragmentingCylinderExample( const std::string filename )
     {
         double r_c = inputs["contact_horizon_factor"];
         r_c *= dx[0];
-        CabanaPD::NormalRepulsionModel contact_model( delta, r_c, K );
+        CabanaPD::NormalRepulsionModel contact_model( delta, r_c, r_c, K );
 
         auto cabana_pd = CabanaPD::createSolver<memory_space>(
             inputs, particles, force_model, contact_model );

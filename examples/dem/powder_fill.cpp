@@ -37,9 +37,8 @@ void powderSettlingExample( const std::string filename )
     // ====================================================
     double rho0 = inputs["density"];
     double vol0 = inputs["volume"];
-    double delta = inputs["horizon"];
-    delta += 1e-10;
     double radius = inputs["radius"];
+    double radius_extend = inputs["radius_extend"];
     double nu = inputs["poisson_ratio"];
     double E = inputs["elastic_modulus"];
     double e = inputs["restitution"];
@@ -50,15 +49,13 @@ void powderSettlingExample( const std::string filename )
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
-    int m = std::floor( delta /
-                        ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
-    int halo_width = m + 1; // Just to be safe.
+    int halo_width = 1;
 
     // ====================================================
     //                    Force model
     // ====================================================
     using model_type = CabanaPD::HertzianModel;
-    model_type contact_model( delta / m * 0.9, radius, nu, E, e );
+    model_type contact_model( radius, radius_extend, nu, E, e );
 
     // ====================================================
     //            Custom particle initialization
