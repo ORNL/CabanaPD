@@ -118,13 +118,14 @@ void randomCracksExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    CabanaPD::ForceModel force_model( CabanaPD::PMB{}, delta, K, G0 );
+    using model_type = CabanaPD::PMB;
+    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0 );
 
     // ====================================================
     //                 Particle generation
     // ====================================================
     // Note that individual inputs can be passed instead (see other examples).
-    CabanaPD::Particles particles( memory_space{}, force_model, inputs,
+    CabanaPD::Particles particles( memory_space{}, model_type{}, inputs,
                                    exec_space{} );
 
     // ====================================================

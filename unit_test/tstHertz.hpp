@@ -94,7 +94,7 @@ void testHertzianContact( const std::string filename )
     //                 Particle generation
     // ====================================================
     int halo_width = 1;
-    CabanaPD::Particles particles( memory_space{}, contact_model, position,
+    CabanaPD::Particles particles( memory_space{}, model_type{}, position,
                                    volume, low_corner, high_corner, num_cells,
                                    halo_width, exec_space{} );
 
