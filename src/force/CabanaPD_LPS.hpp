@@ -65,7 +65,7 @@
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_Particles.hpp>
 #include <CabanaPD_Types.hpp>
-#include <force/CabanaPD_ForceModels_LPS.hpp>
+#include <force_models/CabanaPD_LPS.hpp>
 
 namespace CabanaPD
 {
