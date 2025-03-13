@@ -24,7 +24,7 @@ struct BaseForceModel
     BaseForceModel( const double _delta )
         : delta( _delta ){};
 
-    // Only needed for models which store bond-based values.
+    // Only needed for models which store bond properties.
     void updateBonds( const int, const int ) {}
 
     // No-op for temperature.
