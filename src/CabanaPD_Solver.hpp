@@ -94,7 +94,7 @@ class Solver
 
     // Core module types - required for all problems.
     using particle_type = ParticleType;
-    using integrator_type = Integrator<exec_space>;
+    using integrator_type = VelocityVerlet<exec_space>;
     using force_model_type = ForceModelType;
     using force_type = Force<memory_space, force_model_type>;
     using comm_type = Comm<particle_type, typename force_model_type::base_model,

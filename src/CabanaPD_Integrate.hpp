@@ -68,7 +68,7 @@
 namespace CabanaPD
 {
 template <class ExecutionSpace>
-class Integrator
+class VelocityVerlet
 {
     using exec_space = ExecutionSpace;
 
@@ -76,13 +76,11 @@ class Integrator
     Timer _timer;
 
   public:
-    Integrator( double dt )
+    VelocityVerlet( double dt )
         : _dt( dt )
     {
         _half_dt = 0.5 * dt;
     }
-
-    ~Integrator() {}
 
     template <class ParticlesType>
     double initialHalfStep( ParticlesType& p )
@@ -118,7 +116,7 @@ class Integrator
         Kokkos::RangePolicy<exec_space> policy( p.frozenOffset(),
                                                 p.localOffset() );
         double max_displacement;
-        Kokkos::parallel_reduce( "CabanaPD::Integrator::Initial", policy,
+        Kokkos::parallel_reduce( "CabanaPD::VelocityVerlet::Initial", policy,
                                  init_func,
                                  Kokkos::Max<double>( max_displacement ) );
 
@@ -145,7 +143,7 @@ class Integrator
         };
         Kokkos::RangePolicy<exec_space> policy( p.frozenOffset(),
                                                 p.localOffset() );
-        Kokkos::parallel_for( "CabanaPD::Integrator::Final", policy,
+        Kokkos::parallel_for( "CabanaPD::VelocityVerlet::Final", policy,
                               final_func );
 
         _timer.stop();
