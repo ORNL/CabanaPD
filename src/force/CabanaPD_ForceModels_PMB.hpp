@@ -141,7 +141,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     auto forceCoeff( const int i, const int n, const double s,
                      const double vol ) const
     {
-        // Update bond plastic stretch
+        // Update bond plastic stretch.
         auto s_p = _s_p( i, n );
         // Yield in tension.
         if ( s >= s_p + s_Y )
@@ -156,6 +156,8 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
         return c * ( s - s_p ) * vol;
     }
 
+    // This energy calculation is only valid for pure tension or pure
+    // compression.
     KOKKOS_INLINE_FUNCTION
     auto energy( const int i, const int n, const double s, const double xi,
                  const double vol ) const
@@ -164,14 +166,16 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
         double stretch_term;
         // Yield in tension.
         if ( s >= s_p + s_Y )
-            stretch_term = s_p * ( 2.0 * s - s_p );
+            stretch_term = s_Y * ( 2.0 * s - s_Y );
         // Yield in compression.
         else if ( s <= s_p - s_Y )
-            stretch_term = s_p * ( s_p - 2.0 * s );
+            stretch_term = s_Y * ( -2.0 * s - s_Y );
         else
             // Elastic (in between).
             stretch_term = s * s;
 
+        // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
+        // the integrand (pairwise potential).
         return 0.25 * c * stretch_term * xi * vol;
     }
 };
@@ -367,6 +371,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, TemperatureDependent,
     {
     }
 
+    // This is copied from the base temperature.
     KOKKOS_INLINE_FUNCTION
     bool criticalStretch( const int i, const int j, const double r,
                           const double xi ) const
