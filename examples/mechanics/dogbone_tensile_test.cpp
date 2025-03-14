@@ -141,7 +141,7 @@ void compactTensionTestExample( const std::string filename )
     auto particles =
         CabanaPD::createParticles<memory_space, model_type, thermal_type>(
             exec_space(), low_corner, high_corner, num_cells, halo_width,
-            init_op );
+            Cabana::InitRandom{}, init_op );
 
     auto rho = particles->sliceDensity();
     auto x = particles->sliceReferencePosition();
