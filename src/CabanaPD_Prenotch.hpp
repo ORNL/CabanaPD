@@ -171,45 +171,68 @@ int bondPrenotchIntersection( const Kokkos::Array<double, 3> v1,
     return keep_bond;
 }
 
-template <std::size_t NumNotch, std::size_t NumVector = 1>
+template <typename ViewType>
 struct Prenotch
 {
-    static constexpr std::size_t num_notch = NumNotch;
-    static constexpr std::size_t num_vector = NumNotch;
-    Kokkos::Array<Kokkos::Array<double, 3>, num_vector> _v1;
-    Kokkos::Array<Kokkos::Array<double, 3>, num_vector> _v2;
-    Kokkos::Array<Kokkos::Array<double, 3>, num_notch> _p0;
+    ViewType _v1;
+    ViewType _v2;
+    ViewType _p0;
     bool fixed_orientation;
 
     Timer _timer;
 
-    // Default constructor
-    Prenotch() {}
-
-    // Constructor if all pre-notches are oriented the same way (e.g.
-    // Kalthoff-Winkler).
-    Prenotch( Kokkos::Array<double, 3> v1, Kokkos::Array<double, 3> v2,
-              Kokkos::Array<Kokkos::Array<double, 3>, num_notch> p0 )
-        : _v1( { v1 } )
-        , _v2( { v2 } )
-        , _p0( p0 )
-    {
-        fixed_orientation = true;
-    }
-
-    // Constructor for general case of any orientation for any number of
-    // pre-notches.
-    Prenotch( Kokkos::Array<Kokkos::Array<double, 3>, num_vector> v1,
-              Kokkos::Array<Kokkos::Array<double, 3>, num_vector> v2,
-              Kokkos::Array<Kokkos::Array<double, 3>, num_notch> p0 )
+    // Constructor.
+    Prenotch( ViewType v1, ViewType v2, ViewType p0,
+              typename std::enable_if<( Kokkos::is_view<ViewType>::value ),
+                                      int>::type* = 0 )
         : _v1( v1 )
         , _v2( v2 )
         , _p0( p0 )
     {
-        static_assert(
-            num_vector == num_notch,
-            "Number of orientation vectors must match number of pre-notches." );
+        if ( _v1.extent( 0 ) == 1 && _v2.extent( 0 ) == 1 )
+            fixed_orientation = true;
+        else if ( _v1.size() != _p0.size() )
+            throw std::runtime_error(
+                "Number of orientation vectors must match number of "
+                "pre-notches." );
         fixed_orientation = false;
+    }
+
+    // Array constructor. Single orientation.
+    template <std::size_t NumNotch>
+    Prenotch( Kokkos::Array<double, 3> v1, Kokkos::Array<double, 3> v2,
+              Kokkos::Array<Kokkos::Array<double, 3>, NumNotch> p0 )
+    {
+        using exec_space = typename ViewType::execution_space;
+        Kokkos::RangePolicy<exec_space> policy( 0, 3 );
+        auto copy = KOKKOS_LAMBDA( const int d )
+        {
+            for ( std::size_t p = 0; p < NumNotch; p++ )
+                _p0( p, d ) = p0[p][d];
+            _v1( 0, d ) = v1[d];
+            _v2( 0, d ) = v2[d];
+        };
+        Kokkos::parallel_for( "CabanaPD::Prenotch::copy", policy, copy );
+    }
+
+    // Array constructor. Multiple orientations.
+    template <std::size_t NumNotch>
+    Prenotch( Kokkos::Array<Kokkos::Array<double, 3>, NumNotch> v1,
+              Kokkos::Array<Kokkos::Array<double, 3>, NumNotch> v2,
+              Kokkos::Array<Kokkos::Array<double, 3>, NumNotch> p0 )
+    {
+        using exec_space = typename ViewType::execution_space;
+        Kokkos::RangePolicy<exec_space> policy( 0, 3 );
+        auto copy = KOKKOS_LAMBDA( const int d )
+        {
+            for ( std::size_t p = 0; p < NumNotch; p++ )
+            {
+                _p0( p, d ) = p0[p][d];
+                _v1( p, d ) = v1[p][d];
+                _v2( p, d ) = v2[p][d];
+            }
+        };
+        Kokkos::parallel_for( "CabanaPD::Prenotch::copy", policy, copy );
     }
 
     template <class ExecSpace, class NeighborView, class Particles,
@@ -223,14 +246,18 @@ struct Prenotch
         // TODO: decide whether to disallow prenotches in frozen particles.
         Kokkos::RangePolicy<ExecSpace> policy( 0, particles.localOffset() );
 
-        for ( std::size_t p = 0; p < _p0.size(); p++ )
+        for ( std::size_t p = 0; p < _p0.extent( 0 ); p++ )
         {
             // These will always be different positions.
-            auto p0 = _p0[p];
+            Kokkos::Array<double, 3> p0 = { _p0( p, 0 ), _p0( p, 1 ),
+                                            _p0( p, 2 ) };
             // These may all have the same orientation or all different
             // orientations.
-            auto v1 = getV1( p );
-            auto v2 = getV2( p );
+            auto v = getIndex( p );
+            Kokkos::Array<double, 3> v1 = { _v1( v, 0 ), _v1( v, 1 ),
+                                            _v1( v, 2 ) };
+            Kokkos::Array<double, 3> v2 = { _v2( v, 0 ), _v2( v, 1 ),
+                                            _v2( v, 2 ) };
             auto notch_functor = KOKKOS_LAMBDA( const int i )
             {
                 std::size_t num_neighbors =
@@ -260,21 +287,22 @@ struct Prenotch
     }
     auto time() { return _timer.time(); };
 
-    auto getV1( const int p )
+    auto getIndex( const int p )
     {
         if ( fixed_orientation )
-            return _v1[0];
+            return 0;
         else
-            return _v1[p];
+            return p;
     }
+};
 
-    auto getV2( const int p )
-    {
-        if ( fixed_orientation )
-            return _v2[0];
-        else
-            return _v2[p];
-    }
+template <class>
+struct is_prenotch : public std::false_type
+{
+};
+template <typename ViewType>
+struct is_prenotch<Prenotch<ViewType>> : public std::true_type
+{
 };
 
 } // namespace CabanaPD
