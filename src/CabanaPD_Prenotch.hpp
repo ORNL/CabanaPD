@@ -198,6 +198,21 @@ struct Prenotch
         fixed_orientation = false;
     }
 
+    // Array constructor. Single prenotch.
+    Prenotch( Kokkos::Array<double, 3> v1, Kokkos::Array<double, 3> v2,
+              Kokkos::Array<double, 3> p0 )
+    {
+        using exec_space = typename ViewType::execution_space;
+        Kokkos::RangePolicy<exec_space> policy( 0, 3 );
+        auto copy = KOKKOS_LAMBDA( const int d )
+        {
+            _p0( 0, d ) = p0[d];
+            _v1( 0, d ) = v1[d];
+            _v2( 0, d ) = v2[d];
+        };
+        Kokkos::parallel_for( "CabanaPD::Prenotch::copy", policy, copy );
+    }
+
     // Array constructor. Single orientation.
     template <std::size_t NumNotch>
     Prenotch( Kokkos::Array<double, 3> v1, Kokkos::Array<double, 3> v2,

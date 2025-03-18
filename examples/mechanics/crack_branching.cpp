@@ -60,8 +60,8 @@ void crackBranchingExample( const std::string filename )
                                      low_corner[2] };
     Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
     Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-    Kokkos::Array<Kokkos::Array<double, 3>, 1> notch_positions = { p01 };
-    CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
+    CabanaPD::Prenotch<Kokkos::View<double* [3], memory_space>> prenotch(
+        v1, v2, p01 );
 
     // ====================================================
     //                    Force model
