@@ -246,20 +246,24 @@ struct Prenotch
         // TODO: decide whether to disallow prenotches in frozen particles.
         Kokkos::RangePolicy<ExecSpace> policy( 0, particles.localOffset() );
 
-        for ( std::size_t p = 0; p < _p0.extent( 0 ); p++ )
+        auto p0_local = _p0;
+        auto v1_local = _v1;
+        auto v2_local = _v2;
+        auto notch_functor = KOKKOS_LAMBDA( const int i )
         {
-            // These will always be different positions.
-            Kokkos::Array<double, 3> p0 = { _p0( p, 0 ), _p0( p, 1 ),
-                                            _p0( p, 2 ) };
-            // These may all have the same orientation or all different
-            // orientations.
-            auto v = getIndex( p );
-            Kokkos::Array<double, 3> v1 = { _v1( v, 0 ), _v1( v, 1 ),
-                                            _v1( v, 2 ) };
-            Kokkos::Array<double, 3> v2 = { _v2( v, 0 ), _v2( v, 1 ),
-                                            _v2( v, 2 ) };
-            auto notch_functor = KOKKOS_LAMBDA( const int i )
+            for ( std::size_t p = 0; p < p0_local.extent( 0 ); p++ )
             {
+                // These will always be different positions.
+                Kokkos::Array<double, 3> p0 = {
+                    p0_local( p, 0 ), p0_local( p, 1 ), p0_local( p, 2 ) };
+                // These may all have the same orientation or all different
+                // orientations.
+                auto v = getIndex( p );
+                Kokkos::Array<double, 3> v1 = {
+                    v1_local( v, 0 ), v1_local( v, 1 ), v1_local( v, 2 ) };
+                Kokkos::Array<double, 3> v2 = {
+                    v2_local( v, 0 ), v2_local( v, 1 ), v2_local( v, 2 ) };
+
                 std::size_t num_neighbors =
                     Cabana::NeighborList<Neighbors>::numNeighbor( neighbors,
                                                                   i );
@@ -280,9 +284,9 @@ struct Prenotch
                     if ( !keep_bond )
                         mu( i, n ) = 0;
                 }
-            };
-            Kokkos::parallel_for( "CabanaPD::Prenotch", policy, notch_functor );
-        }
+            }
+        };
+        Kokkos::parallel_for( "CabanaPD::Prenotch", policy, notch_functor );
         _timer.stop();
     }
     auto time() { return _timer.time(); };
