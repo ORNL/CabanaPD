@@ -38,6 +38,15 @@ KOKKOS_INLINE_FUNCTION void getRelativeNormalVelocityComponents(
     vn /= r;
 };
 
+template <class VelType>
+KOKKOS_INLINE_FUNCTION void getRelativeTangentialVelocityComponents(
+    const VelType& vel, const int i, const double vxn, const double vyn,
+    const double vzn, double& vxs, double& vys, double& vzs )
+{
+    vxs = vel( i, 0 ) - vxn;
+    vys = vel( i, 1 ) - vyn;
+    vzs = vel( i, 2 ) - vzn;
+};
 /******************************************************************************
   Normal repulsion forces
 ******************************************************************************/
