@@ -113,8 +113,8 @@ void thermalDeformationHeatTransferPrenotchedExample(
     notch_v1[1] = v12;
     notch_v2[1] = v2;
 
-    CabanaPD::Prenotch<Kokkos::View<double* [3], memory_space>> prenotch(
-        notch_v1, notch_v2, notch_positions );
+    CabanaPD::Prenotch<memory_space> prenotch( notch_v1, notch_v2,
+                                               notch_positions );
 
     // ====================================================
     //            Custom particle initialization

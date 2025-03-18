@@ -171,19 +171,20 @@ int bondPrenotchIntersection( const Kokkos::Array<double, 3> v1,
     return keep_bond;
 }
 
-template <typename ViewType>
+template <typename MemorySpace>
 struct Prenotch
 {
-    ViewType _v1;
-    ViewType _v2;
-    ViewType _p0;
+    using view_type = Kokkos::View<double* [3], MemorySpace>;
+    view_type _v1;
+    view_type _v2;
+    view_type _p0;
     bool fixed_orientation;
 
     Timer _timer;
 
     // Constructor.
-    Prenotch( ViewType v1, ViewType v2, ViewType p0,
-              typename std::enable_if<( Kokkos::is_view<ViewType>::value ),
+    Prenotch( view_type v1, view_type v2, view_type p0,
+              typename std::enable_if<( Kokkos::is_view<view_type>::value ),
                                       int>::type* = 0 )
         : _v1( v1 )
         , _v2( v2 )
@@ -202,7 +203,7 @@ struct Prenotch
     Prenotch( Kokkos::Array<double, 3> v1, Kokkos::Array<double, 3> v2,
               Kokkos::Array<double, 3> p0 )
     {
-        using exec_space = typename ViewType::execution_space;
+        using exec_space = typename MemorySpace::execution_space;
         Kokkos::RangePolicy<exec_space> policy( 0, 3 );
         auto copy = KOKKOS_LAMBDA( const int d )
         {
@@ -218,7 +219,7 @@ struct Prenotch
     Prenotch( Kokkos::Array<double, 3> v1, Kokkos::Array<double, 3> v2,
               Kokkos::Array<Kokkos::Array<double, 3>, NumNotch> p0 )
     {
-        using exec_space = typename ViewType::execution_space;
+        using exec_space = typename MemorySpace::execution_space;
         Kokkos::RangePolicy<exec_space> policy( 0, 3 );
         auto copy = KOKKOS_LAMBDA( const int d )
         {
@@ -236,7 +237,7 @@ struct Prenotch
               Kokkos::Array<Kokkos::Array<double, 3>, NumNotch> v2,
               Kokkos::Array<Kokkos::Array<double, 3>, NumNotch> p0 )
     {
-        using exec_space = typename ViewType::execution_space;
+        using exec_space = typename MemorySpace::execution_space;
         Kokkos::RangePolicy<exec_space> policy( 0, 3 );
         auto copy = KOKKOS_LAMBDA( const int d )
         {
