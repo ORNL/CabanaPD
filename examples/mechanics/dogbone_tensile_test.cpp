@@ -65,10 +65,11 @@ void compactTensionTestExample( const std::string filename )
     //    Custom particle generation and initialization
     // ====================================================
     double G = inputs["gage_length"];
+    double D = inputs["distance_between_grips"];
     double W = inputs["width_narrow_section"];
     double R = inputs["fillet_radius"];
 
-    // Do not create particles outside dogbone tensile test specimen region
+    // Do not create particles outside dogbone tensile test specimen region.
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
     {
         // x- and y-coordinates of center of domain
@@ -84,15 +85,15 @@ void compactTensionTestExample( const std::string filename )
 
         // Bottom-right fillet circle center
         double xc_br = midx + 0.5 * G;
-        double yc_br = midy - 0.5 * W - R;
+        double yc_br = yc_bl;
 
         // Top-left fillet circle center
-        double xc_tl = midx - 0.5 * G;
+        double xc_tl = xc_bl;
         double yc_tl = midy + 0.5 * W + R;
 
         // Top-right fillet circle center
-        double xc_tr = midx + 0.5 * G;
-        double yc_tr = midy + 0.5 * W + R;
+        double xc_tr = xc_br;
+        double yc_tr = yc_tl;
 
         // Gauge section
         if ( Kokkos::abs( x[0] - midx ) < 0.5 * G &&
@@ -151,19 +152,20 @@ void compactTensionTestExample( const std::string filename )
     double v0 = inputs["grip_velocity"];
 
     // Create region for each grip.
+    double L0 = inputs["system_size"][0];
     CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> left_grip(
-        low_corner[0], low_corner[0] + 0.025, low_corner[1], high_corner[1],
-        low_corner[2], high_corner[2] );
+        low_corner[0], low_corner[0] + 0.5 * ( L0 - D ), low_corner[1],
+        high_corner[1], low_corner[2], high_corner[2] );
     CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> right_grip(
-        high_corner[0] - 0.025, high_corner[0], low_corner[1], high_corner[1],
-        low_corner[2], high_corner[2] );
+        high_corner[0] - 0.5 * ( L0 - D ), high_corner[0], low_corner[1],
+        high_corner[1], low_corner[2], high_corner[2] );
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
 
-        // grips' x-velocity
+        // Grips' x-velocity
         if ( left_grip.inside( x, pid ) )
             v( pid, 0 ) = -v0;
         else if ( right_grip.inside( x, pid ) )
