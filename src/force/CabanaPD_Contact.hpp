@@ -46,14 +46,15 @@ class BaseForceContact : public Force<MemorySpace, BaseForceModel>
     using base_type = Force<MemorySpace, BaseForceModel>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
 
+    // NOTE: using 2x radius to find neighbors when particles first touch.
     template <class ParticleType, class ModelType>
     BaseForceContact( const bool half_neigh, const ParticleType& particles,
                       const ModelType model )
-        : base_type( half_neigh, model.radius + model.radius_extend,
+        : base_type( half_neigh, 2.0 * model.radius + model.radius_extend,
                      particles.sliceCurrentPosition(), particles.frozenOffset(),
                      particles.localOffset(), particles.ghost_mesh_lo,
                      particles.ghost_mesh_hi )
-        , radius( model.radius )
+        , radius( 2.0 * model.radius )
         , radius_extend( model.radius_extend )
     {
         for ( int d = 0; d < particles.dim; d++ )
