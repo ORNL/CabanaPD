@@ -38,6 +38,10 @@ struct Elastic
 };
 
 // Contact and DEM (contact without PD) tags.
+
+struct Contact
+{
+};
 struct NoContact
 {
 };
