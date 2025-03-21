@@ -40,12 +40,33 @@ struct ElasticPerfectlyPlastic
 {
 };
 
-// Contact and DEM (contact without PD) tags.
-struct NoContact
+// Model category tags.
+struct Pair
 {
 };
-template <class>
+struct State
+{
+};
+
+// Contact and DEM (contact without PD) tags.
+struct Contact
+{
+    using base_type = Pair;
+};
+struct NoContact
+{
+    using base_type = std::false_type;
+};
+template <class, class SFINAE = void>
 struct is_contact : public std::false_type
+{
+};
+template <typename ModelType>
+struct is_contact<
+    ModelType,
+    typename std::enable_if<(
+        std::is_same<typename ModelType::base_model, Contact>::value )>::type>
+    : public std::true_type
 {
 };
 
@@ -105,15 +126,19 @@ struct is_temperature<DynamicTemperature> : public std::true_type
 // Force model tags.
 struct PMB
 {
+    using base_type = Pair;
 };
 struct LinearPMB
 {
+    using base_type = Pair;
 };
 struct LPS
 {
+    using base_type = State;
 };
 struct LinearLPS
 {
+    using base_type = State;
 };
 
 struct BaseOutput
