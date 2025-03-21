@@ -70,14 +70,16 @@
 
 namespace CabanaPD
 {
-template <class MemorySpace, class... ModelParams>
-class Force<MemorySpace, ForceModel<PMB, Elastic, NoFracture, ModelParams...>>
+template <class MemorySpace, class MechanicsType, class... ModelParams>
+class Force<MemorySpace,
+            ForceModel<PMB, MechanicsType, NoFracture, ModelParams...>>
     : public Force<MemorySpace, BaseForceModel>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ForceModel<PMB, Elastic, NoFracture, ModelParams...>;
+    using model_type =
+        ForceModel<PMB, MechanicsType, NoFracture, ModelParams...>;
     using base_type = Force<MemorySpace, BaseForceModel>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
     using base_type::_neigh_list;
@@ -121,7 +123,7 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, NoFracture, ModelParams...>>
 
             model.thermalStretch( s, i, j );
 
-            const double coeff = model.forceCoeff( s, vol( j ) );
+            const double coeff = model.forceCoeff( i, j, s, vol( j ) );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -160,7 +162,7 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, NoFracture, ModelParams...>>
 
             model.thermalStretch( s, i, j );
 
-            double w = model.energy( s, xi, vol( j ) );
+            double w = model.energy( i, j, s, xi, vol( j ) );
             W( i ) += w;
             Phi += w * vol( i );
         };
@@ -178,15 +180,16 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, NoFracture, ModelParams...>>
     }
 };
 
-template <class MemorySpace, class... ModelParams>
-class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
+template <class MemorySpace, class MechanicsType, class... ModelParams>
+class Force<MemorySpace,
+            ForceModel<PMB, MechanicsType, Fracture, ModelParams...>>
     : public Force<MemorySpace, BaseForceModel>,
       public BaseFracture<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ForceModel<PMB, Elastic, Fracture, ModelParams...>;
+    using model_type = ForceModel<PMB, MechanicsType, Fracture, ModelParams...>;
     using base_type = Force<MemorySpace, BaseForceModel>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
     using base_type::_neigh_list;
@@ -211,6 +214,9 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
                          base_type::getMaxLocalNeighbors() )
         , _model( model )
     {
+        // Needed only for models which store per-bond information.
+        _model.updateBonds( particles.localOffset(),
+                            base_type::getMaxLocalNeighbors() );
     }
 
     template <class ExecSpace, class ParticleType, class PrenotchType>
@@ -264,7 +270,7 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
                 // Else if statement is only for performance.
                 else if ( mu( i, n ) > 0 )
                 {
-                    const double coeff = model.forceCoeff( s, vol( j ) );
+                    const double coeff = model.forceCoeff( i, n, s, vol( j ) );
 
                     double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;
@@ -317,7 +323,7 @@ class Force<MemorySpace, ForceModel<PMB, Elastic, Fracture, ModelParams...>>
 
                 model.thermalStretch( s, i, j );
 
-                double w = mu( i, n ) * model.energy( s, xi, vol( j ) );
+                double w = mu( i, n ) * model.energy( i, n, s, xi, vol( j ) );
                 W( i ) += w;
 
                 phi_i += mu( i, n ) * vol( j );
@@ -392,7 +398,7 @@ class Force<MemorySpace,
 
             model.thermalStretch( linear_s, i, j );
 
-            const double coeff = model.forceCoeff( linear_s, vol( j ) );
+            const double coeff = model.forceCoeff( i, j, linear_s, vol( j ) );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
             fz_i = coeff * xi_z / xi;
@@ -431,7 +437,7 @@ class Force<MemorySpace,
 
             model.thermalStretch( linear_s, i, j );
 
-            double w = model.energy( linear_s, xi, vol( j ) );
+            double w = model.energy( i, j, linear_s, xi, vol( j ) );
             W( i ) += w;
             Phi += w * vol( i );
         };

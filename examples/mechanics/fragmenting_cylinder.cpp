@@ -86,8 +86,8 @@ void fragmentingCylinderExample( const std::string filename )
     };
 
     auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space(), low_corner, high_corner, num_cells, Cabana::InitRandom{},
-        halo_width, init_op );
+        exec_space(), low_corner, high_corner, num_cells, halo_width,
+        Cabana::InitRandom{}, init_op );
 
     auto rho = particles->sliceDensity();
     auto x = particles->sliceReferencePosition();
