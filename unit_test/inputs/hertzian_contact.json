@@ -6,7 +6,6 @@
     "elastic_modulus"        : {"value": 195.6e9, "unit": "Pa"},
     "poisson_ratio"          : {"value": 0.25, "unit": ""},
     "restitution"            : {"value": 0.5},  
-    "horizon"                : {"value": 1e-4 },  
     "radius"                 : {"value": 5e-5 },
     "radius_extend"          : {"value": 2.5e-5 },
     "final_time"             : {"value": 1e-5, "unit": "s"},

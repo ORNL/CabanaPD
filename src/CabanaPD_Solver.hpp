@@ -132,7 +132,9 @@ class Solver
 
     void setup( force_model_type force_model )
     {
-        inputs.computeCriticalTimeStep( force_model );
+        // This timestep is not valid for DEM-only.
+        if constexpr ( !is_contact<force_model_type>::value )
+            inputs.computeCriticalTimeStep( force_model );
 
         num_steps = inputs["num_steps"];
         output_frequency = inputs["output_frequency"];
