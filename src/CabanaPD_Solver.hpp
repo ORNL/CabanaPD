@@ -94,7 +94,7 @@ class Solver
 
     // Core module types - required for all problems.
     using particle_type = ParticleType;
-    using integrator_type = Integrator<exec_space>;
+    using integrator_type = VelocityVerlet<exec_space>;
     using force_model_type = ForceModelType;
     using force_type = Force<memory_space, force_model_type>;
     using comm_type = Comm<particle_type, typename force_model_type::base_model,
@@ -132,7 +132,9 @@ class Solver
 
     void setup( force_model_type force_model )
     {
-        inputs.computeCriticalTimeStep( force_model );
+        // This timestep is not valid for DEM-only.
+        if constexpr ( !is_contact<force_model_type>::value )
+            inputs.computeCriticalTimeStep( force_model );
 
         num_steps = inputs["num_steps"];
         output_frequency = inputs["output_frequency"];
@@ -217,7 +219,7 @@ class Solver
             comm->gatherWeightedVolume();
         }
         // Compute initial internal forces and energy.
-        updateForce();
+        updateForce( 0.0 );
         computeEnergy( *force, *particles, neigh_iter_tag() );
 
         if ( initial_output )
@@ -296,6 +298,8 @@ class Solver
         // FIXME: Will need to rebuild ghosts.
     }
 
+    void updateNeighbors() { force->update( *particles, 0.0, true ); }
+
     template <typename BoundaryType>
     void run( BoundaryType boundary_condition )
     {
@@ -307,7 +311,7 @@ class Solver
             _step_timer.start();
 
             // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( *particles );
+            auto max_displacement = integrator->initialHalfStep( *particles );
 
             // Update ghost particles.
             comm->gatherDisplacement();
@@ -330,10 +334,11 @@ class Solver
                 comm->gatherTemperature();
 
             // Compute internal forces.
-            updateForce();
+            updateForce( max_displacement );
 
             if constexpr ( is_contact<contact_model_type>::value )
-                computeForce( *contact, *particles, neigh_iter_tag{}, false );
+                computeForce( *contact, *particles, max_displacement,
+                              neigh_iter_tag{}, false );
 
             // Add force boundary condition.
             if ( boundary_condition.forceUpdate() )
@@ -359,16 +364,17 @@ class Solver
             _step_timer.start();
 
             // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( *particles );
+            auto max_displacement = integrator->initialHalfStep( *particles );
 
             // Update ghost particles.
             comm->gatherDisplacement();
 
             // Compute internal forces.
-            updateForce();
+            updateForce( max_displacement );
 
             if constexpr ( is_contact<contact_model_type>::value )
-                computeForce( *contact, *particles, neigh_iter_tag{}, false );
+                computeForce( *contact, *particles, max_displacement,
+                              neigh_iter_tag{}, false );
 
             if constexpr ( is_temperature_dependent<
                                typename force_model_type::thermal_type>::value )
@@ -386,7 +392,7 @@ class Solver
 
     // Compute and communicate fields needed for force computation and update
     // forces.
-    void updateForce()
+    void updateForce( const double max_displacement )
     {
         // Compute and communicate weighted volume for LPS (does nothing for
         // PMB). Only computed once without fracture.
@@ -401,7 +407,7 @@ class Solver
         comm->gatherDilatation();
 
         // Compute internal forces.
-        computeForce( *force, *particles, neigh_iter_tag{} );
+        computeForce( *force, *particles, max_displacement, neigh_iter_tag{} );
     }
 
     void output( const int step )
@@ -449,6 +455,7 @@ class Solver
             double integrate_time = integrator->time();
             double force_time = force->time();
             double energy_time = force->timeEnergy();
+            double neigh_time = force->timeNeighbor();
             double output_time = particles->timeOutput();
             _total_time += step_time;
             auto rate = static_cast<double>( particles->numGlobal() *
@@ -458,7 +465,7 @@ class Solver
                  " ", std::scientific, std::setprecision( 2 ), step * dt, " ",
                  W, " ", std::fixed, _total_time, " ", force_time, " ",
                  comm_time, " ", integrate_time, " ", energy_time, " ",
-                 output_time, " ", std::scientific, rate );
+                 neigh_time, " ", output_time, " ", std::scientific, rate );
             out.close();
         }
     }

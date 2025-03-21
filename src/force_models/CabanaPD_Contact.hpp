@@ -25,18 +25,19 @@ namespace CabanaPD
 ******************************************************************************/
 struct ContactModel
 {
-    double delta;
-    double Rc;
+    // Contact neighbor search radius.
+    double radius;
+    // Extend neighbor search radius to reuse lists.
+    double radius_extend;
 
     // PD horizon
     // Contact radius
-    ContactModel( const double _delta, const double _Rc )
-        : delta( _delta )
-        , Rc( _Rc ){};
+    ContactModel( const double _radius, const double _radius_extend )
+        : radius( _radius )
+        , radius_extend( _radius_extend ){};
 };
 
 /* Normal repulsion */
-
 struct NormalRepulsionModel : public ContactModel
 {
     // FIXME: This is for use as the primary force model.
@@ -44,14 +45,17 @@ struct NormalRepulsionModel : public ContactModel
     using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
 
-    using ContactModel::delta;
-    using ContactModel::Rc;
+    double delta;
+    using ContactModel::radius;
+    using ContactModel::radius_extend;
 
     double c;
     double K;
 
-    NormalRepulsionModel( const double delta, const double Rc, const double _K )
-        : ContactModel( delta, Rc )
+    NormalRepulsionModel( const double _delta, const double radius,
+                          const double radius_extend, const double _K )
+        : ContactModel( radius, radius_extend )
+        , delta( _delta )
         , K( _K )
     {
         K = _K;
@@ -63,7 +67,7 @@ struct NormalRepulsionModel : public ContactModel
     auto forceCoeff( const double r, const double vol ) const
     {
         // Contact "stretch"
-        const double sc = ( r - Rc ) / delta;
+        const double sc = ( r - radius ) / delta;
         // Normal repulsion uses a 15 factor compared to the PMB force
         return 15.0 * c * sc * vol;
     }
