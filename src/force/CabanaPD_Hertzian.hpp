@@ -43,7 +43,6 @@ class Force<MemorySpace, HertzianModel> : public BaseForceContact<MemorySpace>
               class ParallelType>
     void computeForceFull( ForceType& fc, const PosType& x, const PosType& u,
                            const ParticleType& particles,
-                           const double max_displacement,
                            ParallelType& neigh_op_tag )
     {
         const int n_frozen = particles.frozenOffset();
@@ -54,7 +53,7 @@ class Force<MemorySpace, HertzianModel> : public BaseForceContact<MemorySpace>
         const auto rho = particles.sliceDensity();
         const auto vel = particles.sliceVelocity();
 
-        base_type::update( particles, max_displacement );
+        base_type::update( particles, particles.getMaxDisplacement() );
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {

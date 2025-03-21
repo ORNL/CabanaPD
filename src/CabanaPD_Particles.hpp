@@ -116,7 +116,6 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     using aosoa_y_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_vol_type = Cabana::AoSoA<scalar_type, memory_space, 1>;
     using aosoa_nofail_type = Cabana::AoSoA<int_type, memory_space, 1>;
-    using aosoa_u_neigh_type = Cabana::AoSoA<vector_type, memory_space, 1>;
     using aosoa_other_type = Cabana::AoSoA<other_types, memory_space>;
     // Using grid here for the particle init.
     using plist_x_type =
@@ -337,7 +336,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         auto rho = sliceDensity();
         auto u = sliceDisplacement();
         auto vol = sliceVolume();
-        auto u_neigh = sliceDisplacementNeighborBuild();
+        auto nofail = sliceNoFail();
 
         // Initialize particles.
         auto create_functor =
@@ -356,7 +355,6 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 Cabana::get( particle, CabanaPD::Field::ReferencePosition(),
                              d ) = px[d];
                 u( pid, d ) = 0.0;
-                u_neigh( pid, d ) = 0;
                 v( pid, d ) = 0.0;
                 f( pid, d ) = 0.0;
             }
@@ -364,7 +362,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             vol( pid ) = pv;
 
             // FIXME: hardcoded.
-            // type( pid ) = 0;
+            type( pid ) = 0;
+            nofail( pid ) = 0;
             rho( pid ) = 1.0;
 
             return create;
@@ -403,7 +402,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         auto type = sliceType();
         auto rho = sliceDensity();
         auto u = sliceDisplacement();
-        auto u_neigh = sliceDisplacementNeighborBuild();
+        auto nofail = sliceNoFail();
 
         static_assert(
             Cabana::is_accessible_from<
@@ -421,11 +420,11 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 {
                     p_x( pid, d ) = x( pid_offset, d );
                     u( pid, d ) = 0.0;
-                    u_neigh( pid, d ) = 0;
                     v( pid, d ) = 0.0;
                     f( pid, d ) = 0.0;
                 }
-                // type( pid ) = 0;
+                type( pid ) = 0;
+                nofail( pid ) = 0;
                 rho( pid ) = 1.0;
             } );
         Kokkos::fence();
@@ -497,14 +496,6 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     auto sliceDisplacement() const
     {
         return Cabana::slice<0>( _aosoa_u, "displacements" );
-    }
-    auto sliceDisplacementNeighborBuild()
-    {
-        return Cabana::slice<0>( _aosoa_u_neigh, "displacement_since_rebuild" );
-    }
-    auto sliceDisplacementNeighborBuild() const
-    {
-        return Cabana::slice<0>( _aosoa_u_neigh, "displacement_since_rebuild" );
     }
     auto sliceForce() { return _plist_f.slice( CabanaPD::Field::Force() ); }
     auto sliceForceAtomic()
@@ -587,7 +578,6 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         _plist_f.aosoa().resize( localOffset() );
         _aosoa_other.resize( localOffset() );
         _aosoa_nofail.resize( referenceOffset() );
-        _aosoa_u_neigh.resize( localOffset() );
 
         _size = _plist_x.size();
         if ( create_frozen )
@@ -605,7 +595,6 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         _plist_f.aosoa().shrinkToFit();
         _aosoa_other.shrinkToFit();
         _aosoa_nofail.shrinkToFit();
-        _aosoa_u_neigh.shrinkToFit();
         _timer.stop();
     };
 
@@ -625,8 +614,6 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         Cabana::remove( execution_space(), num_keep, keep, _aosoa_other,
                         numFrozen() );
         Cabana::remove( execution_space(), num_keep, keep, _aosoa_nofail,
-                        numFrozen() );
-        Cabana::remove( execution_space(), num_keep, keep, _aosoa_u_neigh,
                         numFrozen() );
         resize( frozen_offset + num_keep, 0 );
     }
@@ -680,7 +667,6 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
   protected:
     aosoa_u_type _aosoa_u;
-    aosoa_u_neigh_type _aosoa_u_neigh;
     aosoa_y_type _aosoa_y;
     aosoa_vol_type _aosoa_vol;
     aosoa_nofail_type _aosoa_nofail;
@@ -942,6 +928,96 @@ class Particles<MemorySpace, PMB, TemperatureDependent, BaseOutput, Dimension>
     }
 
     aosoa_temp_type _aosoa_temp;
+};
+
+template <class MemorySpace, class ThermalType, int Dimension>
+class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
+    : public Particles<MemorySpace, PMB, ThermalType, BaseOutput, Dimension>
+{
+    // Note: no overloaded output() since there are very few cases where this
+    // is a desired output field.
+
+  public:
+    using self_type =
+        Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>;
+    using base_type =
+        Particles<MemorySpace, PMB, ThermalType, BaseOutput, Dimension>;
+    using thermal_type = typename base_type::thermal_type;
+    using output_type = typename base_type::output_type;
+    using memory_space = typename base_type::memory_space;
+    using base_type::dim;
+
+    using aosoa_u_neigh_type =
+        Cabana::AoSoA<typename base_type::vector_type, memory_space, 1>;
+
+    // Simulation total domain.
+    using base_type::global_mesh_ext;
+
+    // Simulation sub domain (single MPI rank).
+    using base_type::ghost_mesh_hi;
+    using base_type::ghost_mesh_lo;
+    using base_type::local_mesh_ext;
+    using base_type::local_mesh_hi;
+    using base_type::local_mesh_lo;
+
+    using base_type::dx;
+    using base_type::local_grid;
+
+    using base_type::halo_width;
+
+    // Base constructor.
+    template <typename... Args>
+    Particles( Args&&... args )
+        : base_type( std::forward<Args>( args )... )
+    {
+        _aosoa_u_neigh = aosoa_u_neigh_type( "Particle Contact Fields",
+                                             base_type::localOffset() );
+        init_output();
+    }
+
+    template <typename... Args>
+    void createParticles( Args&&... args )
+    {
+        // Forward arguments to standard or custom particle creation.
+        base_type::createParticles( std::forward<Args>( args )... );
+        _aosoa_u_neigh.resize( base_type::localOffset() );
+    }
+
+    auto sliceDisplacementNeighborBuild()
+    {
+        return Cabana::slice<0>( _aosoa_u_neigh, "displacement_since_rebuild" );
+    }
+    auto sliceDisplacementNeighborBuild() const
+    {
+        return Cabana::slice<0>( _aosoa_u_neigh, "displacement_since_rebuild" );
+    }
+
+    template <typename... Args>
+    void resize( Args&&... args )
+    {
+        base_type::resize( std::forward<Args>( args )... );
+        _aosoa_u_neigh.resize( base_type::localOffset() );
+    }
+
+    void setMaxDisplacement( double new_max ) { _max_displacement = new_max; }
+    double getMaxDisplacement() const { return _max_displacement; }
+
+    friend class Comm<self_type, Pair, TemperatureIndependent>;
+    friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Pair, TemperatureDependent>;
+    friend class Comm<self_type, State, TemperatureDependent>;
+
+  protected:
+    void init_output()
+    {
+        auto u_neigh = sliceDisplacementNeighborBuild();
+        Cabana::deep_copy( u_neigh, 0.0 );
+    }
+
+    // Used for delaying neighbor construction.
+    double _max_displacement;
+
+    aosoa_u_neigh_type _aosoa_u_neigh;
 };
 
 template <class MemorySpace, class ModelType, class ThermalType, int Dimension>

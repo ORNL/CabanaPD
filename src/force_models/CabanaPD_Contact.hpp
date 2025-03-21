@@ -25,8 +25,7 @@ namespace CabanaPD
 ******************************************************************************/
 struct ContactModel
 {
-    // FIXME: This is for use as the primary force model.
-    using base_model = PMB;
+    using base_model = Contact;
 
     // Contact neighbor search radius.
     double radius;

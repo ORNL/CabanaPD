@@ -95,7 +95,6 @@ class Solver
 
     // Core module types - required for all problems.
     using particle_type = ParticleType;
-    using integrator_type = VelocityVerlet<exec_space>;
     using force_model_type = ForceModelType;
     using force_type = Force<memory_space, force_model_type>;
     using comm_type =
@@ -108,6 +107,13 @@ class Solver
     using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
     using contact_type = Force<memory_space, ContactModelType>;
     using contact_model_type = ContactModelType;
+
+    // Flexible module types.
+    // Integration should include max displacement tracking if either model
+    // involves contact.
+    using integrator_type =
+        VelocityVerlet<typename either_contact<force_model_type,
+                                               contact_model_type>::base_type>;
 
     Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
             force_model_type force_model )
@@ -221,7 +227,7 @@ class Solver
             comm->gatherWeightedVolume();
         }
         // Compute initial internal forces and energy.
-        updateForce( 0.0 );
+        updateForce();
         computeEnergy( *force, *particles, neigh_iter_tag() );
 
         if ( initial_output )
@@ -313,7 +319,7 @@ class Solver
             _step_timer.start();
 
             // Integrate - velocity Verlet first half.
-            auto max_displacement = integrator->initialHalfStep( *particles );
+            integrator->initialHalfStep( exec_space{}, *particles );
 
             // Update ghost particles.
             comm->gatherDisplacement();
@@ -336,18 +342,17 @@ class Solver
                 comm->gatherTemperature();
 
             // Compute internal forces.
-            updateForce( max_displacement );
+            updateForce();
 
             if constexpr ( is_contact<contact_model_type>::value )
-                computeForce( *contact, *particles, max_displacement,
-                              neigh_iter_tag{}, false );
+                computeForce( *contact, *particles, neigh_iter_tag{}, false );
 
             // Add force boundary condition.
             if ( boundary_condition.forceUpdate() )
                 boundary_condition.apply( exec_space(), *particles, step * dt );
 
             // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( *particles );
+            integrator->finalHalfStep( exec_space{}, *particles );
 
             output( step );
         }
@@ -366,24 +371,23 @@ class Solver
             _step_timer.start();
 
             // Integrate - velocity Verlet first half.
-            auto max_displacement = integrator->initialHalfStep( *particles );
+            integrator->initialHalfStep( exec_space{}, *particles );
 
             // Update ghost particles.
             comm->gatherDisplacement();
 
             // Compute internal forces.
-            updateForce( max_displacement );
+            updateForce();
 
             if constexpr ( is_contact<contact_model_type>::value )
-                computeForce( *contact, *particles, max_displacement,
-                              neigh_iter_tag{}, false );
+                computeForce( *contact, *particles, neigh_iter_tag{}, false );
 
             if constexpr ( is_temperature_dependent<
                                typename force_model_type::thermal_type>::value )
                 comm->gatherTemperature();
 
             // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( *particles );
+            integrator->finalHalfStep( exec_space{}, *particles );
 
             output( step );
         }
@@ -394,7 +398,7 @@ class Solver
 
     // Compute and communicate fields needed for force computation and update
     // forces.
-    void updateForce( const double max_displacement )
+    void updateForce()
     {
         // Compute and communicate weighted volume for LPS (does nothing for
         // PMB). Only computed once without fracture.
@@ -409,7 +413,7 @@ class Solver
         comm->gatherDilatation();
 
         // Compute internal forces.
-        computeForce( *force, *particles, max_displacement, neigh_iter_tag{} );
+        computeForce( *force, *particles, neigh_iter_tag{} );
     }
 
     void output( const int step )

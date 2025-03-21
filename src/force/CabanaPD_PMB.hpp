@@ -103,7 +103,7 @@ class Force<MemorySpace,
     template <class ForceType, class PosType, class ParticleType,
               class ParallelType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
-                           const ParticleType& particles, const double,
+                           const ParticleType& particles,
                            ParallelType& neigh_op_tag )
     {
         _timer.start();
@@ -229,8 +229,7 @@ class Force<MemorySpace,
     template <class ForceType, class PosType, class ParticleType,
               class ParallelType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
-                           const ParticleType& particles, const double,
-                           ParallelType& )
+                           const ParticleType& particles, ParallelType& )
     {
         _timer.start();
 
@@ -378,8 +377,7 @@ class Force<MemorySpace,
     template <class ForceType, class PosType, class ParticleType,
               class ParallelType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
-                           ParticleType& particles, const double,
-                           ParallelType& neigh_op_tag )
+                           ParticleType& particles, ParallelType& neigh_op_tag )
     {
         _timer.start();
 

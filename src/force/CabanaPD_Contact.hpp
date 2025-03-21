@@ -66,9 +66,10 @@ class BaseForceContact : public Force<MemorySpace, BaseForceModel>
 
     // Only rebuild neighbor list as needed.
     template <class ParticleType>
-    void update( const ParticleType& particles, const double max_displacement,
+    void update( const ParticleType& particles,
                  const bool require_update = false )
     {
+        double max_displacement = particles.getMaxDisplacement();
         if ( max_displacement > radius_extend || require_update )
         {
             _neigh_timer.start();
@@ -120,7 +121,6 @@ class Force<MemorySpace, NormalRepulsionModel>
               class ParallelType>
     void computeForceFull( ForceType& fc, const PosType& x, const PosType& u,
                            const ParticleType& particles,
-                           const double max_displacement,
                            ParallelType& neigh_op_tag )
     {
         auto model = _model;
@@ -129,7 +129,7 @@ class Force<MemorySpace, NormalRepulsionModel>
         const int n_frozen = particles.frozenOffset();
         const int n_local = particles.localOffset();
 
-        base_type::update( particles, max_displacement );
+        base_type::update( particles, particles.getMaxDisplacement() );
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {

@@ -67,11 +67,14 @@
 
 namespace CabanaPD
 {
-template <class ExecutionSpace>
-class VelocityVerlet
-{
-    using exec_space = ExecutionSpace;
 
+template <typename ContactType = NoContact>
+class VelocityVerlet;
+
+template <>
+class VelocityVerlet<NoContact>
+{
+  protected:
     double _dt, _half_dt;
     Timer _timer;
 
@@ -82,8 +85,73 @@ class VelocityVerlet
         _half_dt = 0.5 * dt;
     }
 
-    template <class ParticlesType>
-    double initialHalfStep( ParticlesType& p )
+    template <class ExecutionSpace, class ParticlesType>
+    void initialHalfStep( ExecutionSpace, ParticlesType& p )
+    {
+        _timer.start();
+
+        auto u = p.sliceDisplacement();
+        auto v = p.sliceVelocity();
+        auto f = p.sliceForce();
+        auto rho = p.sliceDensity();
+
+        auto dt = _dt;
+        auto half_dt = _half_dt;
+        auto init_func = KOKKOS_LAMBDA( const int i )
+        {
+            const double half_dt_m = half_dt / rho( i );
+            v( i, 0 ) += half_dt_m * f( i, 0 );
+            v( i, 1 ) += half_dt_m * f( i, 1 );
+            v( i, 2 ) += half_dt_m * f( i, 2 );
+            u( i, 0 ) += dt * v( i, 0 );
+            u( i, 1 ) += dt * v( i, 1 );
+            u( i, 2 ) += dt * v( i, 2 );
+        };
+        Kokkos::RangePolicy<ExecutionSpace> policy( p.frozenOffset(),
+                                                    p.localOffset() );
+        Kokkos::parallel_for( "CabanaPD::VelocityVerlet::Initial", policy,
+                              init_func );
+        _timer.stop();
+    }
+
+    template <class ExecutionSpace, class ParticlesType>
+    void finalHalfStep( ExecutionSpace, ParticlesType& p )
+    {
+        _timer.start();
+
+        auto v = p.sliceVelocity();
+        auto f = p.sliceForce();
+        auto rho = p.sliceDensity();
+
+        auto half_dt = _half_dt;
+        auto final_func = KOKKOS_LAMBDA( const int i )
+        {
+            const double half_dt_m = half_dt / rho( i );
+            v( i, 0 ) += half_dt_m * f( i, 0 );
+            v( i, 1 ) += half_dt_m * f( i, 1 );
+            v( i, 2 ) += half_dt_m * f( i, 2 );
+        };
+        Kokkos::RangePolicy<ExecutionSpace> policy( p.frozenOffset(),
+                                                    p.localOffset() );
+        Kokkos::parallel_for( "CabanaPD::VelocityVerlet::Final", policy,
+                              final_func );
+
+        _timer.stop();
+    }
+
+    double timeInit() { return 0.0; };
+    auto time() { return _timer.time(); };
+};
+
+template <>
+class VelocityVerlet<Contact> : public VelocityVerlet<NoContact>
+{
+    using base_type = VelocityVerlet<NoContact>;
+    using base_type::base_type;
+
+  public:
+    template <class ExecutionSpace, class ParticlesType>
+    void initialHalfStep( ExecutionSpace, ParticlesType& p )
     {
         _timer.start();
 
@@ -105,52 +173,27 @@ class VelocityVerlet
             u( i, 1 ) += dt * v( i, 1 );
             u( i, 2 ) += dt * v( i, 2 );
 
-            // FIXME: only used for contact: get displacement since last
-            // neighbor update.
             auto u_mag = Kokkos::hypot( u( i, 0 ) - u_neigh( i, 0 ),
                                         u( i, 1 ) - u_neigh( i, 1 ),
                                         u( i, 2 ) - u_neigh( i, 2 ) );
             if ( u_mag > max_u )
                 max_u = u_mag;
         };
-        Kokkos::RangePolicy<exec_space> policy( p.frozenOffset(),
-                                                p.localOffset() );
+        Kokkos::RangePolicy<ExecutionSpace> policy( p.frozenOffset(),
+                                                    p.localOffset() );
         double max_displacement;
         Kokkos::parallel_reduce( "CabanaPD::VelocityVerlet::Initial", policy,
                                  init_func,
                                  Kokkos::Max<double>( max_displacement ) );
 
-        _timer.stop();
-        return max_displacement;
-    }
-
-    template <class ParticlesType>
-    void finalHalfStep( ParticlesType& p )
-    {
-        _timer.start();
-
-        auto v = p.sliceVelocity();
-        auto f = p.sliceForce();
-        auto rho = p.sliceDensity();
-
-        auto half_dt = _half_dt;
-        auto final_func = KOKKOS_LAMBDA( const int i )
-        {
-            const double half_dt_m = half_dt / rho( i );
-            v( i, 0 ) += half_dt_m * f( i, 0 );
-            v( i, 1 ) += half_dt_m * f( i, 1 );
-            v( i, 2 ) += half_dt_m * f( i, 2 );
-        };
-        Kokkos::RangePolicy<exec_space> policy( p.frozenOffset(),
-                                                p.localOffset() );
-        Kokkos::parallel_for( "CabanaPD::VelocityVerlet::Final", policy,
-                              final_func );
-
+        p.setMaxDisplacement( max_displacement );
         _timer.stop();
     }
 
-    double timeInit() { return 0.0; };
-    auto time() { return _timer.time(); };
+  protected:
+    using base_type::_dt;
+    using base_type::_half_dt;
+    using base_type::_timer;
 };
 
 } // namespace CabanaPD

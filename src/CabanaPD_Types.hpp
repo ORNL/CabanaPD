@@ -70,6 +70,20 @@ struct is_contact<
 {
 };
 
+template <class, class, class SFINAE = void>
+struct either_contact
+{
+    using base_type = NoContact;
+};
+template <class Model1, class Model2>
+struct either_contact<
+    Model1, Model2,
+    typename std::enable_if<( is_contact<Model1>::value ||
+                              is_contact<Model2>::value )>::type>
+{
+    using base_type = Contact;
+};
+
 // Thermal tags.
 struct TemperatureIndependent
 {
