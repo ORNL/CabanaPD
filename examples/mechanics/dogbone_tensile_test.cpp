@@ -95,7 +95,7 @@ void compactTensionTestExample( const std::string filename )
         double xc_tr = xc_br;
         double yc_tr = yc_tl;
 
-        // Gauge section
+        // Gage section
         if ( Kokkos::abs( x[0] - midx ) < 0.5 * G &&
              Kokkos::abs( x[1] - midy ) > 0.5 * W )
         {
