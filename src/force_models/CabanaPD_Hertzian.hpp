@@ -33,6 +33,7 @@ struct HertzianModel : public ContactModel
     double radius; // Actual radius
     double Rs;     // Equivalent radius
     double Es;     // Equivalent Young's modulus
+    double Gs;     // Equivalent shear modulus
     double e;      // Coefficient of restitution
     double beta;   // Damping coefficient
 
@@ -40,13 +41,14 @@ struct HertzianModel : public ContactModel
     double coeff_h_d;
 
     HertzianModel( const double _Rc, const double _radius, const double _nu,
-                   const double _E, const double _e )
+                   const double _E, const double _G, const double _e )
         : ContactModel( 1.0, _Rc )
     {
         nu = _nu;
         radius = _radius;
         Rs = 0.5 * radius;
         Es = _E / ( 2.0 * Kokkos::pow( 1.0 - nu, 2.0 ) );
+        Gs = Es / ( 2.0 * ( 1 + nu ) );
         e = _e;
         double ln_e = Kokkos::log( e );
         beta = -ln_e / Kokkos::sqrt( Kokkos::pow( ln_e, 2.0 ) +
@@ -58,8 +60,8 @@ struct HertzianModel : public ContactModel
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto forceCoeff( const double r, const double vn, const double vol,
-                     const double rho ) const
+    auto normalForceCoeff( const double r, const double vn, const double vol,
+                           const double rho ) const
     {
         // Contact "overlap"
         const double delta_n = ( r - 2.0 * radius );
@@ -81,6 +83,22 @@ struct HertzianModel : public ContactModel
         double ms = ( rho * vol ) / 2.0;
         coeff += coeff_h_d * Kokkos::sqrt( Sn * ms ) * vn / vol;
         return coeff;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto shearDampingCoeff( const double r, const double vol,
+                            const double rho ) const
+    {
+        // Contact "overlap"
+        const double delta_n = ( r - 2.0 * radius );
+
+        double St = 0.0;
+        if ( delta_n < 0.0 )
+        {
+            St = 8.0 * Gs * Kokkos::sqrt( Rs * Kokkos::abs( delta_n ) );
+        }
+        double ms = ( rho * vol ) / 2.0;
+        return coeff_h_d * Kokkos::sqrt( St * ms ) / vol;
     }
 };
 
