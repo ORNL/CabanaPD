@@ -9,24 +9,40 @@
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef CONTACT_HERTZIAN_H
-#define CONTACT_HERTZIAN_H
+#ifndef CONTACT_H
+#define CONTACT_H
 
-#include <Kokkos_Core.hpp>
+#include <cmath>
 
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Output.hpp>
-#include <force/CabanaPD_Force_Contact.hpp>
-#include <force/CabanaPD_HertzianContact.hpp>
+#include <force_models/CabanaPD_Contact.hpp>
 
 namespace CabanaPD
 {
 /******************************************************************************
+Contact helper functions
+******************************************************************************/
+template <class VelType>
+KOKKOS_INLINE_FUNCTION void getRelativeNormalVelocityComponents(
+    const VelType& vel, const int i, const int j, const double rx,
+    const double ry, const double rz, const double r, double& vx, double& vy,
+    double& vz, double& vn )
+{
+    vx = vel( i, 0 ) - vel( j, 0 );
+    vy = vel( i, 1 ) - vel( j, 1 );
+    vz = vel( i, 2 ) - vel( j, 2 );
+
+    vn = vx * rx + vy * ry + vz * rz;
+    vn /= r;
+};
+
+/******************************************************************************
   Normal repulsion forces
 ******************************************************************************/
 template <class MemorySpace>
-class Force<MemorySpace, HertzianModel>
+class Force<MemorySpace, NormalRepulsionModel>
     : public Force<MemorySpace, BaseForceModel>
 {
   public:
@@ -35,7 +51,7 @@ class Force<MemorySpace, HertzianModel>
 
     template <class ParticleType>
     Force( const bool half_neigh, const ParticleType& particles,
-           const HertzianModel model )
+           const NormalRepulsionModel model )
         : base_type( half_neigh, model.Rc, particles.sliceCurrentPosition(),
                      particles.frozenOffset(), particles.localOffset(),
                      particles.ghost_mesh_lo, particles.ghost_mesh_hi )
@@ -54,14 +70,11 @@ class Force<MemorySpace, HertzianModel>
                            const ParticleType& particles,
                            ParallelType& neigh_op_tag )
     {
-        const int n_frozen = particles.frozenOffset();
-        const int n_local = particles.localOffset();
-
         auto model = _model;
         const auto vol = particles.sliceVolume();
-        const auto rho = particles.sliceDensity();
         const auto y = particles.sliceCurrentPosition();
-        const auto vel = particles.sliceVelocity();
+        const int n_frozen = particles.frozenOffset();
+        const int n_local = particles.localOffset();
 
         _neigh_timer.start();
         _neigh_list.build( y, n_frozen, n_local, model.Rc, 1.0, mesh_min,
@@ -70,19 +83,22 @@ class Force<MemorySpace, HertzianModel>
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {
+            double fcx_i = 0.0;
+            double fcy_i = 0.0;
+            double fcz_i = 0.0;
+
             double xi, r, s;
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-            // Hertz normal force damping component
-            double vx, vy, vz, vn;
-            getRelativeNormalVelocityComponents( vel, i, j, rx, ry, rz, r, vx,
-                                                 vy, vz, vn );
+            const double coeff = model.forceCoeff( r, vol( j ) );
+            fcx_i = coeff * rx / r;
+            fcy_i = coeff * ry / r;
+            fcz_i = coeff * rz / r;
 
-            const double coeff = model.forceCoeff( r, vn, vol( i ), rho( i ) );
-            fc( i, 0 ) += coeff * rx / r;
-            fc( i, 1 ) += coeff * ry / r;
-            fc( i, 2 ) += coeff * rz / r;
+            fc( i, 0 ) += fcx_i;
+            fc( i, 1 ) += fcy_i;
+            fc( i, 2 ) += fcz_i;
         };
 
         _timer.start();
@@ -101,13 +117,13 @@ class Force<MemorySpace, HertzianModel>
     template <class PosType, class WType, class ParticleType,
               class ParallelType>
     double computeEnergyFull( WType&, const PosType&, const PosType&,
-                              ParticleType&, ParallelType& )
+                              ParticleType&, const int, ParallelType& )
     {
         return 0.0;
     }
 
   protected:
-    HertzianModel _model;
+    NormalRepulsionModel _model;
     using base_type::_half_neigh;
     using base_type::_neigh_list;
     using base_type::_timer;

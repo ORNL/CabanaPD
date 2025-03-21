@@ -18,7 +18,7 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate an expanding cylinder resulting in fragmentation
+// Simulate an expanding cylinder resulting in fragmentation.
 void fragmentingCylinderExample( const std::string filename )
 {
     // ====================================================
@@ -37,7 +37,7 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     double rho0 = inputs["density"];
     double K = inputs["bulk_modulus"];
-    // double G = inputs["shear_modulus"]; // Only for LPS.
+    double G = inputs["shear_modulus"]; // Only for LPS.
     double sc = inputs["critical_stretch"];
     double delta = inputs["horizon"];
     delta += 1e-10;
@@ -59,27 +59,28 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type = CabanaPD::ForceModel<CabanaPD::PMB>;
-    model_type force_model( delta, K, G0 );
-    // using model_type =
-    //      CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
-    // model_type force_model( delta, K, G, G0 );
+    // using model_type = CabanaPD::ForceModel<CabanaPD::PMB>;
+    // model_type force_model( delta, K, G0 );
+    using model_type = CabanaPD::ForceModel<CabanaPD::LPS>;
+    model_type force_model( delta, K, G, G0 );
 
     // ====================================================
     //    Custom particle generation and initialization
     // ====================================================
     double x_center = 0.5 * ( low_corner[0] + high_corner[0] );
     double y_center = 0.5 * ( low_corner[1] + high_corner[1] );
+    double z_center = 0.5 * ( low_corner[2] + high_corner[2] );
     double Rout = inputs["cylinder_outer_radius"];
     double Rin = inputs["cylinder_inner_radius"];
+    double H = inputs["cylinder_height"];
 
     // Do not create particles outside given cylindrical region
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
     {
         double rsq = ( x[0] - x_center ) * ( x[0] - x_center ) +
                      ( x[1] - y_center ) * ( x[1] - y_center );
-        if ( rsq < Rin * Rin || rsq > Rout * Rout || x[2] > 0.05 ||
-             x[2] < -0.05 )
+        if ( rsq < Rin * Rin || rsq > Rout * Rout ||
+             x[2] > z_center + 0.5 * H || x[2] < z_center - 0.5 * H )
             return false;
         return true;
     };
@@ -92,14 +93,12 @@ void fragmentingCylinderExample( const std::string filename )
     auto x = particles->sliceReferencePosition();
     auto v = particles->sliceVelocity();
     auto f = particles->sliceForce();
+    auto dx = particles->dx;
 
     double vrmax = inputs["max_radial_velocity"];
     double vrmin = inputs["min_radial_velocity"];
     double vzmax = inputs["max_vertical_velocity"];
-    double zmin = low_corner[2];
-
-    auto dx = particles->dx;
-    double height = inputs["system_size"][2];
+    double zmin = z_center - 0.5 * H;
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
@@ -107,7 +106,7 @@ void fragmentingCylinderExample( const std::string filename )
         rho( pid ) = rho0;
 
         // Velocity
-        double zfactor = ( ( x( pid, 2 ) - zmin ) / ( 0.5 * height ) ) - 1;
+        double zfactor = ( ( x( pid, 2 ) - zmin ) / ( 0.5 * H ) ) - 1;
         double vr = vrmax - vrmin * zfactor * zfactor;
         v( pid, 0 ) =
             vr * Kokkos::cos( Kokkos::atan2( x( pid, 1 ), x( pid, 0 ) ) );
@@ -128,6 +127,7 @@ void fragmentingCylinderExample( const std::string filename )
 
         auto cabana_pd = CabanaPD::createSolver<memory_space>(
             inputs, particles, force_model, contact_model );
+
         cabana_pd->init();
         cabana_pd->run();
     }

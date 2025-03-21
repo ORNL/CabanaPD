@@ -29,13 +29,13 @@
 #include <CabanaPD_Types.hpp>
 #include <CabanaPD_config.hpp>
 
-#include <force/CabanaPD_ContactModels.hpp>
-#include <force/CabanaPD_ForceModels_LPS.hpp>
-#include <force/CabanaPD_ForceModels_PMB.hpp>
-#include <force/CabanaPD_Force_Contact.hpp>
-#include <force/CabanaPD_Force_HertzianContact.hpp>
-#include <force/CabanaPD_Force_LPS.hpp>
-#include <force/CabanaPD_Force_PMB.hpp>
-#include <force/CabanaPD_HertzianContact.hpp>
+#include <force/CabanaPD_Contact.hpp>
+#include <force/CabanaPD_Hertzian.hpp>
+#include <force/CabanaPD_LPS.hpp>
+#include <force/CabanaPD_PMB.hpp>
+#include <force_models/CabanaPD_Contact.hpp>
+#include <force_models/CabanaPD_Hertzian.hpp>
+#include <force_models/CabanaPD_LPS.hpp>
+#include <force_models/CabanaPD_PMB.hpp>
 
 #endif
