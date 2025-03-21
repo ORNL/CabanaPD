@@ -49,7 +49,7 @@ void testIntegratorReversibility( int steps )
     auto x = particles.sliceReferencePosition();
     std::size_t num_particle = x.size();
 
-    CabanaPD::VelocityVerlet<exec_space> integrator( 0.001 );
+    CabanaPD::VelocityVerlet<> integrator( 0.001 );
 
     // Keep a copy of initial positions on the host
     using DataTypes = Cabana::MemberTypes<double[3]>;
@@ -61,8 +61,8 @@ void testIntegratorReversibility( int steps )
     // Integrate one step
     for ( int s = 0; s < steps; ++s )
     {
-        integrator.initialHalfStep( particles );
-        integrator.finalHalfStep( particles );
+        integrator.initialHalfStep( exec_space{}, particles );
+        integrator.finalHalfStep( exec_space{}, particles );
     }
 
     // Reverse the system.
@@ -77,8 +77,8 @@ void testIntegratorReversibility( int steps )
     // Integrate back
     for ( int s = 0; s < steps; ++s )
     {
-        integrator.initialHalfStep( particles );
-        integrator.finalHalfStep( particles );
+        integrator.initialHalfStep( exec_space{}, particles );
+        integrator.finalHalfStep( exec_space{}, particles );
     }
 
     // Make a copy of final results on the host
