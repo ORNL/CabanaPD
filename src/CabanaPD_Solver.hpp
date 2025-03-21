@@ -451,14 +451,16 @@ class Solver
             double energy_time = force->timeEnergy();
             double output_time = particles->timeOutput();
             _total_time += step_time;
-            auto rate = static_cast<double>( particles->numGlobal() *
-                                             output_frequency / ( step_time ) );
+            // Instantaneous rate.
+            double p_steps_per_sec =
+                static_cast<double>( particles->numGlobal() ) / step_time;
+
             _step_timer.reset();
             log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
                  " ", std::scientific, std::setprecision( 2 ), step * dt, " ",
                  W, " ", std::fixed, _total_time, " ", force_time, " ",
                  comm_time, " ", integrate_time, " ", energy_time, " ",
-                 output_time, " ", std::scientific, rate );
+                 output_time, " ", std::scientific, p_steps_per_sec );
             out.close();
         }
     }
@@ -477,8 +479,11 @@ class Solver
             _total_time = _init_time + comm_time + integrate_time + force_time +
                           energy_time + output_time + particles->time();
 
-            double steps_per_sec = 1.0 * num_steps / _total_time;
-            double p_steps_per_sec = particles->numGlobal() * steps_per_sec;
+            // Rates over the whole simulation.s
+            double steps_per_sec =
+                static_cast<double>( num_steps ) / _total_time;
+            double p_steps_per_sec =
+                static_cast<double>( particles->numGlobal() ) * steps_per_sec;
             log( out, std::fixed, std::setprecision( 2 ),
                  "\n#Procs Particles | Total Force Comm Integrate Energy "
                  "Output Init Init_Neighbor |\n",
