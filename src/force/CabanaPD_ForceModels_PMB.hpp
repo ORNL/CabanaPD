@@ -251,6 +251,15 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
     }
 };
 
+// Corresponding elastic version
+template <typename ModelType, typename ParticleType>
+auto createForceModel( ModelType, Elastic, ParticleType, const double delta,
+                       const double K, const double G0 )
+{
+    return ForceModel<ModelType, Elastic, Fracture, TemperatureIndependent>(
+        delta, K, G0 );
+}
+
 template <typename ModelType, typename ParticleType>
 auto createForceModel( ModelType, ElasticPerfectlyPlastic, ParticleType,
                        const double delta, const double K, const double G0,
