@@ -123,9 +123,8 @@ void thermalDeformationHeatTransferExample( const std::string filename )
         temp( pid ) = 0.0;
     };
 
-    std::vector<plane_type> planes = { plane1, plane2 };
     auto bc = CabanaPD::createBoundaryCondition(
-        temp_bc, exec_space{}, *particles, planes, false, 1.0 );
+        temp_bc, exec_space{}, *particles, false, plane1, plane2 );
 
     // ====================================================
     //                   Simulation run
