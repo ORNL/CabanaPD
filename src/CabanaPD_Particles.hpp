@@ -675,8 +675,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     auto timeOutput() { return _output_timer.time(); };
     auto time() { return _timer.time(); };
 
-    friend class Comm<self_type, PMB, TemperatureIndependent>;
-    friend class Comm<self_type, PMB, TemperatureDependent>;
+    friend class Comm<self_type, Pair, TemperatureIndependent>;
+    friend class Comm<self_type, Pair, TemperatureDependent>;
 
   protected:
     aosoa_u_type _aosoa_u;
@@ -806,8 +806,8 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
                            std::forward<OtherFields>( other )... );
     }
 
-    friend class Comm<self_type, PMB, TemperatureIndependent>;
-    friend class Comm<self_type, LPS, TemperatureIndependent>;
+    friend class Comm<self_type, Pair, TemperatureIndependent>;
+    friend class Comm<self_type, State, TemperatureIndependent>;
 
   protected:
     void init_lps()
@@ -929,10 +929,10 @@ class Particles<MemorySpace, PMB, TemperatureDependent, BaseOutput, Dimension>
                            std::forward<OtherFields>( other )... );
     }
 
-    friend class Comm<self_type, PMB, TemperatureIndependent>;
-    friend class Comm<self_type, LPS, TemperatureIndependent>;
-    friend class Comm<self_type, PMB, TemperatureDependent>;
-    friend class Comm<self_type, LPS, TemperatureDependent>;
+    friend class Comm<self_type, Pair, TemperatureIndependent>;
+    friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Pair, TemperatureDependent>;
+    friend class Comm<self_type, State, TemperatureDependent>;
 
   protected:
     void init_temp()
@@ -1036,10 +1036,10 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
                            std::forward<OtherFields>( other )... );
     }
 
-    friend class Comm<self_type, PMB, TemperatureIndependent>;
-    friend class Comm<self_type, LPS, TemperatureIndependent>;
-    friend class Comm<self_type, PMB, TemperatureDependent>;
-    friend class Comm<self_type, LPS, TemperatureDependent>;
+    friend class Comm<self_type, Pair, TemperatureIndependent>;
+    friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Pair, TemperatureDependent>;
+    friend class Comm<self_type, State, TemperatureDependent>;
 
   protected:
     void init_output()

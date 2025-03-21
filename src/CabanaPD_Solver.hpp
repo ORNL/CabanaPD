@@ -81,6 +81,7 @@
 #include <CabanaPD_Particles.hpp>
 #include <CabanaPD_Prenotch.hpp>
 #include <CabanaPD_Timer.hpp>
+#include <CabanaPD_Types.hpp>
 
 namespace CabanaPD
 {
@@ -97,8 +98,9 @@ class Solver
     using integrator_type = VelocityVerlet<exec_space>;
     using force_model_type = ForceModelType;
     using force_type = Force<memory_space, force_model_type>;
-    using comm_type = Comm<particle_type, typename force_model_type::base_model,
-                           typename particle_type::thermal_type>;
+    using comm_type =
+        Comm<particle_type, typename force_model_type::base_model::base_type,
+             typename particle_type::thermal_type>;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using input_type = InputType;
 
