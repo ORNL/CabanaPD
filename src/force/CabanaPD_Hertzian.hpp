@@ -74,14 +74,25 @@ class Force<MemorySpace, HertzianModel>
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
             // Hertz normal force damping component
-            double vx, vy, vz, vn;
-            getRelativeNormalVelocityComponents( vel, i, j, rx, ry, rz, r, vx,
-                                                 vy, vz, vn );
+            double vxn, vyn, vzn, vn;
+            getRelativeNormalVelocityComponents( vel, i, j, rx, ry, rz, r, vxn,
+                                                 vyn, vzn, vn );
 
-            const double coeff = model.forceCoeff( r, vn, vol( i ), rho( i ) );
+            double vxs, vys, vzs;
+            getRelativeTangentialVelocityComponents( vel, i, vxn, vyn, vzn, vxs,
+                                                     vys, vzs );
+
+            const double coeff =
+                model.normalForceCoeff( r, vn, vol( i ), rho( i ) );
             fc( i, 0 ) += coeff * rx / r;
             fc( i, 1 ) += coeff * ry / r;
             fc( i, 2 ) += coeff * rz / r;
+
+            const double tdamping_coeff =
+                model.shearDampingCoeff( r, vol( i ), rho( i ) );
+            fc( i, 0 ) += tdamping_coeff * vxs;
+            fc( i, 1 ) += tdamping_coeff * vys;
+            fc( i, 2 ) += tdamping_coeff * vzs;
         };
 
         _timer.start();
