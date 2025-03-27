@@ -41,9 +41,12 @@ class Inputs
         // m
         // FIXME: this will be slightly different in y/z
         double dx = inputs["dx"]["value"][0];
-        double delta = inputs["horizon"]["value"];
-        int m = std::floor( delta / dx );
-        inputs["m"]["value"] = m;
+        if ( inputs.contains( "horizon" ) )
+        {
+            double delta = inputs["horizon"]["value"];
+            int m = std::floor( delta / dx );
+            inputs["m"]["value"] = m;
+        }
 
         // Set timestep safety factor if not set by user.
         if ( !inputs.contains( "timestep_safety_factor" ) )

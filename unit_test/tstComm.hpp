@@ -77,7 +77,7 @@ void testHalo()
     Cabana::deep_copy( rank_init_host, rank );
 
     // A gather is performed on construction.
-    CabanaPD::Comm<particles_type, CabanaPD::PMB,
+    CabanaPD::Comm<particles_type, CabanaPD::Pair,
                    CabanaPD::TemperatureIndependent>
         comm( particles );
 
