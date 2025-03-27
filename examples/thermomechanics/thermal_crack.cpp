@@ -71,35 +71,35 @@ void thermalCrackExample( const std::string filename )
     //                 Particle generation
     // ====================================================
     // Does not set displacements, velocities, etc.
-    auto particles =
-        CabanaPD::createParticles<memory_space, model_type, thermal_type>(
-            exec_space(), low_corner, high_corner, num_cells, halo_width );
+    CabanaPD::Particles particles( memory_space{}, model_type{}, thermal_type{},
+                                   low_corner, high_corner, num_cells,
+                                   halo_width, exec_space{} );
 
     // ====================================================
     //            Custom particle initialization
     // ====================================================
-    auto rho = particles->sliceDensity();
+    auto rho = particles.sliceDensity();
     auto init_functor = KOKKOS_LAMBDA( const int pid ) { rho( pid ) = rho0; };
-    particles->updateParticles( exec_space{}, init_functor );
+    particles.updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                    Force model
     // ====================================================
-    auto force_model =
-        CabanaPD::createForceModel( model_type{}, CabanaPD::Fracture{},
-                                    *particles, delta, K, G0, alpha, temp0 );
+    auto temp = particles.sliceTemperature();
+    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0, temp, alpha,
+                                      temp0 );
 
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd =
-        CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
+
+    CabanaPD::Solver solver( inputs, particles, force_model );
 
     // --------------------------------------------
     //                Thermal shock
     // --------------------------------------------
-    auto x = particles->sliceReferencePosition();
-    auto temp = particles->sliceTemperature();
+    auto x = particles.sliceReferencePosition();
+    temp = particles.sliceTemperature();
 
     // Plate limits
     double X0 = low_corner[0];
@@ -147,14 +147,13 @@ void thermalCrackExample( const std::string filename )
         // Compute particle temperature
         temp( pid ) = temp_infinity + ( temp0 - temp_infinity ) * fx * fy;
     };
-    auto body_term =
-        CabanaPD::createBodyTerm( temp_func, particles->size(), false );
+    CabanaPD::BodyTerm body_term( temp_func, particles.size(), false );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init( body_term );
-    cabana_pd->run( body_term );
+    solver.init( body_term );
+    solver.run( body_term );
 }
 
 // Initialize MPI+Kokkos.

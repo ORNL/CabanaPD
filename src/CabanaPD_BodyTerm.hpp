@@ -33,7 +33,7 @@ struct BodyTerm
     Timer _timer;
 
     BodyTerm( UserFunctor user, const std::size_t particle_count,
-              const bool force, const bool update_frozen )
+              const bool force, const bool update_frozen = false )
         : _user_functor( user )
         , _particle_count( particle_count )
         , _force_update( force )
@@ -66,14 +66,6 @@ struct BodyTerm
     auto time() { return _timer.time(); };
     auto timeInit() { return 0.0; };
 };
-
-template <class UserFunctor>
-auto createBodyTerm( UserFunctor user_functor, const std::size_t particle_count,
-                     const bool force_update, const bool update_frozen = false )
-{
-    return BodyTerm<UserFunctor>( user_functor, particle_count, force_update,
-                                  update_frozen );
-}
 
 } // namespace CabanaPD
 

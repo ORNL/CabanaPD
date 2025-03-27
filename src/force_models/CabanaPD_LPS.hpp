@@ -36,12 +36,27 @@ struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModel
     double theta_coeff;
     double s_coeff;
 
-    ForceModel( const double _delta, const double _K, const double _G,
-                const int _influence = 0 )
+    ForceModel( LPS, NoFracture, const double _delta, const double _K,
+                const double _G, const int _influence = 0 )
         : base_type( _delta )
         , influence_type( _influence )
         , K( _K )
         , G( _G )
+    {
+        init();
+    }
+
+    ForceModel( LPS, Elastic, NoFracture, const double _delta, const double _K,
+                const double _G, const int _influence = 0 )
+        : base_type( _delta )
+        , influence_type( _influence )
+        , K( _K )
+        , G( _G )
+    {
+        init();
+    }
+
+    void init()
     {
         theta_coeff = 3.0 * K - 5.0 * G;
         s_coeff = 15.0 * G;
@@ -111,10 +126,32 @@ struct ForceModel<LPS, Elastic, Fracture>
     double s0;
     double bond_break_coeff;
 
-    ForceModel( const double _delta, const double _K, const double _G,
-                const double _G0, const int _influence = 0 )
-        : base_type( _delta, _K, _G, _influence )
+    ForceModel( LPS model, const double _delta, const double _K,
+                const double _G, const double _G0, const int _influence = 0 )
+        : base_type( model, NoFracture{}, _delta, _K, _G, _influence )
         , G0( _G0 )
+    {
+        init();
+    }
+
+    ForceModel( LPS model, Fracture, const double _delta, const double _K,
+                const double _G, const double _G0, const int _influence = 0 )
+        : base_type( model, NoFracture{}, _delta, _K, _G, _influence )
+        , G0( _G0 )
+    {
+        init();
+    }
+
+    ForceModel( LPS model, Elastic elastic, Fracture, const double _delta,
+                const double _K, const double _G, const double _G0,
+                const int _influence = 0 )
+        : base_type( model, elastic, NoFracture{}, _delta, _K, _G, _influence )
+        , G0( _G0 )
+    {
+        init();
+    }
+
+    void init()
     {
         if ( influence_type == 1 )
         {
@@ -137,7 +174,11 @@ struct ForceModel<LinearLPS, Elastic, NoFracture>
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = base_type::thermal_type;
 
-    using base_type::base_type;
+    template <typename... Args>
+    ForceModel( LinearLPS, Args&&... args )
+        : base_type( base_model{}, std::forward<Args>( args )... )
+    {
+    }
 
     using base_type::delta;
     using base_type::G;
@@ -156,7 +197,11 @@ struct ForceModel<LinearLPS, Elastic, Fracture>
     using fracture_type = typename base_type::fracture_type;
     using thermal_type = base_type::thermal_type;
 
-    using base_type::base_type;
+    template <typename... Args>
+    ForceModel( LinearLPS, Args&&... args )
+        : base_type( base_model{}, std::forward<Args>( args )... )
+    {
+    }
 
     using base_type::delta;
     using base_type::G;
@@ -169,6 +214,26 @@ struct ForceModel<LinearLPS, Elastic, Fracture>
     using base_type::G0;
     using base_type::s0;
 };
+
+template <typename ModelType>
+ForceModel( ModelType, Elastic, NoFracture, const double delta, const double K,
+            const double G, const int influence = 0 )
+    -> ForceModel<ModelType, Elastic, NoFracture>;
+
+template <typename ModelType>
+ForceModel( ModelType, NoFracture, const double delta, const double K,
+            const double G, const int influence = 0 )
+    -> ForceModel<ModelType, Elastic, NoFracture>;
+
+template <typename ModelType>
+ForceModel( ModelType, Elastic, const double delta, const double K,
+            const double G, const int influence = 0 )
+    -> ForceModel<ModelType, Elastic>;
+
+template <typename ModelType>
+ForceModel( ModelType, const double _delta, const double _K, const double _G,
+            const double _G0, const int _influence = 0 )
+    -> ForceModel<ModelType>;
 
 } // namespace CabanaPD
 
