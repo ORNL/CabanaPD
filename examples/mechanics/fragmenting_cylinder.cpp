@@ -38,6 +38,7 @@ void fragmentingCylinderExample( const std::string filename )
     double rho0 = inputs["density"];
     double K = inputs["bulk_modulus"];
     double G = inputs["shear_modulus"]; // Only for LPS.
+    double sigma_y = inputs["yield_stress"];
     double sc = inputs["critical_stretch"];
     double delta = inputs["horizon"];
     delta += 1e-10;
@@ -57,12 +58,11 @@ void fragmentingCylinderExample( const std::string filename )
     int halo_width = m + 1; // Just to be safe.
 
     // ====================================================
-    //                    Force model
+    //                Force model type
     // ====================================================
-    // using model_type = CabanaPD::ForceModel<CabanaPD::PMB>;
-    // model_type force_model( delta, K, G0 );
-    using model_type = CabanaPD::ForceModel<CabanaPD::LPS>;
-    model_type force_model( delta, K, G, G0 );
+    using model_type = CabanaPD::PMB;
+    using thermal_type = CabanaPD::TemperatureIndependent;
+    using mechanics_type = CabanaPD::ElasticPerfectlyPlastic;
 
     // ====================================================
     //    Custom particle generation and initialization
@@ -85,9 +85,10 @@ void fragmentingCylinderExample( const std::string filename )
         return true;
     };
 
-    auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space(), low_corner, high_corner, num_cells, halo_width,
-        Cabana::InitRandom{}, init_op );
+    auto particles =
+        CabanaPD::createParticles<memory_space, model_type, thermal_type>(
+            exec_space(), low_corner, high_corner, num_cells, halo_width,
+            Cabana::InitRandom{}, init_op );
 
     auto rho = particles->sliceDensity();
     auto x = particles->sliceReferencePosition();
@@ -115,6 +116,12 @@ void fragmentingCylinderExample( const std::string filename )
         v( pid, 2 ) = vzmax * zfactor;
     };
     particles->updateParticles( exec_space{}, init_functor );
+
+    // ====================================================
+    //                    Force model
+    // ====================================================
+    auto force_model = CabanaPD::createForceModel(
+        model_type{}, mechanics_type{}, *particles, delta, K, G0, sigma_y );
 
     // ====================================================
     //  Simulation run with contact physics
