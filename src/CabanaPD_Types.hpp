@@ -36,6 +36,9 @@ struct is_fracture<Fracture> : public std::true_type
 struct Elastic
 {
 };
+struct ElasticPerfectlyPlastic
+{
+};
 
 // Contact and DEM (contact without PD) tags.
 struct NoContact
@@ -80,6 +83,22 @@ struct is_heat_transfer : public std::false_type
 };
 template <>
 struct is_heat_transfer<DynamicTemperature> : public std::true_type
+{
+};
+template <class>
+struct is_temperature : public std::false_type
+{
+};
+template <>
+struct is_temperature<TemperatureIndependent> : public std::true_type
+{
+};
+template <>
+struct is_temperature<TemperatureDependent> : public std::true_type
+{
+};
+template <>
+struct is_temperature<DynamicTemperature> : public std::true_type
 {
 };
 
