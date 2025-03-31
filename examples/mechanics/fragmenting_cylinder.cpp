@@ -120,9 +120,14 @@ void fragmentingCylinderExample( const std::string filename )
         };
         particles->updateParticles( exec_space{}, init_functor );
 
+        // Use contact radius and extension relative to particle spacing.
         double r_c = inputs["contact_horizon_factor"];
-        r_c *= dx[0];
-        contact_type contact_model( delta, r_c, r_c, K );
+        double r_extend = inputs["contact_horizon_extend_factor"];
+        // NOTE: dx/2 is when particles first touch.
+        r_c *= dx[0] / 2.0;
+        r_extend *= dx[0];
+
+        contact_type contact_model( delta, r_c, r_extend, K );
 
         auto cabana_pd = CabanaPD::createSolver<memory_space>(
             inputs, particles, force_model, contact_model );

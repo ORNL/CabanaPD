@@ -28,7 +28,6 @@ struct HertzianModel : public ContactModel
     using thermal_type = TemperatureIndependent;
 
     using base_type::radius;
-    using base_type::radius_extend;
     double nu;   // Poisson's ratio
     double Rs;   // Equivalent radius
     double Es;   // Equivalent Young's modulus

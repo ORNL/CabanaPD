@@ -54,7 +54,7 @@ class BaseForceContact : public Force<MemorySpace, BaseForceModel>
                      particles.sliceCurrentPosition(), particles.frozenOffset(),
                      particles.localOffset(), particles.ghost_mesh_lo,
                      particles.ghost_mesh_hi )
-        , radius( 2.0 * model.radius )
+        , search_radius( 2.0 * model.radius + model.radius_extend )
         , radius_extend( model.radius_extend )
     {
         for ( int d = 0; d < particles.dim; d++ )
@@ -75,8 +75,8 @@ class BaseForceContact : public Force<MemorySpace, BaseForceModel>
             _neigh_timer.start();
             const auto y = particles.sliceCurrentPosition();
             _neigh_list.build( y, particles.frozenOffset(),
-                               particles.localOffset(), radius + radius_extend,
-                               1.0, mesh_min, mesh_max );
+                               particles.localOffset(), search_radius, 1.0,
+                               mesh_min, mesh_max );
             // Reset neighbor update displacement.
             const auto u = particles.sliceDisplacement();
             auto u_neigh = particles.sliceDisplacementNeighborBuild();
@@ -88,7 +88,7 @@ class BaseForceContact : public Force<MemorySpace, BaseForceModel>
     auto timeNeighbor() { return _neigh_timer.time(); };
 
   protected:
-    double radius;
+    double search_radius;
     double radius_extend;
     Timer _neigh_timer;
 
@@ -141,11 +141,13 @@ class Force<MemorySpace, NormalRepulsionModel>
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-            const double coeff = model.forceCoeff( r, vol( j ) );
-            fcx_i = coeff * rx / r;
-            fcy_i = coeff * ry / r;
-            fcz_i = coeff * rz / r;
-
+            if ( r < model.radius )
+            {
+                const double coeff = model.forceCoeff( r, vol( j ) );
+                fcx_i = coeff * rx / r;
+                fcy_i = coeff * ry / r;
+                fcz_i = coeff * rz / r;
+            }
             fc( i, 0 ) += fcx_i;
             fc( i, 1 ) += fcy_i;
             fc( i, 2 ) += fcz_i;
