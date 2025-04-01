@@ -52,10 +52,61 @@ struct QuadraticTag
 //---------------------------------------------------------------------------//
 // Note: all of these reference calculations assume uniform volume and a full
 // particle neighborhood.
-
 //---------------------------------------------------------------------------//
+
+// Get the PMB stress tensor (at the center point).
+// LinearTag: Simplified here because the stretch is constant.
+template <class ModelType>
+double computeReferenceStress(
+    LinearTag, ModelType model, const int m, const double s0, const double,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        int>::type* = 0 )
+{
+    double f_mag;
+    double f_x;
+    double f_y;
+    double f_z;
+    double sigma_xx = 0.0;
+    double sigma_yy = 0.0;
+    double sigma_zz = 0.0;
+    double sigma_xy = 0.0;
+    double sigma_xz = 0.0;
+    double sigma_yz = 0.0;
+    double dx = model.delta / m;
+    double vol = dx * dx * dx;
+    for ( int i = -m; i < m + 1; ++i )
+        for ( int j = -m; j < m + 1; ++j )
+            for ( int k = -m; k < m + 1; ++k )
+            {
+                double xi_x = dx * i;
+                double xi_y = dx * j;
+                double xi_z = dx * k;
+                double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+
+                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                {
+                    f_mag = model.c * s0;
+                    f_x = f_mag * xi_x / xi;
+                    f_y = f_mag * xi_y / xi;
+                    f_z = f_mag * xi_z / xi;
+                    sigma_xx += 0.5 * f_x * xi_x * vol;
+                    sigma_yy += 0.5 * f_y * xi_y * vol;
+                    sigma_zz += 0.5 * f_z * xi_z * vol;
+                    sigma_xy += 0.5 * f_x * xi_y * vol;
+                    sigma_xz += 0.5 * f_x * xi_z * vol;
+                    sigma_yz += 0.5 * f_y * xi_z * vol;
+                }
+            }
+    double sigma_yx = sigma_xy;
+    double sigma_zx = sigma_xz;
+    double sigma_zy = sigma_yz;
+    return sigma_xx, sigma_yy, sigma_zz, sigma_xy, sigma_yx, sigma_xz, sigma_zx,
+           sigma_yz, sigma_zy;
+}
+
 // Get the PMB strain energy density (at the center point).
-// Simplified here because the stretch is constant.
+// LinearTag: Simplified here because the stretch is constant.
 template <class ModelType>
 double computeReferenceStrainEnergyDensity(
     LinearTag, ModelType model, const int m, const double s0, const double,
@@ -83,6 +134,7 @@ double computeReferenceStrainEnergyDensity(
     return W;
 }
 
+// QuadraticTag: Assumes zero y- and z-displacement components.
 template <class ModelType>
 double computeReferenceStrainEnergyDensity(
     QuadraticTag, ModelType model, const int m, const double u11,
@@ -117,6 +169,8 @@ double computeReferenceStrainEnergyDensity(
     return W;
 }
 
+// Get the PMB internal force density (at one point).
+// LinearTag
 template <class ModelType>
 double computeReferenceForceX( LinearTag, ModelType, const int, const double,
                                const double )
@@ -124,8 +178,7 @@ double computeReferenceForceX( LinearTag, ModelType, const int, const double,
     return 0.0;
 }
 
-// Get the PMB force (at one point).
-// Assumes zero y/z displacement components.
+// QuadraticTag: Assumes zero y- and z-displacement components.
 template <class ModelType>
 double computeReferenceForceX(
     QuadraticTag, ModelType model, const int m, const double u11,
@@ -134,7 +187,7 @@ double computeReferenceForceX(
         ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
         int>::type* = 0 )
 {
-    double fx = 0.0;
+    double Fx = 0.0;
     double dx = model.delta / m;
     double vol = dx * dx * dx;
     for ( int i = -m; i < m + 1; ++i )
@@ -153,11 +206,12 @@ double computeReferenceForceX(
                 double s = ( r - xi ) / xi;
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
-                    fx += model.c * s * vol * rx / r;
+                    Fx += model.c * s * vol * rx / r;
             }
-    return fx;
+    return Fx;
 }
 
+// Get the weighted volume (at one point).
 template <class ModelType>
 double computeReferenceWeightedVolume( ModelType model, const int m,
                                        const double vol )
@@ -179,7 +233,8 @@ double computeReferenceWeightedVolume( ModelType model, const int m,
     return weighted_volume;
 }
 
-// LinearTag
+// Get the dilatation (at one point).
+// LinearTag: Simplified here because the stretch is constant.
 template <class ModelType>
 double computeReferenceDilatation( ModelType model, const int m,
                                    const double s0, const double vol,
@@ -203,8 +258,7 @@ double computeReferenceDilatation( ModelType model, const int m,
     return theta;
 }
 
-// QuadraticTag
-// Assumes zero y/z displacement components.
+// QuadraticTag: Assumes zero y- and z-displacement components.
 template <class ModelType>
 double computeReferenceDilatation( ModelType model, const int m,
                                    const double u11, const double vol,
@@ -235,6 +289,7 @@ double computeReferenceDilatation( ModelType model, const int m,
     return theta;
 }
 
+// Get the number of neighbors (at one point).
 double computeReferenceNeighbors( const double delta, const int m )
 {
     double dx = delta / m;
@@ -254,7 +309,70 @@ double computeReferenceNeighbors( const double delta, const int m )
     return num_neighbors;
 }
 
+// Get the LPS stress tensor (at one point).
+// LinearTag: Simplified here because the stretch is constant.
+template <class ModelType>
+double computeReferenceStress(
+    LinearTag, ModelType model, const int m, const double s0, const double,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        int>::type* = 0 )
+{
+    double f_mag;
+    double f_x;
+    double f_y;
+    double f_z;
+    double sigma_xx = 0.0;
+    double sigma_yy = 0.0;
+    double sigma_zz = 0.0;
+    double sigma_xy = 0.0;
+    double sigma_xz = 0.0;
+    double sigma_yz = 0.0;
+    double dx = model.delta / m;
+    double vol = dx * dx * dx;
+
+    auto weighted_volume = computeReferenceWeightedVolume( model, m, vol );
+    auto theta =
+        computeReferenceDilatation( model, m, s0, vol, weighted_volume );
+    auto num_neighbors = computeReferenceNeighbors( model.delta, m );
+
+    // Stress tensor.
+    for ( int i = -m; i < m + 1; ++i )
+        for ( int j = -m; j < m + 1; ++j )
+            for ( int k = -m; k < m + 1; ++k )
+            {
+                double xi_x = dx * i;
+                double xi_y = dx * j;
+                double xi_z = dx * k;
+                double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+
+                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                {
+                    // We assume the dilatation and weighted volume are constant
+                    f_mag = ( ( 1.0 / num_neighbors ) * model.theta_coeff *
+                                  2.0 * theta / weighted_volume +
+                              model.s_coeff * s0 * 2.0 / weighted_volume ) *
+                            model.influenceFunction( xi ) * xi;
+                    f_x = f_mag * xi_x / xi;
+                    f_y = f_mag * xi_y / xi;
+                    f_z = f_mag * xi_z / xi;
+                    sigma_xx += 0.5 * f_x * xi_x * vol;
+                    sigma_yy += 0.5 * f_y * xi_y * vol;
+                    sigma_zz += 0.5 * f_z * xi_z * vol;
+                    sigma_xy += 0.5 * f_x * xi_y * vol;
+                    sigma_xz += 0.5 * f_x * xi_z * vol;
+                    sigma_yz += 0.5 * f_y * xi_z * vol;
+                }
+            }
+    double sigma_yx = sigma_xy;
+    double sigma_zx = sigma_xz;
+    double sigma_zy = sigma_yz;
+    return sigma_xx, sigma_yy, sigma_zz, sigma_xy, sigma_yx, sigma_xz, sigma_zx,
+           sigma_yz, sigma_zy;
+}
+
 // Get the LPS strain energy density (at one point).
+// LinearTag: Simplified here because the stretch is constant.
 template <class ModelType>
 double computeReferenceStrainEnergyDensity(
     LinearTag, ModelType model, const int m, const double s0, const double,
@@ -271,7 +389,7 @@ double computeReferenceStrainEnergyDensity(
         computeReferenceDilatation( model, m, s0, vol, weighted_volume );
     auto num_neighbors = computeReferenceNeighbors( model.delta, m );
 
-    // Strain energy.
+    // Strain energy density.
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
             for ( int k = -m; k < m + 1; ++k )
@@ -293,6 +411,7 @@ double computeReferenceStrainEnergyDensity(
     return W;
 }
 
+// QuadraticTag: Assumes zero y- and z-displacement components.
 template <class ModelType>
 double computeReferenceStrainEnergyDensity(
     QuadraticTag, ModelType model, const int m, const double u11,
@@ -310,7 +429,7 @@ double computeReferenceStrainEnergyDensity(
     auto theta_i =
         computeReferenceDilatation( model, m, u11, vol, weighted_volume, x );
 
-    // Strain energy.
+    // Strain energy density.
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
             for ( int k = -m; k < m + 1; ++k )
@@ -341,8 +460,8 @@ double computeReferenceStrainEnergyDensity(
     return W;
 }
 
-// Get the LPS strain energy density (at one point).
-// Assumes zero y/z displacement components.
+// Get the LPS internal force density (at one point).
+// QuadraticTag: Assumes zero y- and z-displacement components.
 template <class ModelType>
 double computeReferenceForceX(
     QuadraticTag, ModelType model, const int m, const double u11,
@@ -351,7 +470,7 @@ double computeReferenceForceX(
         ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
         int>::type* = 0 )
 {
-    double fx = 0.0;
+    double Fx = 0.0;
     double dx = model.delta / m;
     double vol = dx * dx * dx;
 
@@ -378,7 +497,7 @@ double computeReferenceForceX(
                     model, m, u11, vol, weighted_volume, x_j );
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                 {
-                    fx += ( model.theta_coeff * ( theta_i / weighted_volume +
+                    Fx += ( model.theta_coeff * ( theta_i / weighted_volume +
                                                   theta_j / weighted_volume ) +
                             model.s_coeff * s *
                                 ( 1.0 / weighted_volume +
@@ -386,7 +505,7 @@ double computeReferenceForceX(
                           model.influenceFunction( xi ) * xi * vol * rx / r;
                 }
             }
-    return fx;
+    return Fx;
 }
 
 //---------------------------------------------------------------------------//
@@ -512,10 +631,10 @@ void checkParticle( LinearTag tag, ModelType model, const double s0,
     EXPECT_LE( fy, 1e-13 );
     EXPECT_LE( fz, 1e-13 );
 
-    // Check strain energy (all should be equal for fixed stretch).
+    // Check strain energy density (all should be equal for fixed stretch).
     EXPECT_FLOAT_EQ( W, ref_W );
 
-    // Check energy with analytical value.
+    // Check strain energy density with analytical value.
     checkAnalyticalStrainEnergy( tag, model, s0, W, -1 );
 }
 
