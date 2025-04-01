@@ -22,29 +22,25 @@ namespace CabanaPD
 {
 struct HertzianModel : public ContactModel
 {
-    // FIXME: This is for use as the primary force model.
-    using base_model = PMB;
+    using base_type = ContactModel;
+    using base_model = base_type::base_model;
     using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
 
-    using ContactModel::Rc; // Contact horizon (should be > 2*radius)
-
-    double nu;     // Poisson's ratio
-    double radius; // Actual radius
-    double Rs;     // Equivalent radius
-    double Es;     // Equivalent Young's modulus
-    double e;      // Coefficient of restitution
-    double beta;   // Damping coefficient
-
+    using base_type::radius;
+    double nu;   // Poisson's ratio
+    double Rs;   // Equivalent radius
+    double Es;   // Equivalent Young's modulus
+    double e;    // Coefficient of restitution
+    double beta; // Damping coefficient
     double coeff_h_n;
     double coeff_h_d;
 
-    HertzianModel( const double _Rc, const double _radius, const double _nu,
+    HertzianModel( const double _radius, const double _extend, const double _nu,
                    const double _E, const double _e )
-        : ContactModel( 1.0, _Rc )
+        : base_type( _radius, _extend )
+        , nu( _nu )
     {
-        nu = _nu;
-        radius = _radius;
         Rs = 0.5 * radius;
         Es = _E / ( 2.0 * Kokkos::pow( 1.0 - nu, 2.0 ) );
         e = _e;
@@ -82,11 +78,6 @@ struct HertzianModel : public ContactModel
         coeff += coeff_h_d * Kokkos::sqrt( Sn * ms ) * vn / vol;
         return coeff;
     }
-};
-
-template <>
-struct is_contact<HertzianModel> : public std::true_type
-{
 };
 
 } // namespace CabanaPD

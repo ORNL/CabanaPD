@@ -38,30 +38,83 @@ KOKKOS_INLINE_FUNCTION void getRelativeNormalVelocityComponents(
     vn /= r;
 };
 
-/******************************************************************************
-  Normal repulsion forces
-******************************************************************************/
+// Contact forces base class.
 template <class MemorySpace>
-class Force<MemorySpace, NormalRepulsionModel>
-    : public Force<MemorySpace, BaseForceModel>
+class BaseForceContact : public Force<MemorySpace, BaseForceModel>
 {
   public:
     using base_type = Force<MemorySpace, BaseForceModel>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
 
-    template <class ParticleType>
-    Force( const bool half_neigh, const ParticleType& particles,
-           const NormalRepulsionModel model )
-        : base_type( half_neigh, model.Rc, particles.sliceCurrentPosition(),
-                     particles.frozenOffset(), particles.localOffset(),
-                     particles.ghost_mesh_lo, particles.ghost_mesh_hi )
-        , _model( model )
+    // NOTE: using 2x radius to find neighbors when particles first touch.
+    template <class ParticleType, class ModelType>
+    BaseForceContact( const bool half_neigh, const ParticleType& particles,
+                      const ModelType model )
+        : base_type( half_neigh, 2.0 * model.radius + model.radius_extend,
+                     particles.sliceCurrentPosition(), particles.frozenOffset(),
+                     particles.localOffset(), particles.ghost_mesh_lo,
+                     particles.ghost_mesh_hi )
+        , search_radius( 2.0 * model.radius + model.radius_extend )
+        , radius_extend( model.radius_extend )
     {
         for ( int d = 0; d < particles.dim; d++ )
         {
             mesh_min[d] = particles.ghost_mesh_lo[d];
             mesh_max[d] = particles.ghost_mesh_hi[d];
         }
+    }
+
+    // Only rebuild neighbor list as needed.
+    template <class ParticleType>
+    void update( const ParticleType& particles,
+                 const bool require_update = false )
+    {
+        double max_displacement = particles.getMaxDisplacement();
+        if ( max_displacement > radius_extend || require_update )
+        {
+            _neigh_timer.start();
+            const auto y = particles.sliceCurrentPosition();
+            _neigh_list.build( y, particles.frozenOffset(),
+                               particles.localOffset(), search_radius, 1.0,
+                               mesh_min, mesh_max );
+            // Reset neighbor update displacement.
+            const auto u = particles.sliceDisplacement();
+            auto u_neigh = particles.sliceDisplacementNeighborBuild();
+            Cabana::deep_copy( u_neigh, u );
+            _neigh_timer.stop();
+        }
+    }
+
+    auto timeNeighbor() { return _neigh_timer.time(); };
+
+  protected:
+    double search_radius;
+    double radius_extend;
+    Timer _neigh_timer;
+
+    using base_type::_half_neigh;
+    using base_type::_neigh_list;
+    double mesh_max[3];
+    double mesh_min[3];
+};
+
+/******************************************************************************
+  Normal repulsion forces
+******************************************************************************/
+template <class MemorySpace>
+class Force<MemorySpace, NormalRepulsionModel>
+    : public BaseForceContact<MemorySpace>
+{
+  public:
+    using base_type = BaseForceContact<MemorySpace>;
+    using neighbor_list_type = typename base_type::neighbor_list_type;
+
+    template <class ParticleType>
+    Force( const bool half_neigh, const ParticleType& particles,
+           const NormalRepulsionModel model )
+        : base_type( half_neigh, particles, model )
+        , _model( model )
+    {
     }
 
     template <class ForceType, class PosType, class ParticleType,
@@ -76,10 +129,7 @@ class Force<MemorySpace, NormalRepulsionModel>
         const int n_frozen = particles.frozenOffset();
         const int n_local = particles.localOffset();
 
-        _neigh_timer.start();
-        _neigh_list.build( y, n_frozen, n_local, model.Rc, 1.0, mesh_min,
-                           mesh_max );
-        _neigh_timer.stop();
+        base_type::update( particles, particles.getMaxDisplacement() );
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -91,11 +141,13 @@ class Force<MemorySpace, NormalRepulsionModel>
             double rx, ry, rz;
             getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
 
-            const double coeff = model.forceCoeff( r, vol( j ) );
-            fcx_i = coeff * rx / r;
-            fcy_i = coeff * ry / r;
-            fcz_i = coeff * rz / r;
-
+            if ( r < model.radius )
+            {
+                const double coeff = model.forceCoeff( r, vol( j ) );
+                fcx_i = coeff * rx / r;
+                fcy_i = coeff * ry / r;
+                fcz_i = coeff * rz / r;
+            }
             fc( i, 0 ) += fcx_i;
             fc( i, 1 ) += fcy_i;
             fc( i, 2 ) += fcz_i;
@@ -126,8 +178,8 @@ class Force<MemorySpace, NormalRepulsionModel>
     NormalRepulsionModel _model;
     using base_type::_half_neigh;
     using base_type::_neigh_list;
+    using base_type::_neigh_timer;
     using base_type::_timer;
-    Timer _neigh_timer;
 
     double mesh_max[3];
     double mesh_min[3];

@@ -662,8 +662,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     auto timeOutput() { return _output_timer.time(); };
     auto time() { return _timer.time(); };
 
-    friend class Comm<self_type, PMB, TemperatureIndependent>;
-    friend class Comm<self_type, PMB, TemperatureDependent>;
+    friend class Comm<self_type, Pair, TemperatureIndependent>;
+    friend class Comm<self_type, Pair, TemperatureDependent>;
 
   protected:
     aosoa_u_type _aosoa_u;
@@ -792,8 +792,8 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
                            std::forward<OtherFields>( other )... );
     }
 
-    friend class Comm<self_type, PMB, TemperatureIndependent>;
-    friend class Comm<self_type, LPS, TemperatureIndependent>;
+    friend class Comm<self_type, Pair, TemperatureIndependent>;
+    friend class Comm<self_type, State, TemperatureIndependent>;
 
   protected:
     void init_lps()
@@ -915,10 +915,10 @@ class Particles<MemorySpace, PMB, TemperatureDependent, BaseOutput, Dimension>
                            std::forward<OtherFields>( other )... );
     }
 
-    friend class Comm<self_type, PMB, TemperatureIndependent>;
-    friend class Comm<self_type, LPS, TemperatureIndependent>;
-    friend class Comm<self_type, PMB, TemperatureDependent>;
-    friend class Comm<self_type, LPS, TemperatureDependent>;
+    friend class Comm<self_type, Pair, TemperatureIndependent>;
+    friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Pair, TemperatureDependent>;
+    friend class Comm<self_type, State, TemperatureDependent>;
 
   protected:
     void init_temp()
@@ -928,6 +928,96 @@ class Particles<MemorySpace, PMB, TemperatureDependent, BaseOutput, Dimension>
     }
 
     aosoa_temp_type _aosoa_temp;
+};
+
+template <class MemorySpace, class ThermalType, int Dimension>
+class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
+    : public Particles<MemorySpace, PMB, ThermalType, BaseOutput, Dimension>
+{
+    // Note: no overloaded output() since there are very few cases where this
+    // is a desired output field.
+
+  public:
+    using self_type =
+        Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>;
+    using base_type =
+        Particles<MemorySpace, PMB, ThermalType, BaseOutput, Dimension>;
+    using thermal_type = typename base_type::thermal_type;
+    using output_type = typename base_type::output_type;
+    using memory_space = typename base_type::memory_space;
+    using base_type::dim;
+
+    using aosoa_u_neigh_type =
+        Cabana::AoSoA<typename base_type::vector_type, memory_space, 1>;
+
+    // Simulation total domain.
+    using base_type::global_mesh_ext;
+
+    // Simulation sub domain (single MPI rank).
+    using base_type::ghost_mesh_hi;
+    using base_type::ghost_mesh_lo;
+    using base_type::local_mesh_ext;
+    using base_type::local_mesh_hi;
+    using base_type::local_mesh_lo;
+
+    using base_type::dx;
+    using base_type::local_grid;
+
+    using base_type::halo_width;
+
+    // Base constructor.
+    template <typename... Args>
+    Particles( Args&&... args )
+        : base_type( std::forward<Args>( args )... )
+    {
+        _aosoa_u_neigh = aosoa_u_neigh_type( "Particle Contact Fields",
+                                             base_type::localOffset() );
+        init_output();
+    }
+
+    template <typename... Args>
+    void createParticles( Args&&... args )
+    {
+        // Forward arguments to standard or custom particle creation.
+        base_type::createParticles( std::forward<Args>( args )... );
+        _aosoa_u_neigh.resize( base_type::localOffset() );
+    }
+
+    auto sliceDisplacementNeighborBuild()
+    {
+        return Cabana::slice<0>( _aosoa_u_neigh, "displacement_since_rebuild" );
+    }
+    auto sliceDisplacementNeighborBuild() const
+    {
+        return Cabana::slice<0>( _aosoa_u_neigh, "displacement_since_rebuild" );
+    }
+
+    template <typename... Args>
+    void resize( Args&&... args )
+    {
+        base_type::resize( std::forward<Args>( args )... );
+        _aosoa_u_neigh.resize( base_type::localOffset() );
+    }
+
+    void setMaxDisplacement( double new_max ) { _max_displacement = new_max; }
+    double getMaxDisplacement() const { return _max_displacement; }
+
+    friend class Comm<self_type, Pair, TemperatureIndependent>;
+    friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Pair, TemperatureDependent>;
+    friend class Comm<self_type, State, TemperatureDependent>;
+
+  protected:
+    void init_output()
+    {
+        auto u_neigh = sliceDisplacementNeighborBuild();
+        Cabana::deep_copy( u_neigh, 0.0 );
+    }
+
+    // Used for delaying neighbor construction.
+    double _max_displacement;
+
+    aosoa_u_neigh_type _aosoa_u_neigh;
 };
 
 template <class MemorySpace, class ModelType, class ThermalType, int Dimension>
@@ -1022,10 +1112,10 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
                            std::forward<OtherFields>( other )... );
     }
 
-    friend class Comm<self_type, PMB, TemperatureIndependent>;
-    friend class Comm<self_type, LPS, TemperatureIndependent>;
-    friend class Comm<self_type, PMB, TemperatureDependent>;
-    friend class Comm<self_type, LPS, TemperatureDependent>;
+    friend class Comm<self_type, Pair, TemperatureIndependent>;
+    friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Pair, TemperatureDependent>;
+    friend class Comm<self_type, State, TemperatureDependent>;
 
   protected:
     void init_output()

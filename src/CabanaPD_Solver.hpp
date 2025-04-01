@@ -81,6 +81,7 @@
 #include <CabanaPD_Particles.hpp>
 #include <CabanaPD_Prenotch.hpp>
 #include <CabanaPD_Timer.hpp>
+#include <CabanaPD_Types.hpp>
 
 namespace CabanaPD
 {
@@ -94,11 +95,11 @@ class Solver
 
     // Core module types - required for all problems.
     using particle_type = ParticleType;
-    using integrator_type = Integrator<exec_space>;
     using force_model_type = ForceModelType;
     using force_type = Force<memory_space, force_model_type>;
-    using comm_type = Comm<particle_type, typename force_model_type::base_model,
-                           typename particle_type::thermal_type>;
+    using comm_type =
+        Comm<particle_type, typename force_model_type::base_model::base_type,
+             typename particle_type::thermal_type>;
     using neigh_iter_tag = Cabana::SerialOpTag;
     using input_type = InputType;
 
@@ -106,6 +107,13 @@ class Solver
     using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
     using contact_type = Force<memory_space, ContactModelType>;
     using contact_model_type = ContactModelType;
+
+    // Flexible module types.
+    // Integration should include max displacement tracking if either model
+    // involves contact.
+    using integrator_type =
+        VelocityVerlet<typename either_contact<force_model_type,
+                                               contact_model_type>::base_type>;
 
     Solver( input_type _inputs, std::shared_ptr<particle_type> _particles,
             force_model_type force_model )
@@ -132,7 +140,9 @@ class Solver
 
     void setup( force_model_type force_model )
     {
-        inputs.computeCriticalTimeStep( force_model );
+        // This timestep is not valid for DEM-only.
+        if constexpr ( !is_contact<force_model_type>::value )
+            inputs.computeCriticalTimeStep( force_model );
 
         num_steps = inputs["num_steps"];
         output_frequency = inputs["output_frequency"];
@@ -296,6 +306,8 @@ class Solver
         // FIXME: Will need to rebuild ghosts.
     }
 
+    void updateNeighbors() { force->update( *particles, 0.0, true ); }
+
     template <typename BoundaryType>
     void run( BoundaryType boundary_condition )
     {
@@ -307,7 +319,7 @@ class Solver
             _step_timer.start();
 
             // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( *particles );
+            integrator->initialHalfStep( exec_space{}, *particles );
 
             // Update ghost particles.
             comm->gatherDisplacement();
@@ -340,7 +352,7 @@ class Solver
                 boundary_condition.apply( exec_space(), *particles, step * dt );
 
             // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( *particles );
+            integrator->finalHalfStep( exec_space{}, *particles );
 
             output( step );
         }
@@ -359,7 +371,7 @@ class Solver
             _step_timer.start();
 
             // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( *particles );
+            integrator->initialHalfStep( exec_space{}, *particles );
 
             // Update ghost particles.
             comm->gatherDisplacement();
@@ -375,7 +387,7 @@ class Solver
                 comm->gatherTemperature();
 
             // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( *particles );
+            integrator->finalHalfStep( exec_space{}, *particles );
 
             output( step );
         }
@@ -449,6 +461,7 @@ class Solver
             double integrate_time = integrator->time();
             double force_time = force->time();
             double energy_time = force->timeEnergy();
+            double neigh_time = force->timeNeighbor();
             double output_time = particles->timeOutput();
             _total_time += step_time;
             // Instantaneous rate.
@@ -460,7 +473,8 @@ class Solver
                  " ", std::scientific, std::setprecision( 2 ), step * dt, " ",
                  W, " ", std::fixed, _total_time, " ", force_time, " ",
                  comm_time, " ", integrate_time, " ", energy_time, " ",
-                 output_time, " ", std::scientific, p_steps_per_sec );
+                 neigh_time, " ", output_time, " ", std::scientific,
+                 p_steps_per_sec );
             out.close();
         }
     }

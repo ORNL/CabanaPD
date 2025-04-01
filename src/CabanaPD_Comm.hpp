@@ -235,7 +235,7 @@ class Comm;
 
 // FIXME: extract model from ParticleType instead.
 template <class ParticleType>
-class Comm<ParticleType, PMB, TemperatureIndependent>
+class Comm<ParticleType, Pair, TemperatureIndependent>
 {
   public:
     int mpi_size = -1;
@@ -322,11 +322,11 @@ class Comm<ParticleType, PMB, TemperatureIndependent>
 };
 
 template <class ParticleType>
-class Comm<ParticleType, LPS, TemperatureIndependent>
-    : public Comm<ParticleType, PMB, TemperatureIndependent>
+class Comm<ParticleType, State, TemperatureIndependent>
+    : public Comm<ParticleType, Pair, TemperatureIndependent>
 {
   public:
-    using base_type = Comm<ParticleType, PMB, TemperatureIndependent>;
+    using base_type = Comm<ParticleType, Pair, TemperatureIndependent>;
     using memory_space = typename base_type::memory_space;
     using halo_type = typename base_type::halo_type;
     using base_type::gather_u;
@@ -371,11 +371,11 @@ class Comm<ParticleType, LPS, TemperatureIndependent>
 };
 
 template <class ParticleType>
-class Comm<ParticleType, PMB, TemperatureDependent>
-    : public Comm<ParticleType, PMB, TemperatureIndependent>
+class Comm<ParticleType, Pair, TemperatureDependent>
+    : public Comm<ParticleType, Pair, TemperatureIndependent>
 {
   public:
-    using base_type = Comm<ParticleType, PMB, TemperatureIndependent>;
+    using base_type = Comm<ParticleType, Pair, TemperatureIndependent>;
     using memory_space = typename base_type::memory_space;
     using halo_type = typename base_type::halo_type;
     using base_type::halo;

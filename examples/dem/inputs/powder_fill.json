@@ -7,7 +7,7 @@
     "poisson_ratio"          : {"value": 0.25, "unit": ""},
     "restitution"            : {"value": 0.5},  
     "radius"                 : {"value": 2.5e-3 },
-    "horizon"                  : {"value": 2.0e-2, "unit": "m"},  
+    "radius_extend"             : {"value": 2.5e-3 },
     "cylinder_diameter"        : {"value": 0.25, "unit": "m"},
     "wall_thickness"           : {"value": 0.0045, "unit": "m"},
     "min_height"               : {"value": 0.01, "unit": "m"},
