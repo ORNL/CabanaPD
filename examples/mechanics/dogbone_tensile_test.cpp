@@ -19,7 +19,7 @@
 #include <CabanaPD.hpp>
 
 // Simulate ASTM D638 type I dogbone tensile test.
-void tensileTestExample( const std::string filename )
+void dogboneTensileTestExample( const std::string filename )
 {
     // ====================================================
     //               Choose Kokkos spaces
@@ -68,13 +68,13 @@ void tensileTestExample( const std::string filename )
     double W = inputs["width_narrow_section"];
     double R = inputs["fillet_radius"];
 
+    // x- and y-coordinates of center of domain
+    double midx = 0.5 * ( low_corner[0] + high_corner[0] );
+    double midy = 0.5 * ( low_corner[1] + high_corner[1] );
+
     // Do not create particles outside dogbone tensile test specimen region.
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
     {
-        // x- and y-coordinates of center of domain
-        double midx = 0.5 * ( low_corner[0] + high_corner[0] );
-        double midy = 0.5 * ( low_corner[1] + high_corner[1] );
-
         // Filler radius squared
         double Rsq = R * R;
 
@@ -150,13 +150,12 @@ void tensileTestExample( const std::string filename )
     double v0 = inputs["grip_velocity"];
 
     // Create region for each grip.
-    double L0 = inputs["system_size"][0];
     CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> left_grip(
-        low_corner[0], low_corner[0] + 0.5 * ( L0 - D ), low_corner[1],
-        high_corner[1], low_corner[2], high_corner[2] );
+        low_corner[0], midx - 0.5 * D, low_corner[1], high_corner[1],
+        low_corner[2], high_corner[2] );
     CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> right_grip(
-        high_corner[0] - 0.5 * ( L0 - D ), high_corner[0], low_corner[1],
-        high_corner[1], low_corner[2], high_corner[2] );
+        midx + 0.5 * D, high_corner[0], low_corner[1], high_corner[1],
+        low_corner[2], high_corner[2] );
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
@@ -203,7 +202,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    tensileTestExample( argv[1] );
+    dogboneTensileTestExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();

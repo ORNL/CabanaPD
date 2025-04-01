@@ -172,7 +172,7 @@ The next example is a fragmenting cylinder due to internal pressure [4]. The exa
 ./CabanaPD/build/install/bin/FragmentingCylinder CabanaPD/examples/mechanics/inputs/fragmenting_cylinder.json
 ```
 
-An example highlighting plasticity performs a tensile test on an ASTM standard dogbone specimen:
+An example highlighting plasticity simulates a tensile test based on an ASTM standard dogbone specimen:
 
 ```
 ./CabanaPD/build/install/bin/DogboneTensileTest CabanaPD/examples/mechanics/inputs/dogbone_tensile_test.json
