@@ -24,9 +24,29 @@ struct BaseForceModel
     BaseForceModel( const double _delta )
         : delta( _delta ){};
 
+    // Only needed for models which store bond properties.
+    void updateBonds( const int, const int ) {}
+
     // No-op for temperature.
     KOKKOS_INLINE_FUNCTION
     void thermalStretch( double&, const int, const int ) const {}
+};
+
+template <class MemorySpace>
+class BasePlasticity
+{
+  protected:
+    using memory_space = MemorySpace;
+    using NeighborView = typename Kokkos::View<double**, memory_space>;
+    NeighborView _s_p;
+
+  public:
+    // Must update later because number of neighbors not known at construction.
+    void updateBonds( const int num_local, const int max_neighbors )
+    {
+        Kokkos::realloc( _s_p, num_local, max_neighbors );
+        Kokkos::deep_copy( _s_p, 0.0 );
+    }
 };
 
 template <typename TemperatureType>

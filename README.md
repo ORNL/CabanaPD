@@ -116,6 +116,7 @@ CabanaPD currently includes the following:
  - Mechanical response:
    - Elastic only (no failure)
    - Brittle fracture
+   - Elastic-perfectly plastic (bond-based only)
  - Thermomechanics (bond-based only)
    - Optional heat transfer
  - Time integration
@@ -145,7 +146,7 @@ The first example is an elastic wave propagating through a cube from an initial 
 ./CabanaPD/build/install/bin/ElasticWave CabanaPD/examples/mechanics/inputs/elastic_wave.json
 ```
 
-The second example is the Kalthoff-Winkler experiment [2], where an impactor
+The next example is the Kalthoff-Winkler experiment [2], where an impactor
 causes crack propagation at an angle from two pre-notches on a steel plate. The
 example can be run with:
 
@@ -153,7 +154,7 @@ example can be run with:
 ./CabanaPD/build/install/bin/KalthoffWinkler CabanaPD/examples/mechanics/inputs/kalthoff_winkler.json
 ```
 
-The third example is crack branching in a pre-notched soda-lime glass plate due to traction loading [3]. The example can be run with:
+Another example is crack branching in a pre-notched soda-lime glass plate due to traction loading [3]. The example can be run with:
 
 ```
 ./CabanaPD/build/install/bin/CrackBranching CabanaPD/examples/mechanics/inputs/crack_branching.json
@@ -165,10 +166,16 @@ A similar case, but with multiple random pre-notches, can be run with:
 ./CabanaPD/build/install/bin/RandomCracks CabanaPD/examples/mechanics/inputs/random_cracks.json
 ```
 
-The fourth example is a fragmenting cylinder due to internal pressure [4]. The example can be run with:
+The next example is a fragmenting cylinder due to internal pressure [4]. The example can be run with:
 
 ```
 ./CabanaPD/build/install/bin/FragmentingCylinder CabanaPD/examples/mechanics/inputs/fragmenting_cylinder.json
+```
+
+An example highlighting plasticity performs a tensile test on an ASTM standard dogbone specimen:
+
+```
+./CabanaPD/build/install/bin/DogboneTensileTest CabanaPD/examples/mechanics/inputs/dogbone_tensile_test.json
 ```
 
 ### Thermomechanics
