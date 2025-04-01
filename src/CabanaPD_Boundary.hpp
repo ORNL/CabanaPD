@@ -28,9 +28,6 @@ struct RectangularPrism
 struct Cylinder
 {
 };
-struct Custom
-{
-};
 
 // User-specifed custom boundary. Must use the signature:
 //    bool operator()(PositionType&, const int)
@@ -116,25 +113,23 @@ struct RegionBoundary<Cylinder>
     }
 };
 
-template <class MemorySpace, class BoundaryType>
-struct BoundaryIndexSpace;
-
 // FIXME: fails for some cases if initial guess is not sufficient.
-template <class MemorySpace, class GeometryType>
-struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
+template <class MemorySpace>
+struct BoundaryIndexSpace
 {
     using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
     index_view_type _view;
     index_view_type _count;
     std::size_t particle_count;
+    // FIXME: expose this as needed.
+    const double initial_guess = 0.5;
 
     Timer _timer;
 
     // Construct from region (search for boundary particles).
-    template <class ExecSpace, class Particles>
+    template <class ExecSpace, class Particles, class... RegionType>
     BoundaryIndexSpace( ExecSpace exec_space, Particles particles,
-                        std::vector<RegionBoundary<GeometryType>> planes,
-                        const double initial_guess )
+                        RegionType... regions )
         : particle_count( particles.referenceOffset() )
     {
         _timer.start();
@@ -143,11 +138,9 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
                                  particles.localOffset() * initial_guess );
         _count = index_view_type( "count", 1 );
 
-        for ( RegionBoundary plane : planes )
-        {
-            update( exec_space, particles, plane );
-        }
-        // Resize after all planes searched.
+        update( exec_space, particles, regions... );
+
+        // Resize after all regions searched.
         auto count_host =
             Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, _count );
         if ( count_host( 0 ) < _view.size() )
@@ -158,9 +151,16 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
         _timer.stop();
     }
 
-    template <class ExecSpace, class Particles>
-    void update( ExecSpace, Particles particles,
-                 RegionBoundary<GeometryType> region )
+    // Iterate over all regions.
+    template <class ExecSpace, class Particles, class... RegionType>
+    void update( ExecSpace space, Particles particles, RegionType... region )
+    {
+        ( update( space, particles, region ), ... );
+    }
+
+    // Extract indices from a single region.
+    template <class ExecSpace, class Particles, class RegionType>
+    void update( ExecSpace, Particles particles, RegionType region )
     {
         particle_count = particles.referenceOffset();
 
@@ -194,6 +194,7 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
             Kokkos::deep_copy( count, init_count );
             Kokkos::parallel_for( "CabanaPD::BC::update", policy,
                                   index_functor );
+            Kokkos::fence();
         }
     }
 
@@ -201,33 +202,32 @@ struct BoundaryIndexSpace<MemorySpace, RegionBoundary<GeometryType>>
 };
 
 template <class MemorySpace>
-struct BoundaryIndexSpace<MemorySpace, Custom>
+struct BoundaryIndexSpaceCustom
 {
     using index_view_type = Kokkos::View<std::size_t*, MemorySpace>;
     index_view_type _view;
 
     // Construct from a View of boundary particles.
-    BoundaryIndexSpace( index_view_type input_view )
+    BoundaryIndexSpaceCustom( index_view_type input_view )
         : _view( input_view )
     {
     }
 };
 
-template <class ExecSpace, class Particles, class BoundaryType>
+template <class ExecSpace, class Particles, class... RegionType>
 auto createBoundaryIndexSpace( ExecSpace exec_space, Particles particles,
-                               std::vector<BoundaryType> planes,
-                               const double initial_guess )
+                               RegionType... regions )
 {
     using memory_space = typename Particles::memory_space;
-    return BoundaryIndexSpace<memory_space, BoundaryType>(
-        exec_space, particles, planes, initial_guess );
+    return BoundaryIndexSpace<memory_space>( exec_space, particles,
+                                             regions... );
 }
 
 template <class BoundaryParticles>
 auto createBoundaryIndexSpace( BoundaryParticles particles )
 {
     using memory_space = typename BoundaryParticles::memory_space;
-    return BoundaryIndexSpace<memory_space, Custom>( particles );
+    return BoundaryIndexSpaceCustom<memory_space>( particles );
 }
 
 struct ForceValueBCTag
@@ -253,12 +253,6 @@ struct BoundaryCondition
         , _user_functor( user )
         , _force_update( force )
     {
-    }
-
-    template <class ExecSpace, class Particles, class BoundaryType>
-    void update( ExecSpace exec_space, Particles particles, BoundaryType plane )
-    {
-        _index_space.update( exec_space, particles, plane );
     }
 
     template <class ExecSpace, class ParticleType>
@@ -298,12 +292,6 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
         : _value( value )
         , _index_space( bc_index_space )
     {
-    }
-
-    template <class ExecSpace, class Particles, class BoundaryType>
-    void update( ExecSpace exec_space, Particles particles, BoundaryType plane )
-    {
-        _index_space.update( exec_space, particles, plane );
     }
 
     template <class ExecSpace, class ParticleType>
@@ -347,12 +335,6 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     {
     }
 
-    template <class ExecSpace, class Particles, class BoundaryType>
-    void update( ExecSpace exec_space, Particles particles, BoundaryType plane )
-    {
-        _index_space.update( exec_space, particles, plane );
-    }
-
     template <class ExecSpace, class ParticleType>
     void apply( ExecSpace, ParticleType& particles, double )
     {
@@ -380,32 +362,28 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
 };
 
 // FIXME: relatively large initial guess for allocation.
-template <class BoundaryType, class BCTag, class ExecSpace, class Particles>
+template <class BCTag, class ExecSpace, class Particles, class... RegionType>
 auto createBoundaryCondition( BCTag, const double value, ExecSpace exec_space,
-                              Particles particles,
-                              std::vector<BoundaryType> planes,
-                              const double initial_guess = 0.5 )
+                              Particles particles, RegionType... regions )
 {
     using memory_space = typename Particles::memory_space;
-    using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;
-    bc_index_type bc_indices = createBoundaryIndexSpace(
-        exec_space, particles, planes, initial_guess );
+    using bc_index_type = BoundaryIndexSpace<memory_space>;
+    bc_index_type bc_indices =
+        createBoundaryIndexSpace( exec_space, particles, regions... );
     return BoundaryCondition<bc_index_type, BCTag>( value, bc_indices );
 }
 
 // FIXME: relatively large initial guess for allocation.
-template <class UserFunctor, class BoundaryType, class ExecSpace,
-          class Particles>
+template <class UserFunctor, class ExecSpace, class Particles,
+          class... RegionType>
 auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
-                              Particles particles,
-                              std::vector<BoundaryType> planes,
-                              const bool force_update,
-                              const double initial_guess = 0.5 )
+                              Particles particles, const bool force_update,
+                              RegionType... regions )
 {
     using memory_space = typename Particles::memory_space;
-    using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;
-    bc_index_type bc_indices = createBoundaryIndexSpace(
-        exec_space, particles, planes, initial_guess );
+    using bc_index_type = BoundaryIndexSpace<memory_space>;
+    bc_index_type bc_indices =
+        createBoundaryIndexSpace( exec_space, particles, regions... );
     return BoundaryCondition<bc_index_type, UserFunctor>(
         bc_indices, user_functor, force_update );
 }
@@ -416,7 +394,7 @@ auto createBoundaryCondition( BCTag, const double value,
                               BoundaryParticles particles )
 {
     using memory_space = typename BoundaryParticles::memory_space;
-    using bc_index_type = BoundaryIndexSpace<memory_space, Custom>;
+    using bc_index_type = BoundaryIndexSpaceCustom<memory_space>;
     bc_index_type bc_indices = createBoundaryIndexSpace( particles );
     return BoundaryCondition<bc_index_type, BCTag>( value, bc_indices );
 }
@@ -427,34 +405,10 @@ auto createBoundaryCondition( UserFunctor user_functor,
                               const bool force_update )
 {
     using memory_space = typename BoundaryParticles::memory_space;
-    using bc_index_type = BoundaryIndexSpace<memory_space, Custom>;
+    using bc_index_type = BoundaryIndexSpaceCustom<memory_space>;
     bc_index_type bc_indices = createBoundaryIndexSpace( particles );
     return BoundaryCondition<bc_index_type, UserFunctor>(
         bc_indices, user_functor, force_update );
-}
-
-// Wrappers for single plane cases.
-template <class BoundaryType, class BCTag, class ExecSpace, class Particles>
-auto createBoundaryCondition( BCTag tag, const double value,
-                              ExecSpace exec_space, Particles particles,
-                              BoundaryType plane,
-                              const double initial_guess = 0.5 )
-{
-    std::vector<BoundaryType> plane_vec = { plane };
-    return createBoundaryCondition( tag, value, exec_space, particles,
-                                    plane_vec, initial_guess );
-}
-
-template <class UserFunctor, class BoundaryType, class ExecSpace,
-          class Particles>
-auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
-                              Particles particles, BoundaryType plane,
-                              const bool force_update,
-                              const double initial_guess = 0.5 )
-{
-    std::vector<BoundaryType> plane_vec = { plane };
-    return createBoundaryCondition( user_functor, exec_space, particles,
-                                    plane_vec, force_update, initial_guess );
 }
 
 } // namespace CabanaPD
