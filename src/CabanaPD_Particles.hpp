@@ -1010,9 +1010,9 @@ class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
 
     friend class Comm<self_type, Pair, TemperatureIndependent>;
     friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Contact, TemperatureIndependent>;
     friend class Comm<self_type, Pair, TemperatureDependent>;
     friend class Comm<self_type, State, TemperatureDependent>;
-    friend class Comm<self_type, Contact, TemperatureIndependent>;
     friend class Comm<self_type, Contact, TemperatureDependent>;
 
   protected:
@@ -1099,8 +1099,10 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
 
     friend class Comm<self_type, Pair, TemperatureIndependent>;
     friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Contact, TemperatureIndependent>;
     friend class Comm<self_type, Pair, TemperatureDependent>;
     friend class Comm<self_type, State, TemperatureDependent>;
+    friend class Comm<self_type, Contact, TemperatureDependent>;
 
   protected:
     void init_output()

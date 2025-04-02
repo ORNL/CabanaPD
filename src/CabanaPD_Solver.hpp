@@ -106,7 +106,7 @@ class Solver
     using contact_type = Force<memory_space, ContactModelType>;
     using contact_model_type = ContactModelType;
     using contact_comm_type =
-        Comm<particle_type, Contact, TemperatureIndependent>;
+        Comm<ParticleType, Contact, TemperatureIndependent>;
 
     // Flexible module types.
     // Integration should include max displacement tracking if either model
@@ -186,7 +186,7 @@ class Solver
         // neighbor list. Needed for DEM or PD+contact.
         if constexpr ( is_contact<force_model_type>::value ||
                        is_contact<contact_model_type>::value )
-            contact_comm = std::make_shared<contact_comm_type>( *particles );
+            contact_comm = std::make_shared<contact_comm_type>( particles );
 
         print = print_rank();
         if ( print )
@@ -307,7 +307,7 @@ class Solver
         // FIXME: Will need to rebuild ghosts.
     }
 
-    void updateNeighbors() { force->update( *particles, 0.0, true ); }
+    void updateNeighbors() { force->update( particles, 0.0, true ); }
 
     template <typename BoundaryType>
     void run( BoundaryType boundary_condition )
@@ -346,7 +346,7 @@ class Solver
             // Ghosts must be up to date for any contact, DEM or PD+contact.
             if constexpr ( is_contact<force_model_type>::value ||
                            is_contact<contact_model_type>::value )
-                contact_comm->gather( *particles );
+                contact_comm->gather( particles );
 
             // Compute internal forces.
             updateForce();
@@ -476,7 +476,6 @@ class Solver
                 comm_time = comm->time();
             double integrate_time = integrator->time();
             double force_time = force->time();
-            double neigh_time = force->neighTime();
             double energy_time = force->timeEnergy();
             double neigh_time = force->timeNeighbor();
             double output_time = particles.timeOutput();
@@ -556,10 +555,10 @@ class Solver
         particles.remove( num_keep, keep );
         // Recreate comm lists since they're out of date.
         if constexpr ( !is_contact<force_model_type>::value )
-            comm = std::make_shared<comm_type>( *particles );
+            comm = std::make_shared<comm_type>( particles );
         if constexpr ( is_contact<force_model_type>::value ||
                        is_contact<contact_model_type>::value )
-            contact_comm = std::make_shared<contact_comm_type>( *particles );
+            contact_comm = std::make_shared<contact_comm_type>( particles );
     }
 
     int num_steps;
