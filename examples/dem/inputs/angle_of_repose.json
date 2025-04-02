@@ -1,0 +1,20 @@
+{
+    "dx"                       : {"value": [0.0025, 0.0025, 0.01], "unit": "m"},
+    "system_size"              : {"value": [0.25, 0.25, 1.0], "unit": "m"},
+    "density"                : {"value": 2.0e3,  "unit": "kg/m^3"},
+    "volume"                 : {"value": 6.544985e-8,  "unit": "m^3"},
+    "elastic_modulus"        : {"value": 1.0e5, "unit": "Pa"},
+    "poisson_ratio"          : {"value": 0.25, "unit": ""},
+    "restitution"            : {"value": 0.5},  
+    "radius"                 : {"value": 2.5e-3 },
+    "radius_extend"             : {"value": 2.0e-3 },
+    "cylinder_diameter"        : {"value": 0.1, "unit": "m"},
+    "wall_thickness"           : {"value": 0.01, "unit": "m"},
+    "min_height"               : {"value": 0.1, "unit": "m"},
+    "max_height"               : {"value": 0.45, "unit": "m"},
+    "final_time"               : {"value": 2.0, "unit": "s"},
+    "timestep"                 : {"value": 4e-6, "unit": "s"},
+    "timestep_safety_factor"   : {"value": 0.9},
+    "output_frequency"         : {"value": 100},
+    "output_reference"         : {"value": false}
+}
