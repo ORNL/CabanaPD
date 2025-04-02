@@ -14,6 +14,8 @@
 
 #include <type_traits>
 
+#include <Cabana_Grid.hpp>
+
 namespace CabanaPD
 {
 // Fracture tags.
@@ -208,6 +210,20 @@ struct is_stress_output : public std::false_type
 };
 template <>
 struct is_stress_output<EnergyStressOutput> : public std::true_type
+{
+};
+
+// Particle init types.
+template <class>
+struct is_particle_init : public std::false_type
+{
+};
+template <>
+struct is_particle_init<Cabana::InitUniform> : public std::true_type
+{
+};
+template <>
+struct is_particle_init<Cabana::InitRandom> : public std::true_type
 {
 };
 
