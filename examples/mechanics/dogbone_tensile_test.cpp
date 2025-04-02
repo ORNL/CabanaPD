@@ -58,7 +58,6 @@ void tensileTestExample( const std::string filename )
     //                Force model type
     // ====================================================
     using model_type = CabanaPD::PMB;
-    using thermal_type = CabanaPD::TemperatureIndependent;
     using mechanics_type = CabanaPD::ElasticPerfectlyPlastic;
 
     // ====================================================
@@ -139,14 +138,13 @@ void tensileTestExample( const std::string filename )
         }
     };
 
-    auto particles =
-        CabanaPD::createParticles<memory_space, model_type, thermal_type>(
-            exec_space(), low_corner, high_corner, num_cells, halo_width,
-            Cabana::InitRandom{}, init_op );
+    CabanaPD::Particles particles(
+        memory_space{}, model_type{}, low_corner, high_corner, num_cells,
+        halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
 
-    auto rho = particles->sliceDensity();
-    auto x = particles->sliceReferencePosition();
-    auto v = particles->sliceVelocity();
+    auto rho = particles.sliceDensity();
+    auto x = particles.sliceReferencePosition();
+    auto v = particles.sliceVelocity();
 
     // Grips' velocity magnitude
     double v0 = inputs["grip_velocity"];
@@ -171,19 +169,18 @@ void tensileTestExample( const std::string filename )
         else if ( right_grip.inside( x, pid ) )
             v( pid, 0 ) = v0;
     };
-    particles->updateParticles( exec_space{}, init_functor );
+    particles.updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                    Force model
     // ====================================================
-    auto force_model = CabanaPD::createForceModel(
-        model_type{}, mechanics_type{}, *particles, delta, K, G0, sigma_y );
+    CabanaPD::ForceModel force_model( model_type{}, mechanics_type{},
+                                      memory_space{}, delta, K, G0, sigma_y );
 
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd =
-        CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
+    CabanaPD::Solver solver( inputs, particles, force_model );
 
     // ====================================================
     //                Boundary conditions
@@ -191,13 +188,13 @@ void tensileTestExample( const std::string filename )
     // Reset forces on both grips.
     auto bc =
         createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0, exec_space{},
-                                 *particles, left_grip, right_grip );
+                                 particles, left_grip, right_grip );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init();
-    cabana_pd->run( bc );
+    solver.init();
+    solver.run( bc );
 }
 
 // Initialize MPI+Kokkos.

@@ -77,28 +77,27 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type = CabanaPD::ForceModel<CabanaPD::PMB>;
-    model_type force_model( delta, K, G0 );
-    // using model_type =
-    //     CabanaPD::ForceModel<CabanaPD::LPS>;
-    // model_type force_model( delta, K, G, G0 );
+    using model_type = CabanaPD::PMB;
+    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0 );
+    // using model_type = CabanaPD::LPS;
+    // CabanaPD::ForceModel force_model( model_type{}, delta, K, G, G0 );
 
     // ====================================================
     //                 Particle generation
     // ====================================================
-    // Does not set displacements, velocities, etc.
-    auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space(), low_corner, high_corner, num_cells, halo_width );
+    CabanaPD::Particles particles( memory_space{}, model_type{}, low_corner,
+                                   high_corner, num_cells, halo_width,
+                                   exec_space{} );
 
     // ====================================================
     //            Custom particle initialization
     // ====================================================
-    auto rho = particles->sliceDensity();
-    auto x = particles->sliceReferencePosition();
-    auto v = particles->sliceVelocity();
-    auto f = particles->sliceForce();
+    auto rho = particles.sliceDensity();
+    auto x = particles.sliceReferencePosition();
+    auto v = particles.sliceVelocity();
+    auto f = particles.sliceForce();
 
-    double dx = particles->dx[0];
+    double dx = particles.dx[0];
     double v0 = inputs["impactor_velocity"];
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
@@ -109,13 +108,12 @@ void kalthoffWinklerExample( const std::string filename )
              x( pid, 0 ) < -0.5 * height + dx )
             v( pid, 0 ) = v0;
     };
-    particles->updateParticles( exec_space{}, init_functor );
+    particles.updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd =
-        CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
+    CabanaPD::Solver solver( inputs, particles, force_model );
 
     // ====================================================
     //                Boundary conditions
@@ -126,13 +124,13 @@ void kalthoffWinklerExample( const std::string filename )
         x_bc - dx, x_bc + dx, y_prenotch1 - 0.25 * dx, y_prenotch2 + 0.25 * dx,
         -thickness, thickness );
     auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
-                                       exec_space{}, *particles, plane );
+                                       exec_space{}, particles, plane );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init( bc, prenotch );
-    cabana_pd->run( bc );
+    solver.init( bc, prenotch );
+    solver.run( bc );
 }
 
 // Initialize MPI+Kokkos.

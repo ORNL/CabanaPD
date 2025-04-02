@@ -82,9 +82,10 @@ void powderSettlingExample( const std::string filename )
         return true;
     };
     // Container particles should be frozen, never updated.
-    auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space(), low_corner, high_corner, num_cells, halo_width,
-        CabanaPD::BaseOutput{}, create_container, 0, true );
+    CabanaPD::Particles particles( memory_space{}, model_type{},
+                                   CabanaPD::BaseOutput{}, low_corner,
+                                   high_corner, num_cells, halo_width,
+                                   create_container, exec_space{}, true );
 
     // Create powder.
     double min_height = inputs["min_height"];
@@ -100,51 +101,49 @@ void powderSettlingExample( const std::string filename )
 
         return false;
     };
-    particles->createParticles( exec_space(), Cabana::InitRandom{},
-                                create_powder, particles->numFrozen() );
+    particles.createParticles( exec_space(), Cabana::InitRandom{},
+                               create_powder, particles.numFrozen() );
 
     // Set density/volumes.
-    auto rho = particles->sliceDensity();
-    auto vol = particles->sliceVolume();
+    auto rho = particles.sliceDensity();
+    auto vol = particles.sliceVolume();
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         rho( pid ) = rho0;
         vol( pid ) = vol0;
     };
-    particles->updateParticles( exec_space{}, init_functor );
+    particles.updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd = CabanaPD::createSolver<memory_space>( inputs, particles,
-                                                           contact_model );
+    CabanaPD::Solver solver( inputs, particles, contact_model );
 
     // ====================================================
     //                   Simulation init
     // ====================================================
-    cabana_pd->init();
+    solver.init();
 
     // Use a force magnitude threshold to remove particles that are too close.
     // TODO: The force magnitude should be based on the maximum desired overlap
     // according to the properties of the contact model
-    cabana_pd->remove( 1e6 );
+    solver.remove( 1e6 );
 
     // ====================================================
     //                   Boundary condition
     // ====================================================
-    auto f = cabana_pd->particles->sliceForce();
-    rho = cabana_pd->particles->sliceDensity();
+    auto f = solver.particles.sliceForce();
+    rho = solver.particles.sliceDensity();
     auto body_functor = KOKKOS_LAMBDA( const int pid, const double )
     {
         f( pid, 2 ) -= 9.8 * rho( pid );
     };
-    auto gravity =
-        CabanaPD::createBodyTerm( body_functor, particles->size(), true );
+    CabanaPD::BodyTerm gravity( body_functor, particles.size(), true );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->run( gravity );
+    solver.run( gravity );
 }
 
 // Initialize MPI+Kokkos.

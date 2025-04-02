@@ -144,9 +144,9 @@ class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, Fracture,
                   const model_type model )
         : base_type( half_neigh, force,
                      typename base_type::model_type(
-                         model.delta, model.K, model.temperature, model.kappa,
-                         model.cp, model.alpha, model.temp0,
-                         model.constant_microconductivity ) )
+                         PMB{}, NoFracture{}, model.delta, model.K,
+                         model.temperature, model.kappa, model.cp, model.alpha,
+                         model.temp0, model.constant_microconductivity ) )
         , fracture_type( force.getBrokenBonds() )
         , _model( model )
     {

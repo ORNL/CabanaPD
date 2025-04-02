@@ -54,24 +54,24 @@ void elasticWaveExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type =
-        CabanaPD::ForceModel<CabanaPD::LinearLPS, CabanaPD::Elastic,
-                             CabanaPD::NoFracture>;
-    model_type force_model( delta, K, G );
+    using model_type = CabanaPD::LinearLPS;
+    CabanaPD::ForceModel force_model( model_type{}, CabanaPD::NoFracture{},
+                                      delta, K, G );
 
     // ====================================================
     //                 Particle generation
     // ====================================================
-    auto particles = CabanaPD::createParticles<memory_space, model_type>(
-        exec_space(), low_corner, high_corner, num_cells, halo_width );
+    CabanaPD::Particles particles( memory_space{}, model_type{}, low_corner,
+                                   high_corner, num_cells, halo_width,
+                                   exec_space{} );
 
     // ====================================================
     //            Custom particle initialization
     // ====================================================
-    auto rho = particles->sliceDensity();
-    auto x = particles->sliceReferencePosition();
-    auto u = particles->sliceDisplacement();
-    auto v = particles->sliceVelocity();
+    auto rho = particles.sliceDensity();
+    auto x = particles.sliceReferencePosition();
+    auto u = particles.sliceDisplacement();
+    auto v = particles.sliceVelocity();
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
@@ -96,26 +96,26 @@ void elasticWaveExample( const std::string filename )
             v( pid, d ) = 0.0;
         }
     };
-    particles->updateParticles( exec_space{}, init_functor );
+    particles.updateParticles( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd =
-        CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
+    CabanaPD::Solver solver( inputs, particles, force_model );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init();
-    cabana_pd->run();
+    solver.init();
+    solver.run();
 
     // ====================================================
     //                      Outputs
     // ====================================================
     // Output x-displacement along the x-axis
-    createDisplacementProfile( MPI_COMM_WORLD, "displacement_profile.txt",
-                               *particles, num_cells[0], 0 );
+    CabanaPD::createDisplacementProfile( MPI_COMM_WORLD,
+                                         "displacement_profile.txt", particles,
+                                         num_cells[0], 0 );
 }
 
 // Initialize MPI+Kokkos.
