@@ -63,6 +63,7 @@
 #include <Kokkos_Core.hpp>
 
 #include <CabanaPD_ForceModels.hpp>
+#include <CabanaPD_Neighbor.hpp>
 #include <CabanaPD_Particles.hpp>
 
 namespace CabanaPD
@@ -130,160 +131,33 @@ template <class MemorySpace, class ForceType>
 class Force;
 
 template <class MemorySpace>
-class Force<MemorySpace, BaseForceModel>
+class BaseForce
 {
-  public:
-    using neighbor_list_type =
-        Cabana::VerletList<MemorySpace, Cabana::FullNeighborTag,
-                           Cabana::VerletLayout2D, Cabana::TeamOpTag>;
-
   protected:
-    bool _half_neigh;
-    neighbor_list_type _neigh_list;
-
     Timer _timer;
     Timer _energy_timer;
 
   public:
-    // Primary constructor: use positions and construct neighbors.
-    template <class ParticleType>
-    Force( const bool half_neigh, const double delta,
-           const ParticleType& particles, const double tol = 1e-14 )
-        : _half_neigh( half_neigh )
-        , _neigh_list( neighbor_list_type(
-              particles.sliceReferencePosition(), particles.frozenOffset(),
-              particles.localOffset(), delta + tol, 1.0,
-              particles.ghost_mesh_lo, particles.ghost_mesh_hi ) )
+    // Default to no-op.
+    template <class ParticleType, class NeighborType>
+    void computeWeightedVolume( ParticleType&, const NeighborType ) const
     {
     }
-
-    // General constructor (necessary for contact, but could be used by any
-    // force routine).
-    template <class PositionType>
-    Force( const bool half_neigh, const double delta,
-           const PositionType& positions, const std::size_t frozen_offset,
-           const std::size_t local_offset, const double mesh_min[3],
-           const double mesh_max[3], const double tol = 1e-14 )
-        : _half_neigh( half_neigh )
-        , _neigh_list( neighbor_list_type( positions, frozen_offset,
-                                           local_offset, delta + tol, 1.0,
-                                           mesh_min, mesh_max ) )
+    template <class ParticleType, class NeighborType>
+    void computeDilatation( ParticleType&, const NeighborType ) const
     {
     }
-
-    // Constructor which stores existing neighbors.
-    template <class NeighborListType>
-    Force( const bool half_neigh, const NeighborListType& neighbors )
-        : _half_neigh( half_neigh )
-        , _neigh_list( neighbors )
-    {
-    }
-
-    // FIXME: should it be possible to update this list?
-    template <class ParticleType>
-    void update( const ParticleType&, const double, const bool = false )
-    {
-    }
-
-    unsigned getMaxLocalNeighbors()
-    {
-        auto neigh = _neigh_list;
-        unsigned local_max_neighbors;
-        auto neigh_max = KOKKOS_LAMBDA( const int, unsigned& max_n )
-        {
-            max_n =
-                Cabana::NeighborList<neighbor_list_type>::maxNeighbor( neigh );
-        };
-        using exec_space = typename MemorySpace::execution_space;
-        Kokkos::RangePolicy<exec_space> policy( 0, 1 );
-        Kokkos::parallel_reduce( policy, neigh_max, local_max_neighbors );
-        Kokkos::fence();
-        return local_max_neighbors;
-    }
-
-    void getNeighborStatistics( unsigned& max_neighbors,
-                                unsigned long long& total_neighbors )
-    {
-        auto neigh = _neigh_list;
-        unsigned local_max_neighbors;
-        unsigned long long local_total_neighbors;
-        auto neigh_stats = KOKKOS_LAMBDA( const int, unsigned& max_n,
-                                          unsigned long long& total_n )
-        {
-            max_n =
-                Cabana::NeighborList<neighbor_list_type>::maxNeighbor( neigh );
-            total_n = Cabana::NeighborList<neighbor_list_type>::totalNeighbor(
-                neigh );
-        };
-        using exec_space = typename MemorySpace::execution_space;
-        Kokkos::RangePolicy<exec_space> policy( 0, 1 );
-        Kokkos::parallel_reduce( policy, neigh_stats, local_max_neighbors,
-                                 local_total_neighbors );
-        Kokkos::fence();
-        MPI_Reduce( &local_max_neighbors, &max_neighbors, 1, MPI_UNSIGNED,
-                    MPI_MAX, 0, MPI_COMM_WORLD );
-        MPI_Reduce( &local_total_neighbors, &total_neighbors, 1,
-                    MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD );
-    }
-
-    // Default to no-op for pair models.
-    template <class ParticleType, class ParallelType>
-    void computeWeightedVolume( ParticleType&, const ParallelType ) const
-    {
-    }
-    template <class ParticleType, class ParallelType>
-    void computeDilatation( ParticleType&, const ParallelType ) const
-    {
-    }
-
-    auto getNeighbors() const { return _neigh_list; }
 
     auto time() { return _timer.time(); };
     auto timeEnergy() { return _energy_timer.time(); };
-    auto timeNeighbor() { return 0.0; };
-};
-
-template <class MemorySpace>
-class BaseFracture
-{
-  protected:
-    using memory_space = MemorySpace;
-    using NeighborView = typename Kokkos::View<int**, memory_space>;
-    NeighborView _mu;
-
-  public:
-    BaseFracture( const int local_particles, const int max_neighbors )
-    {
-        // Create View to track broken bonds.
-        // TODO: this could be optimized to ignore frozen particle bonds.
-        _mu = NeighborView(
-            Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
-            local_particles, max_neighbors );
-        Kokkos::deep_copy( _mu, 1 );
-    }
-
-    BaseFracture( NeighborView mu )
-        : _mu( mu )
-    {
-    }
-
-    template <class ExecSpace, class ParticleType, class PrenotchType,
-              class NeighborList>
-    void prenotch( ExecSpace exec_space, const ParticleType& particles,
-                   PrenotchType& prenotch, NeighborList& neigh_list )
-    {
-        prenotch.create( exec_space, _mu, particles, neigh_list );
-    }
-
-    auto getBrokenBonds() const { return _mu; }
 };
 
 /******************************************************************************
   Force free functions.
 ******************************************************************************/
-template <class ForceType, class ParticleType, class ParallelType>
+template <class ForceType, class ParticleType, class NeighborType>
 void computeForce( ForceType& force, ParticleType& particles,
-                   const ParallelType& neigh_op_tag, const bool reset = true )
+                   NeighborType& neighbor, const bool reset = true )
 {
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
@@ -300,16 +174,17 @@ void computeForce( ForceType& force, ParticleType& particles,
     //                    neigh_op_tag );
 
     // Forces only atomic if using team threading.
-    if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
-        force.computeForceFull( f_a, x, u, particles, neigh_op_tag );
+    if constexpr ( std::is_same<typename NeighborType::Tag,
+                                Cabana::TeamOpTag>::value )
+        force.computeForceFull( f_a, x, u, particles, neighbor );
     else
-        force.computeForceFull( f, x, u, particles, neigh_op_tag );
+        force.computeForceFull( f, x, u, particles, neighbor );
     Kokkos::fence();
 }
 
-template <class ForceType, class ParticleType, class ParallelType>
+template <class ForceType, class ParticleType, class NeighborType>
 double computeEnergy( ForceType& force, ParticleType& particles,
-                      const ParallelType& neigh_op_tag )
+                      const NeighborType& neighbor )
 {
     double energy = 0.0;
     if constexpr ( is_energy_output<typename ParticleType::output_type>::value )
@@ -327,7 +202,7 @@ double computeEnergy( ForceType& force, ParticleType& particles,
         //    energy = computeEnergy_half( force, x, u,
         //                                   neigh_op_tag );
         // else
-        energy = force.computeEnergyFull( W, x, u, particles, neigh_op_tag );
+        energy = force.computeEnergyFull( W, x, u, particles, neighbor );
         Kokkos::fence();
     }
     return energy;
