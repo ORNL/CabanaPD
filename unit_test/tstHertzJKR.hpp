@@ -16,28 +16,25 @@
 
 namespace Test
 {
-template <class VelType, class DensityType, class VolumeType>
-double calculateKE( const VelType& v, const DensityType& rho,
-                    const VolumeType& vol )
+template <class ForceType>
+double getPulloffForce( const ForceType& f, double vol )
 {
-    using Kokkos::hypot;
-    using Kokkos::pow;
+    using execution_space = typename ForceType::execution_space;
 
-    using execution_space = typename VelType::execution_space;
+    double pulloff_force;
+    auto min_po = Kokkos::Min<double>( pulloff_force );
 
-    double tke;
     Kokkos::parallel_reduce(
-        "total_ke", Kokkos::RangePolicy<execution_space>( 0, v.size() ),
-        KOKKOS_LAMBDA( const int& i, double& sum ) {
-            sum += 0.5 * rho( i ) * vol( i ) *
-                   pow( hypot( v( i, 0 ), v( i, 1 ), v( i, 2 ) ), 2.0 );
+        "pulloff_force", Kokkos::RangePolicy<execution_space>( 0, f.size() ),
+        KOKKOS_LAMBDA( const int t, double& min ) {
+            min_po.join( min, f( t ) );
         },
-        Kokkos::Sum<double>( tke ) );
+        min_po );
 
-    return tke;
+    return pulloff_force * vol;
 }
 
-void testHertzianContact( const std::string filename )
+void testHertzianJKRContact( const std::string filename )
 {
     // ====================================================
     //             Use test Kokkos spaces
@@ -60,6 +57,7 @@ void testHertzianContact( const std::string filename )
     double nu = inputs["poisson_ratio"];
     double E = inputs["elastic_modulus"];
     double e = inputs["restitution"];
+    double gamma = inputs["surface_adhesion"];
 
     // ====================================================
     //                  Discretization
@@ -80,18 +78,18 @@ void testHertzianContact( const std::string filename )
         "create_particles", Kokkos::RangePolicy<exec_space>( 0, num_particles ),
         KOKKOS_LAMBDA( const int p ) {
             if ( p == 0 )
-                position( p, 0 ) = 5.1e-5;
+                position( p, 0 ) = 5.01e-5;
             else
-                position( p, 0 ) = -5.1e-5;
+                position( p, 0 ) = -5.01e-5;
             volume( p ) = vol;
         } );
 
     // ====================================================
     //            Force model
     // ====================================================
-    using model_type = CabanaPD::HertzianModel;
+    using model_type = CabanaPD::HertzianJKRModel;
     // No search radius extension.
-    model_type contact_model( radius, radius_extend, nu, E, e );
+    model_type contact_model( radius, radius_extend, nu, E, e, gamma );
 
     // ====================================================
     //                 Particle generation
@@ -119,26 +117,40 @@ void testHertzianContact( const std::string filename )
     };
     particles.updateParticles( exec_space{}, init_functor );
 
-    // Get initial total KE
-    double ke_i = calculateKE( v, rho, vo );
-
     // ====================================================
     //  Simulation run
     // ====================================================
     CabanaPD::Solver solver( inputs, particles, contact_model );
     solver.init();
-    solver.run();
 
-    // Get final total KE
-    double ke_f = calculateKE( v, rho, vo );
+    Kokkos::View<double*, memory_space> force_time( "forces",
+                                                    solver.num_steps );
 
-    EXPECT_NEAR( std::sqrt( ke_f / ke_i ), e, 1e-3 );
+    auto force = particles.sliceForce();
+    for ( int step = 1; step <= solver.num_steps; ++step )
+    {
+        solver.runStep( step );
+
+        Kokkos::parallel_for(
+            "extract_force", Kokkos::RangePolicy<exec_space>( 0, 1 ),
+            KOKKOS_LAMBDA( const int ) {
+                force_time( step - 1 ) = force( 0, 0 );
+            } );
+    }
+
+    double min_po = getPulloffForce( force_time, vol );
+    double min_po_a = contact_model.fc;
+
+    EXPECT_NEAR( min_po / min_po_a, -1.0, 5e-3 );
+
+    // TODO: We should also test with some amount of damping enabled, similar to
+    // the plain Hertz unit test.
 }
 
-TEST( TEST_CATEGORY, test_hertzian_contact )
+TEST( TEST_CATEGORY, test_hertzian_jkr_contact )
 {
-    std::string input = "hertzian_contact.json";
-    testHertzianContact( input );
+    std::string input = "hertzian_jkr_contact.json";
+    testHertzianJKRContact( input );
 }
 
 } // end namespace Test
