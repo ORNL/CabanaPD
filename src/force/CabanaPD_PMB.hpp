@@ -305,6 +305,104 @@ class Force<MemorySpace,
     }
 };
 
+template <class MemorySpace, class MechanicsType, class ThermalType,
+          class... ModelParams>
+class Force<MemorySpace, ForceModel<PMB, MechanicsType, Fracture, ThermalType,
+                                    DynamicDensity, ModelParams...>>
+    : public Force<MemorySpace,
+                   ForceModel<PMB, MechanicsType, Fracture, ModelParams...>>,
+      public Dilatation<MemorySpace,
+                        ForceModel<PMB, MechanicsType, Fracture, ThermalType,
+                                   DynamicDensity, ModelParams...>>
+{
+  public:
+    // Using the default exec_space.
+    using exec_space = typename MemorySpace::execution_space;
+    using model_type = ForceModel<PMB, MechanicsType, Fracture, ModelParams...>;
+    using base_type = BaseForce<MemorySpace>;
+
+  protected:
+    model_type _model;
+
+    using base_type::_energy_timer;
+    using base_type::_timer;
+
+  public:
+    Force( const model_type model )
+        : base_type()
+        , _model( model )
+    {
+    }
+
+    template <class ForceType, class PosType, class ParticleType,
+              class NeighborType>
+    void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
+                           const ParticleType& particles,
+                           const NeighborType& neighbor )
+    {
+        _timer.start();
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
+
+        auto model = _model;
+        const auto vol = particles.sliceVolume();
+        const auto nofail = particles.sliceNoFail();
+        auto theta = particles.sliceDilatation();
+
+        auto force_full = KOKKOS_LAMBDA( const int i )
+        {
+            std::size_t num_neighbors =
+                Cabana::NeighborList<neighbor_list_type>::numNeighbor(
+                    neigh_list, i );
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            {
+                double fx_i = 0.0;
+                double fy_i = 0.0;
+                double fz_i = 0.0;
+
+                std::size_t j =
+                    Cabana::NeighborList<neighbor_list_type>::getNeighbor(
+                        neigh_list, i, n );
+
+                // Get the reference positions and displacements.
+                double xi, r, s;
+                double rx, ry, rz;
+                getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+
+                model.thermalStretch( s, i, j );
+
+                model.updateDensity( i, theta( i ) );
+
+                // Break if beyond critical stretch unless in no-fail zone.
+                if ( model.criticalStretch( i, j, r, xi ) && !nofail( i ) &&
+                     !nofail( j ) )
+                {
+                    mu( i, n ) = 0;
+                }
+                // Else if statement is only for performance.
+                else if ( mu( i, n ) > 0 )
+                {
+                    const double coeff = model.forceCoeff( i, n, s, vol( j ) );
+
+                    double muij = mu( i, n );
+                    fx_i = muij * coeff * rx / r;
+                    fy_i = muij * coeff * ry / r;
+                    fz_i = muij * coeff * rz / r;
+
+                    f( i, 0 ) += fx_i;
+                    f( i, 1 ) += fy_i;
+                    f( i, 2 ) += fz_i;
+                }
+            }
+        };
+
+        neighbor.iterateLinear( exec_space{}, force_full, particles,
+                                "CabanaPD::ForcePMBDamage::computeFull" );
+        _timer.stop();
+    }
+};
+
 template <class MemorySpace, class... ModelParams>
 class Force<MemorySpace,
             ForceModel<LinearPMB, Elastic, NoFracture, ModelParams...>>

@@ -248,18 +248,21 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
         coeff = 3.0 / pi / delta / delta / delta / delta;
     }
 
-    // Fused density update using plastic dilatation.
-    KOKKOS_INLINE_FUNCTION auto dilatation( const int i, const double s,
+    // Update plastic dilatation.
+    KOKKOS_INLINE_FUNCTION auto dilatation( const int, const double s,
                                             const double xi, const double vol,
                                             const double ) const
     {
-        double theta_i = coeff * s * xi * vol;
+        return coeff * s * xi * vol;
+    }
 
-        // Update density using updated dilatation.
+    // Density update using plastic dilatation.
+    KOKKOS_INLINE_FUNCTION void updateDensity( const int i,
+                                               const double theta_i )
+    {
+        // Update density using plastic dilatation.
         // Note that this assumes zero initial plastic dilatation.
         rho( i ) = rho0 * Kokkos::exp( theta_i ); // exp(theta_i - theta_i_0)
-
-        return theta_i;
     }
 };
 
