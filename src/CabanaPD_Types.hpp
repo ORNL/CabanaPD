@@ -35,9 +35,15 @@ struct is_fracture<Fracture> : public std::true_type
 // Mechanics tags.
 struct Elastic
 {
+    using base_type = Elastic;
+};
+struct Plastic
+{
+    using base_type = Plastic;
 };
 struct ElasticPerfectlyPlastic
 {
+    using base_type = Plastic;
 };
 
 // Model category tags.
@@ -185,6 +191,10 @@ struct is_energy_output : public std::false_type
 };
 template <>
 struct is_energy_output<EnergyOutput> : public std::true_type
+{
+};
+
+struct DynamicDensity
 {
 };
 
