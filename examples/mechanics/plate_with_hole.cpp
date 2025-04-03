@@ -79,7 +79,7 @@ void plateWithHoleExample( const std::string filename )
 
     CabanaPD::Particles particles(
         memory_space{}, model_type{}, CabanaPD::EnergyStressOutput{},
-        low_corner, high_corner, num_cells, halo_width, Cabana::InitRandom{},
+        low_corner, high_corner, num_cells, halo_width, Cabana::InitUniform{},
         init_op, exec_space{} );
 
     // ====================================================
