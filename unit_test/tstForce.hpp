@@ -175,7 +175,7 @@ double computeReferenceForceX(
         ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
         int>::type* = 0 )
 {
-    double Fx = 0.0;
+    double fx = 0.0;
     double dx = model.delta / m;
     double vol = dx * dx * dx;
     for ( int i = -m; i < m + 1; ++i )
@@ -194,9 +194,9 @@ double computeReferenceForceX(
                 double s = ( r - xi ) / xi;
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
-                    Fx += model.c * s * vol * rx / r;
+                    fx += model.c * s * vol * rx / r;
             }
-    return Fx;
+    return fx;
 }
 
 // Get the weighted volume (at one point).
@@ -453,7 +453,7 @@ double computeReferenceForceX(
         ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
         int>::type* = 0 )
 {
-    double Fx = 0.0;
+    double fx = 0.0;
     double dx = model.delta / m;
     double vol = dx * dx * dx;
 
@@ -480,7 +480,7 @@ double computeReferenceForceX(
                     model, m, u11, vol, weighted_volume, x_j );
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                 {
-                    Fx += ( model.theta_coeff * ( theta_i / weighted_volume +
+                    fx += ( model.theta_coeff * ( theta_i / weighted_volume +
                                                   theta_j / weighted_volume ) +
                             model.s_coeff * s *
                                 ( 1.0 / weighted_volume +
@@ -488,7 +488,7 @@ double computeReferenceForceX(
                           model.influenceFunction( xi ) * xi * vol * rx / r;
                 }
             }
-    return Fx;
+    return fx;
 }
 
 //---------------------------------------------------------------------------//

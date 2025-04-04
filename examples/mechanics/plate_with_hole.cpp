@@ -65,7 +65,7 @@ void plateWithHoleExample( const std::string filename )
     // ====================================================
     double x_center = 0.5 * ( low_corner[0] + high_corner[0] );
     double y_center = 0.5 * ( low_corner[1] + high_corner[1] );
-    double R = inputs["radius_hole"];
+    double R = inputs["hole_radius"];
 
     // Do not create particles inside given cylindrical region
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
