@@ -227,6 +227,7 @@ class Solver
         // Compute initial internal forces and energy.
         updateForce();
         computeEnergy( *force, particles, neigh_iter_tag() );
+        computeStress( *force, particles, neigh_iter_tag() );
 
         if ( initial_output )
             particles.output( 0, 0.0, output_reference );
@@ -420,6 +421,7 @@ class Solver
         if ( step % output_frequency == 0 )
         {
             auto W = computeEnergy( *force, particles, neigh_iter_tag() );
+            computeStress( *force, particles, neigh_iter_tag() );
 
             particles.output( step / output_frequency, step * dt,
                               output_reference );
