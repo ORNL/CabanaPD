@@ -9,8 +9,8 @@
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef CONTACT_HERTZIAN_H
-#define CONTACT_HERTZIAN_H
+#ifndef CONTACT_HERTZIANJKR_H
+#define CONTACT_HERTZIANJKR_H
 
 #include <Kokkos_Core.hpp>
 
