@@ -187,7 +187,7 @@ void dogboneTensileTestExample( const std::string filename )
     // Reset forces on both grips.
     auto bc =
         createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0, exec_space{},
-                                 particles, left_grip, right_grip );
+                                 solver.particles, left_grip, right_grip );
 
     // ====================================================
     //                   Simulation run
