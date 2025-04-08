@@ -98,8 +98,8 @@ void thermalCrackExample( const std::string filename )
     // --------------------------------------------
     //                Thermal shock
     // --------------------------------------------
-    auto x = particles.sliceReferencePosition();
-    temp = particles.sliceTemperature();
+    auto x = solver.particles.sliceReferencePosition();
+    temp = solver.particles.sliceTemperature();
 
     // Plate limits
     double X0 = low_corner[0];
@@ -147,7 +147,7 @@ void thermalCrackExample( const std::string filename )
         // Compute particle temperature
         temp( pid ) = temp_infinity + ( temp0 - temp_infinity ) * fx * fy;
     };
-    CabanaPD::BodyTerm body_term( temp_func, particles.size(), false );
+    CabanaPD::BodyTerm body_term( temp_func, solver.particles.size(), false );
 
     // ====================================================
     //                   Simulation run
