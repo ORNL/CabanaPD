@@ -72,16 +72,16 @@ namespace CabanaPD
 ******************************************************************************/
 template <class PosType>
 KOKKOS_INLINE_FUNCTION void
-getDistanceComponents( const PosType& x, const PosType& u, const int i,
-                       const int j, double& xi, double& r, double& s,
-                       double& rx, double& ry, double& rz )
+getDistance( const PosType& x, const PosType& u, const int i, const int j,
+             double& xi, double& r, double& s, double& rx, double& ry,
+             double& rz, double& xi_x, double& xi_y, double& xi_z )
 {
     // Get the reference positions and displacements.
-    const double xi_x = x( j, 0 ) - x( i, 0 );
+    xi_x = x( j, 0 ) - x( i, 0 );
     const double eta_u = u( j, 0 ) - u( i, 0 );
-    const double xi_y = x( j, 1 ) - x( i, 1 );
+    xi_y = x( j, 1 ) - x( i, 1 );
     const double eta_v = u( j, 1 ) - u( i, 1 );
-    const double xi_z = x( j, 2 ) - x( i, 2 );
+    xi_z = x( j, 2 ) - x( i, 2 );
     const double eta_w = u( j, 2 ) - u( i, 2 );
     rx = xi_x + eta_u;
     ry = xi_y + eta_v;
@@ -94,16 +94,27 @@ getDistanceComponents( const PosType& x, const PosType& u, const int i,
 template <class PosType>
 KOKKOS_INLINE_FUNCTION void getDistance( const PosType& x, const PosType& u,
                                          const int i, const int j, double& xi,
-                                         double& r, double& s )
+                                         double& r, double& s, double& rx,
+                                         double& ry, double& rz )
 {
-    double rx, ry, rz;
-    getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+    double xi_x, xi_y, xi_z;
+    getDistance( x, u, i, j, xi, r, s, rx, ry, rz, xi_x, xi_y, xi_z );
 }
 
 template <class PosType>
-KOKKOS_INLINE_FUNCTION void getLinearizedDistanceComponents(
-    const PosType& x, const PosType& u, const int i, const int j, double& xi,
-    double& s, double& xi_x, double& xi_y, double& xi_z )
+KOKKOS_INLINE_FUNCTION void getDistance( const PosType& x, const PosType& u,
+                                         const int i, const int j, double& xi,
+                                         double& r, double& s )
+{
+    double rx, ry, rz;
+    getDistance( x, u, i, j, xi, r, s, rx, ry, rz );
+}
+
+template <class PosType>
+KOKKOS_INLINE_FUNCTION void
+getLinearizedDistance( const PosType& x, const PosType& u, const int i,
+                       const int j, double& xi, double& s, double& xi_x,
+                       double& xi_y, double& xi_z )
 {
     // Get the reference positions and displacements.
     xi_x = x( j, 0 ) - x( i, 0 );
@@ -122,7 +133,7 @@ getLinearizedDistance( const PosType& x, const PosType& u, const int i,
                        const int j, double& xi, double& s )
 {
     double xi_x, xi_y, xi_z;
-    getLinearizedDistanceComponents( x, u, i, j, xi, s, xi_x, xi_y, xi_z );
+    getLinearizedDistance( x, u, i, j, xi, s, xi_x, xi_y, xi_z );
 }
 
 // Forward declaration.
@@ -143,6 +154,7 @@ class Force<MemorySpace, BaseForceModel>
 
     Timer _timer;
     Timer _energy_timer;
+    Timer _stress_timer;
 
   public:
     // Primary constructor: use positions and construct neighbors.
@@ -331,6 +343,22 @@ double computeEnergy( ForceType& force, ParticleType& particles,
         Kokkos::fence();
     }
     return energy;
+}
+
+template <class ForceType, class ParticleType, class ParallelType>
+void computeStress( ForceType& force, ParticleType& particles,
+                    const ParallelType& neigh_op_tag )
+{
+    if constexpr ( is_stress_output<typename ParticleType::output_type>::value )
+    {
+        auto stress = particles.sliceStress();
+
+        // Reset stress.
+        Cabana::deep_copy( stress, 0.0 );
+
+        force.computeStressFull( particles, neigh_op_tag );
+        Kokkos::fence();
+    }
 }
 
 } // namespace CabanaPD
