@@ -174,6 +174,8 @@ class Force<MemorySpace, NormalRepulsionModel>
         return 0.0;
     }
 
+    auto neighTime() { return _neigh_timer.time(); }
+
   protected:
     NormalRepulsionModel _model;
     using base_type::_half_neigh;
