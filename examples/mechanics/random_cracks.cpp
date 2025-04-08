@@ -171,8 +171,8 @@ void randomCracksExample( const std::string filename )
     // Create BC last to ensure ghost particles are included.
     double sigma0 = inputs["traction"];
     double b0 = sigma0 / dy;
-    f = particles.sliceForce();
-    x = particles.sliceReferencePosition();
+    f = solver.particles.sliceForce();
+    x = solver.particles.sliceReferencePosition();
     // Create a symmetric force BC in the y-direction.
     auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
     {
@@ -180,8 +180,8 @@ void randomCracksExample( const std::string filename )
         auto sign = std::abs( ypos ) / ypos;
         f( pid, 1 ) += b0 * sign;
     };
-    auto bc = createBoundaryCondition( bc_op, exec_space{}, particles, true,
-                                       plane1, plane2 );
+    auto bc = createBoundaryCondition( bc_op, exec_space{}, solver.particles,
+                                       true, plane1, plane2 );
 
     // ====================================================
     //                   Simulation run
