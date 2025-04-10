@@ -1,0 +1,21 @@
+{
+    "num_cells"                : {"value": [51, 51, 101]},
+    "system_size"              : {"value": [0.254, 0.254, 0.3048], "unit": "m"},
+    "grid_perturbation_factor" : {"value": 0.1},
+    "density"                  : {"value": 7800, "unit": "kg/m^3"},
+    "bulk_modulus"             : {"value": 130e+9, "unit": "Pa"},
+    "shear_modulus"            : {"value": 78e+9, "unit": "Pa"},
+    "critical_stretch"         : {"value": 0.02},
+    "horizon"                  : {"value": 0.00417462, "unit": "m"},  
+    "pressure"                 : {"value": 2e6,   "unit": "Pa"},
+    "cylinder_outer_radius"    : {"value": 0.127, "unit": "m"},
+    "cylinder_inner_radius"    : {"value": 0.0635, "unit": "m"},
+    "max_radial_velocity"      : {"value": 200, "unit": "m/s"}, 
+    "min_radial_velocity"      : {"value": 50, "unit": "m/s"},
+    "max_vertical_velocity"    : {"value": 100, "unit": "m/s"}, 
+    "final_time"               : {"value": 2.5e-4, "unit": "s"},
+    "timestep"                 : {"value": 1.7e-07, "unit": "s"},
+    "timestep_safety_factor"   : {"value": 0.70},
+    "output_frequency"         : {"value": 50},
+    "output_reference"         : {"value": false}
+}
