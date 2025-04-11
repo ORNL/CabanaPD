@@ -738,7 +738,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
             localOffset(), getPosition( use_reference ), sliceForce(),
-            sliceDisplacement(), sliceVelocity(),
+            sliceDisplacement(), sliceVelocity(), sliceDensity(),
             std::forward<OtherFields>( other )... );
 #else
 #ifdef Cabana_ENABLE_SILO
@@ -746,7 +746,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             writePartialRangeTimeStep(
                 "particles", local_grid->globalGrid(), output_step, output_time,
                 0, localOffset(), getPosition( use_reference ), sliceForce(),
-                sliceDisplacement(), sliceVelocity(),
+                sliceDisplacement(), sliceVelocity(), sliceDensity(),
                 std::forward<OtherFields>( other )... );
 
 #else
