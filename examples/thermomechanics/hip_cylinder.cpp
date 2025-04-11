@@ -83,96 +83,39 @@ void HIPCylinderExample( const std::string filename )
         return true;
     };
 
-    // ====================================================
-    //  Simulation run with contact physics
-    // ====================================================
-    if ( inputs["use_contact"] )
+    CabanaPD::Particles particles(
+        memory_space{}, model_type{}, low_corner, high_corner, num_cells,
+        halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
+
+    auto rho = particles.sliceDensity();
+    auto x = particles.sliceReferencePosition();
+    auto v = particles.sliceVelocity();
+    auto f = particles.sliceForce();
+
+    double vrmax = inputs["max_radial_velocity"];
+    double vrmin = inputs["min_radial_velocity"];
+    double vzmax = inputs["max_vertical_velocity"];
+    double zmin = z_center - 0.5 * H;
+
+    auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
-        using contact_type = CabanaPD::NormalRepulsionModel;
-        CabanaPD::Particles particles(
-            memory_space{}, contact_type{}, low_corner, high_corner, num_cells,
-            halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
+        // Density
+        rho( pid ) = rho0;
 
-        auto rho = particles.sliceDensity();
-        auto x = particles.sliceReferencePosition();
-        auto v = particles.sliceVelocity();
-        auto f = particles.sliceForce();
-        auto dx = particles.dx;
+        // Velocity
+        double zfactor = ( ( x( pid, 2 ) - zmin ) / ( 0.5 * H ) ) - 1;
+        double vr = vrmax - vrmin * zfactor * zfactor;
+        v( pid, 0 ) =
+            vr * Kokkos::cos( Kokkos::atan2( x( pid, 1 ), x( pid, 0 ) ) );
+        v( pid, 1 ) =
+            vr * Kokkos::sin( Kokkos::atan2( x( pid, 1 ), x( pid, 0 ) ) );
+        v( pid, 2 ) = vzmax * zfactor;
+    };
+    particles.updateParticles( exec_space{}, init_functor );
 
-        double vrmax = inputs["max_radial_velocity"];
-        double vrmin = inputs["min_radial_velocity"];
-        double vzmax = inputs["max_vertical_velocity"];
-        double zmin = z_center - 0.5 * H;
-
-        auto init_functor = KOKKOS_LAMBDA( const int pid )
-        {
-            // Density
-            rho( pid ) = rho0;
-
-            // Velocity
-            double zfactor = ( ( x( pid, 2 ) - zmin ) / ( 0.5 * H ) ) - 1;
-            double vr = vrmax - vrmin * zfactor * zfactor;
-            v( pid, 0 ) =
-                vr * Kokkos::cos( Kokkos::atan2( x( pid, 1 ), x( pid, 0 ) ) );
-            v( pid, 1 ) =
-                vr * Kokkos::sin( Kokkos::atan2( x( pid, 1 ), x( pid, 0 ) ) );
-            v( pid, 2 ) = vzmax * zfactor;
-        };
-        particles.updateParticles( exec_space{}, init_functor );
-
-        // Use contact radius and extension relative to particle spacing.
-        double r_c = inputs["contact_horizon_factor"];
-        double r_extend = inputs["contact_horizon_extend_factor"];
-        // NOTE: dx/2 is when particles first touch.
-        r_c *= dx[0] / 2.0;
-        r_extend *= dx[0];
-
-        contact_type contact_model( delta, r_c, r_extend, K );
-
-        CabanaPD::Solver solver( inputs, particles, force_model,
-                                 contact_model );
-        solver.init();
-        solver.run();
-    }
-    // ====================================================
-    //  Simulation run without contact
-    // ====================================================
-    else
-    {
-        CabanaPD::Particles particles(
-            memory_space{}, model_type{}, low_corner, high_corner, num_cells,
-            halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
-
-        auto rho = particles.sliceDensity();
-        auto x = particles.sliceReferencePosition();
-        auto v = particles.sliceVelocity();
-        auto f = particles.sliceForce();
-
-        double vrmax = inputs["max_radial_velocity"];
-        double vrmin = inputs["min_radial_velocity"];
-        double vzmax = inputs["max_vertical_velocity"];
-        double zmin = z_center - 0.5 * H;
-
-        auto init_functor = KOKKOS_LAMBDA( const int pid )
-        {
-            // Density
-            rho( pid ) = rho0;
-
-            // Velocity
-            double zfactor = ( ( x( pid, 2 ) - zmin ) / ( 0.5 * H ) ) - 1;
-            double vr = vrmax - vrmin * zfactor * zfactor;
-            v( pid, 0 ) =
-                vr * Kokkos::cos( Kokkos::atan2( x( pid, 1 ), x( pid, 0 ) ) );
-            v( pid, 1 ) =
-                vr * Kokkos::sin( Kokkos::atan2( x( pid, 1 ), x( pid, 0 ) ) );
-            v( pid, 2 ) = vzmax * zfactor;
-        };
-        particles.updateParticles( exec_space{}, init_functor );
-
-        CabanaPD::Solver solver( inputs, particles, force_model );
-        solver.init();
-        solver.run();
-    }
+    CabanaPD::Solver solver( inputs, particles, force_model );
+    solver.init();
+    solver.run();
 }
 
 // Initialize MPI+Kokkos.
