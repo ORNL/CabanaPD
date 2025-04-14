@@ -1226,13 +1226,12 @@ class Particles<MemorySpace, ModelType, ThermalType, OutputType, DynamicDensity,
     using base_type = Particles<MemorySpace, LPS, ThermalType, OutputType,
                                 StaticDensity, Dimension>;
     using thermal_type = typename base_type::thermal_type;
-    using output_type = EnergyOutput;
+    using output_type = OutputType;
     using memory_space = typename base_type::memory_space;
     using base_type::dim;
 
-    // energy, damage
-    using output_types = Cabana::MemberTypes<double, double>;
-    using aosoa_output_type = Cabana::AoSoA<output_types, memory_space, 1>;
+    using aosoa_density_type =
+        Cabana::AoSoA<Cabana::MemberTypes<double>, memory_space, 1>;
 
     // Per type.
     using base_type::n_types;
@@ -1257,12 +1256,58 @@ class Particles<MemorySpace, ModelType, ThermalType, OutputType, DynamicDensity,
                DynamicDensity, Args&&... args )
         : base_type( space, LPS{}, temp, std::forward<Args>( args )... )
     {
+        _aosoa_density = aosoa_density_type( "Particle Output Fields",
+                                             base_type::localOffset() );
+        init();
+    }
+
+    template <typename... Args>
+    void createParticles( Args&&... args )
+    {
+        // Forward arguments to standard or custom particle creation.
+        base_type::createParticles( std::forward<Args>( args )... );
+        _aosoa_density.resize( base_type::localOffset() );
+    }
+
+    auto sliceCurrentDensity()
+    {
+        return Cabana::slice<0>( _aosoa_density, "current_density" );
+    }
+    auto sliceCurrentDensity() const
+    {
+        return Cabana::slice<0>( _aosoa_density, "current_density" );
+    }
+
+    template <typename... Args>
+    void resize( Args&&... args )
+    {
+        base_type::resize( std::forward<Args>( args )... );
+        _aosoa_density.resize( base_type::localOffset() );
+    }
+
+    template <typename... OtherFields>
+    void output( const int output_step, const double output_time,
+                 const bool use_reference, OtherFields&&... other )
+    {
+        base_type::output( output_step, output_time, use_reference,
+                           sliceCurrentDensity(),
+                           std::forward<OtherFields>( other )... );
     }
 
     friend class Comm<self_type, Pair, TemperatureIndependent>;
     friend class Comm<self_type, State, TemperatureIndependent>;
     friend class Comm<self_type, Pair, TemperatureDependent>;
     friend class Comm<self_type, State, TemperatureDependent>;
+
+  protected:
+    void init()
+    {
+        auto reference = sliceCurrentDensity();
+        auto current = sliceCurrentDensity();
+        Cabana::deep_copy( current, reference );
+    }
+
+    aosoa_density_type _aosoa_density;
 };
 
 /******************************************************************************
