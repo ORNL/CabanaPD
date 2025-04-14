@@ -30,9 +30,9 @@ KOKKOS_INLINE_FUNCTION void getRelativeNormalVelocityComponents(
     const double ry, const double rz, const double r, double& vx, double& vy,
     double& vz, double& vn )
 {
-    vx = vel( i, 0 ) - vel( j, 0 );
-    vy = vel( i, 1 ) - vel( j, 1 );
-    vz = vel( i, 2 ) - vel( j, 2 );
+    vx = vel( j, 0 ) - vel( i, 0 );
+    vy = vel( j, 1 ) - vel( i, 1 );
+    vz = vel( j, 2 ) - vel( i, 2 );
 
     vn = vx * rx + vy * ry + vz * rz;
     vn /= r;

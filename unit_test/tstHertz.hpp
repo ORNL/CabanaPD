@@ -26,7 +26,7 @@ double calculateKE( const VelType& v, const DensityType& rho,
 
     Kokkos::View<double*, MemorySpace> tke( "tke", 1 );
     Kokkos::parallel_reduce(
-        "total_ke", v.size(),
+        "total_ke", Kokkos::RangePolicy<MemorySpace>( 0, v.size() ),
         KOKKOS_LAMBDA( const int i, double& sum ) {
             sum += 0.5 * rho( i ) * vol( i ) *
                    pow( hypot( v( i, 0 ), v( i, 1 ), v( i, 2 ) ), 2.0 );

@@ -89,17 +89,19 @@ struct HertzianJKRModel : public ContactModel
 
         auto a = [=]( const double delta_n )
         {
-            const double c0 = Kokkos::pow( Rs * delta_n, 2.0 );
-            const double c1 = -4.0 * ( 1.0 - Kokkos::pow( nu, 2.0 ) ) * pi *
-                              Gamma * Kokkos::pow( Rs, 2.0 ) / Es;
-            const double c2 = -2.0 * Rs * delta_n;
-            const double P = -Kokkos::pow( c2, 2.0 ) / 12.0 - c0;
-            const double Q = -Kokkos::pow( c2, 3.0 ) / 108.0 + c0 * c2 / 3.0 -
-                             Kokkos::pow( c1, 2.0 ) / 8.0;
-            const double U = Kokkos::pow(
-                -Q / 2.0 + Kokkos::pow( Kokkos::pow( Q, 2.0 ) / 4.0 +
-                                            Kokkos::pow( P, 3.0 ) / 27.0,
-                                        1.0 / 2.0 ),
+            double c0 = Kokkos::pow( Rs * delta_n, 2.0 );
+            double c1 = -4.0 * ( 1.0 - Kokkos::pow( nu, 2.0 ) ) * pi * Gamma *
+                        Kokkos::pow( Rs, 2.0 ) / Es;
+            double c2 = -2.0 * Rs * delta_n;
+            double P = -Kokkos::pow( c2, 2.0 ) / 12.0 - c0;
+            double Q = -Kokkos::pow( c2, 3.0 ) / 108.0 + c0 * c2 / 3.0 -
+                       Kokkos::pow( c1, 2.0 ) / 8.0;
+            double U = Kokkos::pow(
+                -Q / 2.0 +
+                    Kokkos::pow(
+                        Kokkos::max( 0.0, Kokkos::pow( Q, 2.0 ) / 4.0 +
+                                              Kokkos::pow( P, 3.0 ) / 27.0 ),
+                        1.0 / 2.0 ),
                 1.0 / 3.0 );
 
             double s = 0.0;
@@ -111,14 +113,16 @@ struct HertzianJKRModel : public ContactModel
             {
                 s = -5.0 / 6.0 * c2 - Kokkos::pow( Q, 1.0 / 3.0 );
             }
-            const double w = Kokkos::pow( c2 + 2.0 * s, 1.0 / 2.0 );
-            const double lambda = c1 / ( 2.0 * w );
+            double w =
+                Kokkos::pow( Kokkos::max( 0.0, c2 + 2.0 * s ), 1.0 / 2.0 );
+            double lambda = c1 / ( 2.0 * w + 1e-14 );
 
             // The final value for (a)
             return 1.0 / 2.0 *
-                   ( w + Kokkos::pow( Kokkos::pow( w, 2.0 ) -
-                                          4.0 * ( c2 + s + lambda ),
-                                      1.0 / 2.0 ) );
+                   ( w + Kokkos::pow(
+                             Kokkos::max( 0.0, Kokkos::pow( w, 2.0 ) -
+                                                   4.0 * ( c2 + s + lambda ) ),
+                             1.0 / 2.0 ) );
         };
 
         // HertzJKR normal force coefficient
@@ -126,10 +130,12 @@ struct HertzianJKRModel : public ContactModel
         if ( delta_n >= delta_tear )
         {
             auto a3 = Kokkos::pow( a( delta_n ), 3.0 );
-            coeff = coeff_h_n * a3 -
-                    Kokkos::pow( 8.0 * Gamma * pi * Es * a3, 1.0 / 2.0 );
-
-            if ( delta_n < 0.0 && vn >= 0.0 )
+            coeff =
+                -1.0 * ( coeff_h_n * a3 -
+                         Kokkos::pow( 8.0 * Gamma * pi * Es * a3, 1.0 / 2.0 ) );
+            std::cout << a( delta_n ) << " " << delta_n << " " << delta_tear
+                      << " " << vn << "\n";
+            if ( delta_n <= 0.0 && vn <= 0.0 )
             {
                 coeff = 0.0;
             }
