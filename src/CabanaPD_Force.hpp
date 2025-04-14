@@ -127,7 +127,8 @@ getLinearizedDistance( const PosType& x, const PosType& u, const int i,
 }
 
 // Forward declaration.
-template <class MemorySpace, class ForceType>
+template <class MemorySpace, class ForceModelType, class ModelType,
+          class FractureType = NoFracture, class DensityType = StaticDensity>
 class Force;
 
 template <class MemorySpace>
@@ -155,18 +156,14 @@ class BaseForce
 /******************************************************************************
   Dilatation.
 ******************************************************************************/
-template <class MemorySpace, class ModelType>
+template <class MemorySpace, class ModelType, class FractureType>
 class Dilatation;
 
-template <class MemorySpace,
-          template <class, class, class, class...> class ModelType,
-          class PDModelType, class MechanicsType, class... ModelParams>
-class Dilatation<MemorySpace, ModelType<PDModelType, MechanicsType, NoFracture,
-                                        ModelParams...>>
+template <class MemorySpace, class ModelType>
+class Dilatation<MemorySpace, ModelType, NoFracture>
 {
   protected:
-    using model_type =
-        ModelType<PDModelType, MechanicsType, NoFracture, ModelParams...>;
+    using model_type = ModelType;
     model_type _model;
 
     Timer _timer;
@@ -236,15 +233,11 @@ class Dilatation<MemorySpace, ModelType<PDModelType, MechanicsType, NoFracture,
     auto time() { return _timer.time(); };
 };
 
-template <class MemorySpace,
-          template <class, class, class, class...> class ModelType,
-          class PDModelType, class MechanicsType, class... ModelParams>
-class Dilatation<MemorySpace, ModelType<PDModelType, MechanicsType, Fracture,
-                                        ModelParams...>>
+template <class MemorySpace, class ModelType>
+class Dilatation<MemorySpace, ModelType, Fracture>
 {
   protected:
-    using model_type =
-        ModelType<PDModelType, MechanicsType, Fracture, ModelParams...>;
+    using model_type = ModelType;
     model_type _model;
 
     Timer _timer;

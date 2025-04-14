@@ -23,9 +23,11 @@ namespace CabanaPD
 struct HertzianModel : public ContactModel
 {
     using base_type = ContactModel;
+    using model_type = ContactModel;
     using base_model = base_type::base_model;
     using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
+    using density_type = StaticDensity;
 
     using base_type::radius;
     double nu;   // Poisson's ratio

@@ -69,13 +69,12 @@
 
 namespace CabanaPD
 {
-template <class MemorySpace>
-class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
-    : public Dilatation<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, LPS, NoFracture>
+    : public Dilatation<MemorySpace, ModelType, NoFracture>
 {
   protected:
-    using base_type =
-        Dilatation<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>;
+    using base_type = Dilatation<MemorySpace, ModelType, NoFracture>;
     using model_type = typename base_type::model_type;
     using base_type::_model;
 
@@ -172,13 +171,12 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
     auto timeEnergy() { return _energy_timer.time(); };
 };
 
-template <class MemorySpace>
-class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
-    : public Dilatation<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, LPS, Fracture>
+    : public Dilatation<MemorySpace, ModelType, Fracture>
 {
   protected:
-    using base_type =
-        Dilatation<MemorySpace, ForceModel<LPS, Elastic, Fracture>>;
+    using base_type = Dilatation<MemorySpace, ModelType, Fracture>;
     using model_type = typename base_type::model_type;
     using base_type::_model;
 
@@ -324,13 +322,12 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
     auto timeEnergy() { return _energy_timer.time(); };
 };
 
-template <class MemorySpace>
-class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
-    : public Dilatation<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
+    : public Dilatation<MemorySpace, ModelType, NoFracture>
 {
   protected:
-    using base_type =
-        Dilatation<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>;
+    using base_type = Dilatation<MemorySpace, ModelType, NoFracture>;
     using model_type = typename base_type::model_type;
     model_type _model;
 

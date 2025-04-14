@@ -82,6 +82,7 @@
 #include <CabanaPD_Prenotch.hpp>
 #include <CabanaPD_Timer.hpp>
 #include <CabanaPD_Types.hpp>
+#include <force_models/CabanaPD_Contact.hpp>
 
 namespace CabanaPD
 {
@@ -95,7 +96,10 @@ class Solver
 
     // Core module types - required for all problems.
     using force_model_type = ForceModelType;
-    using force_type = Force<memory_space, force_model_type>;
+    using force_type = Force<memory_space, force_model_type,
+                             typename force_model_type::model_type,
+                             typename force_model_type::fracture_type,
+                             typename force_model_type::density_type>;
     using comm_type =
         Comm<ParticleType, typename force_model_type::base_model::base_type,
              typename ParticleType::thermal_type>;
@@ -104,7 +108,7 @@ class Solver
 
     // Optional module types.
     using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
-    using contact_type = Force<memory_space, ContactModelType>;
+    using contact_type = Force<memory_space, ContactModelType, ContactModel>;
     using contact_model_type = ContactModelType;
 
     // Flexible module types.
@@ -161,7 +165,7 @@ class Solver
         // Update temperature ghost size if needed.
         if constexpr ( is_temperature_dependent<
                            typename force_model_type::thermal_type>::value )
-            force_model.update( particles.sliceTemperature() );
+            force_model.update( particles );
 
         neighbor = std::make_shared<neighbor_type>( inputs["half_neigh"],
                                                     force_model, particles );

@@ -693,7 +693,9 @@ void testForce( ModelType model, const double dx, const double m,
 
     // This needs to exactly match the mesh spacing to compare with the single
     // particle calculation.
-    CabanaPD::Force<TEST_MEMSPACE, ModelType> force( model );
+    CabanaPD::Force<TEST_MEMSPACE, ModelType, typename ModelType::model_type,
+                    typename ModelType::fracture_type>
+        force( model );
     CabanaPD::Neighbor<TEST_MEMSPACE, typename ModelType::fracture_type>
         neighbor( false, model, particles );
     auto x = particles.sliceReferencePosition();

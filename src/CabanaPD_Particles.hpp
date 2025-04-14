@@ -79,15 +79,17 @@
 namespace CabanaPD
 {
 template <class MemorySpace, class ModelType, class ThermalType,
-          class OutputType = BaseOutput, int Dimension = 3>
+          class OutputType = BaseOutput, class DensityType = StaticDensity,
+          int Dimension = 3>
 class Particles;
 
 template <class MemorySpace, int Dimension>
-class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
+class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput,
+                StaticDensity, Dimension>
 {
   public:
     using self_type = Particles<MemorySpace, PMB, TemperatureIndependent,
-                                BaseOutput, Dimension>;
+                                BaseOutput, StaticDensity, Dimension>;
     using thermal_type = TemperatureIndependent;
     using output_type = BaseOutput;
     using memory_space = MemorySpace;
@@ -784,15 +786,16 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 };
 
 template <class MemorySpace, int Dimension>
-class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
+class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput,
+                StaticDensity, Dimension>
     : public Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput,
-                       Dimension>
+                       StaticDensity, Dimension>
 {
   public:
     using self_type = Particles<MemorySpace, LPS, TemperatureIndependent,
-                                BaseOutput, Dimension>;
+                                BaseOutput, StaticDensity, Dimension>;
     using base_type = Particles<MemorySpace, PMB, TemperatureIndependent,
-                                BaseOutput, Dimension>;
+                                BaseOutput, StaticDensity, Dimension>;
     using output_type = typename base_type::output_type;
     using thermal_type = TemperatureIndependent;
     using memory_space = typename base_type::memory_space;
@@ -903,15 +906,15 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
 
 template <class MemorySpace, class ModelType, int Dimension>
 class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
-                Dimension>
+                StaticDensity, Dimension>
     : public Particles<MemorySpace, ModelType, TemperatureIndependent,
-                       BaseOutput, Dimension>
+                       BaseOutput, StaticDensity, Dimension>
 {
   public:
     using self_type = Particles<MemorySpace, ModelType, TemperatureDependent,
-                                BaseOutput, Dimension>;
+                                BaseOutput, StaticDensity, Dimension>;
     using base_type = Particles<MemorySpace, ModelType, TemperatureIndependent,
-                                BaseOutput, Dimension>;
+                                BaseOutput, StaticDensity, Dimension>;
     using thermal_type = TemperatureDependent;
     using output_type = typename base_type::output_type;
     using memory_space = typename base_type::memory_space;
@@ -1016,17 +1019,19 @@ class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
 };
 
 template <class MemorySpace, class ThermalType, int Dimension>
-class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
-    : public Particles<MemorySpace, PMB, ThermalType, BaseOutput, Dimension>
+class Particles<MemorySpace, Contact, ThermalType, BaseOutput, StaticDensity,
+                Dimension>
+    : public Particles<MemorySpace, PMB, ThermalType, BaseOutput, StaticDensity,
+                       Dimension>
 {
     // Note: no overloaded output() since there are very few cases where this
     // is a desired output field.
 
   public:
-    using self_type =
-        Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>;
-    using base_type =
-        Particles<MemorySpace, PMB, ThermalType, BaseOutput, Dimension>;
+    using self_type = Particles<MemorySpace, Contact, ThermalType, BaseOutput,
+                                StaticDensity, Dimension>;
+    using base_type = Particles<MemorySpace, PMB, ThermalType, BaseOutput,
+                                StaticDensity, Dimension>;
     using thermal_type = typename base_type::thermal_type;
     using output_type = typename base_type::output_type;
     using memory_space = typename base_type::memory_space;
@@ -1106,15 +1111,16 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
 };
 
 template <class MemorySpace, class ModelType, class ThermalType, int Dimension>
-class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
+class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput,
+                StaticDensity, Dimension>
     : public Particles<MemorySpace, ModelType, ThermalType, BaseOutput,
-                       Dimension>
+                       StaticDensity, Dimension>
 {
   public:
-    using self_type =
-        Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>;
-    using base_type =
-        Particles<MemorySpace, ModelType, ThermalType, BaseOutput, Dimension>;
+    using self_type = Particles<MemorySpace, ModelType, ThermalType,
+                                EnergyOutput, StaticDensity, Dimension>;
+    using base_type = Particles<MemorySpace, ModelType, ThermalType, BaseOutput,
+                                StaticDensity, Dimension>;
     using thermal_type = typename base_type::thermal_type;
     using output_type = EnergyOutput;
     using memory_space = typename base_type::memory_space;
@@ -1206,6 +1212,59 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
     aosoa_output_type _aosoa_output;
 };
 
+// Requires LPS base regardless of model type.
+template <class MemorySpace, class ModelType, class ThermalType,
+          class OutputType, int Dimension>
+class Particles<MemorySpace, ModelType, ThermalType, OutputType, DynamicDensity,
+                Dimension>
+    : public Particles<MemorySpace, LPS, ThermalType, OutputType, StaticDensity,
+                       Dimension>
+{
+  public:
+    using self_type = Particles<MemorySpace, ModelType, ThermalType, OutputType,
+                                DynamicDensity, Dimension>;
+    using base_type = Particles<MemorySpace, LPS, ThermalType, OutputType,
+                                StaticDensity, Dimension>;
+    using thermal_type = typename base_type::thermal_type;
+    using output_type = EnergyOutput;
+    using memory_space = typename base_type::memory_space;
+    using base_type::dim;
+
+    // energy, damage
+    using output_types = Cabana::MemberTypes<double, double>;
+    using aosoa_output_type = Cabana::AoSoA<output_types, memory_space, 1>;
+
+    // Per type.
+    using base_type::n_types;
+
+    // Simulation total domain.
+    using base_type::global_mesh_ext;
+
+    // Simulation sub domain (single MPI rank).
+    using base_type::ghost_mesh_hi;
+    using base_type::ghost_mesh_lo;
+    using base_type::local_mesh_ext;
+    using base_type::local_mesh_hi;
+    using base_type::local_mesh_lo;
+
+    using base_type::dx;
+    using base_type::local_grid;
+
+    using base_type::halo_width;
+
+    template <typename... Args>
+    Particles( MemorySpace space, ModelType, TemperatureDependent temp,
+               DynamicDensity, Args&&... args )
+        : base_type( space, LPS{}, temp, std::forward<Args>( args )... )
+    {
+    }
+
+    friend class Comm<self_type, Pair, TemperatureIndependent>;
+    friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Pair, TemperatureDependent>;
+    friend class Comm<self_type, State, TemperatureDependent>;
+};
+
 /******************************************************************************
   Template deduction guides.
 ******************************************************************************/
@@ -1237,6 +1296,12 @@ Particles( MemorySpace, ModelType, ThermalType, OutputType,
                                    int>::type* = 0 )
     -> Particles<MemorySpace, typename ModelType::base_model,
                  typename ThermalType::base_type, OutputType>;
+
+template <typename MemorySpace, typename ModelType, typename ThermalType,
+          typename DensityType, typename... Args>
+Particles( MemorySpace, ModelType, ThermalType, DensityType, Args... )
+    -> Particles<MemorySpace, typename ModelType::base_model,
+                 typename ThermalType::base_type, EnergyOutput, DensityType>;
 
 template <typename MemorySpace, typename ModelType, typename OutputType,
           typename ExecSpace, class UserFunctor, std::size_t Dim>

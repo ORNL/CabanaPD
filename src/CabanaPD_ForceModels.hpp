@@ -17,22 +17,6 @@
 
 namespace CabanaPD
 {
-struct BaseForceModel
-{
-    double delta;
-
-    BaseForceModel( const double _delta )
-        : delta( _delta ){};
-
-    auto cutoff() const { return delta; }
-
-    // Only needed for models which store bond properties.
-    void updateBonds( const int, const int ) {}
-
-    // No-op for temperature.
-    KOKKOS_INLINE_FUNCTION
-    void thermalStretch( double&, const int, const int ) const {}
-};
 
 template <class MemorySpace>
 class BasePlasticity
@@ -74,7 +58,11 @@ struct BaseTemperatureModel
         temperature = model.temperature;
     }
 
-    void update( const TemperatureType _temp ) { temperature = _temp; }
+    template <typename ParticleType>
+    void update( const ParticleType& particles )
+    {
+        temperature = particles.sliceTemperature();
+    }
 
     // Update stretch with temperature effects.
     KOKKOS_INLINE_FUNCTION
@@ -122,6 +110,11 @@ template <typename PeridynamicsModelType, typename MechanicsModelType = Elastic,
           typename DamageType = Fracture,
           typename ThermalType = TemperatureIndependent, typename... DataTypes>
 struct ForceModel;
+
+template <typename PeridynamicsModelType, typename MechanicsModelType = Elastic,
+          typename DamageType = Fracture,
+          typename ThermalType = TemperatureDependent, typename... DataTypes>
+struct ForceDensityModel;
 
 } // namespace CabanaPD
 

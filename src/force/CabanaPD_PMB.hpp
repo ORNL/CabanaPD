@@ -70,16 +70,14 @@
 
 namespace CabanaPD
 {
-template <class MemorySpace, class MechanicsType, class... ModelParams>
-class Force<MemorySpace,
-            ForceModel<PMB, MechanicsType, NoFracture, ModelParams...>>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, PMB, NoFracture>
     : public BaseForce<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type =
-        ForceModel<PMB, MechanicsType, NoFracture, ModelParams...>;
+    using model_type = ModelType;
     using base_type = BaseForce<MemorySpace>;
 
   protected:
@@ -165,15 +163,14 @@ class Force<MemorySpace,
     }
 };
 
-template <class MemorySpace, class MechanicsType, class... ModelParams>
-class Force<MemorySpace,
-            ForceModel<PMB, MechanicsType, Fracture, ModelParams...>>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, PMB, Fracture>
     : public BaseForce<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ForceModel<PMB, MechanicsType, Fracture, ModelParams...>;
+    using model_type = ModelType;
     using base_type = BaseForce<MemorySpace>;
 
   protected:
@@ -305,32 +302,31 @@ class Force<MemorySpace,
     }
 };
 
-template <class MemorySpace, class MechanicsType, class ThermalType,
-          class... ModelParams>
-class Force<MemorySpace, ForceModel<PMB, MechanicsType, Fracture, ThermalType,
-                                    DynamicDensity, ModelParams...>>
-    : public Force<MemorySpace,
-                   ForceModel<PMB, MechanicsType, Fracture, ModelParams...>>,
-      public Dilatation<MemorySpace,
-                        ForceModel<PMB, MechanicsType, Fracture, ThermalType,
-                                   DynamicDensity, ModelParams...>>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, PMB, Fracture, DynamicDensity>
+    : public Force<MemorySpace, ModelType, PMB, Fracture>,
+      public Dilatation<MemorySpace, ModelType, Fracture>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ForceModel<PMB, MechanicsType, Fracture, ModelParams...>;
-    using base_type = BaseForce<MemorySpace>;
+    using model_type = ModelType;
+    using base_type = Force<MemorySpace, ModelType, PMB, Fracture>;
+    using dilatation_type = Dilatation<MemorySpace, ModelType, Fracture>;
+
+    using dilatation_type::computeDilatation;
+    using dilatation_type::computeWeightedVolume;
 
   protected:
-    model_type _model;
+    using base_type::_model;
 
     using base_type::_energy_timer;
     using base_type::_timer;
 
   public:
     Force( const model_type model )
-        : base_type()
-        , _model( model )
+        : base_type( model )
+        , dilatation_type( model )
     {
     }
 
@@ -403,16 +399,14 @@ class Force<MemorySpace, ForceModel<PMB, MechanicsType, Fracture, ThermalType,
     }
 };
 
-template <class MemorySpace, class... ModelParams>
-class Force<MemorySpace,
-            ForceModel<LinearPMB, Elastic, NoFracture, ModelParams...>>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, LinearPMB, NoFracture>
     : public BaseForce<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type =
-        ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>;
+    using model_type = ModelType;
     using base_type = BaseForce<MemorySpace>;
 
   protected:

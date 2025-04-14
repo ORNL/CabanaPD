@@ -45,6 +45,9 @@ void HIPCylinderExample( const std::string filename )
     double G0 = 9 * K * delta * ( sc * sc ) / 5;
     // For LPS with influence_type == 0 (default)
     // double G0 = 15 * K * delta * ( sc * sc ) / 8;
+    double sigma_y = 10.0;
+    double alpha = inputs["thermal_expansion_coeff"];
+    double temp0 = inputs["reference_temperature"];
 
     // ====================================================
     //                  Discretization
@@ -60,7 +63,9 @@ void HIPCylinderExample( const std::string filename )
     //                    Force model
     // ====================================================
     using model_type = CabanaPD::PMB;
-    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0 );
+    using mechanics_type = CabanaPD::ElasticPerfectlyPlastic;
+    using thermal_type = CabanaPD::TemperatureDependent;
+    using density_type = CabanaPD::DynamicDensity;
 
     // ====================================================
     //    Custom particle generation and initialization
@@ -84,8 +89,8 @@ void HIPCylinderExample( const std::string filename )
     };
 
     CabanaPD::Particles particles(
-        memory_space{}, model_type{}, low_corner, high_corner, num_cells,
-        halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
+        memory_space{}, model_type{}, thermal_type{}, density_type{},
+        low_corner, high_corner, num_cells, halo_width, init_op, exec_space{} );
 
     auto rho = particles.sliceDensity();
     auto x = particles.sliceReferencePosition();
@@ -112,6 +117,12 @@ void HIPCylinderExample( const std::string filename )
         v( pid, 2 ) = vzmax * zfactor;
     };
     particles.updateParticles( exec_space{}, init_functor );
+
+    rho = particles.sliceDensity();
+    auto temp = particles.sliceTemperature();
+    CabanaPD::ForceDensityModel force_model( model_type{}, mechanics_type{},
+                                             rho, delta, K, G0, sigma_y, rho0,
+                                             temp, alpha, temp0 );
 
     CabanaPD::Solver solver( inputs, particles, force_model );
     solver.init();

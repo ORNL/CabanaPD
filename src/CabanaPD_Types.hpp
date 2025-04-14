@@ -194,6 +194,9 @@ struct is_energy_output<EnergyOutput> : public std::true_type
 {
 };
 
+struct StaticDensity
+{
+};
 struct DynamicDensity
 {
 };

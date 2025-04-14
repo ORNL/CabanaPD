@@ -20,15 +20,15 @@
 namespace CabanaPD
 {
 template <>
-struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModel
+struct ForceModel<LPS, Elastic, NoFracture>
 {
-    using base_type = BaseForceModel;
+    using model_type = LPS;
     using base_model = LPS;
     using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
+    using density_type = StaticDensity;
 
-    using base_type::delta;
-
+    double delta;
     int influence_type;
 
     double K;
@@ -38,7 +38,7 @@ struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModel
 
     ForceModel( LPS, NoFracture, const double _delta, const double _K,
                 const double _G, const int _influence = 0 )
-        : base_type( _delta )
+        : delta( _delta )
         , influence_type( _influence )
         , K( _K )
         , G( _G )
@@ -48,13 +48,22 @@ struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModel
 
     ForceModel( LPS, Elastic, NoFracture, const double _delta, const double _K,
                 const double _G, const int _influence = 0 )
-        : base_type( _delta )
+        : delta( _delta )
         , influence_type( _influence )
         , K( _K )
         , G( _G )
     {
         init();
     }
+
+    auto cutoff() const { return delta; }
+
+    // Only needed for models which store bond properties.
+    void updateBonds( const int, const int ) {}
+
+    // No-op for temperature.
+    KOKKOS_INLINE_FUNCTION
+    void thermalStretch( double&, const int, const int ) const {}
 
     void init()
     {
@@ -111,6 +120,7 @@ template <>
 struct ForceModel<LPS, Elastic, Fracture>
     : public ForceModel<LPS, Elastic, NoFracture>
 {
+    using model_type = LPS;
     using base_type = ForceModel<LPS, Elastic, NoFracture>;
     using base_model = typename base_type::base_model;
     using fracture_type = Fracture;
@@ -169,6 +179,7 @@ template <>
 struct ForceModel<LinearLPS, Elastic, NoFracture>
     : public ForceModel<LPS, Elastic, NoFracture>
 {
+    using model_type = LinearLPS;
     using base_type = ForceModel<LPS, Elastic, NoFracture>;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
@@ -192,6 +203,7 @@ template <>
 struct ForceModel<LinearLPS, Elastic, Fracture>
     : public ForceModel<LPS, Elastic, Fracture>
 {
+    using model_type = LinearLPS;
     using base_type = ForceModel<LPS, Elastic, Fracture>;
     using base_model = typename base_type::base_model;
     using fracture_type = typename base_type::fracture_type;
