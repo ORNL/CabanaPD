@@ -96,6 +96,10 @@ void HIPCylinderExample( const std::string filename )
     auto rho = particles.sliceDensity();
     auto x = particles.sliceReferencePosition();
 
+    // Use time to seed random number generator
+    std::srand( std::time( nullptr ) );
+    double rho_perturb_factor = 0.1;
+
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center ) +
@@ -106,6 +110,11 @@ void HIPCylinderExample( const std::string filename )
              x( pid, 2 ) > z_center - 0.5 * H + W )
         { // Powder density
             rho( pid ) = 0.7 * rho0;
+            // Perturb powder density
+            double factor =
+                ( 1 + ( -1 + 2 * ( (double)std::rand() / ( RAND_MAX ) ) ) *
+                          rho_perturb_factor );
+            rho( pid ) *= factor;
         }
         else
         { // Container density
@@ -186,7 +195,7 @@ void HIPCylinderExample( const std::string filename )
         //    Temperature BC
         // ---------------------
         // temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
-        temp( pid ) = Tmax;
+        // temp( pid ) = Tmax;
     };
     CabanaPD::BodyTerm body_term( temp_func, particles.size(), false );
 
