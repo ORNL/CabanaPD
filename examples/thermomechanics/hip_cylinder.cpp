@@ -43,10 +43,6 @@ void HIPCylinderExample( const std::string filename )
     double sigma_y = inputs["yield_stress"];
     double delta = inputs["horizon"];
     delta += 1e-10;
-    // For PMB or LPS with influence_type == 1
-    // double G0 = 9 * K * delta * ( sc * sc ) / 5;
-    // For LPS with influence_type == 0 (default)
-    // double G0 = 15 * K * delta * ( sc * sc ) / 8;
     double alpha = inputs["thermal_expansion_coeff"];
     double temp0 = inputs["reference_temperature"];
     double sigma0 = inputs["traction"];
@@ -94,17 +90,19 @@ void HIPCylinderExample( const std::string filename )
         memory_space{}, model_type{}, thermal_type{}, density_type{},
         low_corner, high_corner, num_cells, halo_width, init_op, exec_space{} );
 
+    // Impose separate density values for powder and container particles.
+    double W = inputs["wall_thickness"];
     auto rho = particles.sliceDensity();
     auto x = particles.sliceReferencePosition();
-    double W = inputs["wall_thickness"];
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center ) +
                      ( x( pid, 1 ) - y_center ) * ( x( pid, 1 ) - y_center );
         if ( rsq > ( Rin + W ) * ( Rin + W ) &&
-             rsq > ( Rout - W ) * ( Rout - W ) &&
-             x( pid, 2 ) > low_corner[2] + W )
+             rsq < ( Rout - W ) * ( Rout - W ) &&
+             x( pid, 2 ) < z_center + 0.5 * H - W &&
+             x( pid, 2 ) > z_center - 0.5 * H + W )
         { // Powder density
             rho( pid ) = 0.7 * rho0;
         }
@@ -138,20 +136,22 @@ void HIPCylinderExample( const std::string filename )
     CabanaPD::Solver solver( inputs, particles, force_model );
 
     // ====================================================
-    //                Boundary conditions
+    //                    Impose field
     // ====================================================
-
     // Create BC last to ensure ghost particles are included.
     double dx = particles.dx[0];
-    // double dy = particles.dx[1];
     double dz = particles.dx[2];
-    // double sigma0 = inputs["traction"];
     double b0 = sigma0 / dx;
     auto f = particles.sliceForce();
     x = particles.sliceReferencePosition();
-    // Create an isostatic pressure BC.
-    auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
+    temp = particles.sliceTemperature();
+    // This is purposely delayed until after solver init so that ghosted
+    // particles are correctly taken into account for lambda capture here.
+    auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
+        // ---------------------
+        // Isostatic pressure BC
+        // ---------------------
         double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center ) +
                      ( x( pid, 1 ) - y_center ) * ( x( pid, 1 ) - y_center );
         double theta =
@@ -180,33 +180,20 @@ void HIPCylinderExample( const std::string filename )
         {
             f( pid, 2 ) += b0;
         };
-    };
-    auto bc =
-        createBoundaryCondition( bc_op, exec_space{}, particles, true, plane );
 
-    // ====================================================
-    //                   Imposed field
-    // ====================================================
-    /*
-    x = particles.sliceReferencePosition();
-    auto temp = particles.sliceTemperature();
-    const double low_corner_y = low_corner[1];
-    // This is purposely delayed until after solver init so that ghosted
-    // particles are correctly taken into account for lambda capture here.
-    auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
-    {
-        temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
+        // ---------------------
+        //    Temperature BC
+        // ---------------------
+
+        // temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
     };
     CabanaPD::BodyTerm body_term( temp_func, particles.size(), false );
-    */
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    solver.init( bc );
-    solver.run( bc );
-    // solver.init( body_term );
-    // solver.run( body_term );
+    solver.init( body_term );
+    solver.run( body_term );
 }
 
 // Initialize MPI+Kokkos.
