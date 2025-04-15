@@ -94,6 +94,7 @@ void HIPCylinderExample( const std::string filename )
     // Impose separate density values for powder and container particles.
     double W = inputs["wall_thickness"];
     auto rho = particles.sliceDensity();
+    auto temp = particles.sliceTemperature();
     auto x = particles.sliceReferencePosition();
 
     // Use time to seed random number generator
@@ -120,6 +121,8 @@ void HIPCylinderExample( const std::string filename )
         { // Container density
             rho( pid ) = rho0;
         };
+        // Temperature
+        temp( pid ) = temp0;
     };
     particles.updateParticles( exec_space{}, init_functor );
 
@@ -135,7 +138,7 @@ void HIPCylinderExample( const std::string filename )
     // ====================================================
     rho = particles.sliceDensity();
     auto rho_current = particles.sliceCurrentDensity();
-    auto temp = particles.sliceTemperature();
+    temp = particles.sliceTemperature();
     CabanaPD::ForceDensityModel force_model(
         model_type{}, mechanics_type{}, rho, rho_current, delta, K, G0, sigma_y,
         rho0, temp, alpha, temp0 );
