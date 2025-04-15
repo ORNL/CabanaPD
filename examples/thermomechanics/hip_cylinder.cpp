@@ -45,7 +45,8 @@ void HIPCylinderExample( const std::string filename )
     delta += 1e-10;
     double alpha = inputs["thermal_expansion_coeff"];
     double temp0 = inputs["reference_temperature"];
-    double sigma0 = inputs["traction"];
+    double Pmax = inputs["maximum_pressure"];
+    double Tmax = inputs["maximum_temperature"];
 
     // ====================================================
     //                  Discretization
@@ -141,7 +142,7 @@ void HIPCylinderExample( const std::string filename )
     // Create BC last to ensure ghost particles are included.
     double dx = particles.dx[0];
     double dz = particles.dx[2];
-    double b0 = sigma0 / dx;
+    double b0 = Pmax / dx;
     auto f = particles.sliceForce();
     x = particles.sliceReferencePosition();
     temp = particles.sliceTemperature();
@@ -184,8 +185,8 @@ void HIPCylinderExample( const std::string filename )
         // ---------------------
         //    Temperature BC
         // ---------------------
-
         // temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
+        temp( pid ) = Tmax;
     };
     CabanaPD::BodyTerm body_term( temp_func, particles.size(), false );
 
