@@ -80,6 +80,7 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
 
     using base_type::_timer;
     Timer _energy_timer;
+    Timer _stress_timer;
 
   public:
     // Using the default exec_space.
@@ -110,7 +111,7 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
 
             double xi, r, s;
             double rx, ry, rz;
-            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+            getDistance( x, u, i, j, xi, r, s, rx, ry, rz );
 
             const double coeff = model.forceCoeff(
                 s, xi, vol( j ), m( i ), m( j ), theta( i ), theta( j ) );
@@ -169,6 +170,53 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
     }
 
     auto timeEnergy() { return _energy_timer.time(); };
+
+    template <class ParticleType, class NeighborType>
+    void computeStressFull( ParticleType& particles, NeighborType& neighbor )
+    {
+        _stress_timer.start();
+
+        auto model = _model;
+        const auto x = particles.sliceReferencePosition();
+        const auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        const auto theta = particles.sliceDilatation();
+        const auto m = particles.sliceWeightedVolume();
+        auto stress = particles.sliceStress();
+
+        auto stress_full = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            double xi, r, s;
+            double rx, ry, rz;
+            double xi_x, xi_y, xi_z;
+            getDistance( x, u, i, j, xi, r, s, rx, ry, rz, xi_x, xi_y, xi_z );
+
+            double coeff = model.forceCoeff( s, xi, vol( j ), m( i ), m( j ),
+                                             theta( i ), theta( j ) );
+            coeff *= 0.5;
+            const double fx_i = coeff * rx / r;
+            const double fy_i = coeff * ry / r;
+            const double fz_i = coeff * rz / r;
+
+            // Update stress tensor components
+            stress( i, 0, 0 ) += fx_i * xi_x;
+            stress( i, 1, 1 ) += fy_i * xi_y;
+            stress( i, 2, 2 ) += fz_i * xi_z;
+
+            stress( i, 0, 1 ) += fx_i * xi_y;
+            stress( i, 1, 0 ) += fy_i * xi_x;
+
+            stress( i, 0, 2 ) += fx_i * xi_z;
+            stress( i, 2, 0 ) += fz_i * xi_x;
+
+            stress( i, 1, 2 ) += fy_i * xi_z;
+            stress( i, 2, 1 ) += fz_i * xi_y;
+        };
+
+        neighbor.iterate( exec_space{}, stress_full, particles,
+                          "CabanaPD::ForceLPS::computeStressFull" );
+        _stress_timer.stop();
+    }
 };
 
 template <class MemorySpace, class ModelType>
@@ -182,6 +230,7 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
 
     using base_type::_timer;
     Timer _energy_timer;
+    Timer _stress_timer;
 
   public:
     // Using the default exec_space.
@@ -228,7 +277,7 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                 // Get the reference positions and displacements.
                 double xi, r, s;
                 double rx, ry, rz;
-                getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+                getDistance( x, u, i, j, xi, r, s, rx, ry, rz );
 
                 // Break if beyond critical stretch unless in no-fail zone.
                 if ( r * r >= break_coeff * xi * xi && !nofail( i ) &&
@@ -320,6 +369,72 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
     }
 
     auto timeEnergy() { return _energy_timer.time(); };
+
+    template <class ParticleType, class NeighborType>
+    void computeStressFull( ParticleType& particles, NeighborType& neighbor )
+    {
+        _stress_timer.start();
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
+
+        auto model = _model;
+        const auto x = particles.sliceReferencePosition();
+        const auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        const auto theta = particles.sliceDilatation();
+        const auto m = particles.sliceWeightedVolume();
+        auto stress = particles.sliceStress();
+
+        auto stress_full = KOKKOS_LAMBDA( const int i )
+        {
+            std::size_t num_neighbors =
+                Cabana::NeighborList<neighbor_list_type>::numNeighbor(
+                    neigh_list, i );
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            {
+                std::size_t j =
+                    Cabana::NeighborList<neighbor_list_type>::getNeighbor(
+                        neigh_list, i, n );
+
+                if ( mu( i, n ) > 0 ) // Only compute stress for unbroken bonds
+                {
+                    double xi, r, s;
+                    double rx, ry, rz;
+                    double xi_x, xi_y, xi_z;
+                    getDistance( x, u, i, j, xi, r, s, rx, ry, rz, xi_x, xi_y,
+                                 xi_z );
+
+                    double coeff =
+                        model.forceCoeff( s, xi, vol( j ), m( i ), m( j ),
+                                          theta( i ), theta( j ) );
+                    coeff *= 0.5;
+                    const double muij = mu( i, n );
+                    const double fx_i = muij * coeff * rx / r;
+                    const double fy_i = muij * coeff * ry / r;
+                    const double fz_i = muij * coeff * rz / r;
+
+                    // Update stress tensor components
+                    stress( i, 0, 0 ) += fx_i * xi_x;
+                    stress( i, 1, 1 ) += fy_i * xi_y;
+                    stress( i, 2, 2 ) += fz_i * xi_z;
+
+                    stress( i, 0, 1 ) += fx_i * xi_y;
+                    stress( i, 1, 0 ) += fy_i * xi_x;
+
+                    stress( i, 0, 2 ) += fx_i * xi_z;
+                    stress( i, 2, 0 ) += fz_i * xi_x;
+
+                    stress( i, 1, 2 ) += fy_i * xi_z;
+                    stress( i, 2, 1 ) += fz_i * xi_y;
+                }
+            }
+        };
+
+        neighbor.iterateLinear( exec_space{}, stress_full, particles,
+                                "CabanaPD::ForceLPS::computeStressFull" );
+        _stress_timer.stop();
+    }
 };
 
 template <class MemorySpace, class ModelType>
@@ -333,6 +448,7 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
 
     using base_type::_timer;
     Timer _energy_timer;
+    Timer _stress_timer;
 
   public:
     // Using the default exec_space.
@@ -367,8 +483,7 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
             // Get the bond distance and linearized stretch.
             double xi, linear_s;
             double xi_x, xi_y, xi_z;
-            getLinearizedDistanceComponents( x, u, i, j, xi, linear_s, xi_x,
-                                             xi_y, xi_z );
+            getLinearizedDistance( x, u, i, j, xi, linear_s, xi_x, xi_y, xi_z );
 
             const double coeff =
                 model.forceCoeff( linear_s, xi, vol( j ), m( i ), m( j ),
@@ -429,6 +544,53 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
     }
 
     auto timeEnergy() { return _energy_timer.time(); };
+
+    template <class ParticleType, class NeighborType>
+    void computeStressFull( ParticleType& particles, NeighborType& neighbor )
+    {
+        _stress_timer.start();
+
+        auto model = _model;
+        const auto x = particles.sliceReferencePosition();
+        const auto u = particles.sliceDisplacement();
+        const auto vol = particles.sliceVolume();
+        const auto theta = particles.sliceDilatation();
+        const auto m = particles.sliceWeightedVolume();
+        auto stress = particles.sliceStress();
+
+        auto stress_full = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            // Get the linearized components
+            double xi, linear_s;
+            double xi_x, xi_y, xi_z;
+            getLinearizedDistance( x, u, i, j, xi, linear_s, xi_x, xi_y, xi_z );
+
+            double coeff = model.forceCoeff( linear_s, xi, vol( j ), m( i ),
+                                             m( j ), theta( i ), theta( j ) );
+            coeff *= 0.5;
+            const double fx_i = coeff * xi_x / xi;
+            const double fy_i = coeff * xi_y / xi;
+            const double fz_i = coeff * xi_z / xi;
+
+            // Update stress tensor components
+            stress( i, 0, 0 ) += fx_i * xi_x;
+            stress( i, 1, 1 ) += fy_i * xi_y;
+            stress( i, 2, 2 ) += fz_i * xi_z;
+
+            stress( i, 0, 1 ) += fx_i * xi_y;
+            stress( i, 1, 0 ) += fy_i * xi_x;
+
+            stress( i, 0, 2 ) += fx_i * xi_z;
+            stress( i, 2, 0 ) += fz_i * xi_x;
+
+            stress( i, 1, 2 ) += fy_i * xi_z;
+            stress( i, 2, 1 ) += fz_i * xi_y;
+        };
+
+        neighbor.iterate( exec_space{}, stress_full, particles,
+                          "CabanaPD::ForceLPS::computeStressFull" );
+        _stress_timer.stop();
+    }
 };
 
 } // namespace CabanaPD

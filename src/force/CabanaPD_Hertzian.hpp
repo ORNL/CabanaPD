@@ -52,7 +52,7 @@ class Force<MemorySpace, HertzianModel, ContactModel>
         {
             double xi, r, s;
             double rx, ry, rz;
-            getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
+            getDistance( x, u, i, j, xi, r, s, rx, ry, rz );
 
             // Hertz normal force damping component
             double vx, vy, vz, vn;

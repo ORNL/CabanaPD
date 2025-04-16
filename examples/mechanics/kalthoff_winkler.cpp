@@ -124,7 +124,7 @@ void kalthoffWinklerExample( const std::string filename )
         x_bc - dx, x_bc + dx, y_prenotch1 - 0.25 * dx, y_prenotch2 + 0.25 * dx,
         -thickness, thickness );
     auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
-                                       exec_space{}, particles, plane );
+                                       exec_space{}, solver.particles, plane );
 
     // ====================================================
     //                   Simulation run

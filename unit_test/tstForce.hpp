@@ -52,10 +52,51 @@ struct QuadraticTag
 //---------------------------------------------------------------------------//
 // Note: all of these reference calculations assume uniform volume and a full
 // particle neighborhood.
-
 //---------------------------------------------------------------------------//
+
+// Get the PMB stress tensor (at the center point).
+// Linear case: simplified here because the stretch is constant.
+template <class ModelType>
+auto computeReferenceStress(
+    LinearTag, ModelType model, const int m, const double s0,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        int>::type* = 0 )
+{
+    double f_mag;
+    double f_x, f_y, f_z;
+    // Components xx, yy, zz
+    std::array<double, 3> sigma = { 0.0, 0.0, 0.0 };
+    double dx = model.delta / m;
+    double vol = dx * dx * dx;
+
+    // Stress tensor.
+    for ( int i = -m; i < m + 1; ++i )
+        for ( int j = -m; j < m + 1; ++j )
+            for ( int k = -m; k < m + 1; ++k )
+            {
+                double xi_x = dx * i;
+                double xi_y = dx * j;
+                double xi_z = dx * k;
+                double xi =
+                    std::sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+
+                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                {
+                    f_mag = model.c * s0;
+                    f_x = f_mag * xi_x / xi;
+                    f_y = f_mag * xi_y / xi;
+                    f_z = f_mag * xi_z / xi;
+                    sigma[0] += 0.5 * f_x * xi_x * vol;
+                    sigma[1] += 0.5 * f_y * xi_y * vol;
+                    sigma[2] += 0.5 * f_z * xi_z * vol;
+                }
+            }
+    return sigma;
+}
+
 // Get the PMB strain energy density (at the center point).
-// Simplified here because the stretch is constant.
+// Linear case: Simplified here because the stretch is constant.
 template <class ModelType>
 double computeReferenceStrainEnergyDensity(
     LinearTag, ModelType model, const int m, const double s0, const double,
@@ -83,6 +124,7 @@ double computeReferenceStrainEnergyDensity(
     return W;
 }
 
+// Quadratic case: assumes zero y- and z-displacement components.
 template <class ModelType>
 double computeReferenceStrainEnergyDensity(
     QuadraticTag, ModelType model, const int m, const double u11,
@@ -117,6 +159,8 @@ double computeReferenceStrainEnergyDensity(
     return W;
 }
 
+// Get the PMB internal force density (at one point).
+// Linear case: always zero
 template <class ModelType>
 double computeReferenceForceX( LinearTag, ModelType, const int, const double,
                                const double )
@@ -124,8 +168,7 @@ double computeReferenceForceX( LinearTag, ModelType, const int, const double,
     return 0.0;
 }
 
-// Get the PMB force (at one point).
-// Assumes zero y/z displacement components.
+// Quadratic case: assumes zero y- and z-displacement components.
 template <class ModelType>
 double computeReferenceForceX(
     QuadraticTag, ModelType model, const int m, const double u11,
@@ -158,6 +201,7 @@ double computeReferenceForceX(
     return fx;
 }
 
+// Get the weighted volume (at one point).
 template <class ModelType>
 double computeReferenceWeightedVolume( ModelType model, const int m,
                                        const double vol )
@@ -179,7 +223,8 @@ double computeReferenceWeightedVolume( ModelType model, const int m,
     return weighted_volume;
 }
 
-// LinearTag
+// Get the dilatation (at one point).
+// Linear case: Simplified here because the stretch is constant.
 template <class ModelType>
 double computeReferenceDilatation( ModelType model, const int m,
                                    const double s0, const double vol,
@@ -203,8 +248,7 @@ double computeReferenceDilatation( ModelType model, const int m,
     return theta;
 }
 
-// QuadraticTag
-// Assumes zero y/z displacement components.
+// Quadratic case: assumes zero y- and z-displacement components.
 template <class ModelType>
 double computeReferenceDilatation( ModelType model, const int m,
                                    const double u11, const double vol,
@@ -235,6 +279,7 @@ double computeReferenceDilatation( ModelType model, const int m,
     return theta;
 }
 
+// Get the number of neighbors (at one point).
 double computeReferenceNeighbors( const double delta, const int m )
 {
     double dx = delta / m;
@@ -254,7 +299,64 @@ double computeReferenceNeighbors( const double delta, const int m )
     return num_neighbors;
 }
 
+// Get the LPS stress tensor (at one point).
+// Linear case: simplified here because the stretch is constant.
+template <class ModelType>
+auto computeReferenceStress(
+    LinearTag, ModelType model, const int m, const double s0,
+    typename std::enable_if<
+        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        int>::type* = 0 )
+{
+    double f_mag;
+    double f_x, f_y, f_z;
+    // Components xx, yy, zz
+    std::array<double, 3> sigma = { 0.0, 0.0, 0.0 };
+    double dx = model.delta / m;
+    double vol = dx * dx * dx;
+
+    auto weighted_volume = computeReferenceWeightedVolume( model, m, vol );
+    auto theta =
+        computeReferenceDilatation( model, m, s0, vol, weighted_volume );
+
+    // Stress tensor.
+    for ( int i = -m; i < m + 1; ++i )
+        for ( int j = -m; j < m + 1; ++j )
+            for ( int k = -m; k < m + 1; ++k )
+            {
+                double xi_x = dx * i;
+                double xi_y = dx * j;
+                double xi_z = dx * k;
+                double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+
+                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                {
+                    // We assume the dilatation and weighted volume are constant
+                    f_mag =
+                        ( model.theta_coeff * 2.0 * theta / weighted_volume +
+                          model.s_coeff * s0 * 2.0 / weighted_volume ) *
+                        model.influenceFunction( xi ) * xi;
+                    f_x = f_mag * xi_x / xi;
+                    f_y = f_mag * xi_y / xi;
+                    f_z = f_mag * xi_z / xi;
+                    sigma[0] += 0.5 * f_x * xi_x * vol;
+                    sigma[1] += 0.5 * f_y * xi_y * vol;
+                    sigma[2] += 0.5 * f_z * xi_z * vol;
+                }
+            }
+    return sigma;
+}
+
+// Quadratic case: not calculated.
+template <class ModelType>
+auto computeReferenceStress( QuadraticTag, ModelType, const int, const double )
+{
+    std::array<double, 3> sigma = { 0.0, 0.0, 0.0 };
+    return sigma;
+}
+
 // Get the LPS strain energy density (at one point).
+// Linear case: simplified here because the stretch is constant.
 template <class ModelType>
 double computeReferenceStrainEnergyDensity(
     LinearTag, ModelType model, const int m, const double s0, const double,
@@ -271,7 +373,7 @@ double computeReferenceStrainEnergyDensity(
         computeReferenceDilatation( model, m, s0, vol, weighted_volume );
     auto num_neighbors = computeReferenceNeighbors( model.delta, m );
 
-    // Strain energy.
+    // Strain energy density.
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
             for ( int k = -m; k < m + 1; ++k )
@@ -293,6 +395,7 @@ double computeReferenceStrainEnergyDensity(
     return W;
 }
 
+// Quadratic case: Assumes zero y- and z-displacement components.
 template <class ModelType>
 double computeReferenceStrainEnergyDensity(
     QuadraticTag, ModelType model, const int m, const double u11,
@@ -310,7 +413,7 @@ double computeReferenceStrainEnergyDensity(
     auto theta_i =
         computeReferenceDilatation( model, m, u11, vol, weighted_volume, x );
 
-    // Strain energy.
+    // Strain energy density.
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
             for ( int k = -m; k < m + 1; ++k )
@@ -341,8 +444,8 @@ double computeReferenceStrainEnergyDensity(
     return W;
 }
 
-// Get the LPS strain energy density (at one point).
-// Assumes zero y/z displacement components.
+// Get the LPS internal force density (at one point).
+// Quadratic case: assumes zero y- and z-displacement components.
 template <class ModelType>
 double computeReferenceForceX(
     QuadraticTag, ModelType model, const int m, const double u11,
@@ -392,10 +495,10 @@ double computeReferenceForceX(
 //---------------------------------------------------------------------------//
 // System creation.
 //---------------------------------------------------------------------------//
-template <class ModelType>
-CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
-                    typename ModelType::thermal_type, CabanaPD::EnergyOutput>
-createParticles( ModelType model, LinearTag, const double dx, const double s0 )
+template <class ModelTag>
+CabanaPD::Particles<TEST_MEMSPACE, ModelTag, CabanaPD::TemperatureIndependent,
+                    CabanaPD::EnergyStressOutput>
+createParticles( ModelTag model, LinearTag, const double dx, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -403,8 +506,9 @@ createParticles( ModelType model, LinearTag, const double dx, const double s0 )
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    CabanaPD::Particles particles( TEST_MEMSPACE{}, model, box_min, box_max,
-                                   num_cells, 0, TEST_EXECSPACE{} );
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, model,
+                                   CabanaPD::EnergyStressOutput{}, box_min,
+                                   box_max, num_cells, 0, TEST_EXECSPACE{} );
 
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
@@ -421,10 +525,10 @@ createParticles( ModelType model, LinearTag, const double dx, const double s0 )
     return particles;
 }
 
-template <class ModelType>
-CabanaPD::Particles<TEST_MEMSPACE, typename ModelType::base_model,
-                    typename ModelType::thermal_type, CabanaPD::EnergyOutput>
-createParticles( ModelType model, QuadraticTag, const double dx,
+template <class ModelTag>
+CabanaPD::Particles<TEST_MEMSPACE, ModelTag, CabanaPD::TemperatureIndependent,
+                    CabanaPD::EnergyStressOutput>
+createParticles( ModelTag model, QuadraticTag, const double dx,
                  const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
@@ -433,8 +537,9 @@ createParticles( ModelType model, QuadraticTag, const double dx,
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    CabanaPD::Particles particles( TEST_MEMSPACE{}, model, box_min, box_max,
-                                   num_cells, 0, TEST_EXECSPACE{} );
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, model,
+                                   CabanaPD::EnergyStressOutput{}, box_min,
+                                   box_max, num_cells, 0, TEST_EXECSPACE{} );
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto v = particles.sliceVelocity();
@@ -462,11 +567,12 @@ void checkResults( HostParticleType aosoa_host, double local_min[3],
 {
     double delta = model.delta;
     double ref_Phi = 0.0;
-    auto f_host = Cabana::slice<0>( aosoa_host );
-    auto x_host = Cabana::slice<1>( aosoa_host );
-    auto W_host = Cabana::slice<2>( aosoa_host );
-    auto vol_host = Cabana::slice<3>( aosoa_host );
-    auto theta_host = Cabana::slice<4>( aosoa_host );
+    auto sigma_host = Cabana::slice<0>( aosoa_host );
+    auto f_host = Cabana::slice<1>( aosoa_host );
+    auto x_host = Cabana::slice<2>( aosoa_host );
+    auto W_host = Cabana::slice<3>( aosoa_host );
+    auto vol_host = Cabana::slice<4>( aosoa_host );
+    auto theta_host = Cabana::slice<5>( aosoa_host );
     // Check the results: avoid the system boundary for per particle values.
     int particles_checked = 0;
     for ( std::size_t p = 0; p < aosoa_host.size(); ++p )
@@ -482,11 +588,22 @@ void checkResults( HostParticleType aosoa_host, double local_min[3],
              z < local_max[2] - delta * boundary_width )
         {
             // These are constant for linear, but vary for quadratic.
+            auto ref_sigma = computeReferenceStress( test_tag, model, m, s0 );
             double ref_W = computeReferenceStrainEnergyDensity( test_tag, model,
                                                                 m, s0, x );
             double ref_f = computeReferenceForceX( test_tag, model, m, s0, x );
-            checkParticle( test_tag, model, s0, f_host( p, 0 ), f_host( p, 1 ),
-                           f_host( p, 2 ), ref_f, W_host( p ), ref_W, x );
+
+            std::array<double, 3> f = { f_host( p, 0 ), f_host( p, 1 ),
+                                        f_host( p, 2 ) };
+            // Components xx, yy, zz, xy, xz, yz, yx, zx, zy
+            std::array<double, 9> sigma = {
+                sigma_host( p, 0, 0 ), sigma_host( p, 1, 1 ),
+                sigma_host( p, 2, 2 ), sigma_host( p, 0, 1 ),
+                sigma_host( p, 0, 2 ), sigma_host( p, 1, 2 ),
+                sigma_host( p, 1, 0 ), sigma_host( p, 2, 0 ),
+                sigma_host( p, 2, 1 ) };
+            checkParticle( test_tag, model, s0, f, ref_f, W_host( p ), ref_W,
+                           sigma, ref_sigma, x );
             particles_checked++;
         }
         checkAnalyticalDilatation( model, test_tag, s0, theta_host( p ) );
@@ -504,36 +621,43 @@ void checkResults( HostParticleType aosoa_host, double local_min[3],
 //---------------------------------------------------------------------------//
 template <class ModelType>
 void checkParticle( LinearTag tag, ModelType model, const double s0,
-                    const double fx, const double fy, const double fz,
-                    const double, const double W, const double ref_W,
-                    const double )
+                    const std::array<double, 3> f, const double, const double W,
+                    const double ref_W, const std::array<double, 9> sigma,
+                    const std::array<double, 3> ref_sigma, const double )
 {
-    EXPECT_LE( fx, 1e-13 );
-    EXPECT_LE( fy, 1e-13 );
-    EXPECT_LE( fz, 1e-13 );
+    for ( std::size_t d = 0; d < 3; ++d )
+        EXPECT_LE( f[d], 1e-13 );
 
-    // Check strain energy (all should be equal for fixed stretch).
+    // Check strain energy density (all should be equal for fixed stretch).
     EXPECT_FLOAT_EQ( W, ref_W );
 
-    // Check energy with analytical value.
+    // Check strain energy density with analytical value.
     checkAnalyticalStrainEnergy( tag, model, s0, W, -1 );
+
+    // Check stress (diagonal should be equal for fixed stretch).
+    for ( std::size_t d = 0; d < 3; ++d )
+        EXPECT_FLOAT_EQ( sigma[d], ref_sigma[d] );
+    // Other components should be zero.
+    for ( std::size_t d = 3; d < 9; ++d )
+        EXPECT_LE( sigma[d], 1e-13 );
 }
 
 template <class ModelType>
 void checkParticle( QuadraticTag tag, ModelType model, const double s0,
-                    const double fx, const double fy, const double fz,
-                    const double ref_f, const double W, const double ref_W,
+                    const std::array<double, 3> f, const double ref_f,
+                    const double W, const double ref_W,
+                    const std::array<double, 9>, const std::array<double, 3>,
                     const double x )
 {
     // Check force in x with discretized result (reference currently incorrect).
-    EXPECT_FLOAT_EQ( fx, ref_f );
+    EXPECT_FLOAT_EQ( f[0], ref_f );
 
     // Check force in x with analytical value.
-    checkAnalyticalForce( tag, model, s0, fx );
+    checkAnalyticalForce( tag, model, s0, f[0] );
 
     // Check force: other components should be zero.
-    EXPECT_LE( fy, 1e-13 );
-    EXPECT_LE( fz, 1e-13 );
+    EXPECT_LE( f[1], 1e-13 );
+    EXPECT_LE( f[2], 1e-13 );
 
     // Check energy. Not quite within the floating point tolerance.
     EXPECT_NEAR( W, ref_W, 1e-6 );
@@ -649,15 +773,6 @@ void checkAnalyticalDilatation( ModelType, QuadraticTag, const double,
 }
 
 template <class ForceType, class ParticleType, class NeighborType>
-double computeEnergyAndForce( ForceType force, ParticleType& particles,
-                              const NeighborType& neighbor )
-{
-    computeForce( force, particles, neighbor );
-    double Phi = computeEnergy( force, particles, neighbor );
-    return Phi;
-}
-
-template <class ForceType, class ParticleType, class NeighborType>
 void initializeForce( ForceType& force, ParticleType& particles,
                       const NeighborType& neighbor )
 {
@@ -668,7 +783,7 @@ void initializeForce( ForceType& force, ParticleType& particles,
 template <class ParticleType, class AoSoAType>
 void copyTheta( CabanaPD::PMB, const ParticleType&, AoSoAType& aosoa_host )
 {
-    auto theta_host = Cabana::slice<4>( aosoa_host );
+    auto theta_host = Cabana::slice<5>( aosoa_host );
     Cabana::deep_copy( theta_host, 0.0 );
 }
 
@@ -676,7 +791,7 @@ template <class ParticleType, class AoSoAType>
 void copyTheta( CabanaPD::LPS, const ParticleType& particles,
                 AoSoAType& aosoa_host )
 {
-    auto theta_host = Cabana::slice<4>( aosoa_host );
+    auto theta_host = Cabana::slice<5>( aosoa_host );
     auto theta = particles.sliceDilatation();
     Cabana::deep_copy( theta_host, theta );
 }
@@ -689,7 +804,8 @@ void testForce( ModelType model, const double dx, const double m,
                 const double boundary_width, const TestType test_tag,
                 const double s0 )
 {
-    auto particles = createParticles( model, test_tag, dx, s0 );
+    using model_tag = typename ModelType::base_model;
+    auto particles = createParticles( model_tag{}, test_tag, dx, s0 );
 
     // This needs to exactly match the mesh spacing to compare with the single
     // particle calculation.
@@ -701,23 +817,29 @@ void testForce( ModelType model, const double dx, const double m,
     auto x = particles.sliceReferencePosition();
     auto f = particles.sliceForce();
     auto W = particles.sliceStrainEnergy();
+    auto sigma = particles.sliceStress();
     auto vol = particles.sliceVolume();
     //  No communication needed (as in the main solver) since this test is only
     //  intended for one rank.
     initializeForce( force, particles, neighbor );
 
-    double Phi = computeEnergyAndForce( force, particles, neighbor );
+    computeForce( force, particles, neighbor );
+    double Phi = computeEnergy( force, particles, neighbor );
+    computeStress( force, particles, neighbor );
 
     // Make a copy of final results on the host
     std::size_t num_particle = x.size();
-    using HostAoSoA = Cabana::AoSoA<
-        Cabana::MemberTypes<double[3], double[3], double, double, double>,
-        Kokkos::HostSpace>;
+    using HostAoSoA =
+        Cabana::AoSoA<Cabana::MemberTypes<double[3][3], double[3], double[3],
+                                          double, double, double>,
+                      Kokkos::HostSpace>;
     HostAoSoA aosoa_host( "host_aosoa", num_particle );
-    auto f_host = Cabana::slice<0>( aosoa_host );
-    auto x_host = Cabana::slice<1>( aosoa_host );
-    auto W_host = Cabana::slice<2>( aosoa_host );
-    auto vol_host = Cabana::slice<3>( aosoa_host );
+    auto sigma_host = Cabana::slice<0>( aosoa_host );
+    auto f_host = Cabana::slice<1>( aosoa_host );
+    auto x_host = Cabana::slice<2>( aosoa_host );
+    auto W_host = Cabana::slice<3>( aosoa_host );
+    auto vol_host = Cabana::slice<4>( aosoa_host );
+    Cabana::deep_copy( sigma_host, sigma );
     Cabana::deep_copy( f_host, f );
     Cabana::deep_copy( x_host, x );
     Cabana::deep_copy( W_host, W );
@@ -744,7 +866,7 @@ void testNeighbor( const double dx, const double m, const double delta )
     CabanaPD::ForceModel model( model_type{}, CabanaPD::Elastic{},
                                 CabanaPD::NoFracture{}, delta, 1.0 );
 
-    auto particles = createParticles( model, LinearTag{}, dx, 0.0 );
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.0 );
 
     CabanaPD::Neighbor<TEST_MEMSPACE, CabanaPD::NoFracture> neighbor(
         false, model, particles );

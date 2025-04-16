@@ -172,22 +172,27 @@ The next example is a fragmenting cylinder due to internal pressure [4]. The exa
 ./CabanaPD/build/install/bin/FragmentingCylinder CabanaPD/examples/mechanics/inputs/fragmenting_cylinder.json
 ```
 
-An example highlighting plasticity performs a tensile test on an ASTM standard dogbone specimen:
+An example highlighting plasticity simulates a tensile test based on an ASTM standard dogbone specimen:
 
 ```
 ./CabanaPD/build/install/bin/DogboneTensileTest CabanaPD/examples/mechanics/inputs/dogbone_tensile_test.json
+```
+An example demonstrating the peridynamic stress tensor computation simulates a square plate under tension with a circular hole at its center [5].
+
+```
+./CabanaPD/build/install/bin/PlateWithHole CabanaPD/examples/mechanics/inputs/plate_with_hole.json
 ```
 
 ### Thermomechanics
 Examples which demonstrate temperature-dependent mechanics and fracture are within `examples/thermomechanics`.
 
-The first example is thermoelastic deformation in a homogeneous plate due to linear thermal loading [5]. The example can be run with:
+The first example is thermoelastic deformation in a homogeneous plate due to linear thermal loading [6]. The example can be run with:
 
 ```
 ./CabanaPD/build/install/bin/ThermalDeformation CabanaPD/examples/thermomechanics/thermal_deformation.json
 ```
 
-The second example is crack initiation and propagation in an alumina ceramic plate due to a thermal shock caused by water quenching [6]. The example can be run with:
+The second example is crack initiation and propagation in an alumina ceramic plate due to a thermal shock caused by water quenching [7]. The example can be run with:
 
 ```
 ./CabanaPD/build/install/bin/ThermalCrack CabanaPD/examples/thermomechanics/thermal_crack.json
@@ -223,9 +228,11 @@ Kunze, and L.W. Meyer, eds., Vol 1, DGM Informationsgesellschaft Verlag (1988)
 
 [4] D.J. Littlewood, M.L. Parks, J.T. Foster, J.A. Mitchell, and P. Diehl, The peridigm meshfree peridynamics code, Journal of Peridynamics and Nonlocal Modeling 6 (2024): 118–148.  
 
-[5] D. He, D. Huang, and D. Jiang, Modeling and studies of fracture in functionally graded materials under thermal shock loading using peridynamics, Theoretical and Applied Fracture Mechanics 111 (2021): 102852.
+[5] A.S. Fallah, I.N. Giannakeas, R. Mella, M.R. Wenman, Y. Safa, and H. Bahai, On the computational derivation of bond-based peridynamic stress tensor, Journal of Peridynamics and Nonlocal Modeling 2 (2020): 352–378. 
 
-[6] C.P. Jiang, X.F. Wu, J. Li, F. Song, Y.F. Shao, X.H. Xu, and P. Yan, A study of the mechanism of formation and numerical simulations of crack patterns in ceramics subjected to thermal shock, Acta Materialia 60 (2012): 4540–4550.
+[6] D. He, D. Huang, and D. Jiang, Modeling and studies of fracture in functionally graded materials under thermal shock loading using peridynamics, Theoretical and Applied Fracture Mechanics 111 (2021): 102852.
+
+[7] C.P. Jiang, X.F. Wu, J. Li, F. Song, Y.F. Shao, X.H. Xu, and P. Yan, A study of the mechanism of formation and numerical simulations of crack patterns in ceramics subjected to thermal shock, Acta Materialia 60 (2012): 4540–4550.
 
 ## Contributing
 
