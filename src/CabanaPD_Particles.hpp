@@ -1302,7 +1302,7 @@ class Particles<MemorySpace, ModelType, ThermalType, OutputType, DynamicDensity,
   protected:
     void init()
     {
-        auto reference = sliceCurrentDensity();
+        auto reference = sliceDensity();
         auto current = sliceCurrentDensity();
         Cabana::deep_copy( current, reference );
     }
