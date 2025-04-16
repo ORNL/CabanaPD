@@ -114,8 +114,8 @@ void elasticWaveExample( const std::string filename )
     // ====================================================
     // Output x-displacement along the x-axis
     CabanaPD::createDisplacementProfile( MPI_COMM_WORLD,
-                                         "displacement_profile.txt", particles,
-                                         num_cells[0], 0 );
+                                         "displacement_profile.txt",
+                                         solver.particles, num_cells[0], 0 );
 }
 
 // Initialize MPI+Kokkos.
