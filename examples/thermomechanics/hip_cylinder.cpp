@@ -152,12 +152,12 @@ void HIPCylinderExample( const std::string filename )
     //                    Impose field
     // ====================================================
     // Create BC last to ensure ghost particles are included.
-    double dx = particles.dx[0];
-    double dz = particles.dx[2];
+    double dx = solver.particles.dx[0];
+    double dz = solver.particles.dx[2];
     double b0 = Pmax / dx;
-    auto f = particles.sliceForce();
-    x = particles.sliceReferencePosition();
-    temp = particles.sliceTemperature();
+    auto f = solver.particles.sliceForce();
+    x = solver.particles.sliceReferencePosition();
+    temp = solver.particles.sliceTemperature();
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
     auto force_temp_func = KOKKOS_LAMBDA( const int pid, const double t )
@@ -199,7 +199,8 @@ void HIPCylinderExample( const std::string filename )
         // ---------------------
         temp( pid ) = Tmax;
     };
-    CabanaPD::BodyTerm body_term( force_temp_func, particles.size(), false );
+    CabanaPD::BodyTerm body_term( force_temp_func, solver.particles.size(),
+                                  false );
 
     // ====================================================
     //                   Simulation run
