@@ -160,7 +160,7 @@ void HIPCylinderExample( const std::string filename )
     temp = solver.particles.sliceTemperature();
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
-    auto force_temp_func = KOKKOS_LAMBDA( const int pid, const double t )
+    auto force_temp_func = KOKKOS_LAMBDA( const int pid, const double )
     {
         // ---------------------
         // Isostatic pressure BC
