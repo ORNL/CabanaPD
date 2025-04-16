@@ -200,7 +200,7 @@ void HIPCylinderExample( const std::string filename )
         temp( pid ) = Tmax;
     };
     CabanaPD::BodyTerm body_term( force_temp_func, solver.particles.size(),
-                                  false );
+                                  true );
 
     // ====================================================
     //                   Simulation run
