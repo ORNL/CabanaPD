@@ -39,12 +39,18 @@ struct ContactModel
     ContactModel( const double _radius, const double _radius_extend )
         : radius( _radius )
         , radius_extend( _radius_extend ){};
+
+    auto cutoff() const { return 2.0 * radius + radius_extend; }
+    auto extend() const { return radius_extend; }
+
+    void updateBonds( const int, const int ) {}
 };
 
 /* Normal repulsion */
 struct NormalRepulsionModel : public ContactModel
 {
     using base_type = ContactModel;
+    using model_type = ContactModel;
     using base_model = base_type::base_model;
     using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
