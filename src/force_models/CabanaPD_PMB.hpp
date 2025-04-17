@@ -581,7 +581,6 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     // Define which base functions to use (do not use LPS).
     using base_type::cutoff;
     using base_type::energy;
-    using base_type::forceCoeff;
     using base_type::thermalStretch;
     using base_type::updateBonds;
 
@@ -604,6 +603,14 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
         , rho_current( _rho_c )
     {
         coeff = 3.0 / pi / delta / delta / delta / delta;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto forceCoeff( const int i, const int, const double s,
+                     const double vol ) const
+    {
+        auto c_current = c * rho_current( i ) / rho0;
+        return c_current * s * vol;
     }
 
     // Update plastic dilatation.
