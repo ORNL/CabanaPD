@@ -96,10 +96,12 @@ void HIPCylinderExample( const std::string filename )
     auto rho = particles.sliceDensity();
     auto temp = particles.sliceTemperature();
     auto x = particles.sliceReferencePosition();
+    auto nofail = particles.sliceNoFail();
 
     // Use time to seed random number generator
     std::srand( std::time( nullptr ) );
-    double rho_perturb_factor = 0.1;
+    // double rho_perturb_factor = 0.1;
+    double rho_perturb_factor = 0.02;
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
@@ -110,7 +112,8 @@ void HIPCylinderExample( const std::string filename )
              x( pid, 2 ) < z_center + 0.5 * H - W &&
              x( pid, 2 ) > z_center - 0.5 * H + W )
         { // Powder density
-            rho( pid ) = 0.7 * rho0;
+            // rho( pid ) = 0.7 * rho0;
+            rho( pid ) = 0.85 * rho0;
             // Perturb powder density
             double factor =
                 ( 1 + ( -1 + 2 * ( (double)std::rand() / ( RAND_MAX ) ) ) *
@@ -123,6 +126,8 @@ void HIPCylinderExample( const std::string filename )
         };
         // Temperature
         temp( pid ) = temp0;
+        // No fail
+        nofail( pid ) = 1;
     };
     particles.updateParticles( exec_space{}, init_functor );
 
@@ -147,6 +152,22 @@ void HIPCylinderExample( const std::string filename )
     //                   Create solver
     // ====================================================
     CabanaPD::Solver solver( inputs, particles, force_model );
+    /*
+    using contact_type = CabanaPD::NormalRepulsionModel;
+    auto dx = particles.dx;
+
+    // Use contact radius and extension relative to particle spacing.
+    double r_c = inputs["contact_horizon_factor"];
+    double r_extend = inputs["contact_horizon_extend_factor"];
+    // NOTE: dx/2 is when particles first touch.
+    r_c *= dx[0] / 2.0;
+    r_extend *= dx[0];
+
+    contact_type contact_model( delta, r_c, r_extend, K );
+
+    CabanaPD::Solver solver( inputs, particles, force_model,
+                                     contact_model );
+                                     */
 
     // ====================================================
     //                    Impose field
@@ -171,25 +192,29 @@ void HIPCylinderExample( const std::string filename )
             Kokkos::atan2( x( pid, 1 ) - y_center, x( pid, 0 ) - x_center );
 
         // BC on outer boundary
-        if ( rsq > ( Rout - dx ) * ( Rout - dx ) )
+        // if ( rsq > ( Rout - dx ) * ( Rout - dx ) )
+        if ( rsq > ( Rout - W ) * ( Rout - W ) )
         {
             f( pid, 0 ) += -b0 * Kokkos::cos( theta );
             f( pid, 1 ) += -b0 * Kokkos::sin( theta );
         }
         // BC on inner boundary
-        else if ( rsq < ( Rin + dx ) * ( Rin + dx ) )
+        // else if ( rsq < ( Rin + dx ) * ( Rin + dx ) )
+        else if ( rsq < ( Rin + W ) * ( Rin + W ) )
         {
             f( pid, 0 ) += b0 * Kokkos::cos( theta );
             f( pid, 1 ) += b0 * Kokkos::sin( theta );
         };
 
         // BC on top boundary
-        if ( x( pid, 2 ) > z_center + 0.5 * H - dz )
+        // if ( x( pid, 2 ) > z_center + 0.5 * H - dz )
+        if ( x( pid, 2 ) > z_center + 0.5 * H - W )
         {
             f( pid, 2 ) += -b0;
         }
         // BC on bottom boundary
-        else if ( x( pid, 2 ) < z_center - 0.5 * H + dz )
+        // else if ( x( pid, 2 ) < z_center - 0.5 * H + dz )
+        else if ( x( pid, 2 ) < z_center - 0.5 * H + W )
         {
             f( pid, 2 ) += b0;
         };

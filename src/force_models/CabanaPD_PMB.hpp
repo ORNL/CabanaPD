@@ -620,7 +620,7 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     {
         // Update density using plastic dilatation.
         // Note that this assumes zero initial plastic dilatation.
-        rho_current( i ) = Kokkos::min( rho( i ) * Kokkos::exp( theta_i ),
+        rho_current( i ) = Kokkos::min( rho( i ) * Kokkos::exp( -theta_i ),
                                         rho0 ); // exp(theta_i - theta_i_0)
     }
 
