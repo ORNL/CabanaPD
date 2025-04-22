@@ -190,10 +190,17 @@ void dogboneTensileTestExample( const std::string filename )
                                  solver.particles, left_grip, right_grip );
 
     // ====================================================
+    //                      Outputs
+    // ====================================================
+    auto output = CabanaPD::createOutputTimeSeries(
+        CabanaPD::ForceDisplacementTag{}, "total_displacement.txt", inputs,
+        exec_space{}, particles, right_grip );
+
+    // ====================================================
     //                   Simulation run
     // ====================================================
     solver.init();
-    solver.run( bc );
+    solver.run( bc, output );
 }
 
 // Initialize MPI+Kokkos.
