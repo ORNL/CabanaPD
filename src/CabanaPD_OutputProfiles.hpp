@@ -17,6 +17,7 @@
 #include <Cabana_Core.hpp>
 
 #include <CabanaPD_Geometry.hpp>
+#include <CabanaPD_Output.hpp>
 
 namespace CabanaPD
 {
@@ -93,7 +94,7 @@ void createDisplacementMagnitudeProfile( std::string file_name,
 /******************************************************************************
   Scalar time series
 ******************************************************************************/
-template <typename MemorySpace, typename FunctorTypeX, typename FunctorTypeY>
+template <typename MemorySpace, typename FunctorType>
 class OutputTimeSeries
 {
     using memory_space = MemorySpace;
@@ -103,20 +104,16 @@ class OutputTimeSeries
     steering_vector_type _indices;
 
     std::string file_name;
-    profile_type _profile_x;
-    profile_type _profile_y;
-    FunctorTypeX _output_x;
-    FunctorTypeY _output_y;
+    profile_type _profile;
+    FunctorType _output;
     std::size_t index;
 
   public:
     OutputTimeSeries( std::string name, Inputs inputs,
-                      const steering_vector_type indices, FunctorTypeX output_x,
-                      FunctorTypeY output_y )
+                      const steering_vector_type indices, FunctorType output )
         : _indices( indices )
         , file_name( name )
-        , _output_x( output_x )
-        , _output_y( output_y )
+        , _output( output )
         , index( 0 )
     {
         double time = inputs["final_time"];
@@ -124,15 +121,14 @@ class OutputTimeSeries
         double freq = inputs["output_frequency"];
         int output_steps = static_cast<int>( time / dt / freq );
         // Purposely using zero-init here.
-        _profile_x = profile_type( "time_output_x", output_steps );
-        _profile_y = profile_type( "time_output_y", output_steps );
+        _profile = profile_type( "time_output", output_steps );
     }
 
-    void operator()( const int b, double& px, double& py ) const
+    KOKKOS_INLINE_FUNCTION
+    void operator()( const int b, double& px ) const
     {
         auto p = _indices._view( b );
-        px += _output_x( p );
-        py += _output_y( p );
+        px += _output( p );
     }
 
     void update()
@@ -140,20 +136,16 @@ class OutputTimeSeries
         Kokkos::RangePolicy<typename memory_space::execution_space> policy(
             0, _indices.size() );
         Kokkos::parallel_reduce( "time_series", policy, *this,
-                                 _profile_x( index ), _profile_y( index ) );
+                                 _profile( index ) );
         index++;
     }
 
     void print( MPI_Comm comm )
     {
-        auto profile_x_host = Kokkos::create_mirror_view_and_copy(
-            Kokkos::HostSpace{}, _profile_x );
-        MPI_Allreduce( MPI_IN_PLACE, profile_x_host.data(),
-                       profile_x_host.size(), MPI_DOUBLE, MPI_SUM, comm );
-        auto profile_y_host = Kokkos::create_mirror_view_and_copy(
-            Kokkos::HostSpace{}, _profile_y );
-        MPI_Allreduce( MPI_IN_PLACE, profile_y_host.data(),
-                       profile_y_host.size(), MPI_DOUBLE, MPI_SUM, comm );
+        auto profile_host = Kokkos::create_mirror_view_and_copy(
+            Kokkos::HostSpace{}, _profile );
+        MPI_Allreduce( MPI_IN_PLACE, profile_host.data(), profile_host.size(),
+                       MPI_DOUBLE, MPI_SUM, comm );
         auto num_particles = static_cast<int>( _indices.size() );
         MPI_Allreduce( MPI_IN_PLACE, &num_particles, 1, MPI_INT, MPI_SUM,
                        comm );
@@ -164,64 +156,21 @@ class OutputTimeSeries
             fout.open( file_name, std::ios::app );
             for ( std::size_t t = 0; t < index; t++ )
             {
-                fout << profile_x_host( t ) / num_particles << " "
-                     << profile_y_host( t ) / num_particles << std::endl;
+                fout << profile_host( t ) / num_particles << std::endl;
             }
         }
     }
 };
 
-template <typename UserFunctorX, typename UserFunctorY, typename ExecSpace,
-          typename ParticleType, typename GeometryType>
-auto createOutputTimeSeries( UserFunctorX user_x, UserFunctorY user_y,
-                             std::string name, const Inputs inputs,
+template <typename FunctorType, typename ExecSpace, typename ParticleType,
+          typename GeometryType>
+auto createOutputTimeSeries( std::string name, const Inputs inputs,
                              ExecSpace exec_space,
-                             const ParticleType& particles,
-                             const GeometryType geom,
-                             const double initial_guess = 1.0 )
-{
-    using memory_space = typename ParticleType::memory_space;
-    std::vector<GeometryType> geom_vec = { geom };
-    using sv_type = ParticleSteeringVector<memory_space>;
-    sv_type indices = createParticleSteeringVector( exec_space, particles,
-                                                    geom_vec, initial_guess );
-    return OutputTimeSeries( name, inputs, indices, user_x, user_y );
-}
-
-struct ForceDisplacementTag
-{
-};
-
-template <typename FieldType>
-struct updateField
-{
-    FieldType f;
-
-    updateField( const FieldType& field )
-        : f( field )
-    {
-    }
-
-    auto operator()( const int p ) const
-    {
-        return Kokkos::sqrt( f( p, 0 ) * f( p, 0 ) + f( p, 1 ) * f( p, 1 ) +
-                             f( p, 2 ) * f( p, 2 ) );
-    }
-};
-
-template <typename ExecSpace, typename ParticleType, typename GeometryType>
-auto createOutputTimeSeries( ForceDisplacementTag, std::string name,
-                             const Inputs inputs, ExecSpace exec_space,
-                             const ParticleType& particles,
+                             const ParticleType& particles, FunctorType user,
                              const GeometryType geom )
 {
     ParticleSteeringVector indices( exec_space, particles, geom );
-
-    auto f = particles.sliceForce();
-    auto u = particles.sliceDisplacement();
-    auto update_f = updateField( f );
-    auto update_u = updateField( u );
-    return OutputTimeSeries( name, inputs, indices, update_u, update_f );
+    return OutputTimeSeries( name, inputs, indices, user );
 }
 
 } // namespace CabanaPD

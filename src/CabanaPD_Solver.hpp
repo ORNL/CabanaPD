@@ -308,24 +308,6 @@ class Solver
     void updateNeighbors() { force->update( *particles, 0.0, true ); }
 
     template <typename BoundaryType>
-    void
-    run( BoundaryType boundary_condition,
-         typename std::enable_if_t<( is_bc<BoundaryType>::value ), int>* = 0 )
-    {
-        init_output( boundary_condition.timeInit() );
-
-        // Main timestep loop.
-        for ( int step = 1; step <= num_steps; step++ )
-        {
-            _step_timer.start();
-            runStep( step, boundary_condition );
-        }
-
-        // Final output and timings.
-        final_output();
-    }
-
-    template <typename BoundaryType>
     void runStep( const int step, BoundaryType boundary_condition )
     {
         // Integrate - velocity Verlet first half.
@@ -367,21 +349,6 @@ class Solver
         output( step );
     }
 
-    void run()
-    {
-        init_output();
-
-        // Main timestep loop.
-        for ( int step = 1; step <= num_steps; step++ )
-        {
-            _step_timer.start();
-            runStep( step );
-        }
-
-        // Final output and timings.
-        final_output();
-    }
-
     void runStep( const int step )
     {
         // Integrate - velocity Verlet first half.
@@ -406,11 +373,11 @@ class Solver
         output( step );
     }
 
-    template <typename OutputType>
-    void
-    run( OutputType region_output,
-         typename std::enable_if_t<( !is_bc<OutputType>::value ), int>* = 0 )
+    template <typename... OutputType>
+    void run( OutputType&... region_output )
     {
+        init_output();
+
         // Main timestep loop.
         for ( int step = 1; step <= num_steps; step++ )
         {
@@ -418,15 +385,15 @@ class Solver
             runStep( step );
             // FIXME: not included in timing
             if ( step % output_frequency == 0 )
-                region_output.update();
+                updateRegion( region_output... );
         }
 
         // Final output and timings.
-        final_output( region_output );
+        final_output( region_output... );
     }
 
-    template <typename BoundaryType, typename OutputType>
-    void run( BoundaryType boundary_condition, OutputType region_output )
+    template <typename BoundaryType, typename... OutputType>
+    void run( BoundaryType& boundary_condition, OutputType&... region_output )
     {
         init_output( boundary_condition.timeInit() );
 
@@ -437,11 +404,23 @@ class Solver
             runStep( step, boundary_condition );
             // FIXME: not included in timing
             if ( step % output_frequency == 0 )
-                region_output.update();
+                updateRegion( region_output... );
         }
 
         // Final output and timings.
-        final_output( region_output );
+        final_output( region_output... );
+    }
+
+    // Iterate over all regions.
+    template <typename... RegionType>
+    void updateRegion( RegionType&... region )
+    {
+        ( updateRegion( region ), ... );
+    }
+    template <typename RegionType>
+    void updateRegion( RegionType& region )
+    {
+        region.update();
     }
 
     // Compute and communicate fields needed for force computation and update
@@ -566,11 +545,23 @@ class Solver
         }
     }
 
-    template <typename OutputType>
-    void final_output( OutputType region_output )
+    template <typename... RegionType>
+    void final_output( RegionType... region )
     {
         final_output();
-        region_output.print( particles.comm() );
+        printRegion( region... );
+    }
+
+    // Iterate over all regions.
+    template <typename... RegionType>
+    void printRegion( RegionType... region )
+    {
+        ( printRegion( region ), ... );
+    }
+    template <typename RegionType>
+    void printRegion( RegionType region )
+    {
+        region.print( particles.comm() );
     }
 
     int num_steps;
