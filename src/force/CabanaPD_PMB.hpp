@@ -96,7 +96,7 @@ class Force<MemorySpace,
     template <class ParticleType>
     Force( const bool half_neigh, const ParticleType& particles,
            const model_type model )
-        : base_type( half_neigh, model.delta, particles )
+        : base_type( half_neigh, model.cutoff(), particles )
         , _model( model )
     {
     }
@@ -263,7 +263,7 @@ class Force<MemorySpace,
     template <class ParticleType>
     Force( const bool half_neigh, const ParticleType& particles,
            const model_type model )
-        : base_type( half_neigh, model.delta, particles )
+        : base_type( half_neigh, model.cutoff(), particles )
         , fracture_type( particles.localOffset(),
                          base_type::getMaxLocalNeighbors() )
         , _model( model )

@@ -27,8 +27,6 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
 {
     using base_type = BaseForceModel;
     using base_model = LPS;
-    using fracture_type = NoFracture;
-    using thermal_type = TemperatureIndependent;
 
     using base_type::delta;
 
@@ -124,7 +122,6 @@ struct ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
     using thermal_type = typename base_temperature_type::thermal_type;
 
     using base_type::base_type;
-    using base_type::delta;
     using base_type::operator();
     using base_temperature_type::operator();
 };
@@ -149,10 +146,8 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
     using base_fracture_type::s0;
     using base_type::base_type;
     using base_type::delta;
-    using base_type::G;
     using base_type::influence_type;
     using base_type::K;
-    using base_type::s_coeff;
 
     using base_type::operator();
     using base_fracture_type::operator();
@@ -213,13 +208,6 @@ struct ForceModel<LinearLPS, Elastic, NoFracture, TemperatureIndependent>
     {
     }
 
-    using base_type::delta;
-    using base_type::G;
-    using base_type::influence_type;
-    using base_type::K;
-    using base_type::s_coeff;
-    using base_type::theta_coeff;
-
     using base_type::base_type;
     using base_type::operator();
 };
@@ -241,17 +229,6 @@ struct ForceModel<LinearLPS, Elastic, Fracture, TemperatureIndependent>
         : base_type( base_model{}, std::forward<Args>( args )... )
     {
     }
-
-    using base_type::delta;
-    using base_type::G;
-    using base_type::influence_type;
-    using base_type::K;
-    using base_type::s_coeff;
-    using base_type::theta_coeff;
-
-    using base_type::bond_break_coeff;
-    using base_type::G0;
-    using base_type::s0;
 
     using base_type::base_type;
     using base_type::operator();
