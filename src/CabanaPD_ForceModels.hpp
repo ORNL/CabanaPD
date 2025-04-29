@@ -37,6 +37,8 @@ struct BaseForceModel
     BaseForceModel( const double _delta )
         : delta( _delta ){};
 
+    auto cutoff() const { return delta; }
+
     // Only needed for models which store bond properties.
     void updateBonds( const int, const int ) {}
 };
@@ -152,7 +154,6 @@ struct ThermalFractureModel
         BaseTemperatureModel<TemperatureDependent, TemperatureType>;
 
     // Does not use the base bond_break_coeff.
-    using base_fracture_type::G0;
     using base_fracture_type::s0;
     using base_temperature_type::alpha;
     using base_temperature_type::temp0;

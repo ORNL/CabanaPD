@@ -175,13 +175,6 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
     using fracture_type = Fracture;
     using thermal_type = base_temperature_type::thermal_type;
 
-    using base_fracture_type::bond_break_coeff;
-    using base_fracture_type::G0;
-    using base_fracture_type::s0;
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
     using base_type::operator();
     using base_fracture_type::operator();
     using base_temperature_type::operator();
@@ -224,16 +217,6 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     using mechanics_type = ElasticPerfectlyPlastic;
     using typename base_type::thermal_type;
 
-    using base_fracture_type::bond_break_coeff;
-    using base_fracture_type::G0;
-    using base_fracture_type::s0;
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    using base_type::_s_p;
-    double s_Y;
-
     using base_type::operator();
     using base_fracture_type::operator();
     using base_temperature_type::operator();
@@ -267,10 +250,6 @@ struct ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>
     using base_type::base_type;
     using base_type::operator();
 
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
     template <typename... Args>
     ForceModel( LinearPMB, Args... args )
         : base_type( base_model{}, args... )
@@ -291,14 +270,6 @@ struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
     using mechanics_type = Elastic;
     using thermal_type = base_type::thermal_type;
 
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    using base_type::base_type;
-    using base_type::bond_break_coeff;
-    using base_type::G0;
-    using base_type::s0;
     using base_type::operator();
 
     template <typename... Args>
@@ -347,14 +318,6 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
     using fracture_type = NoFracture;
     using thermal_type = TemperatureDependent;
 
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    // Thermal parameters
-    using base_temperature_type::alpha;
-    using base_temperature_type::temp0;
-
     using base_type::operator();
     using base_temperature_type::operator();
 
@@ -378,19 +341,6 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
     using base_type::fracture_type;
     using mechanics_type = Elastic;
     using thermal_type = TemperatureDependent;
-
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    // Does not use the base bond_break_coeff.
-    using base_temperature_type::G0;
-    using base_temperature_type::s0;
-
-    // Thermal parameters
-    using base_temperature_type::alpha;
-    using base_temperature_type::temp0;
-    using base_temperature_type::temperature;
 
     using base_type::operator();
     using base_temperature_type::operator();
@@ -463,18 +413,6 @@ struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
     using fracture_type = NoFracture;
     using thermal_type = DynamicTemperature;
 
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    // Thermal parameters
-    using base_heat_transfer_type::cp;
-    using base_heat_transfer_type::kappa;
-    using base_heat_transfer_type::thermal_coeff;
-    using base_temperature_type::alpha;
-    using base_temperature_type::temp0;
-    using base_temperature_type::temperature;
-
     using base_type::operator();
     using base_temperature_type::operator();
 
@@ -515,21 +453,6 @@ struct ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
     using base_type::base_model;
     using fracture_type = Fracture;
     using thermal_type = DynamicTemperature;
-
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    using base_temperature_type::G0;
-    using base_temperature_type::s0;
-
-    // Thermal parameters
-    using base_heat_transfer_type::cp;
-    using base_heat_transfer_type::kappa;
-    using base_heat_transfer_type::thermal_coeff;
-    using base_temperature_type::alpha;
-    using base_temperature_type::temp0;
-    using base_temperature_type::temperature;
 
     using base_type::operator();
     using base_temperature_type::operator();
