@@ -71,11 +71,10 @@ namespace CabanaPD
 {
 template <class MemorySpace>
 class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
-    : public Force<MemorySpace, BaseForceModel>
+    : public BaseForce<MemorySpace>
 {
   protected:
-    using base_type = Force<MemorySpace, BaseForceModel>;
-    using base_type::_half_neigh;
+    using base_type = BaseForce<MemorySpace>;
     using model_type = ForceModel<LPS, Elastic, NoFracture>;
     model_type _model;
 
@@ -86,20 +85,15 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using neighbor_list_type = typename base_type::neighbor_list_type;
-    using base_type::_neigh_list;
 
-    template <class ParticleType>
-    Force( const bool half_neigh, ParticleType& particles,
-           const model_type model )
-        : base_type( half_neigh, model.delta, particles )
-        , _model( model )
+    Force( const model_type model )
+        : _model( model )
     {
     }
 
-    template <class ParticleType, class ParallelType>
+    template <class ParticleType, class NeighborType>
     void computeWeightedVolume( ParticleType& particles,
-                                const ParallelType neigh_op_tag )
+                                const NeighborType& neighbor )
     {
         _timer.start();
 
@@ -117,19 +111,14 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
             getDistance( x, u, i, j, xi, r, s );
             m( i ) += model.weightedVolume( xi, vol( j ) );
         };
-
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Cabana::neighbor_parallel_for(
-            policy, weighted_volume, _neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::computeWeightedVolume" );
-
+        neighbor.iterate( exec_space{}, weighted_volume, particles,
+                          "CabanaPD::Dilatation::computeWeightedVolume" );
         _timer.stop();
     }
 
-    template <class ParticleType, class ParallelType>
+    template <class ParticleType, class NeighborType>
     void computeDilatation( ParticleType& particles,
-                            const ParallelType neigh_op_tag )
+                            const NeighborType neighbor )
     {
         _timer.start();
 
@@ -149,20 +138,17 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
             theta( i ) += model.dilatation( s, xi, vol( j ), m( i ) );
         };
 
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Cabana::neighbor_parallel_for(
-            policy, dilatation, _neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::computeDilatation" );
+        neighbor.iterate( exec_space{}, dilatation, particles,
+                          "CabanaPD::Dilatation::compute" );
 
         _timer.stop();
     }
 
     template <class ForceType, class PosType, class ParticleType,
-              class ParallelType>
+              class NeighborType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
-                           ParallelType& neigh_op_tag )
+                           NeighborType& neighbor )
     {
         _timer.start();
 
@@ -191,29 +177,26 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
             f( i, 2 ) += fz_i;
         };
 
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Cabana::neighbor_parallel_for(
-            policy, force_full, _neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::computeFull" );
-
+        neighbor.iterate( exec_space{}, force_full, particles,
+                          "CabanaPD::ForceLPS::computeFull" );
         _timer.stop();
     }
 
     template <class PosType, class WType, class ParticleType,
-              class ParallelType>
+              class NeighborType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
                               const ParticleType& particles,
-                              ParallelType& neigh_op_tag )
+                              NeighborType& neighbor )
     {
         _energy_timer.start();
 
         auto model = _model;
-        auto neigh_list = _neigh_list;
 
         const auto vol = particles.sliceVolume();
         const auto theta = particles.sliceDilatation();
         auto m = particles.sliceWeightedVolume();
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
 
         auto energy_full =
             KOKKOS_LAMBDA( const int i, const int j, double& Phi )
@@ -231,14 +214,9 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
             Phi += w * vol( i );
         };
 
-        double strain_energy = 0.0;
-
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Cabana::neighbor_parallel_reduce(
-            policy, energy_full, _neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, strain_energy,
-            "CabanaPD::ForceLPS::computeEnergyFull" );
+        double strain_energy =
+            neighbor.reduce( exec_space{}, energy_full, particles,
+                             "CabanaPD::ForceLPS::computeEnergyFull" );
 
         _energy_timer.stop();
         return strain_energy;
@@ -247,14 +225,12 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
     auto time() { return _timer.time(); };
     auto timeEnergy() { return _energy_timer.time(); };
 
-    template <class ParticleType, class ParallelType>
-    void computeStressFull( ParticleType& particles,
-                            ParallelType& neigh_op_tag )
+    template <class ParticleType, class NeighborType>
+    void computeStressFull( ParticleType& particles, NeighborType& neighbor )
     {
         _stress_timer.start();
 
         auto model = _model;
-        auto neigh_list = _neigh_list;
         const auto x = particles.sliceReferencePosition();
         const auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();
@@ -290,12 +266,8 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
             stress( i, 1, 2 ) += fy_i * xi_z;
             stress( i, 2, 1 ) += fz_i * xi_y;
         };
-
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Cabana::neighbor_parallel_for(
-            policy, stress_full, _neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPSFracture::computeStressFull" );
+        neighbor.iterate( exec_space{}, stress_full, particles,
+                          "CabanaPD::ForceLPS::computeStressFull" );
 
         _stress_timer.stop();
     }
@@ -303,15 +275,10 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
 
 template <class MemorySpace>
 class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
-    : public Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>,
-      public BaseFracture<MemorySpace>
+    : public Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
 {
   protected:
-    using fracture_type = BaseFracture<MemorySpace>;
-    using fracture_type::_mu;
-
     using base_type = Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>;
-    using base_type::_half_neigh;
     using model_type = ForceModel<LPS, Elastic, Fracture>;
     model_type _model;
 
@@ -322,30 +289,22 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using neighbor_list_type = typename base_type::neighbor_list_type;
-    using base_type::_neigh_list;
 
-    template <class ParticleType>
-    Force( const bool half_neigh, const ParticleType& particles,
-           const model_type model )
-        : base_type( half_neigh, particles, model )
-        , fracture_type( particles.localOffset(),
-                         base_type::getMaxLocalNeighbors() )
+    Force( const model_type model )
+        : base_type( model )
         , _model( model )
     {
     }
 
-    template <class ExecSpace, class ParticleType, class PrenotchType>
-    void prenotch( ExecSpace exec_space, const ParticleType& particles,
-                   PrenotchType& prenotch )
-    {
-        fracture_type::prenotch( exec_space, particles, prenotch, _neigh_list );
-    }
-
-    template <class ParticleType, class ParallelType>
-    void computeWeightedVolume( ParticleType& particles, ParallelType )
+    template <class ParticleType, class NeighborType>
+    void computeWeightedVolume( ParticleType& particles,
+                                const NeighborType& neighbor )
     {
         _timer.start();
+
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
 
         auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
@@ -353,8 +312,6 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
         auto m = particles.sliceWeightedVolume();
         Cabana::deep_copy( m, 0.0 );
         auto model = _model;
-        auto neigh_list = _neigh_list;
-        auto mu = _mu;
 
         auto weighted_volume = KOKKOS_LAMBDA( const int i )
         {
@@ -375,18 +332,21 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
             }
         };
 
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::computeWeightedVolume",
-                              policy, weighted_volume );
+        neighbor.iterateLinear(
+            exec_space{}, weighted_volume, particles,
+            "CabanaPD::ForceLPSDamage::computeWeightedVolume" );
 
         _timer.stop();
     }
 
-    template <class ParticleType, class ParallelType>
-    void computeDilatation( ParticleType& particles, ParallelType )
+    template <class ParticleType, class NeighborType>
+    void computeDilatation( ParticleType& particles,
+                            const NeighborType& neighbor )
     {
         _timer.start();
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
 
         const auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
@@ -394,8 +354,7 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
         auto m = particles.sliceWeightedVolume();
         auto theta = particles.sliceDilatation();
         auto model = _model;
-        auto neigh_list = _neigh_list;
-        auto mu = _mu;
+
         Cabana::deep_copy( theta, 0.0 );
 
         auto dilatation = KOKKOS_LAMBDA( const int i )
@@ -423,25 +382,25 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
             }
         };
 
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::computeDilatation",
-                              policy, dilatation );
+        neighbor.iterateLinear( exec_space{}, dilatation, particles,
+                                "CabanaPD::ForceLPSDamage::computeDilatation" );
 
         _timer.stop();
     }
 
     template <class ForceType, class PosType, class ParticleType,
-              class ParallelType>
+              class NeighborType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
-                           const ParticleType& particles, ParallelType )
+                           const ParticleType& particles,
+                           NeighborType& neighbor )
     {
         _timer.start();
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
 
         auto break_coeff = _model.bond_break_coeff;
         auto model = _model;
-        auto neigh_list = _neigh_list;
-        auto mu = _mu;
 
         const auto vol = particles.sliceVolume();
         auto theta = particles.sliceDilatation();
@@ -493,24 +452,24 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
             }
         };
 
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::computeFull", policy,
-                              force_full );
+        neighbor.iterateLinear( exec_space{}, force_full, particles,
+                                "CabanaPD::ForceLPSDamage::computeFull" );
 
         _timer.stop();
     }
 
     template <class PosType, class WType, class ParticleType,
-              class ParallelType>
+              class NeighborType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              ParticleType& particles, ParallelType& )
+                              ParticleType& particles,
+                              const NeighborType& neighbor )
     {
         _energy_timer.start();
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
 
         auto model = _model;
-        auto neigh_list = _neigh_list;
-        auto mu = _mu;
 
         const auto vol = particles.sliceVolume();
         const auto theta = particles.sliceDilatation();
@@ -548,30 +507,29 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
             phi( i ) = 1 - phi_i / vol_H_i;
         };
 
-        double strain_energy = 0.0;
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Kokkos::parallel_reduce( "CabanaPD::ForceLPSDamage::computeEnergyFull",
-                                 policy, energy_full, strain_energy );
+        double strain_energy = neighbor.reduceLinear(
+            exec_space{}, energy_full, particles,
+            "CabanaPD::ForceLPSDamage::computeEnergyFull" );
 
         _energy_timer.stop();
         return strain_energy;
     }
 
-    template <class ParticleType, class ParallelType>
-    void computeStressFull( ParticleType& particles, ParallelType& )
+    template <class ParticleType, class NeighborType>
+    void computeStressFull( ParticleType& particles, NeighborType& neighbor )
     {
         _stress_timer.start();
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
 
         auto model = _model;
-        auto neigh_list = _neigh_list;
         const auto x = particles.sliceReferencePosition();
         const auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();
         const auto theta = particles.sliceDilatation();
         const auto m = particles.sliceWeightedVolume();
         auto stress = particles.sliceStress();
-        auto mu = _mu;
 
         auto stress_full = KOKKOS_LAMBDA( const int i )
         {
@@ -617,11 +575,9 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
                 }
             }
         };
-
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Kokkos::parallel_for( "CabanaPD::ForceLPSFracture::computeStressFull",
-                              policy, stress_full );
+        neighbor.iterateLinear(
+            exec_space{}, stress_full, particles,
+            "CabanaPD::ForceLPSFracture::computeStressFull" );
 
         _stress_timer.stop();
     }
@@ -643,22 +599,18 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using neighbor_list_type = typename base_type::neighbor_list_type;
-    using base_type::_neigh_list;
 
-    template <class ParticleType>
-    Force( const bool half_neigh, ParticleType& particles,
-           const model_type model )
-        : base_type( half_neigh, particles, model )
+    Force( const model_type model )
+        : base_type( model )
         , _model( model )
     {
     }
 
     template <class ForceType, class PosType, class ParticleType,
-              class ParallelType>
+              class NeighborType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
                            const ParticleType& particles,
-                           ParallelType& neigh_op_tag )
+                           NeighborType& neighbor )
     {
         _timer.start();
 
@@ -691,25 +643,22 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
             f( i, 2 ) += fz_i;
         };
 
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Cabana::neighbor_parallel_for(
-            policy, force_full, _neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::computeFull" );
-
+        neighbor.iterate( exec_space{}, force_full, particles,
+                          "CabanaPD::ForceLPS::computeFull" );
         _timer.stop();
     }
 
     template <class PosType, class WType, class ParticleType,
-              class ParallelType>
+              class NeighborType>
     double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
                               const ParticleType& particles,
-                              ParallelType& neigh_op_tag )
+                              NeighborType& neighbor )
     {
         _energy_timer.start();
 
         auto model = _model;
-        auto neigh_list = _neigh_list;
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
 
         const auto vol = particles.sliceVolume();
         const auto theta = particles.sliceDilatation();
@@ -732,27 +681,20 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
             Phi += w * vol( i );
         };
 
-        double strain_energy = 0.0;
-
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Cabana::neighbor_parallel_reduce(
-            policy, energy_full, _neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, strain_energy,
-            "CabanaPD::ForceLPS::computeEnergyFull" );
+        double strain_energy =
+            neighbor.reduce( exec_space{}, energy_full, particles,
+                             "CabanaPD::ForceLPS::computeEnergyFull" );
 
         _energy_timer.stop();
         return strain_energy;
     }
 
-    template <class ParticleType, class ParallelType>
-    void computeStressFull( ParticleType& particles,
-                            ParallelType& neigh_op_tag )
+    template <class ParticleType, class NeighborType>
+    void computeStressFull( ParticleType& particles, NeighborType& neighbor )
     {
         _stress_timer.start();
 
         auto model = _model;
-        auto neigh_list = _neigh_list;
         const auto x = particles.sliceReferencePosition();
         const auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();
@@ -788,12 +730,8 @@ class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
             stress( i, 1, 2 ) += fy_i * xi_z;
             stress( i, 2, 1 ) += fz_i * xi_y;
         };
-
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Cabana::neighbor_parallel_for(
-            policy, stress_full, _neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::ForceLPS::computeStressFull" );
+        neighbor.iterate( exec_space{}, stress_full, particles,
+                          "CabanaPD::ForceLPS::computeStressFull" );
 
         _stress_timer.stop();
     }

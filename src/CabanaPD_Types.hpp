@@ -35,9 +35,15 @@ struct is_fracture<Fracture> : public std::true_type
 // Mechanics tags.
 struct Elastic
 {
+    using base_type = Elastic;
+};
+struct Plastic
+{
+    using base_type = Plastic;
 };
 struct ElasticPerfectlyPlastic
 {
+    using base_type = Plastic;
 };
 
 // Model category tags.
