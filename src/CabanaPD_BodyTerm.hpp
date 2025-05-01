@@ -16,7 +16,6 @@
 
 #include <Cabana_Core.hpp>
 
-#include <CabanaPD_Boundary.hpp>
 #include <CabanaPD_Output.hpp>
 #include <CabanaPD_Timer.hpp>
 
