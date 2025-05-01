@@ -200,17 +200,6 @@ auto createBoundaryCondition( UserFunctor user_functor,
     return BoundaryCondition( bc_indices, user_functor, force_update );
 }
 
-// Boundary conditions.
-template <class>
-struct is_bc : public std::false_type
-{
-};
-template <typename MemorySpace, typename BoundaryType>
-struct is_bc<BoundaryCondition<MemorySpace, BoundaryType>>
-    : public std::true_type
-{
-};
-
 } // namespace CabanaPD
 
 #endif

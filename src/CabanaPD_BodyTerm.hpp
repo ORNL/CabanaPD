@@ -68,10 +68,6 @@ struct BodyTerm
     auto timeInit() { return 0.0; };
 };
 
-template <typename BoundaryType>
-struct is_bc<BodyTerm<BoundaryType>> : public std::true_type
-{
-};
 } // namespace CabanaPD
 
 #endif
