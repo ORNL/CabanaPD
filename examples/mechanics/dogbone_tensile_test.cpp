@@ -192,29 +192,29 @@ void dogboneTensileTestExample( const std::string filename )
     // ====================================================
     //                      Outputs
     // ====================================================
-    auto dx = particles.dx[0];
-    auto f = particles.sliceForce();
+    auto dx = solver.particles.dx[0];
+    auto f = solver.particles.sliceForce();
     auto force_func = KOKKOS_LAMBDA( const int p ) { return f( p, 0 ); };
     auto output_f = CabanaPD::createOutputTimeSeries(
-        "output_force.txt", inputs, exec_space{}, particles, force_func,
+        "output_force.txt", inputs, exec_space{}, solver.particles, force_func,
         right_grip );
 
-    auto y = particles.sliceCurrentPosition();
+    auto y = solver.particles.sliceCurrentPosition();
     auto pos_func = KOKKOS_LAMBDA( const int p ) { return y( p, 0 ); };
     double x_gl = midx - 0.4 * G;
     CabanaPD::Region<CabanaPD::RectangularPrism> left_pos(
         x_gl, x_gl + dx, low_corner[1], high_corner[1], low_corner[2],
         high_corner[2] );
     auto output_yl = CabanaPD::createOutputTimeSeries(
-        "output_left_position.txt", inputs, exec_space{}, particles, pos_func,
-        left_pos );
+        "output_left_position.txt", inputs, exec_space{}, solver.particles,
+        pos_func, left_pos );
     double x_gr = midx + 0.4 * G;
     CabanaPD::Region<CabanaPD::RectangularPrism> right_pos(
         x_gr - dx, x_gr, low_corner[1], high_corner[1], low_corner[2],
         high_corner[2] );
     auto output_yr = CabanaPD::createOutputTimeSeries(
-        "output_right_position.txt", inputs, exec_space{}, particles, pos_func,
-        right_pos );
+        "output_right_position.txt", inputs, exec_space{}, solver.particles,
+        pos_func, right_pos );
 
     // ====================================================
     //                   Simulation run
