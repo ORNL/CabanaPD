@@ -102,7 +102,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     //                   Boundary condition
     // ====================================================
     // Temperature profile imposed on top and bottom surfaces
-    double dy = particles.dx[1];
+    double dy = solver.particles.dx[1];
     using plane_type = CabanaPD::Region<CabanaPD::RectangularPrism>;
 
     // Top surface
