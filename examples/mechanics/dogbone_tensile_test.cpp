@@ -55,7 +55,7 @@ void dogboneTensileTestExample( const std::string filename )
     int halo_width = m + 1; // Just to be safe.
 
     // ====================================================
-    //                Force model type
+    //                  Force model type
     // ====================================================
     using model_type = CabanaPD::PMB;
     using mechanics_type = CabanaPD::ElasticPerfectlyPlastic;
@@ -143,30 +143,11 @@ void dogboneTensileTestExample( const std::string filename )
         halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
 
     auto rho = particles.sliceDensity();
-    auto x = particles.sliceReferencePosition();
-    auto v = particles.sliceVelocity();
-
-    // Grips' velocity magnitude
-    double v0 = inputs["grip_velocity"];
-
-    // Create region for each grip.
-    CabanaPD::Region<CabanaPD::RectangularPrism> left_grip(
-        low_corner[0], midx - 0.5 * D, low_corner[1], high_corner[1],
-        low_corner[2], high_corner[2] );
-    CabanaPD::Region<CabanaPD::RectangularPrism> right_grip(
-        midx + 0.5 * D, high_corner[0], low_corner[1], high_corner[1],
-        low_corner[2], high_corner[2] );
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
-
-        // Grips' x-velocity
-        if ( left_grip.inside( x, pid ) )
-            v( pid, 0 ) = -v0;
-        else if ( right_grip.inside( x, pid ) )
-            v( pid, 0 ) = v0;
     };
     particles.updateParticles( exec_space{}, init_functor );
 
@@ -182,35 +163,95 @@ void dogboneTensileTestExample( const std::string filename )
     CabanaPD::Solver solver( inputs, particles, force_model );
 
     // ====================================================
-    //                Boundary conditions
+    //                  Impose field
     // ====================================================
-    // Reset forces on both grips.
-    auto bc =
-        createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0, exec_space{},
-                                 solver.particles, left_grip, right_grip );
+    // Grip velocity
+    double v0 = inputs["grip_velocity"];
+
+    // Create BC last to ensure ghost particles are included.
+    auto x = solver.particles.sliceReferencePosition();
+    auto u = solver.particles.sliceDisplacement();
+    auto disp_func = KOKKOS_LAMBDA( const int pid, const double t )
+    {
+        // Right grip
+        if ( x( pid, 0 ) > midx + 0.5 * D )
+        {
+            u( pid, 0 ) = v0 * t;
+            u( pid, 1 ) = 0;
+            u( pid, 2 ) = 0;
+        }
+
+        // Left grip
+        if ( x( pid, 0 ) < midx - 0.5 * D )
+        {
+            u( pid, 0 ) = 0;
+            u( pid, 1 ) = 0;
+            u( pid, 2 ) = 0;
+        }
+    };
+    CabanaPD::BodyTerm body_term( disp_func, solver.particles.size(), false );
 
     // ====================================================
     //                      Outputs
     // ====================================================
     auto dx = solver.particles.dx[0];
+    auto dy = solver.particles.dx[1];
+    auto dz = solver.particles.dx[2];
     auto f = solver.particles.sliceForce();
-    auto force_func = KOKKOS_LAMBDA( const int p ) { return f( p, 0 ); };
-    auto output_f = CabanaPD::createOutputTimeSeries(
-        "output_force.txt", inputs, exec_space{}, solver.particles, force_func,
-        right_grip );
+
+    // Generate force outputs for right grip to compute stress.
+
+    // Create region for right grip.
+    CabanaPD::Region<CabanaPD::RectangularPrism> right_grip(
+        midx + 0.5 * D, high_corner[0], low_corner[1], high_corner[1],
+        low_corner[2], high_corner[2] );
+
+    // Output force on right grip in x-direction.
+    auto force_func_x = KOKKOS_LAMBDA( const int p )
+    {
+        return f( p, 0 ) * dx * dy * dz;
+    };
+    auto output_fx = CabanaPD::createOutputTimeSeries(
+        "output_force_x.txt", inputs, exec_space{}, solver.particles,
+        force_func_x, right_grip );
+
+    // Output force on right grip in y-direction.
+    auto force_func_y = KOKKOS_LAMBDA( const int p )
+    {
+        return f( p, 1 ) * dx * dy * dz;
+    };
+    auto output_fy = CabanaPD::createOutputTimeSeries(
+        "output_force_y.txt", inputs, exec_space{}, solver.particles,
+        force_func_y, right_grip );
+
+    // Output force on right grip in z-direction.
+    auto force_func_z = KOKKOS_LAMBDA( const int p )
+    {
+        return f( p, 2 ) * dx * dy * dz;
+    };
+    auto output_fz = CabanaPD::createOutputTimeSeries(
+        "output_force_z.txt", inputs, exec_space{}, solver.particles,
+        force_func_z, right_grip );
+
+    // Generate position outputs for gage to compute strain.
 
     auto y = solver.particles.sliceCurrentPosition();
     auto pos_func = KOKKOS_LAMBDA( const int p ) { return y( p, 0 ); };
-    double x_gl = midx - 0.4 * G;
+    double dG = 0.1 * G;
+
+    // Output x-position of left side of gage.
+    double x_gl = midx - 0.5 * G;
     CabanaPD::Region<CabanaPD::RectangularPrism> left_pos(
-        x_gl, x_gl + dx, low_corner[1], high_corner[1], low_corner[2],
+        x_gl, x_gl + dG, low_corner[1], high_corner[1], low_corner[2],
         high_corner[2] );
     auto output_yl = CabanaPD::createOutputTimeSeries(
         "output_left_position.txt", inputs, exec_space{}, solver.particles,
         pos_func, left_pos );
-    double x_gr = midx + 0.4 * G;
+
+    // Output x-position of right side of gage.
+    double x_gr = midx + 0.5 * G;
     CabanaPD::Region<CabanaPD::RectangularPrism> right_pos(
-        x_gr - dx, x_gr, low_corner[1], high_corner[1], low_corner[2],
+        x_gr - dG, x_gr, low_corner[1], high_corner[1], low_corner[2],
         high_corner[2] );
     auto output_yr = CabanaPD::createOutputTimeSeries(
         "output_right_position.txt", inputs, exec_space{}, solver.particles,
@@ -219,8 +260,9 @@ void dogboneTensileTestExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
-    solver.init();
-    solver.run( bc, output_f, output_yl, output_yr );
+    solver.init( body_term );
+    solver.run( body_term, output_fx, output_fy, output_fz, output_yl,
+                output_yr );
 }
 
 // Initialize MPI+Kokkos.
