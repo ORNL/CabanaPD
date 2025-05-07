@@ -163,30 +163,35 @@ void dogboneTensileTestExample( const std::string filename )
     CabanaPD::Solver solver( inputs, particles, force_model );
 
     // ====================================================
-    //                  Impose field
+    //                  Boundary conditions
     // ====================================================
     // Grip velocity
     double v0 = inputs["grip_velocity"];
+
+    // Create region for both grips.
+    CabanaPD::Region<CabanaPD::RectangularPrism> right_grip(
+        midx + 0.5 * D, high_corner[0], low_corner[1], high_corner[1],
+        low_corner[2], high_corner[2] );
+    CabanaPD::Region<CabanaPD::RectangularPrism> left_grip(
+        low_corner[0], midx - 0.5 * D, low_corner[1], high_corner[1],
+        low_corner[2], high_corner[2] );
 
     // Create BC last to ensure ghost particles are included.
     auto x = solver.particles.sliceReferencePosition();
     auto u = solver.particles.sliceDisplacement();
     auto disp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
-        // Right grip
-        if ( x( pid, 0 ) > midx + 0.5 * D )
+        if ( right_grip.inside( x, pid ) )
         {
             u( pid, 0 ) = v0 * t;
-            u( pid, 1 ) = 0;
-            u( pid, 2 ) = 0;
+            u( pid, 1 ) = 0.0;
+            u( pid, 2 ) = 0.0;
         }
-
-        // Left grip
-        if ( x( pid, 0 ) < midx - 0.5 * D )
+        else if ( left_grip.inside( x, pid ) )
         {
-            u( pid, 0 ) = 0;
-            u( pid, 1 ) = 0;
-            u( pid, 2 ) = 0;
+            u( pid, 0 ) = 0.0;
+            u( pid, 1 ) = 0.0;
+            u( pid, 2 ) = 0.0;
         }
     };
     CabanaPD::BodyTerm body_term( disp_func, solver.particles.size(), false );
@@ -200,12 +205,6 @@ void dogboneTensileTestExample( const std::string filename )
     auto f = solver.particles.sliceForce();
 
     // Generate force outputs for right grip to compute stress.
-
-    // Create region for right grip.
-    CabanaPD::Region<CabanaPD::RectangularPrism> right_grip(
-        midx + 0.5 * D, high_corner[0], low_corner[1], high_corner[1],
-        low_corner[2], high_corner[2] );
-
     // Output force on right grip in x-direction.
     auto force_func_x = KOKKOS_LAMBDA( const int p )
     {
@@ -234,7 +233,6 @@ void dogboneTensileTestExample( const std::string filename )
         force_func_z, right_grip );
 
     // Generate position outputs for gage to compute strain.
-
     auto y = solver.particles.sliceCurrentPosition();
     auto pos_func = KOKKOS_LAMBDA( const int p ) { return y( p, 0 ); };
     double dG = 0.1 * G;
