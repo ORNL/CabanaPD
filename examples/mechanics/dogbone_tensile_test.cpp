@@ -194,7 +194,9 @@ void dogboneTensileTestExample( const std::string filename )
             u( pid, 2 ) = 0.0;
         }
     };
-    CabanaPD::BodyTerm body_term( disp_func, solver.particles.size(), false );
+    auto bc = CabanaPD::createBoundaryCondition( disp_func, exec_space{},
+                                                 solver.particles, false,
+                                                 left_grip, right_grip );
 
     // ====================================================
     //                      Outputs
@@ -258,9 +260,8 @@ void dogboneTensileTestExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
-    solver.init( body_term );
-    solver.run( body_term, output_fx, output_fy, output_fz, output_yl,
-                output_yr );
+    solver.init( bc );
+    solver.run( bc, output_fx, output_fy, output_fz, output_yl, output_yr );
 }
 
 // Initialize MPI+Kokkos.
