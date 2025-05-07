@@ -114,24 +114,20 @@ void thermalDeformationExample( const std::string filename )
     //                      Outputs
     // ====================================================
     // Output y-displacement along the x-axis
-    createDisplacementProfile( MPI_COMM_WORLD,
-                               "ydisplacement_xaxis_profile.txt",
-                               solver.particles, num_cells[0], 0, 1 );
+    CabanaPD::createDisplacementProfile( "ydisplacement_xaxis_profile.txt",
+                                         solver.particles, 0, 1 );
 
     // Output y-displacement along the y-axis
-    createDisplacementProfile( MPI_COMM_WORLD,
-                               "ydisplacement_yaxis_profile.txt",
-                               solver.particles, num_cells[1], 1, 1 );
+    CabanaPD::createDisplacementProfile( "ydisplacement_yaxis_profile.txt",
+                                         solver.particles, 1, 1 );
 
     // Output displacement magnitude along the x-axis
-    createDisplacementMagnitudeProfile(
-        MPI_COMM_WORLD, "displacement_magnitude_xaxis_profile.txt",
-        solver.particles, num_cells[0], 0 );
+    CabanaPD::createDisplacementMagnitudeProfile(
+        "displacement_magnitude_xaxis_profile.txt", solver.particles, 0 );
 
     // Output displacement magnitude along the y-axis
-    createDisplacementMagnitudeProfile(
-        MPI_COMM_WORLD, "displacement_magnitude_yaxis_profile.txt",
-        solver.particles, num_cells[1], 1 );
+    CabanaPD::createDisplacementMagnitudeProfile(
+        "displacement_magnitude_yaxis_profile.txt", solver.particles, 1 );
 }
 
 // Initialize MPI+Kokkos.

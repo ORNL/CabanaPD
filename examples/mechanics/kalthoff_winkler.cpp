@@ -120,7 +120,7 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     // Create BC last to ensure ghost particles are included.
     double x_bc = -0.5 * height;
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane(
+    CabanaPD::Region<CabanaPD::RectangularPrism> plane(
         x_bc - dx, x_bc + dx, y_prenotch1 - 0.25 * dx, y_prenotch2 + 0.25 * dx,
         -thickness, thickness );
     auto bc = createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0,
