@@ -308,59 +308,73 @@ class Solver
     void updateNeighbors() { force->update( *particles, 0.0, true ); }
 
     template <typename BoundaryType>
-    void run( BoundaryType boundary_condition )
+    void runStep( const int step, BoundaryType boundary_condition )
     {
-        init_output( boundary_condition.timeInit() );
+        // Integrate - velocity Verlet first half.
+        integrator->initialHalfStep( exec_space{}, particles );
 
-        // Main timestep loop.
-        for ( int step = 1; step <= num_steps; step++ )
+        // Update ghost particles.
+        comm->gatherDisplacement();
+
+        if constexpr ( is_heat_transfer<
+                           typename force_model_type::thermal_type>::value )
         {
-            _step_timer.start();
-
-            // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( exec_space{}, particles );
-
-            // Update ghost particles.
-            comm->gatherDisplacement();
-
-            if constexpr ( is_heat_transfer<
-                               typename force_model_type::thermal_type>::value )
-            {
-                if ( step % thermal_subcycle_steps == 0 )
-                    computeHeatTransfer( *heat_transfer, particles,
-                                         neigh_iter_tag{},
-                                         thermal_subcycle_steps * dt );
-            }
-
-            // Add non-force boundary condition.
-            if ( !boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space(), particles, step * dt );
-
-            if constexpr ( is_temperature_dependent<
-                               typename force_model_type::thermal_type>::value )
-                comm->gatherTemperature();
-
-            // Compute internal forces.
-            updateForce();
-
-            if constexpr ( is_contact<contact_model_type>::value )
-                computeForce( *contact, particles, neigh_iter_tag{}, false );
-
-            // Add force boundary condition.
-            if ( boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space(), particles, step * dt );
-
-            // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( exec_space{}, particles );
-
-            output( step );
+            if ( step % thermal_subcycle_steps == 0 )
+                computeHeatTransfer( *heat_transfer, particles,
+                                     neigh_iter_tag{},
+                                     thermal_subcycle_steps * dt );
         }
 
-        // Final output and timings.
-        final_output();
+        // Add non-force boundary condition.
+        if ( !boundary_condition.forceUpdate() )
+            boundary_condition.apply( exec_space(), particles, step * dt );
+
+        if constexpr ( is_temperature_dependent<
+                           typename force_model_type::thermal_type>::value )
+            comm->gatherTemperature();
+
+        // Compute internal forces.
+        updateForce();
+
+        if constexpr ( is_contact<contact_model_type>::value )
+            computeForce( *contact, particles, neigh_iter_tag{}, false );
+
+        // Add force boundary condition.
+        if ( boundary_condition.forceUpdate() )
+            boundary_condition.apply( exec_space(), particles, step * dt );
+
+        // Integrate - velocity Verlet second half.
+        integrator->finalHalfStep( exec_space{}, particles );
+
+        output( step );
     }
 
-    void run()
+    void runStep( const int step )
+    {
+        // Integrate - velocity Verlet first half.
+        integrator->initialHalfStep( exec_space{}, particles );
+
+        // Update ghost particles.
+        comm->gatherDisplacement();
+
+        // Compute internal forces.
+        updateForce();
+
+        if constexpr ( is_contact<contact_model_type>::value )
+            computeForce( *contact, particles, neigh_iter_tag{}, false );
+
+        if constexpr ( is_temperature_dependent<
+                           typename force_model_type::thermal_type>::value )
+            comm->gatherTemperature();
+
+        // Integrate - velocity Verlet second half.
+        integrator->finalHalfStep( exec_space{}, particles );
+
+        output( step );
+    }
+
+    template <typename... OutputType>
+    void run( OutputType&... region_output )
     {
         init_output();
 
@@ -368,31 +382,45 @@ class Solver
         for ( int step = 1; step <= num_steps; step++ )
         {
             _step_timer.start();
-
-            // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( exec_space{}, particles );
-
-            // Update ghost particles.
-            comm->gatherDisplacement();
-
-            // Compute internal forces.
-            updateForce();
-
-            if constexpr ( is_contact<contact_model_type>::value )
-                computeForce( *contact, particles, neigh_iter_tag{}, false );
-
-            if constexpr ( is_temperature_dependent<
-                               typename force_model_type::thermal_type>::value )
-                comm->gatherTemperature();
-
-            // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( exec_space{}, particles );
-
-            output( step );
+            runStep( step );
+            // FIXME: not included in timing
+            if ( step % output_frequency == 0 )
+                updateRegion( region_output... );
         }
 
         // Final output and timings.
-        final_output();
+        final_output( region_output... );
+    }
+
+    template <typename BoundaryType, typename... OutputType>
+    void run( BoundaryType& boundary_condition, OutputType&... region_output )
+    {
+        init_output( boundary_condition.timeInit() );
+
+        // Main timestep loop.
+        for ( int step = 1; step <= num_steps; step++ )
+        {
+            _step_timer.start();
+            runStep( step, boundary_condition );
+            // FIXME: not included in timing
+            if ( step % output_frequency == 0 )
+                updateRegion( region_output... );
+        }
+
+        // Final output and timings.
+        final_output( region_output... );
+    }
+
+    // Iterate over all regions.
+    template <typename... RegionType>
+    void updateRegion( RegionType&... region )
+    {
+        ( updateRegion( region ), ... );
+    }
+    template <typename RegionType>
+    void updateRegion( RegionType& region )
+    {
+        region.update();
     }
 
     // Compute and communicate fields needed for force computation and update
@@ -515,6 +543,25 @@ class Solver
                  p_steps_per_sec / comm->mpi_size );
             out.close();
         }
+    }
+
+    template <typename... RegionType>
+    void final_output( RegionType... region )
+    {
+        final_output();
+        printRegion( region... );
+    }
+
+    // Iterate over all regions.
+    template <typename... RegionType>
+    void printRegion( RegionType... region )
+    {
+        ( printRegion( region ), ... );
+    }
+    template <typename RegionType>
+    void printRegion( RegionType region )
+    {
+        region.print( particles.comm() );
     }
 
     int num_steps;

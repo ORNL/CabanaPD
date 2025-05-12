@@ -103,7 +103,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // ====================================================
     // Temperature profile imposed on top and bottom surfaces
     double dy = solver.particles.dx[1];
-    using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
+    using plane_type = CabanaPD::Region<CabanaPD::RectangularPrism>;
 
     // Top surface
     plane_type plane1( low_corner[0], high_corner[0], high_corner[1] - dy,
@@ -137,8 +137,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     int profile_dim = 1;
     auto value = KOKKOS_LAMBDA( const int pid ) { return temp( pid ); };
     std::string file_name = "temperature_yaxis_profile.txt";
-    createOutputProfile( MPI_COMM_WORLD, num_cells[1], profile_dim, file_name,
-                         solver.particles, value );
+    createOutputProfile( file_name, solver.particles, profile_dim, value );
 }
 
 // Initialize MPI+Kokkos.

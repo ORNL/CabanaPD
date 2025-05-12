@@ -86,10 +86,10 @@ void plateWithHoleExample( const std::string filename )
     //                Boundary conditions planes
     // ====================================================
     double dx = particles.dx[1];
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane1(
+    CabanaPD::Region<CabanaPD::RectangularPrism> plane1(
         low_corner[0] - dx, low_corner[0] + dx, low_corner[1], high_corner[1],
         low_corner[2], high_corner[2] );
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane2(
+    CabanaPD::Region<CabanaPD::RectangularPrism> plane2(
         high_corner[0] - dx, high_corner[0] + dx, low_corner[1], high_corner[1],
         low_corner[2], high_corner[2] );
 

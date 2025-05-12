@@ -132,10 +132,10 @@ void randomCracksExample( const std::string filename )
     //                Boundary conditions planes
     // ====================================================
     double dy = particles.dx[1];
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane1(
+    CabanaPD::Region<CabanaPD::RectangularPrism> plane1(
         low_corner[0], high_corner[0], low_corner[1] - dy, low_corner[1] + dy,
         low_corner[2], high_corner[2] );
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> plane2(
+    CabanaPD::Region<CabanaPD::RectangularPrism> plane2(
         low_corner[0], high_corner[0], high_corner[1] - dy, high_corner[1] + dy,
         low_corner[2], high_corner[2] );
 
