@@ -7,11 +7,48 @@
 
 #include <CabanaPD.hpp>
 
+// Copy from host to Particle data Views.
+template <typename MirrorViewType, typename PosViewType, typename VolViewType>
+void copyPositions( const MirrorViewType x, const MirrorViewType y,
+                    const MirrorViewType vol, PosViewType& position,
+                    VolViewType& volume )
+{
+    // Using atomic memory for the count.
+    using memory_space = typename PosViewType::memory_space;
+    using CountView =
+        typename Kokkos::View<int, Kokkos::LayoutRight, memory_space,
+                              Kokkos::MemoryTraits<Kokkos::Atomic>>;
+    CountView count( "count" );
+
+    using exec_space = typename memory_space::execution_space;
+    Kokkos::parallel_for(
+        "copy_to_position", Kokkos::RangePolicy<exec_space>( 0, x.size() ),
+        KOKKOS_LAMBDA( const int pid ) {
+            // Guard against duplicate points. This threaded loop should be
+            // faster than checking during the host read.
+            for ( int p = 0; p < pid; p++ )
+            {
+                auto xdiff = x( p ) - x( pid );
+                auto ydiff = y( p ) - y( pid );
+                if ( ( Kokkos::abs( xdiff ) < 1e-14 ) &&
+                     ( Kokkos::abs( ydiff ) < 1e-14 ) )
+                    return;
+            }
+            const std::size_t c = count()++;
+
+            // Set the particle position.
+            position( c, 0 ) = x( pid );
+            position( c, 1 ) = y( pid );
+            position( c, 2 ) = 0.0;
+            volume( c ) = vol( pid );
+        } );
+}
+
+// Read particles from csv file.
 template <typename MemorySpace, typename ModelType>
 auto read_particles( const std::string filename, const double dx,
                      const int halo_width )
 {
-    // Read particles from csv file.
     // This assumes 2 positions and a volume and ignores the rest.
     std::vector<double> csv_x;
     std::vector<double> csv_y;
@@ -57,39 +94,12 @@ auto read_particles( const std::string filename, const double dx,
 
     // Copy into a single position View.
     Kokkos::View<double* [3], MemorySpace> position( "custom_position",
-                                                     csv_v.size() );
-    Kokkos::View<double*, MemorySpace> volume( "custom_volume", csv_v.size() );
-
-    // Using atomic memory for the count.
-    using CountView =
-        typename Kokkos::View<int, Kokkos::LayoutRight, MemorySpace,
-                              Kokkos::MemoryTraits<Kokkos::Atomic>>;
-    CountView count( "count" );
-
-    using exec_space = typename MemorySpace::execution_space;
-    Kokkos::parallel_for(
-        "copy_to_position", Kokkos::RangePolicy<exec_space>( 0, x.size() ),
-        KOKKOS_LAMBDA( const int pid ) {
-            // Guard against duplicate points. This threaded loop should be
-            // faster than checking during the host read.
-            for ( int p = 0; p < pid; p++ )
-            {
-                auto xdiff = x( p ) - x( pid );
-                auto ydiff = y( p ) - y( pid );
-                if ( ( Kokkos::abs( xdiff ) < 1e-14 ) &&
-                     ( Kokkos::abs( ydiff ) < 1e-14 ) )
-                    return;
-            }
-            const std::size_t c = count()++;
-
-            // Set the particle position.
-            position( c, 0 ) = x( pid );
-            position( c, 1 ) = y( pid );
-            position( c, 2 ) = 0.0;
-            vol( c ) = vol( pid );
-        } );
+                                                     x.size() );
+    Kokkos::View<double*, MemorySpace> volume( "custom_volume", vol.size() );
+    copyPositions( x, y, vol, position, volume );
 
     std::array<double, 3> dx_array = { dx, dx, dx };
+    using exec_space = typename MemorySpace::execution_space;
     return CabanaPD::Particles( MemorySpace{}, ModelType{}, position, vol,
                                 dx_array, halo_width, exec_space{} );
 }
