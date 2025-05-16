@@ -154,7 +154,6 @@ class OutputTimeSeries
         {
             std::fstream fout;
             fout.open( file_name, std::ios::app );
-
             for ( std::size_t t = 0; t < index; t++ )
             {
                 fout << std::fixed << std::setprecision( 15 )
