@@ -20,28 +20,32 @@
 
 namespace CabanaPD
 {
+
+template <typename MechanicsModelType, typename... DataTypes>
+struct BaseForceModelPMB;
+
 template <>
-struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
-    : public BaseForceModel
+struct BaseForceModelPMB<Elastic> : public BaseForceModel
 {
     using base_type = BaseForceModel;
+    using model_type = PMB;
     using base_model = PMB;
-    using fracture_type = NoFracture;
-    using thermal_type = TemperatureIndependent;
+    using mechanics_type = Elastic;
 
     using base_type::delta;
 
     double c;
     double K;
 
-    ForceModel( PMB, NoFracture, const double delta, const double _K )
+    BaseForceModelPMB( PMB, NoFracture, const double delta, const double _K )
         : base_type( delta )
         , K( _K )
     {
         init();
     }
 
-    ForceModel( PMB, Elastic, NoFracture, const double delta, const double _K )
+    BaseForceModelPMB( PMB, Elastic, NoFracture, const double delta,
+                       const double _K )
         : base_type( delta )
         , K( _K )
     {
@@ -51,15 +55,15 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
     void init() { c = 18.0 * K / ( pi * delta * delta * delta * delta ); }
 
     KOKKOS_INLINE_FUNCTION
-    auto forceCoeff( const int, const int, const double s,
+    auto operator()( ForceCoeffTag, const int, const int, const double s,
                      const double vol ) const
     {
         return c * s * vol;
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto energy( const int, const int, const double s, const double xi,
-                 const double vol ) const
+    auto operator()( EnergyTag, const int, const int, const double s,
+                     const double xi, const double vol ) const
     {
         // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
         // the integrand (pairwise potential).
@@ -67,101 +71,33 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
     }
 };
 
-template <>
-struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
-    : public ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
-{
-    using base_type = ForceModel<PMB, Elastic, NoFracture>;
-    using base_model = typename base_type::base_model;
-    using fracture_type = Fracture;
-    using mechanics_type = Elastic;
-    using thermal_type = base_type::thermal_type;
-
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-    double G0;
-    double s0;
-    double bond_break_coeff;
-
-    ForceModel( PMB model, const double delta, const double K,
-                const double _G0 )
-        : base_type( model, NoFracture{}, delta, K )
-        , G0( _G0 )
-    {
-        init();
-    }
-
-    ForceModel( PMB model, Elastic elastic, const double delta, const double K,
-                const double _G0 )
-        : base_type( model, elastic, NoFracture{}, delta, K )
-        , G0( _G0 )
-    {
-        init();
-    }
-
-    void init()
-    {
-        s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / K / delta );
-        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
-    }
-
-    // Constructor to work with plasticity.
-    ForceModel( PMB model, Elastic elastic, const double delta, const double K,
-                const double _G0, const double _s0 )
-        : base_type( model, elastic, NoFracture{}, delta, K )
-        , G0( _G0 )
-        , s0( _s0 )
-    {
-        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
-    }
-
-    KOKKOS_INLINE_FUNCTION
-    bool criticalStretch( const int, const int, const double r,
-                          const double xi ) const
-    {
-        return r * r >= bond_break_coeff * xi * xi;
-    }
-};
-
 template <typename MemorySpace>
-struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
-                  TemperatureIndependent, MemorySpace>
-    : public ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>,
-      public BasePlasticity<MemorySpace>
+struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
+    : public BaseForceModelPMB<Elastic>, public BasePlasticity<MemorySpace>
 {
-    using base_type = ForceModel<PMB, Elastic>;
+    using base_type = BaseForceModelPMB<Elastic>;
+    using base_fracture_type = BaseFractureModel;
     using base_plasticity_type = BasePlasticity<MemorySpace>;
-    using base_model = typename base_type::base_model;
-    using fracture_type = Fracture;
-    using mechanics_type = ElasticPerfectlyPlastic;
-    using thermal_type = base_type::thermal_type;
 
-    using base_type::bond_break_coeff;
-    using base_type::c;
-    using base_type::delta;
-    using base_type::G0;
-    using base_type::K;
-    using base_type::s0;
+    using mechanics_type = ElasticPerfectlyPlastic;
 
     using base_plasticity_type::_s_p;
+    using base_type::c;
     double s_Y;
 
     using base_plasticity_type::updateBonds;
 
-    ForceModel( PMB model, mechanics_type, MemorySpace, const double delta,
-                const double K, const double G0, const double sigma_y )
-        : base_type( model, Elastic{}, delta, K, G0,
-                     // s0
-                     ( 5.0 * G0 / sigma_y / delta + sigma_y / K ) / 6.0 )
+    BaseForceModelPMB( PMB model, mechanics_type, MemorySpace,
+                       const double delta, const double K,
+                       const double sigma_y )
+        : base_type( model, NoFracture{}, delta, K )
         , base_plasticity_type()
         , s_Y( sigma_y / 3.0 / K )
     {
     }
 
-    // FIXME: avoiding multiple inheritance.
     KOKKOS_INLINE_FUNCTION
-    auto forceCoeff( const int i, const int n, const double s,
+    auto operator()( ForceCoeffTag, const int i, const int n, const double s,
                      const double vol ) const
     {
         // Update bond plastic stretch.
@@ -182,8 +118,8 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     // This energy calculation is only valid for pure tension or pure
     // compression.
     KOKKOS_INLINE_FUNCTION
-    auto energy( const int i, const int n, const double s, const double xi,
-                 const double vol ) const
+    auto operator()( EnergyTag, const int i, const int n, const double s,
+                     const double xi, const double vol ) const
     {
         auto s_p = _s_p( i, n );
         double stretch_term;
@@ -204,49 +140,120 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
 };
 
 template <>
+struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
+    : public BaseForceModelPMB<Elastic>,
+      BaseNoFractureModel,
+      BaseTemperatureModel<TemperatureIndependent>
+{
+    using base_type = BaseForceModelPMB<Elastic>;
+    using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
+
+    using base_type::base_type;
+    using base_type::delta;
+    using base_type::operator();
+    using base_temperature_type::operator();
+};
+
+template <>
+struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
+    : public BaseForceModelPMB<Elastic>,
+      BaseFractureModel,
+      BaseTemperatureModel<TemperatureIndependent>
+{
+    using base_type = BaseForceModelPMB<Elastic>;
+    using base_fracture_type = BaseFractureModel;
+    using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
+
+    using base_type::operator();
+    using base_fracture_type::operator();
+    using base_temperature_type::operator();
+
+    ForceModel( PMB model, const double delta, const double K, const double G0,
+                const int influence_type = 1 )
+        : base_type( model, NoFracture{}, delta, K )
+        , base_fracture_type( delta, K, G0, influence_type )
+    {
+    }
+
+    ForceModel( PMB model, Elastic elastic, const double delta, const double K,
+                const double G0, const int influence_type = 1 )
+        : base_type( model, elastic, NoFracture{}, delta, K )
+        , base_fracture_type( delta, K, G0, influence_type )
+    {
+    }
+
+    // Constructor to work with plasticity.
+    ForceModel( PMB model, Elastic elastic, const double delta, const double K,
+                const double G0, const double s0 )
+        : base_type( model, elastic, NoFracture{}, delta, K )
+        , base_fracture_type( G0, s0 )
+    {
+    }
+};
+
+template <typename MemorySpace>
+struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                  TemperatureIndependent, MemorySpace>
+    : public BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>,
+      public BaseFractureModel,
+      public BaseTemperatureModel<TemperatureIndependent>
+{
+    using base_type = BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>;
+    using base_fracture_type = BaseFractureModel;
+    using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
+
+    using base_type::operator();
+    using base_fracture_type::operator();
+    using base_temperature_type::operator();
+    using base_type::updateBonds;
+
+    ForceModel( PMB model, ElasticPerfectlyPlastic mechanics, MemorySpace space,
+                const double delta, const double K, const double G0,
+                const double sigma_y )
+        : base_type( model, mechanics, space, delta, K, sigma_y )
+        , base_fracture_type( G0,
+                              // s0
+                              ( 5.0 * G0 / sigma_y / delta + sigma_y / K ) /
+                                  6.0 )
+        , base_temperature_type()
+    {
+    }
+};
+
+template <>
 struct ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>
     : public ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
 {
-    using base_type = ForceModel<PMB, Elastic, NoFracture>;
-    using base_model = typename base_type::base_model;
-    using fracture_type = typename base_type::fracture_type;
-    using mechanics_type = Elastic;
-    using thermal_type = base_type::thermal_type;
+    using base_type =
+        ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>;
+    using model_type = LinearPMB;
+
+    using base_type::base_type;
+    using base_type::operator();
 
     template <typename... Args>
     ForceModel( LinearPMB, Args... args )
         : base_type( base_model{}, args... )
     {
     }
-
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
 };
 
 template <>
 struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
     : public ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
 {
-    using base_type = ForceModel<PMB>;
-    using base_model = typename base_type::base_model;
-    using fracture_type = typename base_type::fracture_type;
-    using mechanics_type = Elastic;
-    using thermal_type = base_type::thermal_type;
+    using base_type =
+        ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>;
+
+    using model_type = LinearPMB;
+
+    using base_type::operator();
 
     template <typename... Args>
     ForceModel( LinearPMB, Args... args )
         : base_type( base_model{}, std::forward<Args>( args )... )
     {
     }
-
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    using base_type::bond_break_coeff;
-    using base_type::G0;
-    using base_type::s0;
 };
 
 template <typename ModelType>
@@ -276,135 +283,67 @@ ForceModel( ModelType, ElasticPerfectlyPlastic, MemorySpace, const double delta,
 template <typename TemperatureType>
 struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
                   TemperatureType>
-    : public BaseTemperatureModel<TemperatureType>,
-      public ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
+    : public BaseForceModelPMB<Elastic>,
+      BaseNoFractureModel,
+      BaseTemperatureModel<TemperatureDependent, TemperatureType>
 {
-    using base_type =
-        ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>;
-    using base_temperature_type = BaseTemperatureModel<TemperatureType>;
-    using base_model = PMB;
-    using fracture_type = NoFracture;
-    using thermal_type = TemperatureDependent;
+    using base_type = BaseForceModelPMB<Elastic>;
+    using base_temperature_type =
+        BaseTemperatureModel<TemperatureDependent, TemperatureType>;
 
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    // Thermal parameters
-    using base_temperature_type::alpha;
-    using base_temperature_type::temp0;
-
-    // Explicitly use the temperature-dependent stretch.
-    using base_temperature_type::thermalStretch;
+    using base_type::operator();
+    using base_temperature_type::operator();
 
     ForceModel( PMB model, NoFracture fracture, const double _delta,
                 const double _K, const TemperatureType _temp,
                 const double _alpha, const double _temp0 = 0.0 )
-        : base_temperature_type( _temp, _alpha, _temp0 )
-        , base_type( model, fracture, _delta, _K )
+        : base_type( model, fracture, _delta, _K )
+        , base_temperature_type( _temp, _alpha, _temp0 )
+
     {
     }
 };
 
 template <typename TemperatureType>
 struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
-    : public BaseTemperatureModel<TemperatureType>,
-      public ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
-
+    : public BaseForceModelPMB<Elastic>, ThermalFractureModel<TemperatureType>
 {
-    using base_type =
-        ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>;
-    using base_temperature_type = BaseTemperatureModel<TemperatureType>;
-    using base_model = typename base_type::base_model;
-    using fracture_type = typename base_type::fracture_type;
-    using mechanics_type = Elastic;
-    using thermal_type = TemperatureDependent;
+    using base_type = BaseForceModelPMB<Elastic>;
+    using base_temperature_type = ThermalFractureModel<TemperatureType>;
 
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    // Does not use the base bond_break_coeff.
-    using base_type::G0;
-    using base_type::s0;
-
-    // Thermal parameters
-    using base_temperature_type::alpha;
-    using base_temperature_type::temp0;
-    using base_temperature_type::temperature;
-
-    // Explicitly use the temperature-dependent stretch.
-    using base_temperature_type::thermalStretch;
+    using base_type::operator();
+    using base_temperature_type::operator();
 
     ForceModel( PMB model, const double _delta, const double _K,
                 const double _G0, const TemperatureType _temp,
                 const double _alpha, const double _temp0 = 0.0 )
-        : base_temperature_type( _temp, _alpha, _temp0 )
-        , base_type( model, _delta, _K, _G0 )
-    {
-    }
+        : base_type( model, NoFracture{}, _delta, _K )
+        , base_temperature_type( _delta, _K, _G0, _temp, _alpha, _temp0 )
 
-    KOKKOS_INLINE_FUNCTION
-    bool criticalStretch( const int i, const int j, const double r,
-                          const double xi ) const
     {
-        double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
-        double bond_break_coeff =
-            ( 1.0 + s0 + alpha * temp_avg ) * ( 1.0 + s0 + alpha * temp_avg );
-        return r * r >= bond_break_coeff * xi * xi;
     }
 };
 
 template <typename TemperatureType>
 struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, TemperatureDependent,
                   TemperatureType>
-    : public ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
-                        TemperatureIndependent,
-                        typename TemperatureType::memory_space>,
-      BaseTemperatureModel<TemperatureType>
+    : public BaseForceModelPMB<ElasticPerfectlyPlastic,
+                               typename TemperatureType::memory_space>,
+      public ThermalFractureModel<TemperatureType>
 {
-    using base_type = ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
-                                 TemperatureIndependent,
-                                 typename TemperatureType::memory_space>;
-    using base_temperature_type = BaseTemperatureModel<TemperatureType>;
-    using base_model = typename base_type::base_model;
-    using fracture_type = typename base_type::fracture_type;
-    using mechanics_type = ElasticPerfectlyPlastic;
-    using thermal_type = TemperatureDependent;
+    using base_type = BaseForceModelPMB<ElasticPerfectlyPlastic,
+                                        typename TemperatureType::memory_space>;
+    using base_temperature_type = ThermalFractureModel<TemperatureType>;
 
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    // Does not use the base bond_break_coeff.
-    using base_type::G0;
-    using base_type::s0;
-
-    // Thermal parameters
-    using base_temperature_type::alpha;
-    using base_temperature_type::temp0;
-    using base_temperature_type::temperature;
-
-    // Explicitly use the temperature-dependent stretch.
-    using base_temperature_type::thermalStretch;
+    using base_type::operator();
+    using base_temperature_type::operator();
 
     ForceModel( const double _delta, const double _K, const double _G0,
-                const double _sigma_y, const TemperatureType _temp,
+                const double sigma_y, const TemperatureType _temp,
                 const double _alpha, const double _temp0 = 0.0 )
-        : base_type( _delta, _K, _G0, _sigma_y )
-        , base_temperature_type( _temp, _alpha, _temp0 )
+        : base_type( _delta, _K, _G0, sigma_y )
+        , base_temperature_type( _delta, _K, _G0, _temp, _alpha, _temp0 )
     {
-    }
-
-    // This is copied from the base temperature.
-    KOKKOS_INLINE_FUNCTION
-    bool criticalStretch( const int i, const int j, const double r,
-                          const double xi ) const
-    {
-        double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
-        double bond_break_coeff =
-            ( 1.0 + s0 + alpha * temp_avg ) * ( 1.0 + s0 + alpha * temp_avg );
-        return r * r >= bond_break_coeff * xi * xi;
     }
 };
 
@@ -424,41 +363,31 @@ ForceModel( ModelType, const double delta, const double K, const double _G0,
 
 template <typename TemperatureType>
 struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
-    : public BaseDynamicTemperatureModel,
-      public ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
-                        TemperatureType>
+    : public BaseForceModelPMB<Elastic>,
+      BaseNoFractureModel,
+      BaseTemperatureModel<TemperatureDependent, TemperatureType>,
+      BaseDynamicTemperatureModel
 {
-    using base_type = ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
-                                 TemperatureType>;
-    using base_temperature_type = BaseDynamicTemperatureModel;
-    using base_model = PMB;
-    using fracture_type = NoFracture;
+    using base_type = BaseForceModelPMB<Elastic>;
+    using base_temperature_type =
+        BaseTemperatureModel<TemperatureDependent, TemperatureType>;
+    using base_heat_transfer_type = BaseDynamicTemperatureModel;
+
+    // Necessary to distinguish between TemperatureDependent
     using thermal_type = DynamicTemperature;
 
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    // Thermal parameters
-    using base_temperature_type::cp;
-    using base_temperature_type::kappa;
-    using base_temperature_type::thermal_coeff;
-    using base_type::alpha;
-    using base_type::temp0;
-    using base_type::temperature;
-
-    // Explicitly use the temperature-dependent stretch.
-    using base_type::thermalStretch;
+    using base_type::operator();
+    using base_temperature_type::operator();
 
     ForceModel( PMB model, NoFracture fracture, const double _delta,
                 const double _K, const TemperatureType& _temp,
                 const double _kappa, const double _cp, const double _alpha,
                 const double _temp0 = 0.0,
                 const bool _constant_microconductivity = true )
-        : base_temperature_type( _delta, _kappa, _cp,
-                                 _constant_microconductivity )
-        , base_type( model, fracture, _delta, _K, _temp, _alpha, _temp0 )
-
+        : base_type( model, fracture, _delta, _K )
+        , base_temperature_type( _temp, _alpha, _temp0 )
+        , base_heat_transfer_type( _delta, _kappa, _cp,
+                                   _constant_microconductivity )
     {
     }
 };
@@ -474,45 +403,30 @@ ForceModel( ModelType, NoFracture, const double delta, const double K,
 template <typename ModelType, typename TemperatureType>
 struct ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
                   TemperatureType>
-    : public BaseDynamicTemperatureModel,
-      public ForceModel<ModelType, Elastic, Fracture, TemperatureDependent,
-                        TemperatureType>
 
+    : public BaseForceModelPMB<Elastic>,
+      ThermalFractureModel<TemperatureType>,
+      BaseDynamicTemperatureModel
 {
-    using base_type = ForceModel<PMB, Elastic, Fracture, TemperatureDependent,
-                                 TemperatureType>;
-    using base_temperature_type = BaseDynamicTemperatureModel;
-    using base_model = typename base_type::base_model;
-    using fracture_type = typename base_type::fracture_type;
+    using base_type = BaseForceModelPMB<Elastic>;
+    using base_temperature_type = ThermalFractureModel<TemperatureType>;
+    using base_heat_transfer_type = BaseDynamicTemperatureModel;
+
+    // Necessary to distinguish between TemperatureDependent
     using thermal_type = DynamicTemperature;
 
-    using base_type::c;
-    using base_type::delta;
-    using base_type::K;
-
-    // Does not use the base bond_break_coeff.
-    using base_type::G0;
-    using base_type::s0;
-
-    // Thermal parameters
-    using base_temperature_type::cp;
-    using base_temperature_type::kappa;
-    using base_temperature_type::thermal_coeff;
-    using base_type::alpha;
-    using base_type::temp0;
-    using base_type::temperature;
-
-    // Explicitly use the temperature-dependent stretch.
-    using base_type::thermalStretch;
+    using base_type::operator();
+    using base_temperature_type::operator();
 
     ForceModel( PMB model, const double _delta, const double _K,
                 const double _G0, const TemperatureType _temp,
                 const double _kappa, const double _cp, const double _alpha,
                 const double _temp0 = 0.0,
                 const bool _constant_microconductivity = true )
-        : base_temperature_type( _delta, _kappa, _cp,
-                                 _constant_microconductivity )
-        , base_type( model, _delta, _K, _G0, _temp, _alpha, _temp0 )
+        : base_type( model, NoFracture{}, _delta, _K )
+        , base_temperature_type( _delta, _K, _G0, _temp, _alpha, _temp0 )
+        , base_heat_transfer_type( _delta, _kappa, _cp,
+                                   _constant_microconductivity )
     {
     }
 };

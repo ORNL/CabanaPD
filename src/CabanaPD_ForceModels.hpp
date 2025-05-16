@@ -17,6 +17,19 @@
 
 namespace CabanaPD
 {
+struct ForceCoeffTag
+{
+};
+struct EnergyTag
+{
+};
+struct CriticalStretchTag
+{
+};
+struct ThermalStretchTag
+{
+};
+
 struct BaseForceModel
 {
     double delta;
@@ -24,12 +37,67 @@ struct BaseForceModel
     BaseForceModel( const double _delta )
         : delta( _delta ){};
 
+    auto cutoff() const { return delta; }
+
     // Only needed for models which store bond properties.
     void updateBonds( const int, const int ) {}
+};
+
+struct BaseNoFractureModel
+{
+    using fracture_type = NoFracture;
+};
+
+struct BaseFractureModel
+{
+    using fracture_type = Fracture;
+
+    double G0;
+    double s0;
+    double bond_break_coeff;
+
+    BaseFractureModel( const double _delta, const double _K, const double _G0,
+                       const int influence_type = 1 )
+        : G0( _G0 )
+    {
+        s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / _K / _delta ); // 1/xi
+        if ( influence_type == 0 )
+            s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / _K / _delta ); // 1
+
+        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+    };
+
+    // Constructor to work with plasticity.
+    BaseFractureModel( const double _G0, const double _s0 )
+        : G0( _G0 )
+        , s0( _s0 )
+    {
+        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    double operator()( CriticalStretchTag, const int, const int, const double r,
+                       const double xi ) const
+    {
+        return r * r >= bond_break_coeff * xi * xi;
+    }
+};
+
+template <typename ThermalType, typename... TemperatureType>
+struct BaseTemperatureModel;
+
+template <>
+struct BaseTemperatureModel<TemperatureIndependent>
+{
+    using thermal_type = TemperatureIndependent;
 
     // No-op for temperature.
     KOKKOS_INLINE_FUNCTION
-    void thermalStretch( double&, const int, const int ) const {}
+    double operator()( ThermalStretchTag, const int, const int,
+                       const double s ) const
+    {
+        return s;
+    }
 };
 
 template <class MemorySpace>
@@ -50,15 +118,16 @@ class BasePlasticity
 };
 
 template <typename TemperatureType>
-struct BaseTemperatureModel
+struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
 {
+    using thermal_type = TemperatureDependent;
+
     double alpha;
     double temp0;
 
     // Temperature field
     TemperatureType temperature;
 
-    BaseTemperatureModel(){};
     BaseTemperatureModel( const TemperatureType _temp, const double _alpha,
                           const double _temp0 )
         : alpha( _alpha )
@@ -76,10 +145,51 @@ struct BaseTemperatureModel
 
     // Update stretch with temperature effects.
     KOKKOS_INLINE_FUNCTION
-    void thermalStretch( double& s, const int i, const int j ) const
+    double operator()( ThermalStretchTag, const int i, const int j,
+                       const double s ) const
     {
         double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
-        s -= alpha * temp_avg;
+        return s - ( alpha * temp_avg );
+    }
+};
+
+template <typename TemperatureType>
+struct ThermalFractureModel
+    : public BaseFractureModel,
+      BaseTemperatureModel<TemperatureDependent, TemperatureType>
+{
+    using base_fracture_type = BaseFractureModel;
+    using base_temperature_type =
+        BaseTemperatureModel<TemperatureDependent, TemperatureType>;
+    using typename base_fracture_type::fracture_type;
+    using typename base_temperature_type::thermal_type;
+
+    // Does not use the base bond_break_coeff.
+    using base_fracture_type::s0;
+    using base_temperature_type::alpha;
+    using base_temperature_type::temp0;
+    using base_temperature_type::temperature;
+
+    // Does not use the base critical stretch.
+    using base_temperature_type::operator();
+
+    ThermalFractureModel( const double _delta, const double _K,
+                          const double _G0, const TemperatureType _temp,
+                          const double _alpha, const double _temp0,
+                          const int influence_type = 1 )
+        : base_fracture_type( _delta, _K, _G0, influence_type )
+        , base_temperature_type( _temp, _alpha, _temp0 )
+    {
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    double operator()( CriticalStretchTag, const int i, const int j,
+                       const double r, const double xi ) const
+    {
+        double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
+        double bond_break_coeff =
+            ( 1.0 + s0 + alpha * temp_avg ) * ( 1.0 + s0 + alpha * temp_avg );
+        return r * r >= bond_break_coeff * xi * xi;
     }
 };
 
@@ -88,6 +198,8 @@ struct BaseTemperatureModel
 // above).
 struct BaseDynamicTemperatureModel
 {
+    using thermal_type = DynamicTemperature;
+
     double delta;
 
     double thermal_coeff;
