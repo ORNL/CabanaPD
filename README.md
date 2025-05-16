@@ -211,6 +211,29 @@ The second example is pseudo-1d heat transfer (no mechanics) in a pre-notched cu
 ```
 ./CabanaPD/build/install/bin/ThermalDeformationHeatTransferPrenotched CabanaPD/examples/thermomechanics/heat_transfer.json
 ```
+## Visualizing with Paraview
+
+As mentioned above, the simulation results can be visualized with Paraview or similar applications.  
+
+### How to Install
+
+The installation instructions can be found [here](https://www.paraview.org/download/). Ensure the select the appropraite version based on your operating system.
+
+### Importing Files
+
+Once paraview is installed, the following simulation output file group should be imported to view the results `particles_..xmf`. 
+
+If allowed the option to select a reader type, select `XDMF Reader` in the "Open Data With ..." window. 
+
+### Viewing Results
+
+Below are some basic guidlines for how to perform the inital steps in order to view and analyze the results. A more indepth tutorial for Paraview can be found [here](https://docs.paraview.org/en/latest/Tutorials/SelfDirectedTutorial/index.html).
+
+1.  Select `Apply` in the lower lefthand window. This will load your simulation data and parameters.
+
+2. In the upper - middle pannel `Surface` will be selected by defeault as the geometry representation. Depending on your simulation, you might not be able to see the results until this is changed with `Point Gaussian`. 
+
+3. Output parameter values can be selected by changing the pannel set to default as `weighted volume`. 
 
 ## References
 
