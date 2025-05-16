@@ -156,7 +156,8 @@ class OutputTimeSeries
             fout.open( file_name, std::ios::app );
             for ( std::size_t t = 0; t < index; t++ )
             {
-                fout << profile_host( t ) << "  "
+                fout << std::fixed << std::setprecision( 15 )
+                     << profile_host( t ) << "  "
                      << profile_host( t ) / num_particles << std::endl;
             }
         }
