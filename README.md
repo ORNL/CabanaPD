@@ -217,7 +217,7 @@ As mentioned above, the simulation results can be visualized with Paraview or si
 
 ### How to Install
 
-The installation instructions can be found [here](https://www.paraview.org/download/). Ensure the select the appropraite version based on your operating system.
+The installation instructions can be found [here](https://www.paraview.org/download/). Ensure you select the appropriate version based on your operating system.
 
 ### Importing Files
 
@@ -227,13 +227,13 @@ If allowed the option to select a reader type, select `XDMF Reader` in the "Open
 
 ### Viewing Results
 
-Below are some basic guidlines for how to perform the inital steps in order to view and analyze the results. A more indepth tutorial for Paraview can be found [here](https://docs.paraview.org/en/latest/Tutorials/SelfDirectedTutorial/index.html).
+Below are some basic guidelines for how to perform the initial steps in order to view and analyze the results. A more indepth tutorial for Paraview can be found [here](https://docs.paraview.org/en/latest/Tutorials/SelfDirectedTutorial/index.html).
 
-1.  Select `Apply` in the lower lefthand window. This will load your simulation data and parameters.
+1.  Select `Apply` in the lower lefthand window. This will load your simulation data.
 
-2. In the upper - middle pannel `Surface` will be selected by defeault as the geometry representation. Depending on your simulation, you might not be able to see the results until this is changed with `Point Gaussian`. 
+2. In the upper-middle panel `Surface` will be selected by default as the geometry representation. Change this to `Point Gaussian`. 
 
-3. Output parameter values can be selected by changing the pannel set to default as `weighted volume`. 
+3. Different output fields can be selected by changing the panel to the left.
 
 ## References
 
