@@ -166,11 +166,124 @@ void testHalo()
     }
 }
 
+void testContactHalo()
+{
+    using exec_space = TEST_EXECSPACE;
+    using memory_space = TEST_MEMSPACE;
+
+    std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
+    std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
+    std::array<int, 3> num_cells = { 10, 10, 10 };
+    int halo_width = 1;
+
+    double delta = 0.20000001;
+    const int num_particles = 2;
+    // Purposely using zero-init here.
+    Kokkos::View<double* [3], memory_space> position( "custom_position", 2 );
+    Kokkos::View<double*, memory_space> rank( "rank", 2 );
+
+    // Set ID equal to MPI rank.
+    int current_rank = -1;
+    MPI_Comm_rank( MPI_COMM_WORLD, &current_rank );
+
+    // No ints are communicated in CabanaPD. We use the volume field for MPI
+    // rank here for convenience.
+    Kokkos::parallel_for(
+        "create_particles", Kokkos::RangePolicy<exec_space>( 0, num_particles ),
+        KOKKOS_LAMBDA( const int p ) {
+            if ( p == 0 )
+                position( p, 0 ) = 5.1e-5;
+            else
+                position( p, 0 ) = -5.1e-5;
+            rank( p ) = static_cast<double>( current_rank );
+        } );
+
+    using model_type = CabanaPD::PMB;
+    CabanaPD::Particles particles( memory_space{}, model_type{}, position,
+                                   volume, low_corner, high_corner, num_cells,
+                                   halo_width, exec_space{} );
+
+    int init_num_particles = particles.localOffset();
+    using HostAoSoA = Cabana::AoSoA<Cabana::MemberTypes<double[3], double>,
+                                    Kokkos::HostSpace>;
+    HostAoSoA aosoa_init_host( "host_aosoa", init_num_particles );
+    auto x_init_host = Cabana::slice<0>( aosoa_init_host );
+    auto rank_init_host = Cabana::slice<1>( aosoa_init_host );
+    Cabana::deep_copy( x_init_host, x );
+    Cabana::deep_copy( rank_init_host, rank );
+
+    // A gather is performed on construction.
+    using particles_type =
+        CabanaPD::Particles<memory_space, CabanaPD::Contact,
+                            CabanaPD::TemperatureIndependent>;
+    CabanaPD::Comm<particles_type, CabanaPD::Contact,
+                   CabanaPD::TemperatureIndependent>
+        comm( particles );
+
+    HostAoSoA aosoa_host( "host_aosoa", particles.referenceOffset() );
+    x = particles.sliceReferencePosition();
+    rank = particles.sliceVolume();
+    auto x_host = Cabana::slice<0>( aosoa_host );
+    auto rank_host = Cabana::slice<1>( aosoa_host );
+    Cabana::deep_copy( x_host, x );
+    Cabana::deep_copy( rank_host, rank );
+
+    EXPECT_EQ( particles.localOffset(), init_num_particles );
+
+    // Check all local particles unchanged.
+    for ( std::size_t p = 0; p < particles.localOffset(); ++p )
+    {
+        for ( int d = 0; d < 3; ++d )
+        {
+            EXPECT_EQ( x_host( p, d ), x_init_host( p, d ) );
+        }
+        EXPECT_EQ( rank_host( p ), rank_init_host( p ) );
+    }
+
+    int current_size = -1;
+    MPI_Comm_size( MPI_COMM_WORLD, &current_size );
+    // Ghosts should have been created for all but single rank systems.
+    if ( current_size > 1 )
+    {
+        EXPECT_GT( particles.numGhost(), 0 );
+    }
+    // Check all ghost particles in the halo region.
+    for ( std::size_t p = particles.localOffset();
+          p < particles.referenceOffset(); ++p )
+    {
+        for ( int d = 0; d < 3; ++d )
+        {
+            EXPECT_GE( x_host( p, d ), particles.ghost_mesh_lo[d] );
+            EXPECT_LE( x_host( p, d ), particles.ghost_mesh_hi[d] );
+        }
+        EXPECT_NE( rank_host( p ), current_rank );
+    }
+
+    // Check that all local particles (away from global boundaries) have a full
+    // set of neighbors.
+    // FIXME: Expected neighbors per particle could also be calculated at the
+    // boundaries (less than internal particles).
+    auto num_neigh_host =
+        Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, num_neigh );
+    for ( std::size_t p = 0; p < particles.localOffset(); ++p )
+    {
+        if ( x_host( p, 0 ) > box_min[0] + delta * 1.01 &&
+             x_host( p, 0 ) < box_max[0] - delta * 1.01 &&
+             x_host( p, 1 ) > box_min[1] + delta * 1.01 &&
+             x_host( p, 1 ) < box_max[1] - delta * 1.01 &&
+             x_host( p, 2 ) > box_min[2] + delta * 1.01 &&
+             x_host( p, 2 ) < box_max[2] - delta * 1.01 )
+        {
+            EXPECT_EQ( num_neigh_host( p ), expected_n );
+        }
+    }
+}
+
 //---------------------------------------------------------------------------//
 // TESTS
 //---------------------------------------------------------------------------//
 TEST( TEST_CATEGORY, test_particle_halo ) { testHalo(); }
 
-//---------------------------------------------------------------------------//
+TEST( TEST_CATEGORY, test_contact_halo ) { testContactHalo(); }
 
 } // end namespace Test
