@@ -99,7 +99,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     std::size_t frozen_offset = 0;
     std::size_t local_offset = 0;
     std::size_t num_ghost = 0;
-    std::size_t _size = 0;
+    std::size_t reference_offset = 0;
+    std::size_t num_contact_ghost = 0;
+    std::size_t total_size = 0;
 
     // x, u, f (vector matching system dimension).
     using vector_type = Cabana::MemberTypes<double[dim]>;
@@ -137,9 +139,10 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     // FIXME: this is for neighborlist construction.
     double ghost_mesh_lo[dim];
     double ghost_mesh_hi[dim];
-    std::shared_ptr<
-        Cabana::Grid::LocalGrid<Cabana::Grid::UniformMesh<double, dim>>>
-        local_grid;
+
+    using local_grid_type =
+        Cabana::Grid::LocalGrid<Cabana::Grid::UniformMesh<double, dim>>;
+    std::shared_ptr<local_grid_type> local_grid;
     Kokkos::Array<double, dim> dx;
 
     int halo_width;
@@ -393,6 +396,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         auto u = sliceDisplacement();
         auto vol = sliceVolume();
         auto nofail = sliceNoFail();
+        int rank = local_grid->globalGrid().blockId();
 
         // Initialize particles.
         auto create_functor =
@@ -418,17 +422,17 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             vol( pid ) = pv;
 
             // FIXME: hardcoded.
-            type( pid ) = 0;
+            type( pid ) = rank;
             nofail( pid ) = 0;
             rho( pid ) = 1.0;
 
             return create;
         };
         // Fence inside create.
-        local_offset = Cabana::Grid::createParticles(
+        auto local_current = Cabana::Grid::createParticles(
             init_type, exec_space, create_functor, _plist_x, particles_per_cell,
             *local_grid, num_previous, false );
-        resize( local_offset, 0, create_frozen );
+        resize( local_current, 0, create_frozen );
 
         updateGlobal();
         _init_timer.stop();
@@ -564,9 +568,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     auto numLocal() const { return local_offset - frozen_offset; }
     auto localOffset() const { return local_offset; }
     auto numGhost() const { return num_ghost; }
-    // This is currently size because contact ghosts are not added yet.
-    auto referenceOffset() const { return _size; }
-    auto size() const { return _size; }
+    auto referenceOffset() const { return reference_offset; }
+    auto numContactGhost() const { return num_contact_ghost; }
+    auto size() const { return total_size; }
     auto numGlobal() const { return num_global; }
 
     auto sliceReferencePosition()
@@ -664,27 +668,30 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         //_timer.stop();
     }
 
-    void resize( int new_local, int new_ghost,
-                 const bool create_frozen = false )
+    void resize( int new_local, int new_ghost, const bool create_frozen = false,
+                 int new_contact_ghost = 0 )
     {
         _timer.start();
         if ( new_ghost > 0 )
             assert( create_frozen == false );
 
+        if ( create_frozen )
+            frozen_offset = new_local;
         local_offset = new_local;
         num_ghost = new_ghost;
-        _size = new_local + new_ghost;
+        reference_offset = new_local + new_ghost;
+        num_contact_ghost = new_contact_ghost;
+        total_size = reference_offset + num_contact_ghost;
 
-        _plist_x.aosoa().resize( referenceOffset() );
-        _aosoa_u.resize( referenceOffset() );
-        _aosoa_y.resize( referenceOffset() );
-        _aosoa_vol.resize( referenceOffset() );
+        _plist_x.aosoa().resize( size() );
+        _aosoa_u.resize( size() );
+        _aosoa_y.resize( size() );
+        _aosoa_vol.resize( size() );
         _plist_f.aosoa().resize( localOffset() );
         _aosoa_other.resize( localOffset() );
         _aosoa_nofail.resize( referenceOffset() );
 
-        if ( create_frozen )
-            frozen_offset = _size;
+        assert( total_size == _plist_x.size() );
         _timer.stop();
     };
 
@@ -742,7 +749,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         Cabana::Experimental::HDF5ParticleOutput::writeTimeStep(
             h5_config, "particles", MPI_COMM_WORLD, output_step, output_time,
             localOffset(), getPosition( use_reference ), sliceForce(),
-            sliceDisplacement(), sliceVelocity(),
+            sliceDisplacement(), sliceVelocity(), sliceType(),
             std::forward<OtherFields>( other )... );
 #else
 #ifdef Cabana_ENABLE_SILO
@@ -769,7 +776,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     auto time() { return _timer.time(); };
 
     friend class Comm<self_type, Pair, TemperatureIndependent>;
-    friend class Comm<self_type, Pair, TemperatureDependent>;
+    friend class Comm<self_type, Contact, TemperatureIndependent>;
 
   protected:
     aosoa_u_type _aosoa_u;
@@ -871,9 +878,10 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
         return Cabana::slice<0>( _aosoa_m, "weighted_volume" );
     }
 
-    void resize( int new_local, int new_ghost )
+    template <typename... Args>
+    void resize( Args&&... args )
     {
-        base_type::resize( new_local, new_ghost );
+        base_type::resize( std::forward<Args>( args )... );
         _timer.start();
         _aosoa_theta.resize( base_type::referenceOffset() );
         _aosoa_m.resize( base_type::referenceOffset() );
@@ -1009,8 +1017,10 @@ class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
 
     friend class Comm<self_type, Pair, TemperatureIndependent>;
     friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Contact, TemperatureIndependent>;
     friend class Comm<self_type, Pair, TemperatureDependent>;
     friend class Comm<self_type, State, TemperatureDependent>;
+    friend class Comm<self_type, Contact, TemperatureDependent>;
 
   protected:
     void init_temp()
@@ -1096,8 +1106,10 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
 
     friend class Comm<self_type, Pair, TemperatureIndependent>;
     friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Contact, TemperatureIndependent>;
     friend class Comm<self_type, Pair, TemperatureDependent>;
     friend class Comm<self_type, State, TemperatureDependent>;
+    friend class Comm<self_type, Contact, TemperatureDependent>;
 
   protected:
     void init()
@@ -1220,8 +1232,10 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
 
     friend class Comm<self_type, Pair, TemperatureIndependent>;
     friend class Comm<self_type, State, TemperatureIndependent>;
+    friend class Comm<self_type, Contact, TemperatureIndependent>;
     friend class Comm<self_type, Pair, TemperatureDependent>;
     friend class Comm<self_type, State, TemperatureDependent>;
+    friend class Comm<self_type, Contact, TemperatureDependent>;
 
   protected:
     void init()
