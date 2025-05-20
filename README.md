@@ -211,6 +211,31 @@ The second example is pseudo-1d heat transfer (no mechanics) in a pre-notched cu
 ```
 ./CabanaPD/build/install/bin/ThermalDeformationHeatTransferPrenotched CabanaPD/examples/thermomechanics/heat_transfer.json
 ```
+## Visualizing with Paraview
+
+As mentioned above, the simulation results can be visualized with Paraview or similar applications.  
+
+### How to Install
+
+The installation instructions can be found [here](https://www.paraview.org/download/). Ensure you select the appropriate version based on your operating system.
+
+### Importing Files
+
+Once Paraview is installed, the following simulation output file group should be imported to view the results: `particles_..xmf` for HDF5 or `particles_..silo` for SILO. 
+
+If shown the option to select a reader type, select `XDMF Reader` in the "Open Data With ..." window for HDF5. 
+
+### Viewing Results
+
+Below are some basic guidelines for how to perform the initial steps in order to view and analyze the results. A more in-depth tutorial for Paraview can be found [here](https://docs.paraview.org/en/latest/Tutorials/SelfDirectedTutorial/index.html).
+
+1. Select `Apply` in the lower left-hand Properties window. This will load your simulation data.
+
+2. In the Properties window, under Representation, `Surface` will be selected by default as the geometry representation. Change this to `Point Gaussian`. 
+
+3. Different output fields can be selected within the Coloring menu below Representation. 
+
+4. To control the size of the visualized points, scroll down within the Properties window until the Point Gaussian menu and choose a value for Gaussian Radius.
 
 ## References
 
