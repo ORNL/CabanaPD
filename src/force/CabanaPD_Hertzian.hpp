@@ -24,8 +24,9 @@ namespace CabanaPD
 /******************************************************************************
   Normal repulsion forces
 ******************************************************************************/
-template <class MemorySpace>
-class Force<MemorySpace, HertzianModel> : public BaseForceContact<MemorySpace>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, HertzianModel, NoFracture>
+    : public BaseForceContact<MemorySpace>
 {
   public:
     using base_type = BaseForceContact<MemorySpace>;
@@ -33,7 +34,7 @@ class Force<MemorySpace, HertzianModel> : public BaseForceContact<MemorySpace>
 
     template <class ParticleType>
     Force( const bool half_neigh, const ParticleType& particles,
-           const HertzianModel model )
+           const ModelType model )
         : base_type( half_neigh, particles, model )
         , _model( model )
     {
@@ -94,7 +95,7 @@ class Force<MemorySpace, HertzianModel> : public BaseForceContact<MemorySpace>
     }
 
   protected:
-    HertzianModel _model;
+    ModelType _model;
     using base_type::_half_neigh;
     using base_type::_neigh_list;
     using base_type::_neigh_timer;

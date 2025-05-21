@@ -95,7 +95,10 @@ class Solver
 
     // Core module types - required for all problems.
     using force_model_type = ForceModelType;
-    using force_type = Force<memory_space, force_model_type>;
+    using force_model_tag = typename force_model_type::model_type;
+    using force_fracture_type = typename force_model_type::fracture_type;
+    using force_type = Force<memory_space, force_model_type, force_model_tag,
+                             force_fracture_type>;
     using comm_type =
         Comm<ParticleType, typename force_model_type::base_model::base_type,
              typename ParticleType::thermal_type>;
@@ -103,8 +106,12 @@ class Solver
 
     // Optional module types.
     using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
-    using contact_type = Force<memory_space, ContactModelType>;
     using contact_model_type = ContactModelType;
+    using contact_model_tag = typename contact_model_type::model_type;
+    using contact_base_model_type = typename contact_model_type::base_model;
+    using contact_fracture_type = typename contact_model_type::fracture_type;
+    using contact_type = Force<memory_space, contact_model_type,
+                               contact_model_tag, contact_fracture_type>;
 
     // Flexible module types.
     // Integration should include max displacement tracking if either model
@@ -305,7 +312,7 @@ class Solver
         // FIXME: Will need to rebuild ghosts.
     }
 
-    void updateNeighbors() { force->update( *particles, 0.0, true ); }
+    void updateNeighbors() { force->update( particles, 0.0, true ); }
 
     template <typename BoundaryType>
     void runStep( const int step, BoundaryType boundary_condition )

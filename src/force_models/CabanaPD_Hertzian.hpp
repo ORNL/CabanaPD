@@ -24,6 +24,7 @@ struct HertzianModel : public ContactModel
 {
     using base_type = ContactModel;
     using base_model = base_type::base_model;
+    using model_type = HertzianModel;
     using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
 

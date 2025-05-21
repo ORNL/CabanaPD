@@ -137,11 +137,12 @@ getLinearizedDistance( const PosType& x, const PosType& u, const int i,
 }
 
 // Forward declaration.
-template <class MemorySpace, class ForceType>
+template <class MemorySpace, class ModelType, class ModelTag,
+          class FractureType>
 class Force;
 
 template <class MemorySpace>
-class Force<MemorySpace, BaseForceModel>
+class BaseForce
 {
   public:
     using neighbor_list_type =
@@ -159,8 +160,8 @@ class Force<MemorySpace, BaseForceModel>
   public:
     // Primary constructor: use positions and construct neighbors.
     template <class ParticleType>
-    Force( const bool half_neigh, const double delta,
-           const ParticleType& particles, const double tol = 1e-14 )
+    BaseForce( const bool half_neigh, const double delta,
+               const ParticleType& particles, const double tol = 1e-14 )
         : _half_neigh( half_neigh )
         , _neigh_list( neighbor_list_type(
               particles.sliceReferencePosition(), particles.frozenOffset(),
@@ -172,10 +173,10 @@ class Force<MemorySpace, BaseForceModel>
     // General constructor (necessary for contact, but could be used by any
     // force routine).
     template <class PositionType>
-    Force( const bool half_neigh, const double delta,
-           const PositionType& positions, const std::size_t frozen_offset,
-           const std::size_t local_offset, const double mesh_min[3],
-           const double mesh_max[3], const double tol = 1e-14 )
+    BaseForce( const bool half_neigh, const double delta,
+               const PositionType& positions, const std::size_t frozen_offset,
+               const std::size_t local_offset, const double mesh_min[3],
+               const double mesh_max[3], const double tol = 1e-14 )
         : _half_neigh( half_neigh )
         , _neigh_list( neighbor_list_type( positions, frozen_offset,
                                            local_offset, delta + tol, 1.0,
@@ -185,7 +186,7 @@ class Force<MemorySpace, BaseForceModel>
 
     // Constructor which stores existing neighbors.
     template <class NeighborListType>
-    Force( const bool half_neigh, const NeighborListType& neighbors )
+    BaseForce( const bool half_neigh, const NeighborListType& neighbors )
         : _half_neigh( half_neigh )
         , _neigh_list( neighbors )
     {

@@ -26,6 +26,7 @@ template <>
 struct BaseForceModelLPS<Elastic> : public BaseForceModel
 {
     using base_type = BaseForceModel;
+    using model_type = LPS;
     using base_model = LPS;
 
     using base_type::delta;
@@ -136,8 +137,6 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
     using base_fracture_type = BaseFractureModel;
     using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
 
-    using model_type = LPS;
-    using base_model = typename base_type::base_model;
     using fracture_type = Fracture;
     using thermal_type = base_temperature_type::thermal_type;
 
@@ -198,9 +197,7 @@ struct ForceModel<LinearLPS, Elastic, NoFracture, TemperatureIndependent>
 {
     using base_type =
         ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>;
-    using base_temperature_type = typename base_type::base_temperature_type;
-    using base_model = typename base_type::base_model;
-    using fracture_type = typename base_type::fracture_type;
+    using model_type = LinearLPS;
 
     template <typename... Args>
     ForceModel( LinearLPS, Args&&... args )
@@ -220,9 +217,6 @@ struct ForceModel<LinearLPS, Elastic, Fracture, TemperatureIndependent>
         ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>;
 
     using model_type = LinearLPS;
-    using base_model = typename base_type::base_model;
-    using fracture_type = typename base_type::fracture_type;
-    using thermal_type = base_type::thermal_type;
 
     template <typename... Args>
     ForceModel( LinearLPS, Args&&... args )
