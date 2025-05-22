@@ -76,8 +76,8 @@ struct BaseFractureModel
     }
 
     KOKKOS_INLINE_FUNCTION
-    double operator()( CriticalStretchTag, const int, const int, const double r,
-                       const double xi ) const
+    bool operator()( CriticalStretchTag, const int, const int, const double r,
+                     const double xi ) const
     {
         return r * r >= bond_break_coeff * xi * xi;
     }
@@ -183,8 +183,8 @@ struct ThermalFractureModel
     }
 
     KOKKOS_INLINE_FUNCTION
-    double operator()( CriticalStretchTag, const int i, const int j,
-                       const double r, const double xi ) const
+    bool operator()( CriticalStretchTag, const int i, const int j,
+                     const double r, const double xi ) const
     {
         double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
         double bond_break_coeff =
