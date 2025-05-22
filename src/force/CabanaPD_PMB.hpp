@@ -70,17 +70,15 @@
 
 namespace CabanaPD
 {
-template <class MemorySpace, class MechanicsType, class... ModelParams>
-class Force<MemorySpace,
-            ForceModel<PMB, MechanicsType, NoFracture, ModelParams...>>
-    : public Force<MemorySpace, BaseForceModel>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, PMB, NoFracture>
+    : public BaseForce<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type =
-        ForceModel<PMB, MechanicsType, NoFracture, ModelParams...>;
-    using base_type = Force<MemorySpace, BaseForceModel>;
+    using model_type = ModelType;
+    using base_type = BaseForce<MemorySpace>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
     using base_type::_neigh_list;
 
@@ -233,26 +231,22 @@ class Force<MemorySpace,
     }
 };
 
-template <class MemorySpace, class MechanicsType, class... ModelParams>
-class Force<MemorySpace,
-            ForceModel<PMB, MechanicsType, Fracture, ModelParams...>>
-    : public Force<MemorySpace, BaseForceModel>,
-      public BaseFracture<MemorySpace>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, PMB, Fracture>
+    : public BaseForce<MemorySpace>, public BaseFracture<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ForceModel<PMB, MechanicsType, Fracture, ModelParams...>;
-    using base_type = Force<MemorySpace, BaseForceModel>;
+    using model_type = ModelType;
+    using base_type = BaseForce<MemorySpace>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
     using base_type::_neigh_list;
 
   protected:
+    using base_type::_half_neigh;
     using fracture_type = BaseFracture<MemorySpace>;
     using fracture_type::_mu;
-
-    using base_model_type = typename model_type::base_type;
-    using base_type::_half_neigh;
     model_type _model;
 
     using base_type::_energy_timer;
@@ -463,17 +457,15 @@ class Force<MemorySpace,
     }
 };
 
-template <class MemorySpace, class... ModelParams>
-class Force<MemorySpace,
-            ForceModel<LinearPMB, Elastic, NoFracture, ModelParams...>>
-    : public Force<MemorySpace, BaseForceModel>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, LinearPMB, NoFracture>
+    : public BaseForce<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type =
-        ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>;
-    using base_type = Force<MemorySpace, BaseForceModel>;
+    using model_type = ModelType;
+    using base_type = BaseForce<MemorySpace>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
     using base_type::_neigh_list;
 

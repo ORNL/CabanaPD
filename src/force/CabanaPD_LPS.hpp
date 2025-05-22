@@ -69,14 +69,14 @@
 
 namespace CabanaPD
 {
-template <class MemorySpace>
-class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
-    : public Force<MemorySpace, BaseForceModel>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, LPS, NoFracture>
+    : public BaseForce<MemorySpace>
 {
   protected:
-    using base_type = Force<MemorySpace, BaseForceModel>;
+    using base_type = BaseForce<MemorySpace>;
     using base_type::_half_neigh;
-    using model_type = ForceModel<LPS, Elastic, NoFracture>;
+    using model_type = ModelType;
     model_type _model;
 
     using base_type::_energy_timer;
@@ -245,9 +245,6 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
         return strain_energy;
     }
 
-    auto time() { return _timer.time(); };
-    auto timeEnergy() { return _energy_timer.time(); };
-
     template <class ParticleType, class ParallelType>
     void computeStressFull( ParticleType& particles,
                             ParallelType& neigh_op_tag )
@@ -302,18 +299,17 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
     }
 };
 
-template <class MemorySpace>
-class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
-    : public Force<MemorySpace, BaseForceModel>,
-      public BaseFracture<MemorySpace>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, LPS, Fracture>
+    : public BaseForce<MemorySpace>, public BaseFracture<MemorySpace>
 {
   protected:
+    using base_type = BaseForce<MemorySpace>;
+    using base_type::_half_neigh;
     using fracture_type = BaseFracture<MemorySpace>;
     using fracture_type::_mu;
 
-    using base_type = Force<MemorySpace, BaseForceModel>;
-    using base_type::_half_neigh;
-    using model_type = ForceModel<LPS, Elastic, Fracture>;
+    using model_type = ModelType;
     model_type _model;
 
     using base_type::_energy_timer;
@@ -628,13 +624,13 @@ class Force<MemorySpace, ForceModel<LPS, Elastic, Fracture>>
     }
 };
 
-template <class MemorySpace>
-class Force<MemorySpace, ForceModel<LinearLPS, Elastic, NoFracture>>
-    : public Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
+    : public Force<MemorySpace, ModelType, LPS, NoFracture>
 {
   protected:
-    using base_type = Force<MemorySpace, ForceModel<LPS, Elastic, NoFracture>>;
-    using model_type = ForceModel<LinearLPS, Elastic, NoFracture>;
+    using base_type = Force<MemorySpace, ModelType, LPS, NoFracture>;
+    using model_type = ModelType;
     model_type _model;
 
     using base_type::_energy_timer;
