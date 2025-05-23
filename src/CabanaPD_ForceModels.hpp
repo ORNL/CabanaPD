@@ -29,15 +29,37 @@ struct CriticalStretchTag
 struct ThermalStretchTag
 {
 };
+struct WeightedVolumeTag
+{
+};
+struct DilatationTag
+{
+};
+struct InfluenceFunctionTag
+{
+};
 
 struct BaseForceModel
 {
+    using material_type = SingleMaterial;
     double delta;
+    double K;
 
-    BaseForceModel( const double _delta )
-        : delta( _delta ){};
+    BaseForceModel( const double _delta, const double _K )
+        : delta( _delta )
+        , K( _K ){};
+
+    // FIXME: use the first model cutoff for now.
+    template <typename ModelType1, typename ModelType2>
+    BaseForceModel( const ModelType1& model1, const ModelType2& model2 )
+    {
+        delta = model1.delta;
+        K = ( model1.K + model2.K ) / 2.0;
+    }
 
     auto cutoff() const { return delta; }
+
+    auto bulkModulus() const { return K; }
 
     // Only needed for models which store bond properties.
     void updateBonds( const int, const int ) {}
@@ -72,6 +94,17 @@ struct BaseFractureModel
         : G0( _G0 )
         , s0( _s0 )
     {
+        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+    }
+
+    // Average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    BaseFractureModel( const ModelType1& model1, const ModelType2& model2 )
+    {
+        G0 = ( model1.G0 + model2.G0 ) / 2.0;
+        s0 = Kokkos::sqrt( ( model1.s0 * model1.s0 * model1.K +
+                             model2.s0 * model2.s0 * model2.K ) /
+                           ( model1.K + model2.K ) );
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 
@@ -134,11 +167,13 @@ struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
         , temp0( _temp0 )
         , temperature( _temp ){};
 
-    BaseTemperatureModel( const BaseTemperatureModel& model )
+    // Average from existing models.
+    BaseTemperatureModel( const BaseTemperatureModel& model1,
+                          const BaseTemperatureModel& model2 )
     {
-        alpha = model.alpha;
-        temp0 = model.temp0;
-        temperature = model.temperature;
+        // FIXME: correct averaging
+        alpha = ( model1.alpha + model2.alpha ) / 2.0;
+        temp0 = ( model1.temp0 + model2.temp0 ) / 2.0;
     }
 
     void update( const TemperatureType _temp ) { temperature = _temp; }
@@ -178,9 +213,7 @@ struct ThermalFractureModel
                           const double _alpha, const double _temp0,
                           const int influence_type = 1 )
         : base_fracture_type( _delta, _K, _G0, influence_type )
-        , base_temperature_type( _temp, _alpha, _temp0 )
-    {
-    }
+        , base_temperature_type( _temp, _alpha, _temp0 ){};
 
     KOKKOS_INLINE_FUNCTION
     bool operator()( CriticalStretchTag, const int i, const int j,
@@ -217,6 +250,16 @@ struct BaseDynamicTemperatureModel
         const double d3 = _delta * _delta * _delta;
         thermal_coeff = 9.0 / 2.0 * _kappa / pi / d3;
         constant_microconductivity = _constant_microconductivity;
+    }
+
+    // Average from existing models.
+    BaseDynamicTemperatureModel( const BaseDynamicTemperatureModel& model1,
+                                 const BaseDynamicTemperatureModel& model2 )
+    {
+        delta = ( model1.delta + model2.delta ) / 2.0;
+        kappa = ( model1.kappa + model2.kappa ) / 2.0;
+        cp = ( model1.cp + model2.cp ) / 2.0;
+        constant_microconductivity = model1.constant_microconductivity;
     }
 
     KOKKOS_INLINE_FUNCTION double microconductivity_function( double r ) const
