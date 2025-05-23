@@ -34,18 +34,23 @@ struct BaseForceModel
 {
     using material_type = SingleMaterial;
     double delta;
+    double K;
 
-    BaseForceModel( const double _delta )
-        : delta( _delta ){};
+    BaseForceModel( const double _delta, const double _K )
+        : delta( _delta )
+        , K( _K ){};
 
     // FIXME: use the first model cutoff for now.
     template <typename ModelType1, typename ModelType2>
-    BaseForceModel( const ModelType1& model1, const ModelType2& )
+    BaseForceModel( const ModelType1& model1, const ModelType2& model2 )
     {
         delta = model1.delta;
+        K = ( model1.K + model2.K ) / 2.0;
     }
 
     auto cutoff() const { return delta; }
+
+    auto bulkModulus() const { return K; }
 
     // Only needed for models which store bond properties.
     void updateBonds( const int, const int ) {}
@@ -153,15 +158,6 @@ struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
         , temp0( _temp0 )
         , temperature( _temp ){};
 
-    // Average from existing models.
-    BaseTemperatureModel( const BaseTemperatureModel& model1,
-                          const BaseTemperatureModel& model2 )
-    {
-        // FIXME: correct averaging
-        alpha = ( model1.alpha + model2.alpha ) / 2.0;
-        temp0 = ( model1.temp0 + model2.temp0 ) / 2.0;
-    }
-
     void update( const TemperatureType _temp ) { temperature = _temp; }
 
     // Update stretch with temperature effects.
@@ -236,16 +232,6 @@ struct BaseDynamicTemperatureModel
         const double d3 = _delta * _delta * _delta;
         thermal_coeff = 9.0 / 2.0 * _kappa / pi / d3;
         constant_microconductivity = _constant_microconductivity;
-    }
-
-    // Average from existing models.
-    BaseDynamicTemperatureModel( const BaseDynamicTemperatureModel& model1,
-                                 const BaseDynamicTemperatureModel& model2 )
-    {
-        delta = ( model1.delta + model2.delta ) / 2.0;
-        kappa = ( model1.kappa + model2.kappa ) / 2.0;
-        cp = ( model1.cp + model2.cp ) / 2.0;
-        constant_microconductivity = model1.constant_microconductivity;
     }
 
     KOKKOS_INLINE_FUNCTION double microconductivity_function( double r ) const

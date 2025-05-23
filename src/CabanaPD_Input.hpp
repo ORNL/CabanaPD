@@ -297,8 +297,10 @@ class Inputs
             double dt_ht = inputs["thermal_subcycle_steps"]["value"];
             dt_ht *= dt;
 
+            // Does not currently support multi-material.
             double cp = inputs["specific_heat_capacity"]["value"];
-            double dt_ht_crit = min_rho * cp / sum_ht;
+            double rho = inputs["density"]["value"];
+            double dt_ht_crit = rho * cp / sum_ht;
             compareCriticalTimeStep( "heat_transfer", dt_ht, dt_ht_crit );
         }
     }

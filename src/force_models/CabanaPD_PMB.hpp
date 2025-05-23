@@ -33,21 +33,18 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
     using mechanics_type = Elastic;
 
     using base_type::delta;
-
+    using base_type::K;
     double c;
-    double K;
 
     BaseForceModelPMB( PMB, NoFracture, const double delta, const double _K )
-        : base_type( delta )
-        , K( _K )
+        : base_type( delta, _K )
     {
         init();
     }
 
     BaseForceModelPMB( PMB, Elastic, NoFracture, const double delta,
                        const double _K )
-        : base_type( delta )
-        , K( _K )
+        : base_type( delta, _K )
     {
         init();
     }
@@ -59,7 +56,6 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
     BaseForceModelPMB( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
     {
-        K = ( model1.K + model2.K ) / 2.0;
         c = ( model1.c + model2.c ) / 2.0;
     }
 

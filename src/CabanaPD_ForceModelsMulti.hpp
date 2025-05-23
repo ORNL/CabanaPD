@@ -9,11 +9,10 @@
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef FORCE_MODELS_H
-#define FORCE_MODELS_H
+#ifndef FORCE_MODELS_MULTI_H
+#define FORCE_MODELS_MULTI_H
 
-#include <CabanaPD_Constants.hpp>
-#include <CabanaPD_Types.hpp>
+#include <CabanaPD_Output.hpp>
 
 namespace CabanaPD
 {
@@ -39,6 +38,14 @@ struct ForceModels
     using thermal_type = typename first_model::thermal_type;
     using fracture_type = typename first_model::fracture_type;
 
+    static_assert( ( std::is_same<typename ModelType1::thermal_type,
+                                  TemperatureIndependent>::value ||
+                     std::is_same<typename ModelType2::thermal_type,
+                                  TemperatureIndependent>::value ||
+                     std::is_same<typename ModelType12::thermal_type,
+                                  TemperatureIndependent>::value ),
+                   "Thermomechanics does not yet support multiple materials!" );
+
     ForceModels( MaterialType t, const ModelType1 m1, ModelType2 m2,
                  ModelType12 m12 )
         : delta( 0.0 )
@@ -61,10 +68,27 @@ struct ForceModels
     auto maxDelta( Model m )
     {
         if ( m.delta > delta )
+        {
             delta = m.delta;
+            // Enforce equal cutoff for now.
+            if ( m.delta != delta )
+                log_err( std::cout, "Horizon for each model must match for "
+                                    "multi-material systems." );
+        }
     }
 
     auto cutoff() const { return delta; }
+
+    auto bulkModulus() const { return model1.K; }
+    auto bulkModulus( const int i ) const
+    {
+        if ( i == 0 )
+            return model1.K;
+        else if ( i == 1 )
+            return model2.K;
+        else if ( i == 2 )
+            return model12.K;
+    }
 
     void updateBonds( const int num_local, const int max_neighbors )
     {
