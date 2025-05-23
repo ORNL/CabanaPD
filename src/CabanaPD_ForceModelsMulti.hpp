@@ -89,6 +89,15 @@ struct ForceModels
         else if ( i == 2 )
             return model12.K;
     }
+    // FIXME
+    auto shearModulus() const
+    {
+        if constexpr ( std::is_same<typename ModelType1::base_model,
+                                    LPS>::value )
+            return model1.G;
+        else
+            return 0.0;
+    }
 
     void updateBonds( const int num_local, const int max_neighbors )
     {

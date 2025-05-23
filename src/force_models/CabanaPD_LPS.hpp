@@ -15,6 +15,7 @@
 #include <Kokkos_Core.hpp>
 
 #include <CabanaPD_ForceModels.hpp>
+#include <CabanaPD_Output.hpp>
 #include <CabanaPD_Types.hpp>
 
 namespace CabanaPD
@@ -32,17 +33,20 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
     using base_type::delta;
 
     int influence_type;
+    InfluenceFunctionTag influence_tag;
 
-    double K;
+    using base_type::K;
     double G;
-    double theta_coeff;
-    double s_coeff;
+    // Store coefficients for both i and j for multi-material systems.
+    double theta_coeff_i;
+    double s_coeff_i;
+    double theta_coeff_j;
+    double s_coeff_j;
 
     BaseForceModelLPS( LPS, NoFracture, const double _delta, const double _K,
                        const double _G, const int _influence = 0 )
-        : base_type( _delta )
+        : base_type( _delta, _K )
         , influence_type( _influence )
-        , K( _K )
         , G( _G )
     {
         init();
@@ -51,21 +55,46 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
     BaseForceModelLPS( LPS, Elastic, NoFracture, const double _delta,
                        const double _K, const double _G,
                        const int _influence = 0 )
-        : base_type( _delta )
+        : base_type( _delta, _K )
         , influence_type( _influence )
-        , K( _K )
         , G( _G )
     {
         init();
     }
 
-    void init()
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    BaseForceModelLPS( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
     {
-        theta_coeff = 3.0 * K - 5.0 * G;
-        s_coeff = 15.0 * G;
+        G = ( model1.G + model2.G ) / 2.0;
+        theta_coeff_i = 3.0 * model1.K - 5.0 * model1.G;
+        s_coeff_i = 15.0 * model1.G;
+        theta_coeff_j = 3.0 * model2.K - 5.0 * model2.G;
+        s_coeff_j = 15.0 * model2.G;
+
+        influence_type = model1.influence_type;
+        if ( model2.influence_type != model1.influence_type )
+            log_err( std::cout,
+                     "Influence function type for each model must match for "
+                     "multi-material systems" );
     }
 
-    KOKKOS_INLINE_FUNCTION double influenceFunction( double xi ) const
+    void init()
+    {
+        theta_coeff_i = 3.0 * K - 5.0 * G;
+        s_coeff_i = 15.0 * G;
+        theta_coeff_j = theta_coeff_i;
+        s_coeff_j = s_coeff_i;
+
+        if ( influence_type > 1 || influence_type < 0 )
+            log_err( std::cout, "Influence function type must be 0 or 1." );
+    }
+
+    auto shearModulus() { return G; }
+
+    KOKKOS_INLINE_FUNCTION auto operator()( InfluenceFunctionTag,
+                                            double xi ) const
     {
         if ( influence_type == 1 )
             return 1.0 / xi;
@@ -73,17 +102,27 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
             return 1.0;
     }
 
-    KOKKOS_INLINE_FUNCTION auto weightedVolume( const double xi,
-                                                const double vol ) const
+    KOKKOS_INLINE_FUNCTION auto operator()( InfluenceFunctionTag, const int,
+                                            const int, double xi ) const
     {
-        return influenceFunction( xi ) * xi * xi * vol;
+        return ( *this )( influence_tag, xi );
     }
 
-    KOKKOS_INLINE_FUNCTION auto dilatation( const double s, const double xi,
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( WeightedVolumeTag, const int, const int, const double xi,
+                     const double vol ) const
+    {
+        auto influence = ( *this )( influence_tag, xi );
+        return influence * xi * xi * vol;
+    }
+
+    KOKKOS_INLINE_FUNCTION auto operator()( DilatationTag, const int, const int,
+                                            const double s, const double xi,
                                             const double vol,
                                             const double m_i ) const
     {
-        double theta_i = influenceFunction( xi ) * s * xi * xi * vol;
+        auto influence = ( *this )( influence_tag, xi );
+        double theta_i = influence * s * xi * xi * vol;
         return 3.0 * theta_i / m_i;
     }
 
@@ -94,9 +133,10 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
                                             const double theta_i,
                                             const double theta_j ) const
     {
-        return ( theta_coeff * ( theta_i / m_i + theta_j / m_j ) +
-                 s_coeff * s * ( 1.0 / m_i + 1.0 / m_j ) ) *
-               influenceFunction( xi ) * xi * vol;
+        auto influence = ( *this )( influence_tag, xi );
+        return ( theta_coeff_i * theta_i / m_i + theta_coeff_j * theta_j / m_j +
+                 s * ( s_coeff_i / m_i + s_coeff_j / m_j ) ) *
+               influence * xi * vol;
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -104,10 +144,10 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
                      const double xi, const double vol, const double m_i,
                      const double theta_i, const double num_bonds ) const
     {
-        return 1.0 / num_bonds * 0.5 * theta_coeff / 3.0 *
+        auto influence = ( *this )( influence_tag, xi );
+        return 1.0 / num_bonds * 0.5 * theta_coeff_i / 3.0 *
                    ( theta_i * theta_i ) +
-               0.5 * ( s_coeff / m_i ) * influenceFunction( xi ) * s * s * xi *
-                   xi * vol;
+               0.5 * ( s_coeff_i / m_i ) * influence * s * s * xi * xi * vol;
     }
 };
 
@@ -175,6 +215,14 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
         , base_fracture_type( _delta, _K, _G0, _influence )
     {
         init();
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_fracture_type( model1, model2 )
+    {
     }
 
     void init()

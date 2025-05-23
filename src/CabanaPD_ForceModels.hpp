@@ -29,6 +29,15 @@ struct CriticalStretchTag
 struct ThermalStretchTag
 {
 };
+struct WeightedVolumeTag
+{
+};
+struct DilatationTag
+{
+};
+struct InfluenceFunctionTag
+{
+};
 
 struct BaseForceModel
 {
