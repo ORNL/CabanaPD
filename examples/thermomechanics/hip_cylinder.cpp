@@ -174,7 +174,6 @@ void HIPCylinderExample( const std::string filename )
     // ====================================================
     // Create BC last to ensure ghost particles are included.
     double dx = solver.particles.dx[0];
-    double dz = solver.particles.dx[2];
     double b0 = Pmax / dx;
     auto f = solver.particles.sliceForce();
     x = solver.particles.sliceReferencePosition();
