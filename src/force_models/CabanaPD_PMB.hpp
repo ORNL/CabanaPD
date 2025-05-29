@@ -564,9 +564,9 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     using thermal_type = typename base_type::thermal_type;
     using density_type = DynamicDensity;
 
+    // Does not use base_type::c because it is state dependent.
     using base_type::_s_p;
     using base_type::bond_break_coeff;
-    using base_type::c;
     using base_type::delta;
     using base_type::G0;
     using base_type::K;
@@ -606,10 +606,17 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     }
 
     KOKKOS_INLINE_FUNCTION
+    auto currentC( const int i ) const
+    {
+        // FIXME: form of density dependence.
+        return 6.0 * coeff * K * rho_current( i ) / rho0;
+    }
+
+    KOKKOS_INLINE_FUNCTION
     auto forceCoeff( const int i, const int, const double s,
                      const double vol ) const
     {
-        auto c_current = c * rho_current( i ) / rho0;
+        auto c_current = currentC( i ) * rho_current( i ) / rho0;
         return c_current * s * vol;
     }
 
