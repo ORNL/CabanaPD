@@ -31,8 +31,6 @@
 #include <CabanaPD_config.hpp>
 
 #include <force/CabanaPD_Contact.hpp>
-#include <force/CabanaPD_Hertzian.hpp>
-#include <force/CabanaPD_HertzianJKR.hpp>
 #include <force/CabanaPD_LPS.hpp>
 #include <force/CabanaPD_PMB.hpp>
 #include <force_models/CabanaPD_Contact.hpp>

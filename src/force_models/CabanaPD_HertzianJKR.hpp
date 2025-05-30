@@ -24,6 +24,8 @@ struct HertzianJKRModel : public ContactModel
 {
     using base_type = ContactModel;
     using base_model = base_type::base_model;
+    // This is to dispatch to the correct Force class.
+    using model_type = HertzianModel;
     using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
 
