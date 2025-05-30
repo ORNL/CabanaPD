@@ -72,7 +72,8 @@ struct HertzianJKRModel : public ContactModel
 
     KOKKOS_INLINE_FUNCTION
     auto forceCoeff( const double r, const double vn, const double vol,
-                     const double rho ) const
+                     const double // rho
+    ) const
     {
         // Contact "overlap"
         const double delta_n = ( 2.0 * radius - r );

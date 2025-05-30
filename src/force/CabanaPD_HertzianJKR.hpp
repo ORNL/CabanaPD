@@ -24,8 +24,8 @@ namespace CabanaPD
 /******************************************************************************
   Normal repulsion forces
 ******************************************************************************/
-template <class MemorySpace>
-class Force<MemorySpace, HertzianJKRModel>
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, HertzianJKRModel, NoFracture>
     : public BaseForceContact<MemorySpace>
 {
   public:
