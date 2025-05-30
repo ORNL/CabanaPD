@@ -78,9 +78,9 @@ void testHertzianJKRContact( const std::string filename )
         "create_particles", Kokkos::RangePolicy<exec_space>( 0, num_particles ),
         KOKKOS_LAMBDA( const int p ) {
             if ( p == 0 )
-                position( p, 0 ) = 5.1e-5;
+                position( p, 0 ) = 5.01e-5;
             else
-                position( p, 0 ) = -5.1e-5;
+                position( p, 0 ) = -5.01e-5;
             volume( p ) = vol;
         } );
 

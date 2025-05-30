@@ -6,11 +6,11 @@
     "elastic_modulus"        : {"value": 195.6e9, "unit": "Pa"},
     "poisson_ratio"          : {"value": 0.25, "unit": ""},
     "restitution"            : {"value": 0.5},  
-    "surface_adhesion"       : {"value": 1e-1, "unit": "J/m^2"},
+    "surface_adhesion"       : {"value": 10, "unit": "J/m^2"},
     "radius"                 : {"value": 5e-5 },
     "radius_extend"          : {"value": 1e-8 },
     "final_time"             : {"value": 1e-5, "unit": "s"},
-    "timestep"               : {"value": 1e-8,  "unit": "s"},
+    "timestep"               : {"value": 1e-9,  "unit": "s"},
     "timestep_safety_factor" : {"value": 0.8},
     "output_frequency"       : {"value": 1},
     "output_reference"       : {"value": false}
