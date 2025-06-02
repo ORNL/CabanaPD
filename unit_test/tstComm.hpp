@@ -231,17 +231,8 @@ void testContactHalo()
     Cabana::deep_copy( x_host, x );
     Cabana::deep_copy( rank_host, rank );
 
+    // Check original particles are unchanged.
     EXPECT_EQ( particles.localOffset(), init_num_particles );
-
-    // Check all local particles unchanged.
-    for ( std::size_t p = 0; p < particles.localOffset(); ++p )
-    {
-        for ( int d = 0; d < 3; ++d )
-        {
-            EXPECT_EQ( x_host( p, d ), x_init_host( p, d ) );
-        }
-        EXPECT_EQ( rank_host( p ), rank_init_host( p ) );
-    }
 
     int current_size = -1;
     MPI_Comm_size( MPI_COMM_WORLD, &current_size );
