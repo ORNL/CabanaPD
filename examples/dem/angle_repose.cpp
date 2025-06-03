@@ -68,10 +68,13 @@ void angleOfReposeExample( const std::string filename )
     double particle_radius = cylinder_radius - wall_thickness;
     auto create_container = KOKKOS_LAMBDA( const int, const double x[3] )
     {
-        // Only create particles inside cylinder.
+        // Only create particles for container.
         double rsq = x[0] * x[0] + x[1] * x[1];
-        if ( x[2] > min_height && rsq > particle_radius * particle_radius &&
-             rsq < cylinder_radius * cylinder_radius )
+        if ( ( x[2] > min_height && rsq > particle_radius * particle_radius &&
+               rsq < cylinder_radius * cylinder_radius ) )
+            return true;
+        if ( ( rsq < particle_radius * particle_radius &&
+               x[2] > high_corner[2] - wall_thickness ) )
             return true;
         return false;
     };
@@ -79,7 +82,6 @@ void angleOfReposeExample( const std::string filename )
         memory_space{}, model_type{}, CabanaPD::BaseOutput{}, low_corner,
         high_corner, num_cells, halo_width, Cabana::InitRandom{},
         create_container, exec_space{}, true );
-
     auto create = KOKKOS_LAMBDA( const int, const double x[3] )
     {
         // Only create particles inside cylinder.
@@ -120,11 +122,11 @@ void angleOfReposeExample( const std::string filename )
         f( p, 2 ) -= 9.8 * rho( p );
 
         // Interact with a horizontal wall.
-        if ( y( p, 2 ) - radius - radius_extend < 0.0 )
+        double rz = y( p, 2 );
+        if ( rz - radius < 0.0 || rz > high_corner[2] - radius )
         {
             double vz = v( p, 2 );
-            double rz = y( p, 2 );
-            double vn = vz * rz;
+            double vn = rz * vz;
             vn /= rz;
 
             f( p, 2 ) +=
