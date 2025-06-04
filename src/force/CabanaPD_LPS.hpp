@@ -475,7 +475,7 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                 else if ( mu( i, n ) > 0 )
                 {
                     const double coeff =
-                        model( ForceCoeffTag{}, i, j, s, xi, vol( j ), m( i ),
+                        model( ForceCoeffTag{}, i, n, s, xi, vol( j ), m( i ),
                                m( j ), theta( i ), theta( j ) );
                     double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;
@@ -534,7 +534,7 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                 getDistance( x, u, i, j, xi, r, s );
 
                 double w =
-                    mu( i, n ) * model( EnergyTag{}, i, j, s, xi, vol( j ),
+                    mu( i, n ) * model( EnergyTag{}, i, n, s, xi, vol( j ),
                                         m( i ), theta( i ), num_bonds );
                 W( i ) += w;
 
