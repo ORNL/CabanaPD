@@ -31,6 +31,7 @@ struct HertzianJKRModel : public ContactModel
 
     using base_type::radius;
     double nu;   // Poisson's ratio
+    double E;    // Young's modulus
     double Rs;   // Equivalent radius
     double Es;   // Equivalent Young's modulus
     double e;    // Coefficient of restitution
@@ -49,9 +50,10 @@ struct HertzianJKRModel : public ContactModel
                       const double _gamma )
         : base_type( _radius, _extend )
         , nu( _nu )
+        , E( _E )
     {
         Rs = 0.5 * radius;
-        Es = _E / ( 2.0 * Kokkos::pow( 1.0 - nu, 2.0 ) );
+        Es = _E / ( 2.0 * ( 1.0 - Kokkos::pow( nu, 2.0 ) ) );
         e = _e;
         double ln_e = Kokkos::log( e );
         beta = -ln_e / Kokkos::sqrt( Kokkos::pow( ln_e, 2.0 ) +
@@ -74,8 +76,7 @@ struct HertzianJKRModel : public ContactModel
 
     KOKKOS_INLINE_FUNCTION
     auto forceCoeff( const double r, const double vn, const double vol,
-                     const double // rho
-    ) const
+                     const double rho ) const
     {
         // Contact "overlap"
         const double delta_n = ( 2.0 * radius - r );
@@ -94,7 +95,7 @@ struct HertzianJKRModel : public ContactModel
         {
             double c0 = Kokkos::pow( Rs * delta_n, 2.0 );
             double c1 = -4.0 * ( 1.0 - Kokkos::pow( nu, 2.0 ) ) * pi * Gamma *
-                        Kokkos::pow( Rs, 2.0 ) / Es;
+                        Kokkos::pow( Rs, 2.0 ) / E;
             double c2 = -2.0 * Rs * delta_n;
             double P = -Kokkos::pow( c2, 2.0 ) / 12.0 - c0;
             double Q = -Kokkos::pow( c2, 3.0 ) / 108.0 + c0 * c2 / 3.0 -
@@ -136,8 +137,6 @@ struct HertzianJKRModel : public ContactModel
             coeff =
                 -1.0 * ( coeff_h_n * a3 -
                          Kokkos::pow( 8.0 * Gamma * pi * Es * a3, 1.0 / 2.0 ) );
-            std::cout << a( delta_n ) << " " << delta_n << " " << delta_tear
-                      << " " << vn << "\n";
             if ( delta_n <= 0.0 && vn <= 0.0 )
             {
                 coeff = 0.0;
@@ -146,11 +145,11 @@ struct HertzianJKRModel : public ContactModel
         coeff /= vol;
 
         // Damping force coefficient
-        // double Sn = 0.0;
-        // if ( delta_n < 0.0 )
-        //     Sn = 2.0 * Es * Kokkos::sqrt( Rs * Kokkos::abs( delta_n ) );
-        // double ms = ( rho * vol ) / 2.0;
-        // coeff += coeff_h_d * Kokkos::sqrt( Sn * ms ) * vn / vol;
+        double Sn = 0.0;
+        if ( delta_n < 0.0 )
+            Sn = 2.0 * Es * Kokkos::sqrt( Rs * Kokkos::abs( delta_n ) );
+        double ms = ( rho * vol ) / 2.0;
+        coeff += coeff_h_d * Kokkos::sqrt( Sn * ms ) * vn / vol;
         return coeff;
     }
 };
