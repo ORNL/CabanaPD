@@ -505,7 +505,8 @@ class Solver
             _total_time += step_time;
             // Instantaneous rate.
             double p_steps_per_sec =
-                static_cast<double>( particles.numGlobal() ) / step_time;
+                static_cast<double>( particles.numGlobal() ) *
+                output_frequency / step_time;
 
             _step_timer.reset();
             log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
