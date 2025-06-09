@@ -892,6 +892,18 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
         _timer.stop();
     }
 
+    template <typename KeepType>
+    void remove( const int num_keep, const KeepType& keep )
+    {
+        base_type::remove( num_keep, keep );
+        _timer.start();
+        Cabana::remove( typename base_type::execution_space(), num_keep, keep,
+                        _aosoa_theta, base_type::numFrozen() );
+        Cabana::remove( typename base_type::execution_space(), num_keep, keep,
+                        _aosoa_m, base_type::numFrozen() );
+        _timer.stop();
+    }
+
     template <typename... OtherFields>
     void output( const std::string name, const int output_step,
                  const double output_time, const bool use_reference,
@@ -1019,6 +1031,16 @@ class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
         _aosoa_temp.resize( base_type::referenceOffset() );
     }
 
+    template <typename KeepType>
+    void remove( const int num_keep, const KeepType& keep )
+    {
+        base_type::remove( num_keep, keep );
+        _timer.start();
+        Cabana::remove( typename base_type::execution_space(), num_keep, keep,
+                        _aosoa_temp, base_type::numFrozen() );
+        _timer.stop();
+    }
+
     template <typename... OtherFields>
     void output( const std::string name, const int output_step,
                  const double output_time, const bool use_reference,
@@ -1050,6 +1072,7 @@ class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
     }
 
     aosoa_temp_type _aosoa_temp;
+    using base_type::_timer;
 };
 
 template <class MemorySpace, class ThermalType, int Dimension>
@@ -1121,6 +1144,16 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
         _aosoa_u_neigh.resize( base_type::localOffset() );
     }
 
+    template <typename KeepType>
+    void remove( const int num_keep, const KeepType& keep )
+    {
+        base_type::remove( num_keep, keep );
+        _timer.start();
+        Cabana::remove( typename base_type::execution_space(), num_keep, keep,
+                        _aosoa_u_neigh, base_type::numFrozen() );
+        _timer.stop();
+    }
+
     void setMaxDisplacement( double new_max ) { _max_displacement = new_max; }
     double getMaxDisplacement() const { return _max_displacement; }
 
@@ -1140,6 +1173,7 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
     double _max_displacement;
 
     aosoa_u_neigh_type _aosoa_u_neigh;
+    using base_type::_timer;
 };
 
 template <class MemorySpace, class ModelType, class ThermalType, int Dimension>
@@ -1239,6 +1273,16 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
         _aosoa_output.resize( base_type::localOffset() );
     }
 
+    template <typename KeepType>
+    void remove( const int num_keep, const KeepType& keep )
+    {
+        base_type::remove( num_keep, keep );
+        _timer.start();
+        Cabana::remove( typename base_type::execution_space(), num_keep, keep,
+                        _aosoa_output, base_type::numFrozen() );
+        _timer.stop();
+    }
+
     template <typename... OtherFields>
     void output( const std::string name, const int output_step,
                  const double output_time, const bool use_reference,
@@ -1273,6 +1317,7 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
     }
 
     aosoa_output_type _aosoa_output;
+    using base_type::_timer;
 };
 
 template <class MemorySpace, class ModelType, class ThermalType, int Dimension>
@@ -1347,6 +1392,16 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
         _aosoa_stress.resize( new_local + new_ghost );
     }
 
+    template <typename KeepType>
+    void remove( const int num_keep, const KeepType& keep )
+    {
+        base_type::remove( num_keep, keep );
+        _timer.start();
+        Cabana::remove( typename base_type::execution_space(), num_keep, keep,
+                        _aosoa_stress, base_type::numFrozen() );
+        _timer.stop();
+    }
+
     template <typename... OtherFields>
     void output( const std::string name, const int output_step,
                  const double output_time, const bool use_reference,
@@ -1378,6 +1433,7 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
     }
 
     aosoa_stress_type _aosoa_stress;
+    using base_type::_timer;
 };
 
 /******************************************************************************
