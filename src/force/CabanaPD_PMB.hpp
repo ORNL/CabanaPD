@@ -373,7 +373,7 @@ class Force<MemorySpace, ModelType, PMB, Fracture>
                 s = model( ThermalStretchTag{}, i, j, s );
 
                 double w =
-                    mu( i, n ) * model( EnergyTag{}, i, j, s, xi, vol( j ) );
+                    mu( i, n ) * model( EnergyTag{}, i, n, s, xi, vol( j ) );
                 W( i ) += w;
 
                 phi_i += mu( i, n ) * vol( j );
