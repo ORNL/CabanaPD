@@ -115,7 +115,7 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
             // Get the reference positions and displacements.
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
-            m( i ) += model.weightedVolume( xi, vol( j ) );
+            m( i ) += model( WeightedVolumeTag{}, i, j, xi, vol( j ) );
         };
 
         Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
@@ -146,7 +146,8 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
             // Get the bond distance, displacement, and stretch.
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
-            theta( i ) += model.dilatation( s, xi, vol( j ), m( i ) );
+            theta( i ) +=
+                model( DilatationTag{}, i, j, s, xi, vol( j ), m( i ) );
         };
 
         Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
@@ -368,7 +369,8 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
                 // mu is included to account for bond breaking.
-                m( i ) += mu( i, n ) * model.weightedVolume( xi, vol( j ) );
+                m( i ) += mu( i, n ) *
+                          model( WeightedVolumeTag{}, i, j, xi, vol( j ) );
             }
         };
 
@@ -415,8 +417,8 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                 // broken, because m=0 only occurs when all bonds are broken.
                 // mu is still included to account for individual bond breaking.
                 if ( m( i ) > 0 )
-                    theta( i ) += mu( i, n ) *
-                                  model.dilatation( s, xi, vol( j ), m( i ) );
+                    theta( i ) += mu( i, n ) * model( DilatationTag{}, i, j, s,
+                                                      xi, vol( j ), m( i ) );
             }
         };
 
