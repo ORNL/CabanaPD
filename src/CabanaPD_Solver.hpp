@@ -312,7 +312,7 @@ class Solver
         // FIXME: Will need to rebuild ghosts.
     }
 
-    void updateNeighbors() { force->update( particles, 0.0, true ); }
+    void updateNeighbors() { force->update( particles, true ); }
 
     template <typename BoundaryType>
     void runStep( const int step, BoundaryType boundary_condition )
