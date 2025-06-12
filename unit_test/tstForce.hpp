@@ -498,7 +498,7 @@ double computeReferenceForceX(
 template <class ModelTag>
 CabanaPD::Particles<TEST_MEMSPACE, ModelTag, CabanaPD::TemperatureIndependent,
                     CabanaPD::EnergyStressOutput>
-createParticles( ModelTag model, LinearTag, const double dx, const double s0 )
+createParticles( ModelTag tag, LinearTag, const double dx, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -506,7 +506,7 @@ createParticles( ModelTag model, LinearTag, const double dx, const double s0 )
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    CabanaPD::Particles particles( TEST_MEMSPACE{}, model,
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, tag,
                                    CabanaPD::EnergyStressOutput{}, box_min,
                                    box_max, num_cells, 0, TEST_EXECSPACE{} );
 
@@ -528,8 +528,7 @@ createParticles( ModelTag model, LinearTag, const double dx, const double s0 )
 template <class ModelTag>
 CabanaPD::Particles<TEST_MEMSPACE, ModelTag, CabanaPD::TemperatureIndependent,
                     CabanaPD::EnergyStressOutput>
-createParticles( ModelTag model, QuadraticTag, const double dx,
-                 const double s0 )
+createParticles( ModelTag tag, QuadraticTag, const double dx, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -537,7 +536,7 @@ createParticles( ModelTag model, QuadraticTag, const double dx,
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    CabanaPD::Particles particles( TEST_MEMSPACE{}, model,
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, tag,
                                    CabanaPD::EnergyStressOutput{}, box_min,
                                    box_max, num_cells, 0, TEST_EXECSPACE{} );
     auto x = particles.sliceReferencePosition();
@@ -772,11 +771,12 @@ void checkAnalyticalDilatation( ModelType, QuadraticTag, const double,
 {
 }
 
-template <class ForceType, class ParticleType>
-void initializeForce( ForceType& force, ParticleType& particles )
+template <class ForceType, class ParticleType, class NeighborType>
+void initializeForce( ForceType& force, ParticleType& particles,
+                      const NeighborType& neighbor )
 {
-    force.computeWeightedVolume( particles, Cabana::SerialOpTag{} );
-    force.computeDilatation( particles, Cabana::SerialOpTag{} );
+    force.computeWeightedVolume( particles, neighbor );
+    force.computeDilatation( particles, neighbor );
 }
 
 template <class ParticleType, class AoSoAType>
@@ -810,8 +810,9 @@ void testForce( ModelType model, const double dx, const double m,
     // particle calculation.
     CabanaPD::Force<TEST_MEMSPACE, ModelType, typename ModelType::base_model,
                     typename ModelType::fracture_type>
-        force( true, particles, model );
-
+        force( model );
+    CabanaPD::Neighbor<TEST_MEMSPACE, typename ModelType::fracture_type>
+        neighbor( false, model, particles );
     auto x = particles.sliceReferencePosition();
     auto f = particles.sliceForce();
     auto W = particles.sliceStrainEnergy();
@@ -819,15 +820,11 @@ void testForce( ModelType model, const double dx, const double m,
     auto vol = particles.sliceVolume();
     //  No communication needed (as in the main solver) since this test is only
     //  intended for one rank.
-    initializeForce( force, particles );
+    initializeForce( force, particles, neighbor );
 
-    unsigned int max_neighbors;
-    unsigned long long total_neighbors;
-    force.getNeighborStatistics( max_neighbors, total_neighbors );
-
-    computeForce( force, particles, Cabana::SerialOpTag() );
-    double Phi = computeEnergy( force, particles, Cabana::SerialOpTag() );
-    computeStress( force, particles, Cabana::SerialOpTag() );
+    computeForce( force, particles, neighbor );
+    double Phi = computeEnergy( force, particles, neighbor );
+    computeStress( force, particles, neighbor );
 
     // Make a copy of final results on the host
     std::size_t num_particle = x.size();
@@ -860,8 +857,40 @@ void testForce( ModelType model, const double dx, const double m,
 }
 
 //---------------------------------------------------------------------------//
+// Neighbor test function.
+//---------------------------------------------------------------------------//
+void testNeighbor( const double dx, const double m, const double delta )
+{
+    CabanaPD::PMB model_tag;
+    CabanaPD::ForceModel model( model_tag, CabanaPD::Elastic{},
+                                CabanaPD::NoFracture{}, delta, 1.0 );
+
+    auto particles = createParticles( model_tag, LinearTag{}, dx, 0.0 );
+
+    CabanaPD::Neighbor<TEST_MEMSPACE, CabanaPD::NoFracture> neighbor(
+        false, model, particles );
+
+    auto expected_num_neighbors = computeReferenceNeighbors( model.delta, m );
+    EXPECT_EQ( expected_num_neighbors, neighbor.getMaxLocal() );
+}
+
+//---------------------------------------------------------------------------//
 // GTest tests.
 //---------------------------------------------------------------------------//
+TEST( TEST_CATEGORY, test_neighbor )
+{
+    // dx needs to be decreased for increased m: boundary particles are ignored.
+    double m = 3;
+    double dx = 2.0 / 11.0;
+    double delta = dx * m;
+    testNeighbor( dx, m, delta );
+
+    m = 6;
+    dx = 2.0 / 15.0;
+    delta = dx * m;
+    testNeighbor( dx, m, delta );
+}
+
 TEST( TEST_CATEGORY, test_force_pmb )
 {
     // dx needs to be decreased for increased m: boundary particles are ignored.
