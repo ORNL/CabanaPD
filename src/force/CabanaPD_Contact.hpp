@@ -18,6 +18,8 @@
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Output.hpp>
 #include <force_models/CabanaPD_Contact.hpp>
+#include <force_models/CabanaPD_Hertzian.hpp>
+#include <force_models/CabanaPD_HertzianJKR.hpp>
 
 namespace CabanaPD
 {
@@ -30,9 +32,9 @@ KOKKOS_INLINE_FUNCTION void getRelativeNormalVelocityComponents(
     const double ry, const double rz, const double r, double& vx, double& vy,
     double& vz, double& vn )
 {
-    vx = vel( i, 0 ) - vel( j, 0 );
-    vy = vel( i, 1 ) - vel( j, 1 );
-    vz = vel( i, 2 ) - vel( j, 2 );
+    vx = vel( j, 0 ) - vel( i, 0 );
+    vy = vel( j, 1 ) - vel( i, 1 );
+    vz = vel( j, 2 ) - vel( i, 2 );
 
     vn = vx * rx + vy * ry + vz * rz;
     vn /= r;
@@ -183,6 +185,87 @@ class Force<MemorySpace, ModelType, NormalRepulsionModel, NoFracture>
 
     double mesh_max[3];
     double mesh_min[3];
+};
+
+/******************************************************************************
+  Hertzian contact forces
+******************************************************************************/
+template <class MemorySpace, class ModelType>
+class Force<MemorySpace, ModelType, HertzianModel, NoFracture>
+    : public BaseForceContact<MemorySpace>
+{
+  public:
+    using base_type = BaseForceContact<MemorySpace>;
+    using neighbor_list_type = typename base_type::neighbor_list_type;
+
+    template <class ParticleType>
+    Force( const bool half_neigh, const ParticleType& particles,
+           const ModelType model )
+        : base_type( half_neigh, particles, model )
+        , _model( model )
+    {
+    }
+
+    template <class ForceType, class PosType, class ParticleType,
+              class ParallelType>
+    void computeForceFull( ForceType& fc, const PosType& x, const PosType& u,
+                           const ParticleType& particles,
+                           ParallelType& neigh_op_tag )
+    {
+        const int n_frozen = particles.frozenOffset();
+        const int n_local = particles.localOffset();
+
+        auto model = _model;
+        const auto vol = particles.sliceVolume();
+        const auto rho = particles.sliceDensity();
+        const auto vel = particles.sliceVelocity();
+
+        base_type::update( particles, particles.getMaxDisplacement() );
+
+        auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
+        {
+            double xi, r, s;
+            double rx, ry, rz;
+            getDistance( x, u, i, j, xi, r, s, rx, ry, rz );
+
+            // Hertz normal force damping component
+            double vx, vy, vz, vn;
+            getRelativeNormalVelocityComponents( vel, i, j, rx, ry, rz, r, vx,
+                                                 vy, vz, vn );
+
+            const double coeff = model.forceCoeff( r, vn, vol( i ), rho( i ) );
+            fc( i, 0 ) += coeff * rx / r;
+            fc( i, 1 ) += coeff * ry / r;
+            fc( i, 2 ) += coeff * rz / r;
+        };
+
+        _timer.start();
+
+        // FIXME: using default space for now.
+        using exec_space = typename MemorySpace::execution_space;
+        Kokkos::RangePolicy<exec_space> policy( n_frozen, n_local );
+        Cabana::neighbor_parallel_for(
+            policy, contact_full, _neigh_list, Cabana::FirstNeighborsTag(),
+            neigh_op_tag, "CabanaPD::Contact::compute_full" );
+
+        _timer.stop();
+    }
+
+    // FIXME: implement energy
+    template <class PosType, class WType, class ParticleType,
+              class ParallelType>
+    double computeEnergyFull( WType&, const PosType&, const PosType&,
+                              ParticleType&, ParallelType& )
+    {
+        return 0.0;
+    }
+
+  protected:
+    ModelType _model;
+    using base_type::_half_neigh;
+    using base_type::_neigh_list;
+    using base_type::_neigh_timer;
+    using base_type::_timer;
 };
 
 } // namespace CabanaPD
