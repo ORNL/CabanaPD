@@ -16,24 +16,22 @@
 
 namespace Test
 {
-template <class VelType, class DensityType, class VolumeType>
-double calculateKE( const VelType& v, const DensityType& rho,
-                    const VolumeType& vol )
+template <class ForceType>
+double getPulloffForce( const ForceType& f, double vol )
 {
-    using Kokkos::hypot;
-    using Kokkos::pow;
+    using execution_space = typename ForceType::execution_space;
 
-    using execution_space = typename VelType::execution_space;
+    double pulloff_force;
+    auto min_po = Kokkos::Min<double>( pulloff_force );
 
-    double tke;
     Kokkos::parallel_reduce(
-        "total_ke", Kokkos::RangePolicy<execution_space>( 0, v.size() ),
-        KOKKOS_LAMBDA( const int& i, double& sum ) {
-            sum += 0.5 * rho( i ) * vol( i ) *
-                   pow( hypot( v( i, 0 ), v( i, 1 ), v( i, 2 ) ), 2.0 );
+        "pulloff_force", Kokkos::RangePolicy<execution_space>( 0, f.size() ),
+        KOKKOS_LAMBDA( const int& t ) {
+            min_po = std::min( min_po, f( t, 0 ) );
         },
-        tke );
-    return tke;
+        min_po );
+
+    return pulloff_force * vol;
 }
 
 void testHertzianJKRContact( const std::string filename )
@@ -128,10 +126,18 @@ void testHertzianJKRContact( const std::string filename )
     CabanaPD::Solver solver( inputs, particles, contact_model );
     solver.init();
 
+    Kokkos::View<double*> forces( "forces", solver.num_steps );
+
+    auto force = particles.sliceForce();
+
     for ( int step = 1; step <= solver.num_steps; ++step )
     {
         solver.runStep( step );
+        forces( step ) = force( 0, 0 );
     }
+
+    auto forces_h = Kokkos::create_mirror_view_and_copy( forces );
+    double min_po = getPulloffForce( forces_h, double vol );
 
     // Get final total KE
     // double ke_f = calculateKE( v, rho, vo );
