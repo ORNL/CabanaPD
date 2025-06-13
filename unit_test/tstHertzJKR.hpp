@@ -23,10 +23,12 @@ double calculateKE( const VelType& v, const DensityType& rho,
     using Kokkos::hypot;
     using Kokkos::pow;
 
-    double tke = 0.0;
+    using execution_space = typename VelType::execution_space;
+
+    double tke;
     Kokkos::parallel_reduce(
-        "total_ke", v.size(),
-        KOKKOS_LAMBDA( const int i, double& sum ) {
+        "total_ke", Kokkos::RangePolicy<execution_space>( 0, v.size() ),
+        KOKKOS_LAMBDA( const int& i, double& sum ) {
             sum += 0.5 * rho( i ) * vol( i ) *
                    pow( hypot( v( i, 0 ), v( i, 1 ), v( i, 2 ) ), 2.0 );
         },
@@ -125,7 +127,11 @@ void testHertzianJKRContact( const std::string filename )
     // ====================================================
     CabanaPD::Solver solver( inputs, particles, contact_model );
     solver.init();
-    solver.run();
+
+    for ( int step = 1; step <= solver.num_steps; ++step )
+    {
+        solver.runStep( step );
+    }
 
     // Get final total KE
     // double ke_f = calculateKE( v, rho, vo );

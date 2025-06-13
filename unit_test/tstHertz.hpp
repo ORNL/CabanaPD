@@ -12,30 +12,29 @@
 #include <CabanaPD.hpp>
 
 #include <Kokkos_Core.hpp>
-#include <atomic>
 #include <gtest/gtest.h>
 
 namespace Test
 {
-template <class MemorySpace, class VelType, class DensityType, class VolumeType>
+template <class VelType, class DensityType, class VolumeType>
 double calculateKE( const VelType& v, const DensityType& rho,
                     const VolumeType& vol )
 {
     using Kokkos::hypot;
     using Kokkos::pow;
 
-    Kokkos::View<double*, MemorySpace> tke( "tke", 1 );
+    using execution_space = typename VelType::execution_space;
+
+    double tke;
     Kokkos::parallel_reduce(
-        "total_ke", Kokkos::RangePolicy<MemorySpace>( 0, v.size() ),
-        KOKKOS_LAMBDA( const int i, double& sum ) {
+        "total_ke", Kokkos::RangePolicy<execution_space>( 0, v.size() ),
+        KOKKOS_LAMBDA( const int& i, double& sum ) {
             sum += 0.5 * rho( i ) * vol( i ) *
                    pow( hypot( v( i, 0 ), v( i, 1 ), v( i, 2 ) ), 2.0 );
         },
-        Kokkos::Sum<double>( tke( 0 ) ) );
+        Kokkos::Sum<double>( tke ) );
 
-    auto tke_h =
-        Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, tke );
-    return tke_h( 0 );
+    return tke;
 }
 
 void testHertzianContact( const std::string filename )
@@ -121,7 +120,7 @@ void testHertzianContact( const std::string filename )
     particles.updateParticles( exec_space{}, init_functor );
 
     // Get initial total KE
-    // double ke_i = calculateKE<memory_space>( v, rho, vo );
+    double ke_i = calculateKE( v, rho, vo );
 
     // ====================================================
     //  Simulation run
@@ -131,9 +130,9 @@ void testHertzianContact( const std::string filename )
     solver.run();
 
     // Get final total KE
-    // double ke_f = calculateKE<memory_space>( v, rho, vo );
+    double ke_f = calculateKE( v, rho, vo );
 
-    // EXPECT_NEAR( std::sqrt( ke_f / ke_i ), e, 1e-3 );
+    EXPECT_NEAR( std::sqrt( ke_f / ke_i ), e, 1e-3 );
 }
 
 TEST( TEST_CATEGORY, test_hertzian_contact )
