@@ -26,8 +26,8 @@ double getPulloffForce( const ForceType& f, double vol )
 
     Kokkos::parallel_reduce(
         "pulloff_force", Kokkos::RangePolicy<execution_space>( 0, f.size() ),
-        KOKKOS_LAMBDA( const int& t ) {
-            min_po = std::min( min_po, f( t, 0 ) );
+        KOKKOS_LAMBDA( const int t, double& min ) {
+            min_po.join( min, f( t, 0 ) );
         },
         min_po );
 
@@ -136,12 +136,8 @@ void testHertzianJKRContact( const std::string filename )
         forces( step ) = force( 0, 0 );
     }
 
-    auto forces_h = Kokkos::create_mirror_view_and_copy( forces );
-    double min_po = getPulloffForce( forces_h, double vol );
-
-    // Get final total KE
-    // double ke_f = calculateKE( v, rho, vo );
-    // EXPECT_NEAR( std::sqrt( ke_f / ke_i ), e, 1e-3 );
+    double min_po = getPulloffForce( force, vol );
+    EXPECT_EQ( min_po, 0.0 );
 }
 
 TEST( TEST_CATEGORY, test_hertzian_jkr_contact )
