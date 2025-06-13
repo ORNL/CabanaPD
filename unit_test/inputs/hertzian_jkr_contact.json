@@ -12,6 +12,6 @@
     "final_time"             : {"value": 5e-7, "unit": "s"},
     "timestep"               : {"value": 1e-9,  "unit": "s"},
     "timestep_safety_factor" : {"value": 0.8},
-    "output_frequency"       : {"value": 1},
+    "output_frequency"       : {"value": 500},
     "output_reference"       : {"value": false}
 }

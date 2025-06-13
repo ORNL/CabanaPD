@@ -27,7 +27,7 @@ double getPulloffForce( const ForceType& f, double vol )
     Kokkos::parallel_reduce(
         "pulloff_force", Kokkos::RangePolicy<execution_space>( 0, f.size() ),
         KOKKOS_LAMBDA( const int t, double& min ) {
-            min_po.join( min, f( t, 0 ) );
+            min_po.join( min, f( t ) );
         },
         min_po );
 
@@ -126,18 +126,20 @@ void testHertzianJKRContact( const std::string filename )
     CabanaPD::Solver solver( inputs, particles, contact_model );
     solver.init();
 
-    Kokkos::View<double*> forces( "forces", solver.num_steps );
+    Kokkos::View<double*, TEST_MEMSPACE> forces( "forces", solver.num_steps );
 
     auto force = particles.sliceForce();
 
     for ( int step = 1; step <= solver.num_steps; ++step )
     {
         solver.runStep( step );
-        forces( step ) = force( 0, 0 );
+        forces( step - 1 ) = force( 0, 0 );
     }
 
-    double min_po = getPulloffForce( force, vol );
-    EXPECT_EQ( min_po, 0.0 );
+    double min_po = getPulloffForce( forces, vol );
+    double min_po_a = contact_model.fc;
+
+    EXPECT_NEAR( min_po / min_po_a, -1.0, 5e-3 );
 }
 
 TEST( TEST_CATEGORY, test_hertzian_jkr_contact )
