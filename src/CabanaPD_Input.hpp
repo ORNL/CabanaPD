@@ -38,6 +38,15 @@ class Inputs
         double tf = inputs["final_time"]["value"];
         double dt = inputs["timestep"]["value"];
 
+        // if it contains both m and horizon
+        if ( inputs.contains( "horizon" ) && inputs.contains( "m" ) )
+        {
+            throw std::runtime_error(
+                "Conflict - cannot input both horizon and m."
+                "Declare only 1, and other will be calculated using "
+                "system_size." );
+        }
+
         // m
         // FIXME: this will be slightly different in y/z
         double dx = inputs["dx"]["value"][0];
@@ -46,6 +55,14 @@ class Inputs
             double delta = inputs["horizon"]["value"];
             int m = std::floor( delta / dx );
             inputs["m"]["value"] = m;
+        }
+
+        // if it contains m
+        else if ( inputs.contains( "m" ) )
+        {
+            int m = inputs["m"]["value"];
+            double delta = static_cast<double>( m ) * dx + 1e-10;
+            inputs["horizon"]["value"] = delta;
         }
 
         // Set timestep safety factor if not set by user.
