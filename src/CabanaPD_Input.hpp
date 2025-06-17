@@ -70,9 +70,8 @@ class Inputs
             inputs["timestep_safety_factor"]["value"] = 0.85;
 
         // Check one of bulk or elastic modulus set by user.
-        if ( !inputs.contains( "bulk_modulus" ) )
+        if ( !inputs.contains( "bulk_modulus" ) && !inputs.contains( "elastic_modulus" ))
         {
-            if ( !inputs.contains( "elastic_modulus" ) )
                 throw std::runtime_error( "Must input either bulk_modulus or "
                                           "elastic_modulus." );
         }
