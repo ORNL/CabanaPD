@@ -77,7 +77,7 @@ struct HertzianModel : public ContactModel
         if ( delta_n < 0.0 )
             Sn = 2.0 * Es * Kokkos::sqrt( Rs * Kokkos::abs( delta_n ) );
         double ms = ( rho * vol ) / 2.0;
-        coeff += coeff_h_d * Kokkos::sqrt( Sn * ms ) * vn / vol;
+        coeff -= coeff_h_d * Kokkos::sqrt( Sn * ms ) * vn / vol;
         return coeff;
     }
 };
