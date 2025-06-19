@@ -188,25 +188,45 @@ class Inputs
         double sum_ht = 0;
 
         // Estimate the bulk modulus if needed.
-        double K;
+        std::size_t min_index;
+        std::vector<double> K;
         if ( inputs.contains( "bulk_modulus" ) )
         {
-            K = inputs["bulk_modulus"]["value"];
+            // Necessary because JSON can't determine the type otherwise.
+            std::vector<double> K_vec = inputs["bulk_modulus"]["value"];
+            K = K_vec;
         }
         else
         {
-            double E = inputs["elastic_modulus"]["value"];
+            std::vector<double> E = inputs["elastic_modulus"]["value"];
             // This is only exact for bond-based (PMB).
             double nu = 0.25;
-            K = E / ( 3 * ( 1 - 2 * nu ) );
+
+            // Resize K to match the size of E
+            K.resize( E.size() );
+
+            for ( std::size_t i = 0; i < E.size(); i++ )
+                K[i] = E[i] / ( 3.0 * ( 1.0 - 2.0 * nu ) );
         }
+
+        // Support for multi-material: find the minimum density-bulk modulus
+        // ratio for the correct critical timestep.
+        std::vector<double> rho_over_K;
+        std::vector<double> rho = inputs["density"]["value"];
+        for ( std::size_t i = 0; i < rho.size(); i++ )
+            rho_over_K[i] = rho[i] / K[i];
+        min_index = std::distance( std::begin( rho_over_K ),
+                                   std::min_element( std::begin( rho_over_K ),
+                                                     std::end( rho_over_K ) ) );
+        auto min_K = K[min_index];
+        auto min_rho = rho[min_index];
 
         // Run over the neighborhood of a point in the bulk of a body (at the
         // origin).
         int m = inputs["m"]["value"];
         double delta = inputs["horizon"]["value"];
         // FIXME: this is copied from the forces
-        double c = 18.0 * K / ( pi * delta * delta * delta * delta );
+        double c = 18.0 * min_K / ( pi * delta * delta * delta * delta );
 
         for ( int i = -( m + 1 ); i < m + 2; i++ )
         {
@@ -253,8 +273,8 @@ class Inputs
         }
 
         double dt = inputs["timestep"]["value"];
-        double rho = inputs["density"]["value"];
-        double dt_crit = std::sqrt( 2.0 * rho / sum );
+        // This supports multi-material.
+        double dt_crit = std::sqrt( 2.0 * min_rho / sum );
         compareCriticalTimeStep( "mechanics", dt, dt_crit );
 
         // Heat transfer timestep.
@@ -265,7 +285,7 @@ class Inputs
             dt_ht *= dt;
 
             double cp = inputs["specific_heat_capacity"]["value"];
-            double dt_ht_crit = rho * cp / sum_ht;
+            double dt_ht_crit = min_rho * cp / sum_ht;
             compareCriticalTimeStep( "heat_transfer", dt_ht, dt_ht_crit );
         }
     }

@@ -26,6 +26,7 @@ namespace CabanaPD
 struct ContactModel
 {
     using base_model = Contact;
+    using material_type = SingleMaterial;
 
     // Contact neighbor search radius.
     double radius;
