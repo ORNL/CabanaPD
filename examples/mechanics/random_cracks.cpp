@@ -53,16 +53,19 @@ void randomCracksExample( const std::string filename )
     //                    Pre-notches
     // ====================================================
     // Number of pre-notches
-    constexpr int Npn = 200;
+    int num_prenotches = inputs["num_prenotches"];
 
     double minl = inputs["minimum_prenotch_length"];
     double maxl = inputs["maximum_prenotch_length"];
     double thickness = high_corner[2] - low_corner[2];
 
     // Initialize pre-notch arrays
-    Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_positions;
-    Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v1;
-    Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v2;
+    Kokkos::View<double* [3], memory_space> notch_positions( "position",
+                                                             num_prenotches );
+    Kokkos::View<double* [3], memory_space> notch_v1( "vector1",
+                                                      num_prenotches );
+    Kokkos::View<double* [3], memory_space> notch_v2( "vector2",
+                                                      num_prenotches );
 
     // Changing this seed will re-randomize the cracks.
     std::size_t seed = 44758454;
@@ -71,7 +74,7 @@ void randomCracksExample( const std::string filename )
     std::uniform_real_distribution<> dis( 0.0, 1.0 );
 
     // Loop over pre-notches
-    for ( int n = 0; n < Npn; n++ )
+    for ( int n = 0; n < num_prenotches; n++ )
     {
         // Random numbers for pre-notch position
         double random_number_x = dis( gen );
@@ -86,10 +89,11 @@ void randomCracksExample( const std::string filename )
         double Yc1 = ( low_corner[1] + maxl ) +
                      ( ( high_corner[1] - maxl ) - ( low_corner[1] + maxl ) ) *
                          random_number_y;
-        Kokkos::Array<double, 3> p0 = { Xc1, Yc1, low_corner[2] };
 
         // Assign pre-notch position
-        notch_positions[n] = p0;
+        notch_positions( n, 0 ) = Xc1;
+        notch_positions( n, 1 ) = Yc1;
+        notch_positions( n, 2 ) = low_corner[2];
 
         // Random pre-notch length on XY-plane
         double random_number_l = dis( gen );
@@ -100,20 +104,21 @@ void randomCracksExample( const std::string filename )
         double theta = CabanaPD::pi * random_number_theta;
 
         // Pre-notch v1 vector on XY-plane
-        Kokkos::Array<double, 3> v1 = { l * cos( theta ), l * sin( theta ), 0 };
-        notch_v1[n] = v1;
+        notch_v1( n, 0 ) = l * cos( theta );
+        notch_v1( n, 1 ) = l * sin( theta );
+        notch_v1( n, 2 ) = 0.0;
 
         // Random number for y-component of v2 vector: the angle of v2 in the
         // YZ-plane is between -45 and 45 deg.
         double random_number_v2_y = dis( gen );
 
         // Pre-notch v2 vector on YZ-plane
-        Kokkos::Array<double, 3> v2 = {
-            0, ( -1.0 + 2.0 * random_number_v2_y ) * thickness, thickness };
-        notch_v2[n] = v2;
+        notch_v2( n, 0 ) = 0.0;
+        notch_v2( n, 1 ) = ( -1.0 + 2.0 * random_number_v2_y ) * thickness;
+        notch_v2( n, 2 ) = thickness;
     }
 
-    CabanaPD::Prenotch<Npn> prenotch( notch_v1, notch_v2, notch_positions );
+    CabanaPD::Prenotch prenotch( notch_v1, notch_v2, notch_positions );
 
     // ====================================================
     //                    Force model

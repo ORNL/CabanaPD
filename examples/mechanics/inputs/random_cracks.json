@@ -6,11 +6,12 @@
     "fracture_energy"         : {"value": 3.8,   "unit": "J/m^2"},
     "horizon"                 : {"value": 0.001, "unit": "m"},   
     "traction"                : {"value": 2e6,   "unit": "Pa"},
+    "num_prenotches"          : {"value": 200},
     "minimum_prenotch_length" : {"value": 0.001, "unit": "m"},
     "maximum_prenotch_length" : {"value": 0.0025, "unit": "m"},
-    "final_time"              : {"value": 43e-6, "unit": "s"},
+    "final_time"              : {"value": 4.5e-6, "unit": "s"},
     "timestep"                : {"value": 4.5e-8,  "unit": "s"},
     "timestep_safety_factor"  : {"value": 0.85},
-    "output_frequency"        : {"value": 5},
+    "output_frequency"        : {"value": 50},
     "output_reference"        : {"value": true}
 }
