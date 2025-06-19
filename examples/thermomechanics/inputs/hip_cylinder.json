@@ -2,6 +2,7 @@
     "num_cells"                : {"value": [100, 100, 140]},
     "system_size"              : {"value": [0.25, 0.25, 0.35], "unit": "m"},
     "density"                  : {"value": 7950, "unit": "kg/m^3"},
+    "powder_initial_relative_density" : {"value": 0.85},
     "elastic_modulus"          : {"value": 195.6e+9, "unit": "Pa"},
     "fracture_energy"          : {"value": 1550e+6, "unit": "J/m^2"},
     "horizon"                  : {"value": 0.0075, "unit": "m"}, 

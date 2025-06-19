@@ -602,21 +602,40 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
         , rho( _rho )
         , rho_current( _rho_c )
     {
-        coeff = 3.0 / pi / delta / delta / delta / delta;
+        coeff = 18.0 / pi / delta / delta / delta / delta;
     }
 
     KOKKOS_INLINE_FUNCTION
     auto currentC( const int i ) const
     {
-        // FIXME: form of density dependence.
-        return 6.0 * coeff * K * rho_current( i ) / rho0;
+        // Initial relative density for relative density factor (HARDCODED)
+        double D0 = 0.69;
+        // Relative density:
+        double D = rho_current( i ) / rho0;
+        // Relative density factor from C. Van Nguyen et al., Journal of
+        // Materials Processing Technology 226 (2015): 134-145.
+        double RD = Kokkos::pow( ( D - D0 ) / ( 1.0 - D0 ), 1.46 * ( 1 - D0 ) );
+
+        // Young's modulus from C. Van Nguyen et al., Journal of Materials
+        // Processing Technology 226 (2015): 134-145.
+        // double T = temp( i );
+        // double E = ( 199510 - 65.63 * T - 0.0276 * T * T - 1.754E-6 * T * T *
+        // T ) * RD;
+        //
+        // Bulk modulus
+        // double nu = 0.25; // Use bond-based model
+        // double K = E / ( 3 * ( 1 - 2 * nu ) );
+        //
+        // return coeff * K;
+
+        return coeff * K * RD;
     }
 
     KOKKOS_INLINE_FUNCTION
     auto forceCoeff( const int i, const int, const double s,
                      const double vol ) const
     {
-        auto c_current = currentC( i ) * rho_current( i ) / rho0;
+        auto c_current = currentC( i );
         return c_current * s * vol;
     }
 

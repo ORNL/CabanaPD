@@ -45,8 +45,6 @@ void HIPCylinderExample( const std::string filename )
     delta += 1e-10;
     double alpha = inputs["thermal_expansion_coeff"];
     double temp0 = inputs["reference_temperature"];
-    double Pmax = inputs["maximum_pressure"];
-    double Tmax = inputs["maximum_temperature"];
 
     // ====================================================
     //                  Discretization
@@ -93,6 +91,7 @@ void HIPCylinderExample( const std::string filename )
 
     // Impose separate density values for powder and container particles.
     double W = inputs["wall_thickness"];
+    double D0 = inputs["powder_initial_relative_density"];
     auto rho = particles.sliceDensity();
     auto temp = particles.sliceTemperature();
     auto x = particles.sliceReferencePosition();
@@ -100,7 +99,6 @@ void HIPCylinderExample( const std::string filename )
 
     // Use time to seed random number generator
     std::srand( std::time( nullptr ) );
-    // double rho_perturb_factor = 0.1;
     double rho_perturb_factor = 0.02;
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
@@ -112,8 +110,7 @@ void HIPCylinderExample( const std::string filename )
              x( pid, 2 ) < z_center + 0.5 * H - W &&
              x( pid, 2 ) > z_center - 0.5 * H + W )
         { // Powder density
-            // rho( pid ) = 0.7 * rho0;
-            rho( pid ) = 0.85 * rho0;
+            rho( pid ) = D0 * rho0;
             // Perturb powder density
             double factor =
                 ( 1 + ( -1 + 2 * ( (double)std::rand() / ( RAND_MAX ) ) ) *
@@ -173,6 +170,8 @@ void HIPCylinderExample( const std::string filename )
     //                    Impose field
     // ====================================================
     // Create BC last to ensure ghost particles are included.
+    double Pmax = inputs["maximum_pressure"];
+    double Tmax = inputs["maximum_temperature"];
     double dx = solver.particles.dx[0];
     double b0 = Pmax / dx;
     auto f = solver.particles.sliceForce();
