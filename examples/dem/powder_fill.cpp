@@ -63,6 +63,7 @@ void powderSettlingExample( const std::string filename )
     double diameter = inputs["cylinder_diameter"];
     double cylinder_radius = 0.5 * diameter;
     double wall_thickness = inputs["wall_thickness"];
+    double bottom = low_corner[2];
 
     // Create container.
     auto create_container = KOKKOS_LAMBDA( const int, const double x[3] )
@@ -74,7 +75,7 @@ void powderSettlingExample( const std::string filename )
             return false;
         // Leave remaining bottom wall particles and remove particles inside
         // cylinder
-        if ( x[2] > low_corner[2] + wall_thickness &&
+        if ( x[2] > bottom + wall_thickness &&
              rsq < ( cylinder_radius - wall_thickness ) *
                        ( cylinder_radius - wall_thickness ) )
             return false;
