@@ -194,7 +194,7 @@ class BaseForce
 
     // FIXME: should it be possible to update this list?
     template <class ParticleType>
-    void update( const ParticleType&, const double, const bool = false )
+    void update( const ParticleType&, const bool = false )
     {
     }
 
