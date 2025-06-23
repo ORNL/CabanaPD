@@ -1034,7 +1034,9 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
     void resize( Args&&... args )
     {
         base_type::resize( std::forward<Args>( args )... );
-        resizeImpl( base_type::localOffset() );
+        // This needs to match the base displacement field for a deep_copy, even
+        // thought it's not communicated directly.
+        resizeImpl( base_type::size() );
     }
 
     template <typename KeepType>
