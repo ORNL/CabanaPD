@@ -106,8 +106,8 @@ void plateWithHoleExample( const std::string filename )
         // Density
         rho( pid ) = rho0;
         // No-fail zone
-        if ( x( pid, 0 ) <= plane1.low_x + delta + 1e-10 ||
-             x( pid, 0 ) >= plane2.high_x - delta - 1e-10 )
+        if ( x( pid, 0 ) <= plane1.low[0] + delta + 1e-10 ||
+             x( pid, 0 ) >= plane2.high[0] - delta - 1e-10 )
             nofail( pid ) = 1;
     };
     particles.updateParticles( exec_space{}, init_functor );
