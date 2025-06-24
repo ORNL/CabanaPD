@@ -177,50 +177,31 @@ struct Region<Line>
 // this is equivalent to the RightTrapezoidalPrism region when rotated by 180
 // degrees on the XY-plane.
 template <>
-struct Region<InvertedRightTrapezoidalPrism>
+struct Region<InvertedRightTrapezoidalPrism> : public Region<RectangularPrism>
 {
-    double low_x;
-    double high_x;
-    double low_y;
-    double high_y;
-    double low_z;
-    double high_z;
+    using base_type = Region<RectangularPrism>;
+    using base_type::high;
+    using base_type::low;
     double Lx_bottom;
 
     Region( const double _low_x, const double _high_x, const double _low_y,
             const double _high_y, const double _low_z, const double _high_z,
             const double _Lx_bottom )
-        : low_x( _low_x )
-        , high_x( _high_x )
-        , low_y( _low_y )
-        , high_y( _high_y )
-        , low_z( _low_z )
-        , high_z( _high_z )
+        : base_type( _low_x, _high_x, _low_y, _high_y, _low_z, _high_z )
         , Lx_bottom( _Lx_bottom )
     {
-        assert( low_x < high_x );
-        assert( low_y < high_y );
-        assert( low_z < high_z );
         assert( Lx_bottom >= 0.0 );
-        assert( Lx_bottom < high_x - low_x );
+        assert( Lx_bottom < high[0] - low[0] );
     }
 
     template <class ArrayType>
     Region( const ArrayType _low, const ArrayType _high,
             const double _Lx_bottom )
-        : low_x( _low[0] )
-        , high_x( _high[0] )
-        , low_y( _low[1] )
-        , high_y( _high[1] )
-        , low_z( _low[2] )
-        , high_z( _high[2] )
+        : base_type( _low, _high )
         , Lx_bottom( _Lx_bottom )
     {
-        assert( low_x < high_x );
-        assert( low_y < high_y );
-        assert( low_z < high_z );
         assert( Lx_bottom >= 0.0 );
-        assert( Lx_bottom < high_x - low_x );
+        assert( Lx_bottom < high[0] - low[0] );
     }
 
     template <class PositionType>
@@ -229,14 +210,14 @@ struct Region<InvertedRightTrapezoidalPrism>
     {
         // Slope of non-parallel side
         double m_slope =
-            ( high_y - low_y ) / ( ( high_x - low_x ) - Lx_bottom );
+            ( high[1] - low[1] ) / ( ( high[0] - low[0] ) - Lx_bottom );
 
-        return (
-            ( ( x( pid, 0 ) >= high_x - Lx_bottom && x( pid, 0 ) <= high_x ) ||
-              x( pid, 1 ) - low_y >
-                  m_slope * ( ( high_x - x( pid, 0 ) ) - Lx_bottom ) ) &&
-            x( pid, 1 ) >= low_y && x( pid, 1 ) <= high_y &&
-            x( pid, 2 ) >= low_z && x( pid, 2 ) <= high_z );
+        return ( ( ( x( pid, 0 ) >= high[0] - Lx_bottom &&
+                     x( pid, 0 ) <= high[0] ) ||
+                   x( pid, 1 ) - low[1] >
+                       m_slope * ( ( high[0] - x( pid, 0 ) ) - Lx_bottom ) ) &&
+                 base_type::inside( x, pid, 1 ) &&
+                 base_type::inside( x, pid, 2 ) );
     }
 };
 
@@ -245,49 +226,30 @@ struct Region<InvertedRightTrapezoidalPrism>
 // bases oriented along the x-direction and the right angle located at the
 // bottom-left vertex.
 template <>
-struct Region<RightTrapezoidalPrism>
+struct Region<RightTrapezoidalPrism> : public Region<RectangularPrism>
 {
-    double low_x;
-    double high_x;
-    double low_y;
-    double high_y;
-    double low_z;
-    double high_z;
+    using base_type = Region<RectangularPrism>;
+    using base_type::high;
+    using base_type::low;
     double Lx_top;
 
     Region( const double _low_x, const double _high_x, const double _low_y,
             const double _high_y, const double _low_z, const double _high_z,
             const double _Lx_top )
-        : low_x( _low_x )
-        , high_x( _high_x )
-        , low_y( _low_y )
-        , high_y( _high_y )
-        , low_z( _low_z )
-        , high_z( _high_z )
+        : base_type( _low_x, _high_x, _low_y, _high_y, _low_z, _high_z )
         , Lx_top( _Lx_top )
     {
-        assert( low_x < high_x );
-        assert( low_y < high_y );
-        assert( low_z < high_z );
         assert( Lx_top >= 0.0 );
-        assert( Lx_top < high_x - low_x );
+        assert( Lx_top < high[0] - low[0] );
     }
 
     template <class ArrayType>
     Region( const ArrayType _low, const ArrayType _high, const double _Lx_top )
-        : low_x( _low[0] )
-        , high_x( _high[0] )
-        , low_y( _low[1] )
-        , high_y( _high[1] )
-        , low_z( _low[2] )
-        , high_z( _high[2] )
+        : base_type( _low[0], _high[0] )
         , Lx_top( _Lx_top )
     {
-        assert( low_x < high_x );
-        assert( low_y < high_y );
-        assert( low_z < high_z );
         assert( Lx_top >= 0.0 );
-        assert( Lx_top < high_x - low_x );
+        assert( Lx_top < high[0] - low[0] );
     }
 
     template <class PositionType>
@@ -295,13 +257,14 @@ struct Region<RightTrapezoidalPrism>
                                         const int pid ) const
     {
         // Slope of non-parallel side
-        double m_slope = ( high_y - low_y ) / ( ( high_x - low_x ) - Lx_top );
+        double m_slope =
+            ( high[1] - low[1] ) / ( ( high[0] - low[0] ) - Lx_top );
 
-        return ( ( ( x( pid, 0 ) >= low_x && x( pid, 0 ) <= low_x + Lx_top ) ||
-                   high_y - x( pid, 1 ) >
-                       m_slope * ( ( x( pid, 0 ) - low_x ) - Lx_top ) ) &&
-                 x( pid, 1 ) >= low_y && x( pid, 1 ) <= high_y &&
-                 x( pid, 2 ) >= low_z && x( pid, 2 ) <= high_z );
+        return (
+            ( ( x( pid, 0 ) >= low[0] && x( pid, 0 ) <= low[0] + Lx_top ) ||
+              high[1] - x( pid, 1 ) >
+                  m_slope * ( ( x( pid, 0 ) - low[0] ) - Lx_top ) ) &&
+            base_type::inside( x, pid, 1 ) && base_type::inside( x, pid, 2 ) );
     }
 };
 
