@@ -61,48 +61,42 @@ struct Region
 template <>
 struct Region<RectangularPrism>
 {
-    double low_x;
-    double high_x;
-    double low_y;
-    double high_y;
-    double low_z;
-    double high_z;
+    Kokkos::Array<double, 3> low;
+    Kokkos::Array<double, 3> high;
 
-    Region( const double _low_x, const double _high_x, const double _low_y,
-            const double _high_y, const double _low_z, const double _high_z )
-        : low_x( _low_x )
-        , high_x( _high_x )
-        , low_y( _low_y )
-        , high_y( _high_y )
-        , low_z( _low_z )
-        , high_z( _high_z )
+    Region( const double low_x, const double high_x, const double low_y,
+            const double high_y, const double low_z, const double high_z )
+        : low( { low_x, low_y, low_z } )
+        , high( { high_x, high_y, high_z } )
     {
-        assert( low_x < high_x );
-        assert( low_y < high_y );
-        assert( low_z < high_z );
+        assert( low[0] < high[0] );
+        assert( low[1] < high[1] );
+        assert( low[2] < high[2] );
     }
 
     template <class ArrayType>
     Region( const ArrayType _low, const ArrayType _high )
-        : low_x( _low[0] )
-        , high_x( _high[0] )
-        , low_y( _low[1] )
-        , high_y( _high[1] )
-        , low_z( _low[2] )
-        , high_z( _high[2] )
+        : low( { _low[0], _low[1], _low[2] } )
+        , high( { _high[0], _high[1], _high[2] } )
     {
         assert( low_x < high_x );
-        assert( low_y < high_y );
-        assert( low_z < high_z );
+        assert( low[1] < high[1] );
+        assert( low[2] < high[2] );
     }
 
     template <class PositionType>
     KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
                                         const int pid ) const
     {
-        return ( x( pid, 0 ) >= low_x && x( pid, 0 ) <= high_x &&
-                 x( pid, 1 ) >= low_y && x( pid, 1 ) <= high_y &&
-                 x( pid, 2 ) >= low_z && x( pid, 2 ) <= high_z );
+        return ( inside( x, pid, 0 ) && inside( x, pid, 1 ) &&
+                 inside( x, pid, 2 ) );
+    }
+
+    template <class PositionType>
+    KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x, const int pid,
+                                        const int d ) const
+    {
+        return ( x( pid, d ) >= low[d] && x( pid, d ) <= high[d] );
     }
 };
 

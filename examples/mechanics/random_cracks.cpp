@@ -153,8 +153,8 @@ void randomCracksExample( const std::string filename )
         // Density
         rho( pid ) = rho0;
         // No-fail zone
-        if ( x( pid, 1 ) <= plane1.low_y + delta + 1e-10 ||
-             x( pid, 1 ) >= plane2.high_y - delta - 1e-10 )
+        if ( x( pid, 1 ) <= plane1.low[1] + delta + 1e-10 ||
+             x( pid, 1 ) >= plane2.high[1] - delta - 1e-10 )
             nofail( pid ) = 1;
     };
     particles.updateParticles( exec_space{}, init_functor );
