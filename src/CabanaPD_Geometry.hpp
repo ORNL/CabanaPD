@@ -182,8 +182,8 @@ struct ParticleSteeringVector
     index_view_type _view;
     index_view_type _count;
     std::size_t particle_count;
-    // FIXME: expose this as needed.
-    const double initial_guess = 0.5;
+    // Could expose this parameter as needed.
+    const double initial_guess = 0.1;
 
     Timer _timer;
 
@@ -227,7 +227,7 @@ struct ParticleSteeringVector
 
     // Extract indices from a single region.
     template <class ExecSpace, class Particles, class RegionType>
-    void update( ExecSpace, Particles particles, RegionType region )
+    void update( ExecSpace exec_space, Particles particles, RegionType region )
     {
         particle_count = particles.referenceOffset();
 
@@ -235,8 +235,24 @@ struct ParticleSteeringVector
             Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, _count );
         auto init_count = count_host( 0 );
 
+        count( exec_space, particles, region );
+        // Fence before deep_copy.
+        Kokkos::deep_copy( count_host, _count );
+
+        if ( count_host( 0 ) > _view.size() )
+        {
+            Kokkos::resize( _view, count_host( 0 ) );
+            Kokkos::deep_copy( _count, init_count );
+            count( exec_space, particles, region );
+            Kokkos::fence();
+        }
+    }
+
+    template <class ExecSpace, class Particles, class RegionType>
+    void count( ExecSpace, Particles particles, RegionType region )
+    {
+        auto count_copy = _count;
         auto index_space = _view;
-        auto count = _count;
         auto x = particles.sliceReferencePosition();
         // TODO: configure including frozen particles.
         Kokkos::RangePolicy<ExecSpace> policy( 0, particles.localOffset() );
@@ -245,24 +261,14 @@ struct ParticleSteeringVector
             if ( region.inside( x, pid ) )
             {
                 // Resize after count if needed.
-                auto c = Kokkos::atomic_fetch_add( &count( 0 ), 1 );
+                auto c = Kokkos::atomic_fetch_add( &count_copy( 0 ), 1 );
                 if ( c < index_space.size() )
                 {
                     index_space( c ) = pid;
                 }
             }
         };
-
         Kokkos::parallel_for( "CabanaPD::BC::update", policy, index_functor );
-        Kokkos::deep_copy( count_host, _count );
-        if ( count_host( 0 ) > index_space.size() )
-        {
-            Kokkos::resize( index_space, count_host( 0 ) );
-            Kokkos::deep_copy( count, init_count );
-            Kokkos::parallel_for( "CabanaPD::BC::update", policy,
-                                  index_functor );
-            Kokkos::fence();
-        }
     }
 
     // Update from a View of boundary particles (custom).
