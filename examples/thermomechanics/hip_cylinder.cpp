@@ -97,8 +97,14 @@ void HIPCylinderExample( const std::string filename )
     auto x = particles.sliceReferencePosition();
     auto nofail = particles.sliceNoFail();
 
+    using pool_type = Kokkos::Random_XorShift64_Pool<exec_space>;
+    using random_type = Kokkos::Random_XorShift64<exec_space>;
+    pool_type pool;
+    int seed = 456854;
+    pool.init( seed, particles.numLocal() );
+
     // Use time to seed random number generator
-    std::srand( std::time( nullptr ) );
+    //std::srand( std::time( nullptr ) );
     double rho_perturb_factor = 0.02;
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
@@ -112,9 +118,16 @@ void HIPCylinderExample( const std::string filename )
         { // Powder density
             rho( pid ) = D0 * rho0;
             // Perturb powder density
-            double factor =
-                ( 1 + ( -1 + 2 * ( (double)std::rand() / ( RAND_MAX ) ) ) *
-                          rho_perturb_factor );
+            auto gen = pool.get_state();
+      	    auto rand =
+                Kokkos::rand<random_type, double>::draw( gen, 0.0, 1.0 );
+	    double factor =
+                ( 1 + ( 2.0 * rand - 1.0 ) *
+                         rho_perturb_factor );
+	   
+	  //  double factor =
+          //      ( 1 + ( -1 + 2 * ( (double)std::rand() / ( RAND_MAX ) ) ) *
+         //                 rho_perturb_factor );
             rho( pid ) *= factor;
         }
         else
