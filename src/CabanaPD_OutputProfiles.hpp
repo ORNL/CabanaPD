@@ -98,7 +98,7 @@ template <typename MemorySpace, typename FunctorType>
 class OutputTimeSeries
 {
     using memory_space = MemorySpace;
-    using profile_type = Kokkos::View<double*, memory_space>;
+    using profile_type = Kokkos::View<double*, Kokkos::HostSpace>;
 
     using steering_vector_type = ParticleSteeringVector<MemorySpace>;
     steering_vector_type _indices;
@@ -135,6 +135,7 @@ class OutputTimeSeries
     {
         Kokkos::RangePolicy<typename memory_space::execution_space> policy(
             0, _indices.size() );
+        // Reduce into host view.
         Kokkos::parallel_reduce( "time_series", policy, *this,
                                  _profile( index ) );
         index++;
