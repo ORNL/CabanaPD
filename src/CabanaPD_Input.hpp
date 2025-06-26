@@ -41,10 +41,7 @@ class Inputs
         // if it contains both m and horizon
         if ( inputs.contains( "horizon" ) && inputs.contains( "m" ) )
         {
-            throw std::runtime_error(
-                "Conflict - cannot input both horizon and m."
-                "Declare only 1, and other will be calculated using "
-                "system_size." );
+            throw std::runtime_error( "Cannot input both horizon and m." );
         }
 
         // m
@@ -61,7 +58,7 @@ class Inputs
         else if ( inputs.contains( "m" ) )
         {
             int m = inputs["m"]["value"];
-            double delta = static_cast<double>( m ) * dx + 1e-10;
+            double delta = static_cast<double>( m ) * dx + 0.01 * dx;
             inputs["horizon"]["value"] = delta;
         }
 
