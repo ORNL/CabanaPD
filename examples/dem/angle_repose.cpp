@@ -70,8 +70,9 @@ void angleOfReposeExample( const std::string filename )
     {
         // Only create particles for container.
         double rsq = x[0] * x[0] + x[1] * x[1];
-        if ( ( x[2] > min_height && rsq > particle_radius * particle_radius &&
-               rsq < cylinder_radius * cylinder_radius ) )
+        if ( ( x[2] > min_height && rsq // > particle_radius * particle_radius
+                                        // && rsq
+                                        < cylinder_radius * cylinder_radius ) )
             return true;
         if ( ( rsq < particle_radius * particle_radius &&
                x[2] > high_corner[2] - wall_thickness ) )
@@ -81,7 +82,7 @@ void angleOfReposeExample( const std::string filename )
     CabanaPD::Particles particles(
         memory_space{}, model_type{}, CabanaPD::BaseOutput{}, low_corner,
         high_corner, num_cells, halo_width, Cabana::InitRandom{},
-        create_container, exec_space{}, true );
+        create_container, exec_space{}, false );
     auto create = KOKKOS_LAMBDA( const int, const double x[3] )
     {
         // Only create particles inside cylinder.
@@ -91,8 +92,8 @@ void angleOfReposeExample( const std::string filename )
             return true;
         return false;
     };
-    particles.createParticles( exec_space{}, Cabana::InitRandom{}, create,
-                               particles.localOffset() );
+    // particles.createParticles( exec_space{}, Cabana::InitRandom{}, create,
+    //                            particles.localOffset() );
 
     // Set density/volumes.
     auto rho = particles.sliceDensity();
