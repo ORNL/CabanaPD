@@ -48,33 +48,12 @@ struct ForceModels
 
     ForceModels( MaterialType t, const ModelType1 m1, ModelType2 m2,
                  ModelType12 m12 )
-        : delta( 0.0 )
-        , type( t )
+        : type( t )
         , model1( m1 )
         , model2( m2 )
         , model12( m12 )
     {
         setHorizon();
-    }
-
-    void setHorizon()
-    {
-        maxDelta( model1 );
-        maxDelta( model2 );
-        maxDelta( model12 );
-    }
-
-    template <typename Model>
-    auto maxDelta( Model m )
-    {
-        if ( m.delta > delta )
-        {
-            delta = m.delta;
-            // Enforce equal cutoff for now.
-            if ( m.delta != delta )
-                log_err( std::cout, "Horizon for each model must match for "
-                                    "multi-material systems." );
-        }
     }
 
     auto cutoff() const { return delta; }
@@ -124,6 +103,23 @@ struct ForceModels
     ModelType1 model1;
     ModelType2 model2;
     ModelType12 model12;
+
+  protected:
+    void setHorizon()
+    {
+        // Enforce equal cutoff for now.
+        delta = model1.delta;
+        checkDelta( model2 );
+        checkDelta( model12 );
+    }
+
+    template <typename Model>
+    auto checkDelta( Model m, const double tol = 1e-10 )
+    {
+        if ( std::abs( m.delta - delta ) > tol )
+            log_err( std::cout, "Horizon for each model must match for "
+                                "multi-material systems." );
+    }
 };
 
 template <typename ParticleType, typename ModelType1, typename ModelType2,
