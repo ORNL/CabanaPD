@@ -72,7 +72,7 @@ void kalthoffWinklerExample( const std::string filename )
     Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
     Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
     Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = { p01, p02 };
-    CabanaPD::Prenotch<2> prenotch( v1, v2, notch_positions );
+    CabanaPD::Prenotch<memory_space> prenotch( v1, v2, notch_positions );
 
     // ====================================================
     //                    Force model

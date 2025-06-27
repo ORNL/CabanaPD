@@ -265,17 +265,18 @@ class Solver
     }
 
     // Initialize with prenotch, but no BC.
-    template <std::size_t NumPrenotch>
-    void init( Prenotch<NumPrenotch> prenotch,
-               const bool initial_output = true )
+    template <typename PrenotchType>
+    void init( PrenotchType prenotch, const bool initial_output = true,
+               typename std::enable_if<( is_prenotch<PrenotchType>::value ),
+                                       int>::type* = 0 )
     {
         init_prenotch( prenotch );
         init( initial_output );
     }
 
     // Initialize with prenotch and BC.
-    template <typename BoundaryType, std::size_t NumPrenotch>
-    void init( BoundaryType boundary_condition, Prenotch<NumPrenotch> prenotch,
+    template <typename BoundaryType, typename PrenotchType>
+    void init( BoundaryType boundary_condition, PrenotchType prenotch,
                const bool initial_output = true )
     {
         init_prenotch( prenotch );
@@ -585,8 +586,8 @@ class Solver
     ParticleType particles;
 
   protected:
-    template <std::size_t NumPrenotch>
-    void init_prenotch( Prenotch<NumPrenotch> prenotch )
+    template <typename PrenotchType>
+    void init_prenotch( PrenotchType prenotch )
     {
         static_assert(
             is_fracture<typename force_model_type::fracture_type>::value,
