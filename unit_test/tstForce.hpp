@@ -29,6 +29,7 @@
 
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_ForceModels.hpp>
+#include <CabanaPD_ForceModelsMulti.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Particles.hpp>
 #include <force/CabanaPD_LPS.hpp>
@@ -83,13 +84,13 @@ auto computeReferenceStress(
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                 {
-                    f_mag = model.c * s0;
+                    f_mag = model( CabanaPD::ForceCoeffTag{}, -1, -1, s0, vol );
                     f_x = f_mag * xi_x / xi;
                     f_y = f_mag * xi_y / xi;
                     f_z = f_mag * xi_z / xi;
-                    sigma[0] += 0.5 * f_x * xi_x * vol;
-                    sigma[1] += 0.5 * f_y * xi_y * vol;
-                    sigma[2] += 0.5 * f_z * xi_z * vol;
+                    sigma[0] += 0.5 * f_x * xi_x;
+                    sigma[1] += 0.5 * f_y * xi_y;
+                    sigma[2] += 0.5 * f_z * xi_z;
                 }
             }
     return sigma;
@@ -118,7 +119,7 @@ double computeReferenceStrainEnergyDensity(
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                 {
-                    W += 0.25 * model.c * s0 * s0 * xi * vol;
+                    W += model( CabanaPD::EnergyTag{}, -1, -1, s0, xi, vol );
                 }
             }
     return W;
@@ -153,7 +154,7 @@ double computeReferenceStrainEnergyDensity(
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                 {
-                    W += 0.25 * model.c * s * s * xi * vol;
+                    W += model( CabanaPD::EnergyTag{}, -1, -1, s, xi, vol );
                 }
             }
     return W;
@@ -196,7 +197,8 @@ double computeReferenceForceX(
                 double s = ( r - xi ) / xi;
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
-                    fx += model.c * s * vol * rx / r;
+                    fx += model( CabanaPD::ForceCoeffTag{}, -1, -1, s, vol ) *
+                          rx / r;
             }
     return fx;
 }
@@ -218,7 +220,8 @@ double computeReferenceWeightedVolume( ModelType model, const int m,
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                     weighted_volume +=
-                        model.influenceFunction( xi ) * xi * xi * vol;
+                        model( CabanaPD::InfluenceFunctionTag{}, -1, -1, xi ) *
+                        xi * xi * vol;
             }
     return weighted_volume;
 }
@@ -242,8 +245,10 @@ double computeReferenceDilatation( ModelType model, const int m,
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
-                    theta += 3.0 / weighted_volume *
-                             model.influenceFunction( xi ) * s0 * xi * xi * vol;
+                    theta +=
+                        3.0 / weighted_volume *
+                        model( CabanaPD::InfluenceFunctionTag{}, -1, -1, xi ) *
+                        s0 * xi * xi * vol;
             }
     return theta;
 }
@@ -273,8 +278,10 @@ double computeReferenceDilatation( ModelType model, const int m,
                 double s = ( r - xi ) / xi;
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
-                    theta += 3.0 / weighted_volume *
-                             model.influenceFunction( xi ) * s * xi * xi * vol;
+                    theta +=
+                        3.0 / weighted_volume *
+                        model( CabanaPD::InfluenceFunctionTag{}, -1, -1, xi ) *
+                        s * xi * xi * vol;
             }
     return theta;
 }
@@ -333,15 +340,14 @@ auto computeReferenceStress(
                 {
                     // We assume the dilatation and weighted volume are constant
                     f_mag =
-                        ( model.theta_coeff * 2.0 * theta / weighted_volume +
-                          model.s_coeff * s0 * 2.0 / weighted_volume ) *
-                        model.influenceFunction( xi ) * xi;
+                        model( CabanaPD::ForceCoeffTag{}, -1, -1, s0, xi, vol,
+                               weighted_volume, weighted_volume, theta, theta );
                     f_x = f_mag * xi_x / xi;
                     f_y = f_mag * xi_y / xi;
                     f_z = f_mag * xi_z / xi;
-                    sigma[0] += 0.5 * f_x * xi_x * vol;
-                    sigma[1] += 0.5 * f_y * xi_y * vol;
-                    sigma[2] += 0.5 * f_z * xi_z * vol;
+                    sigma[0] += 0.5 * f_x * xi_x;
+                    sigma[1] += 0.5 * f_y * xi_y;
+                    sigma[2] += 0.5 * f_z * xi_z;
                 }
             }
     return sigma;
@@ -385,11 +391,8 @@ double computeReferenceStrainEnergyDensity(
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                 {
-                    W += ( 1.0 / num_neighbors ) * 0.5 * model.theta_coeff /
-                             3.0 * ( theta * theta ) +
-                         0.5 * ( model.s_coeff / weighted_volume ) *
-                             model.influenceFunction( xi ) * s0 * s0 * xi * xi *
-                             vol;
+                    W += model( CabanaPD::EnergyTag{}, -1, -1, s0, xi, vol,
+                                weighted_volume, theta, num_neighbors );
                 }
             }
     return W;
@@ -429,16 +432,10 @@ double computeReferenceStrainEnergyDensity(
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
                 double s = ( r - xi ) / xi;
 
-                double x_j = x + xi_x;
-                auto theta_j = computeReferenceDilatation(
-                    model, m, u11, vol, weighted_volume, x_j );
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                 {
-                    W += ( 1.0 / num_neighbors ) * 0.5 * model.theta_coeff /
-                             3.0 * ( theta_i * theta_j ) +
-                         0.5 * ( model.s_coeff / weighted_volume ) *
-                             model.influenceFunction( xi ) * s * s * xi * xi *
-                             vol;
+                    W += model( CabanaPD::EnergyTag{}, -1, -1, s, xi, vol,
+                                weighted_volume, theta_i, num_neighbors );
                 }
             }
     return W;
@@ -481,12 +478,10 @@ double computeReferenceForceX(
                     model, m, u11, vol, weighted_volume, x_j );
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                 {
-                    fx += ( model.theta_coeff * ( theta_i / weighted_volume +
-                                                  theta_j / weighted_volume ) +
-                            model.s_coeff * s *
-                                ( 1.0 / weighted_volume +
-                                  1.0 / weighted_volume ) ) *
-                          model.influenceFunction( xi ) * xi * vol * rx / r;
+                    fx += model( CabanaPD::ForceCoeffTag{}, -1, -1, s, xi, vol,
+                                 weighted_volume, weighted_volume, theta_i,
+                                 theta_j ) *
+                          rx / r;
                 }
             }
     return fx;
@@ -675,7 +670,7 @@ void checkAnalyticalStrainEnergy(
 {
     // Relatively large error for small m.
     double threshold = W * 0.15;
-    double analytical_W = 9.0 / 2.0 * model.K * s0 * s0;
+    double analytical_W = 9.0 / 2.0 * model.bulkModulus() * s0 * s0;
     EXPECT_NEAR( W, analytical_W, threshold );
 }
 
@@ -687,7 +682,7 @@ void checkAnalyticalStrainEnergy(
         int>::type* = 0 )
 {
     // LPS is exact.
-    double analytical_W = 9.0 / 2.0 * model.K * s0 * s0;
+    double analytical_W = 9.0 / 2.0 * model.bulkModulus() * s0 * s0;
     EXPECT_FLOAT_EQ( W, analytical_W );
 }
 
@@ -701,7 +696,7 @@ void checkAnalyticalStrainEnergy(
 {
     double threshold = W * 0.05;
     double analytical_W =
-        18.0 * model.K * u11 * u11 *
+        18.0 * model.bulkModulus() * u11 * u11 *
         ( 1.0 / 5.0 * x * x + model.delta * model.delta / 42.0 );
     EXPECT_NEAR( W, analytical_W, threshold );
 }
@@ -715,10 +710,11 @@ void checkAnalyticalStrainEnergy(
         int>::type* = 0 )
 {
     double threshold = W * 0.20;
-    double analytical_W =
-        u11 * u11 *
-        ( ( 2 * model.K + 8.0 / 3.0 * model.G ) * x * x +
-          75.0 / 2.0 * model.G * model.delta * model.delta / 49.0 );
+    double K = model.bulkModulus();
+    double G = model.shearModulus();
+    double analytical_W = u11 * u11 *
+                          ( ( 2.0 * K + 8.0 / 3.0 * G ) * x * x +
+                            75.0 / 2.0 * G * model.delta * model.delta / 49.0 );
     EXPECT_NEAR( W, analytical_W, threshold );
 }
 
@@ -730,7 +726,7 @@ void checkAnalyticalForce(
         int>::type* = 0 )
 {
     double threshold = fx * 0.10;
-    double analytical_f = 18.0 / 5.0 * model.K * s0;
+    double analytical_f = 18.0 / 5.0 * model.bulkModulus() * s0;
     EXPECT_NEAR( fx, analytical_f, threshold );
 }
 
@@ -742,7 +738,8 @@ void checkAnalyticalForce(
         int>::type* = 0 )
 {
     double threshold = fx * 0.10;
-    double analytical_f = 2.0 * ( model.K + 4.0 / 3.0 * model.G ) * s0;
+    double analytical_f =
+        2.0 * ( model.bulkModulus() + 4.0 / 3.0 * model.shearModulus() ) * s0;
     EXPECT_NEAR( fx, analytical_f, threshold );
 }
 
@@ -934,4 +931,43 @@ TEST( TEST_CATEGORY, test_force_lps_damage )
     testForce( model, dx, m, 2.1, LinearTag{}, 0.1 );
     testForce( model, dx, m, 2.1, QuadraticTag{}, 0.01 );
 }
+TEST( TEST_CATEGORY, test_force_pmb_multi )
+{
+    // dx needs to be decreased for increased m: boundary particles are ignored.
+    double m = 3;
+    double dx = 2.0 / 11.0;
+    double delta = dx * m;
+    double K = 1.0;
+    CabanaPD::PMB model_type;
+    CabanaPD::ForceModel model1( model_type, CabanaPD::Elastic{},
+                                 CabanaPD::NoFracture{}, delta, K );
+    CabanaPD::ForceModel model2( model1 );
+
+    auto particles = createParticles( model_type, LinearTag{}, dx, 0.1 );
+    auto models = CabanaPD::createMultiForceModel(
+        particles, CabanaPD::AverageTag{}, model1, model2 );
+    testForce( models, dx, m, 1.1, LinearTag{}, 0.1 );
+    testForce( models, dx, m, 1.1, QuadraticTag{}, 0.01 );
+}
+TEST( TEST_CATEGORY, test_force_lps_multi )
+{
+    double m = 3;
+    // Need a larger system than PMB because the boundary region is larger.
+    double dx = 2.0 / 15.0;
+    double delta = dx * m;
+    double K = 1.0;
+    double G = 0.5;
+    double G0 = 1000.0;
+    CabanaPD::LPS model_type;
+    CabanaPD::ForceModel model1( model_type, CabanaPD::Elastic{},
+                                 CabanaPD::NoFracture{}, delta, K, G, 1 );
+    CabanaPD::ForceModel model2( model_type, delta, K, G, G0, 1 );
+
+    auto particles = createParticles( model_type, LinearTag{}, dx, 0.1 );
+    auto models = CabanaPD::createMultiForceModel(
+        particles, CabanaPD::AverageTag{}, model1, model2 );
+    testForce( models, dx, m, 2.1, LinearTag{}, 0.1 );
+    testForce( models, dx, m, 2.1, QuadraticTag{}, 0.01 );
+}
+
 } // end namespace Test
