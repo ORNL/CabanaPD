@@ -38,6 +38,12 @@ class Inputs
         double tf = inputs["final_time"]["value"];
         double dt = inputs["timestep"]["value"];
 
+        // if it contains both m and horizon
+        if ( inputs.contains( "horizon" ) && inputs.contains( "m" ) )
+        {
+            throw std::runtime_error( "Cannot input both horizon and m." );
+        }
+
         // m
         // FIXME: this will be slightly different in y/z
         double dx = inputs["dx"]["value"][0];
@@ -48,16 +54,24 @@ class Inputs
             inputs["m"]["value"] = m;
         }
 
+        // if it contains m
+        else if ( inputs.contains( "m" ) )
+        {
+            int m = inputs["m"]["value"];
+            double delta = static_cast<double>( m ) * dx + 0.01 * dx;
+            inputs["horizon"]["value"] = delta;
+        }
+
         // Set timestep safety factor if not set by user.
         if ( !inputs.contains( "timestep_safety_factor" ) )
             inputs["timestep_safety_factor"]["value"] = 0.85;
 
         // Check one of bulk or elastic modulus set by user.
-        if ( !inputs.contains( "bulk_modulus" ) )
+        if ( !inputs.contains( "bulk_modulus" ) &&
+             !inputs.contains( "elastic_modulus" ) )
         {
-            if ( !inputs.contains( "elastic_modulus" ) )
-                throw std::runtime_error( "Must input either bulk_modulus or "
-                                          "elastic_modulus." );
+            throw std::runtime_error( "Must input either bulk_modulus or "
+                                      "elastic_modulus." );
         }
 
         int num_steps = tf / dt;
