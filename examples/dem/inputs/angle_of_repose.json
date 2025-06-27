@@ -1,5 +1,5 @@
 {
-    "dx"                       : {"value": [0.0025, 0.0025, 0.0025], "unit": "m"},
+    "dx"                       : {"value": [0.0075, 0.0075, 0.0075], "unit": "m"},
     "system_size"              : {"value": [0.5, 0.5, 0.5], "unit": "m"},
     "density"                : {"value": 2.0e3,  "unit": "kg/m^3"},
     "volume"                 : {"value": 6.544985e-8,  "unit": "m^3"},
@@ -7,7 +7,7 @@
     "poisson_ratio"          : {"value": 0.25, "unit": ""},
     "restitution"            : {"value": 0.35},  
     "radius"                 : {"value": 2.0e-3 },
-    "radius_extend"             : {"value": 0.5e-3 },
+    "radius_extend"             : {"value": 0.45e-3 },
     "cylinder_diameter"        : {"value": 0.1, "unit": "m"},
     "wall_thickness"           : {"value": 0.01, "unit": "m"},
     "min_height"               : {"value": 0.1, "unit": "m"},
