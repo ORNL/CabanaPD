@@ -79,26 +79,6 @@ struct ForceModels
 
     auto cutoff() const { return delta; }
 
-    auto bulkModulus() const { return model1.K; }
-    auto bulkModulus( const int i ) const
-    {
-        if ( i == 0 )
-            return model1.K;
-        else if ( i == 1 )
-            return model2.K;
-        else if ( i == 2 )
-            return model12.K;
-    }
-    // FIXME
-    auto shearModulus() const
-    {
-        if constexpr ( std::is_same<typename ModelType1::base_model,
-                                    LPS>::value )
-            return model1.G;
-        else
-            return 0.0;
-    }
-
     void updateBonds( const int num_local, const int max_neighbors )
     {
         model1.updateBonds( num_local, max_neighbors );

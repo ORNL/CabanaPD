@@ -91,8 +91,6 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
             log_err( std::cout, "Influence function type must be 0 or 1." );
     }
 
-    auto shearModulus() { return G; }
-
     KOKKOS_INLINE_FUNCTION auto operator()( InfluenceFunctionTag,
                                             double xi ) const
     {

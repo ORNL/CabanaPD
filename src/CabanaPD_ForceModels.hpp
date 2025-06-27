@@ -59,8 +59,6 @@ struct BaseForceModel
 
     auto cutoff() const { return delta; }
 
-    auto bulkModulus() const { return K; }
-
     // Only needed for models which store bond properties.
     void updateBonds( const int, const int ) {}
 };
