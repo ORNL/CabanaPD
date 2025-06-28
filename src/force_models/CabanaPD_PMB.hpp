@@ -61,14 +61,14 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
 
     KOKKOS_INLINE_FUNCTION
     auto operator()( ForceCoeffTag, const int, const int, const double s,
-                     const double vol ) const
+                     const double vol, const int = -1 ) const
     {
         return c * s * vol;
     }
 
     KOKKOS_INLINE_FUNCTION
     auto operator()( EnergyTag, const int, const int, const double s,
-                     const double xi, const double vol ) const
+                     const double xi, const double vol, const int = -1 ) const
     {
         // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
         // the integrand (pairwise potential).
@@ -81,7 +81,6 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
     : public BaseForceModelPMB<Elastic>, public BasePlasticity<MemorySpace>
 {
     using base_type = BaseForceModelPMB<Elastic>;
-    using base_fracture_type = BaseFractureModel;
     using base_plasticity_type = BasePlasticity<MemorySpace>;
 
     using mechanics_type = ElasticPerfectlyPlastic;
@@ -105,12 +104,14 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
     template <typename ModelType1, typename ModelType2>
     BaseForceModelPMB( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
+        , base_plasticity_type()
     {
+        s_Y = ( model1.s_Y + model2.s_Y ) / 2.0;
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto operator()( ForceCoeffTag, const int i, const int n, const double s,
-                     const double vol ) const
+    auto operator()( ForceCoeffTag, const int i, const int, const double s,
+                     const double vol, const int n ) const
     {
         // Update bond plastic stretch.
         auto s_p = _s_p( i, n );
@@ -130,8 +131,8 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
     // This energy calculation is only valid for pure tension or pure
     // compression.
     KOKKOS_INLINE_FUNCTION
-    auto operator()( EnergyTag, const int i, const int n, const double s,
-                     const double xi, const double vol ) const
+    auto operator()( EnergyTag, const int i, const int, const double s,
+                     const double xi, const double vol, const int n ) const
     {
         auto s_p = _s_p( i, n );
         double stretch_term;
@@ -327,7 +328,6 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
                 const double _alpha, const double _temp0 = 0.0 )
         : base_type( model, fracture, _delta, _K )
         , base_temperature_type( _temp, _alpha, _temp0 )
-
     {
     }
 };
@@ -347,7 +347,6 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
                 const double _alpha, const double _temp0 = 0.0 )
         : base_type( model, NoFracture{}, _delta, _K )
         , base_temperature_type( _delta, _K, _G0, _temp, _alpha, _temp0 )
-
     {
     }
 
