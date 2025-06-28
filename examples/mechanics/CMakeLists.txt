@@ -19,4 +19,7 @@ target_link_libraries(DogboneTensileTest LINK_PUBLIC CabanaPD)
 add_executable(PlateWithHole plate_with_hole.cpp)
 target_link_libraries(PlateWithHole LINK_PUBLIC CabanaPD)
 
-install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DogboneTensileTest PlateWithHole DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(ColdSprayImpact simple_impact.cpp)  
+target_link_libraries(ColdSprayImpact LINK_PUBLIC CabanaPD)
+
+install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DogboneTensileTest PlateWithHole ColdSprayImpact DESTINATION ${CMAKE_INSTALL_BINDIR})
