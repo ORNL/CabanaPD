@@ -6,6 +6,7 @@
     "elastic_modulus"        : {"value": 1.0e5, "unit": "Pa"},
     "poisson_ratio"          : {"value": 0.25, "unit": ""},
     "restitution"            : {"value": 0.35},  
+    "surface_adhesion"       : {"value": 10, "unit": "J/m^2"},
     "radius"                 : {"value": 2.0e-3 },
     "radius_extend"             : {"value": 0.45e-3 },
     "cylinder_diameter"        : {"value": 0.1, "unit": "m"},

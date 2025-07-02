@@ -42,6 +42,7 @@ void angleOfReposeExample( const std::string filename )
     double nu = inputs["poisson_ratio"];
     double E = inputs["elastic_modulus"];
     double e = inputs["restitution"];
+    double gamma = inputs["surface_adhesion"];
 
     // ====================================================
     //                  Discretization
@@ -54,8 +55,8 @@ void angleOfReposeExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type = CabanaPD::HertzianModel;
-    model_type contact_model( radius, radius_extend, nu, E, e );
+    using model_type = CabanaPD::HertzianJKRModel;
+    model_type contact_model( radius, radius_extend, nu, E, e, gamma );
 
     // ====================================================
     //            Custom particle initialization
