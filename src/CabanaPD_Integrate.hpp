@@ -187,6 +187,7 @@ class VelocityVerlet<Contact> : public VelocityVerlet<NoContact>
                                  init_func,
                                  Kokkos::Max<double>( max_displacement ) );
 
+        Kokkos::fence();
         p.setMaxDisplacement( max_displacement );
         _timer.stop();
     }

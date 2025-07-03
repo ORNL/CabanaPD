@@ -139,6 +139,7 @@ class OutputTimeSeries
         // Reduce into host view.
         Kokkos::parallel_reduce( "time_series", policy, *this,
                                  _profile( index ) );
+        Kokkos::fence();
         index++;
     }
 

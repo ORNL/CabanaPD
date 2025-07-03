@@ -222,10 +222,8 @@ void computeHeatTransfer( HeatTransferType& heat_transfer,
     else
         heat_transfer.computeHeatTransferFull( conduction, x, u, particles,
                                                neigh_op_tag );
-    Kokkos::fence();
 
     heat_transfer.forwardEuler( particles, dt );
-    Kokkos::fence();
 }
 
 } // namespace CabanaPD
