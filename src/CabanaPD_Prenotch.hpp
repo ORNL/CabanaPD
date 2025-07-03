@@ -256,6 +256,8 @@ struct Prenotch
             };
             Kokkos::parallel_for( "CabanaPD::Prenotch", policy, notch_functor );
         }
+        // outside of for loop since each prenotch can run simultaneously,
+        // breaking a bond multiple times without conflict
         Kokkos::fence();
         _timer.stop();
     }
