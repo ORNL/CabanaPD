@@ -263,6 +263,7 @@ struct ParticleSteeringVector
             }
         };
         Kokkos::parallel_for( "CabanaPD::BC::update", policy, index_functor );
+        Kokkos::fence();
     }
 
     // Update from a View of boundary particles (custom).

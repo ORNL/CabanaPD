@@ -64,6 +64,7 @@ struct BoundaryCondition
                 auto pid = index_space( b );
                 user( pid, time );
             } );
+        Kokkos::fence();
         _timer.stop();
     }
 
@@ -107,6 +108,7 @@ struct BoundaryCondition<MemorySpace, ForceValueBCTag>
                 for ( int d = 0; d < 3; d++ )
                     f( pid, d ) = value;
             } );
+        Kokkos::fence();
         _timer.stop();
     }
 
@@ -150,6 +152,7 @@ struct BoundaryCondition<MemorySpace, ForceUpdateBCTag>
                 for ( int d = 0; d < 3; d++ )
                     f( pid, d ) += value;
             } );
+        Kokkos::fence();
         _timer.stop();
     }
 

@@ -111,6 +111,7 @@ class VelocityVerlet<NoContact>
                                                     p.localOffset() );
         Kokkos::parallel_for( "CabanaPD::VelocityVerlet::Initial", policy,
                               init_func );
+        Kokkos::fence();
         _timer.stop();
     }
 
@@ -135,7 +136,7 @@ class VelocityVerlet<NoContact>
                                                     p.localOffset() );
         Kokkos::parallel_for( "CabanaPD::VelocityVerlet::Final", policy,
                               final_func );
-
+        Kokkos::fence();
         _timer.stop();
     }
 

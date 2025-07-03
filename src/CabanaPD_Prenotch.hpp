@@ -256,6 +256,7 @@ struct Prenotch
             };
             Kokkos::parallel_for( "CabanaPD::Prenotch", policy, notch_functor );
         }
+        Kokkos::fence();
         _timer.stop();
     }
     auto time() { return _timer.time(); };
