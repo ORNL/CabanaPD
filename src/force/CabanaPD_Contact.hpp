@@ -163,7 +163,7 @@ class Force<MemorySpace, ModelType, NormalRepulsionModel, NoFracture>
         Cabana::neighbor_parallel_for(
             policy, contact_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::Contact::compute_full" );
-
+        Kokkos::fence();
         _timer.stop();
     }
 
@@ -247,7 +247,7 @@ class Force<MemorySpace, ModelType, HertzianModel, NoFracture>
         Cabana::neighbor_parallel_for(
             policy, contact_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::Contact::compute_full" );
-
+        Kokkos::fence();
         _timer.stop();
     }
 

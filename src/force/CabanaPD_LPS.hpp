@@ -123,7 +123,7 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
         Cabana::neighbor_parallel_for(
             policy, weighted_volume, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPS::computeWeightedVolume" );
-
+        Kokkos::fence();
         _timer.stop();
     }
 
@@ -154,7 +154,7 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
         Cabana::neighbor_parallel_for(
             policy, dilatation, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPS::computeDilatation" );
-
+        Kokkos::fence();
         _timer.stop();
     }
 
@@ -197,7 +197,7 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
         Cabana::neighbor_parallel_for(
             policy, force_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPS::computeFull" );
-
+        Kokkos::fence();
         _timer.stop();
     }
 
@@ -240,7 +240,7 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
             policy, energy_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, strain_energy,
             "CabanaPD::ForceLPS::computeEnergyFull" );
-
+        Kokkos::fence();
         _energy_timer.stop();
         return strain_energy;
     }
@@ -294,7 +294,7 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
         Cabana::neighbor_parallel_for(
             policy, stress_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPSFracture::computeStressFull" );
-
+        Kokkos::fence();
         _stress_timer.stop();
     }
 };
@@ -376,7 +376,7 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                                                 particles.localOffset() );
         Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::computeWeightedVolume",
                               policy, weighted_volume );
-
+        Kokkos::fence();
         _timer.stop();
     }
 
@@ -424,7 +424,7 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                                                 particles.localOffset() );
         Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::computeDilatation",
                               policy, dilatation );
-
+        Kokkos::fence();
         _timer.stop();
     }
 
@@ -493,7 +493,7 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                                                 particles.localOffset() );
         Kokkos::parallel_for( "CabanaPD::ForceLPSDamage::computeFull", policy,
                               force_full );
-
+        Kokkos::fence();
         _timer.stop();
     }
 
@@ -550,7 +550,7 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                                                 particles.localOffset() );
         Kokkos::parallel_reduce( "CabanaPD::ForceLPSDamage::computeEnergyFull",
                                  policy, energy_full, strain_energy );
-
+        Kokkos::fence();
         _energy_timer.stop();
         return strain_energy;
     }
@@ -619,7 +619,7 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                                                 particles.localOffset() );
         Kokkos::parallel_for( "CabanaPD::ForceLPSFracture::computeStressFull",
                               policy, stress_full );
-
+        Kokkos::fence();
         _stress_timer.stop();
     }
 };
@@ -693,7 +693,7 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
         Cabana::neighbor_parallel_for(
             policy, force_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPS::computeFull" );
-
+        Kokkos::fence();
         _timer.stop();
     }
 
@@ -737,7 +737,7 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
             policy, energy_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, strain_energy,
             "CabanaPD::ForceLPS::computeEnergyFull" );
-
+        Kokkos::fence();
         _energy_timer.stop();
         return strain_energy;
     }
@@ -791,7 +791,7 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
         Cabana::neighbor_parallel_for(
             policy, stress_full, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::ForceLPS::computeStressFull" );
-
+        Kokkos::fence();
         _stress_timer.stop();
     }
 };

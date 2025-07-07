@@ -82,7 +82,7 @@ class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, NoFracture,
         Cabana::neighbor_parallel_for(
             policy, temp_func, _neigh_list, Cabana::FirstNeighborsTag(),
             neigh_op_tag, "CabanaPD::HeatTransfer::computeFull" );
-
+        Kokkos::fence();
         _timer.stop();
     }
 
@@ -102,6 +102,7 @@ class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, NoFracture,
                                                 particles.localOffset() );
         Kokkos::parallel_for( "CabanaPD::HeatTransfer::forwardEuler", policy,
                               euler_func );
+        Kokkos::fence();
         _euler_timer.stop();
     }
 };
@@ -195,6 +196,7 @@ class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, Fracture,
                                                 particles.localOffset() );
         Kokkos::parallel_for( "CabanaPD::HeatTransfer::computeFull", policy,
                               temp_func );
+        Kokkos::fence();
         _timer.stop();
     }
 };
@@ -220,10 +222,8 @@ void computeHeatTransfer( HeatTransferType& heat_transfer,
     else
         heat_transfer.computeHeatTransferFull( conduction, x, u, particles,
                                                neigh_op_tag );
-    Kokkos::fence();
 
     heat_transfer.forwardEuler( particles, dt );
-    Kokkos::fence();
 }
 
 } // namespace CabanaPD

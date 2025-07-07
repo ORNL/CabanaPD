@@ -307,7 +307,7 @@ class Solver
                                                 particles.localOffset() );
         Kokkos::parallel_reduce( "remove", policy, remove_functor,
                                  Kokkos::Sum<int>( num_keep ) );
-
+        Kokkos::fence();
         particles.remove( num_keep, keep );
         // FIXME: Will need to rebuild ghosts.
     }

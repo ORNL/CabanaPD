@@ -230,7 +230,6 @@ struct ParticleSteeringVector
         auto init_count = count_host( 0 );
 
         count( exec_space, particles, region );
-        // Fence before deep_copy.
         Kokkos::deep_copy( count_host, _count );
 
         if ( count_host( 0 ) > _view.size() )
@@ -238,7 +237,6 @@ struct ParticleSteeringVector
             Kokkos::resize( _view, count_host( 0 ) );
             Kokkos::deep_copy( _count, init_count );
             count( exec_space, particles, region );
-            Kokkos::fence();
         }
     }
 
@@ -263,6 +261,7 @@ struct ParticleSteeringVector
             }
         };
         Kokkos::parallel_for( "CabanaPD::BC::update", policy, index_functor );
+        Kokkos::fence();
     }
 
     // Update from a View of boundary particles (custom).

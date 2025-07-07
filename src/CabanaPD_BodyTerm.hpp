@@ -58,6 +58,7 @@ struct BodyTerm
         Kokkos::parallel_for(
             "CabanaPD::BodyTerm::apply", policy,
             KOKKOS_LAMBDA( const int p ) { user( p, time ); } );
+        Kokkos::fence();
         _timer.stop();
     }
 

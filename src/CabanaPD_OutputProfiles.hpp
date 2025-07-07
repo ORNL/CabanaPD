@@ -47,6 +47,7 @@ void createOutputProfile( std::string file_name, ParticleType particles,
     Kokkos::RangePolicy<typename memory_space::execution_space> policy(
         0, indices.size() );
     Kokkos::parallel_for( "output_profile", policy, measure_profile );
+    Kokkos::fence();
     auto profile_host =
         Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, profile );
 
@@ -138,6 +139,7 @@ class OutputTimeSeries
         // Reduce into host view.
         Kokkos::parallel_reduce( "time_series", policy, *this,
                                  _profile( index ) );
+        Kokkos::fence();
         index++;
     }
 
