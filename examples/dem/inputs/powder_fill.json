@@ -1,6 +1,7 @@
 {
     "num_cells"                : {"value": [50, 50, 25]},
     "system_size"              : {"value": [0.25, 0.25, 0.125], "unit": "m"},
+    "halo_width"               : {"value": 10},
     "density"                : {"value": 2.0e3,  "unit": "kg/m^3"},
     "volume"                 : {"value": 6.544985e-8,  "unit": "m^3"},
     "elastic_modulus"        : {"value": 1.0e5, "unit": "Pa"},

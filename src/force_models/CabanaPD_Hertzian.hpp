@@ -17,6 +17,7 @@
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Output.hpp>
+#include <force_models/CabanaPD_Contact.hpp>
 
 namespace CabanaPD
 {

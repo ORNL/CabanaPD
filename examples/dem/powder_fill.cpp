@@ -49,7 +49,7 @@ void powderSettlingExample( const std::string filename )
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
-    int halo_width = 1;
+    int halo_width = inputs["halo_width"];
 
     // ====================================================
     //                    Force model
