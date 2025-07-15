@@ -72,8 +72,9 @@ class BaseForceContact : public BaseForce<MemorySpace>
                  const bool require_update = false )
     {
         double max_displacement = particles.getMaxDisplacement();
-        if ( max_displacement > radius_extend || require_update )
+        if ( max_displacement > 0.0003 )
         {
+            std::cout << "[DEBUG] Contact neighbor list being updated...\n";
             _neigh_timer.start();
             const auto y = particles.sliceCurrentPosition();
             _neigh_list.build( y, particles.frozenOffset(),

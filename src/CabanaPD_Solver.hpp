@@ -198,6 +198,7 @@ class Solver
         {
             log( std::cout, "Local particles: ", particles.numLocal(),
                  ", Maximum neighbors: ", max_neighbors );
+            log( std::cout, ", Total neighbors: ", total_neighbors, "\n" );
             log( std::cout, "#Timestep/Total-steps Simulation-time" );
 
             output_file = inputs["output_file"];
@@ -378,7 +379,7 @@ class Solver
         if constexpr ( is_temperature_dependent<
                            typename force_model_type::thermal_type>::value )
             comm->gatherTemperature();
-
+  
         // Integrate - velocity Verlet second half.
         integrator->finalHalfStep( exec_space{}, particles );
 
@@ -417,8 +418,9 @@ class Solver
             // FIXME: not included in timing
             if ( step % output_frequency == 0 )
                 updateRegion( region_output... );
-        }
 
+        }
+ 
         // Final output and timings.
         final_output( region_output... );
     }
@@ -450,7 +452,6 @@ class Solver
         // Compute and communicate dilatation for LPS (does nothing for PMB).
         force->computeDilatation( particles, neigh_iter_tag{} );
         comm->gatherDilatation();
-
         // Compute internal forces.
         computeForce( *force, particles, neigh_iter_tag{} );
     }
