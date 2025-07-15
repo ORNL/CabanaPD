@@ -17,9 +17,9 @@
     "cylinder_inner_radius"    : {"value": 0.0679, "unit": "m"},
     "cylinder_height"          : {"value": 0.3048, "unit": "m"},
     "wall_thickness"           : {"value": 0.0045, "unit": "m"},
-    "final_time"               : {"value": 2.5e-4, "unit": "s"},
+    "final_time"               : {"value": 2.5e-2, "unit": "s"},
     "timestep"                 : {"value": 3.0e-07, "unit": "s"},
     "timestep_safety_factor"   : {"value": 0.70},
-    "output_frequency"         : {"value": 10},
+    "output_frequency"         : {"value": 50},
     "output_reference"         : {"value": false}
 }

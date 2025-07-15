@@ -104,7 +104,7 @@ void HIPCylinderExample( const std::string filename )
     pool.init( seed, particles.numLocal() );
 
     // Use time to seed random number generator
-    //std::srand( std::time( nullptr ) );
+    // std::srand( std::time( nullptr ) );
     double rho_perturb_factor = 0.02;
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
@@ -119,15 +119,13 @@ void HIPCylinderExample( const std::string filename )
             rho( pid ) = D0 * rho0;
             // Perturb powder density
             auto gen = pool.get_state();
-      	    auto rand =
+            auto rand =
                 Kokkos::rand<random_type, double>::draw( gen, 0.0, 1.0 );
-	    double factor =
-                ( 1 + ( 2.0 * rand - 1.0 ) *
-                         rho_perturb_factor );
-	   
-	  //  double factor =
-          //      ( 1 + ( -1 + 2 * ( (double)std::rand() / ( RAND_MAX ) ) ) *
-         //                 rho_perturb_factor );
+            double factor = ( 1 + ( 2.0 * rand - 1.0 ) * rho_perturb_factor );
+
+            //  double factor =
+            //      ( 1 + ( -1 + 2 * ( (double)std::rand() / ( RAND_MAX ) ) ) *
+            //                 rho_perturb_factor );
             rho( pid ) *= factor;
         }
         else
@@ -186,17 +184,19 @@ void HIPCylinderExample( const std::string filename )
     double Pmax = inputs["maximum_pressure"];
     double Tmax = inputs["maximum_temperature"];
     double dx = solver.particles.dx[0];
+    double dz = solver.particles.dx[2];
     double b0 = Pmax / dx;
-    auto f = solver.particles.sliceForce();
     x = solver.particles.sliceReferencePosition();
+    auto f = solver.particles.sliceForce();
+    auto u = solver.particles.sliceDisplacement();
     temp = solver.particles.sliceTemperature();
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
     auto force_temp_func = KOKKOS_LAMBDA( const int pid, const double )
     {
-        // ---------------------
-        // Isostatic pressure BC
-        // ---------------------
+        // -----------------------
+        //  Isostatic pressure BC
+        // -----------------------
         double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center ) +
                      ( x( pid, 1 ) - y_center ) * ( x( pid, 1 ) - y_center );
         double theta =
@@ -230,10 +230,24 @@ void HIPCylinderExample( const std::string filename )
             f( pid, 2 ) += b0;
         };
 
-        // ---------------------
-        //    Temperature BC
-        // ---------------------
+        // -----------------------
+        //      Temperature BC
+        // -----------------------
         temp( pid ) = Tmax;
+
+        // -----------------------
+        // Constrain displacements
+        // -----------------------
+        double Rmid = 0.5 * ( Rin + Rout );
+
+        if ( x( pid, 2 ) > z_center - dz && x( pid, 2 ) < z_center + dz &&
+             rsq > ( Rmid - dx ) * ( Rmid - dx ) &&
+             rsq < ( Rmid + dx ) * ( Rmid + dx ) )
+        {
+            u( pid, 0 ) = 0.0;
+            u( pid, 1 ) = 0.0;
+            u( pid, 2 ) = 0.0;
+        }
     };
     CabanaPD::BodyTerm body_term( force_temp_func, solver.particles.size(),
                                   true );
