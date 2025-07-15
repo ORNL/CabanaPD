@@ -152,17 +152,22 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
 template <>
 struct ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
     : public BaseForceModelLPS<Elastic>,
+      BaseNoFractureModel,
       BaseTemperatureModel<TemperatureIndependent>
 
 {
     using base_type = BaseForceModelLPS<Elastic>;
+    using base_fracture_type = BaseNoFractureModel;
     using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
     using fracture_type = NoFracture;
     using thermal_type = typename base_temperature_type::thermal_type;
 
     using base_type::base_type;
     using base_type::operator();
+    using base_fracture_type::operator();
     using base_temperature_type::operator();
+
+    using base_type::influence_type;
 };
 
 template <>

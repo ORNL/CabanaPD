@@ -159,11 +159,13 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
       BaseTemperatureModel<TemperatureIndependent>
 {
     using base_type = BaseForceModelPMB<Elastic>;
+    using base_fracture_type = BaseNoFractureModel;
     using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
 
     using base_type::base_type;
     using base_type::delta;
     using base_type::operator();
+    using base_fracture_type::operator();
     using base_temperature_type::operator();
 };
 

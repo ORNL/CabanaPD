@@ -66,6 +66,15 @@ struct BaseForceModel
 struct BaseNoFractureModel
 {
     using fracture_type = NoFracture;
+
+    // This should only be used in multi-material models in which the current
+    // model does not support failure.
+    KOKKOS_INLINE_FUNCTION
+    bool operator()( CriticalStretchTag, const int, const int, const double,
+                     const double ) const
+    {
+        return false;
+    }
 };
 
 struct BaseFractureModel
