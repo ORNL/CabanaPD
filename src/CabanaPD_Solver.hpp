@@ -525,6 +525,9 @@ class Solver
     {
         if ( print )
         {
+            // Add the last steps and initialization to total.
+            _total_time += _step_timer.time() + _init_time;
+
             std::ofstream out( output_file, std::ofstream::app );
             double comm_time = comm->time();
             double integrate_time = integrator->time();
@@ -533,8 +536,6 @@ class Solver
             double output_time = particles.timeOutput();
             // Init neighbor build and later (contact) rebuilds.
             double neigh_time = _neighbor_timer.time() + force->timeNeighbor();
-            _total_time = _init_time + comm_time + integrate_time + force_time +
-                          energy_time + output_time + particles.time();
 
             // Rates over the whole simulation.
             double steps_per_sec =
