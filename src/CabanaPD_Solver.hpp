@@ -477,14 +477,15 @@ class Solver
     {
         // Output after construction and initial forces.
         std::ofstream out( output_file, std::ofstream::app );
-        _init_time += _init_timer.time() + _neighbor_timer.time() +
-                      particles.timeInit() + comm->timeInit() +
-                      integrator->timeInit() + boundary_init_time;
+        _init_time += _init_timer.time() + particles.timeInit() +
+                      comm->timeInit() + integrator->timeInit() +
+                      boundary_init_time;
         log( out, "Init-Time(s): ", _init_time );
         log( out, "Init-Neighbor-Time(s): ", _neighbor_timer.time(), "\n" );
         log( out, "#Timestep/Total-steps Simulation-time Total-strain-energy "
-                  "Step-Time(s) Force-Time(s) Comm-Time(s) Integrate-Time(s) "
-                  "Energy-Time(s) Output-Time(s) Particle*steps/s" );
+                  "Step-Time(s) Force-Time(s) Neighbor-Time(s) Comm-Time(s) "
+                  "Integrate-Time(s) Energy-Time(s) Output-Time(s) "
+                  "Particle*steps/s" );
     }
 
     void step_output( const int step, const double W )
@@ -500,7 +501,8 @@ class Solver
             double integrate_time = integrator->time();
             double force_time = force->time();
             double energy_time = force->timeEnergy();
-            double neigh_time = force->timeNeighbor();
+            // Init neighbor build and later (contact) rebuilds.
+            double neigh_time = _neighbor_timer.time() + force->timeNeighbor();
             double output_time = particles.timeOutput();
             _total_time += step_time;
             // Instantaneous rate.
@@ -512,8 +514,8 @@ class Solver
             log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
                  " ", std::scientific, std::setprecision( 2 ), step * dt, " ",
                  W, " ", std::fixed, _total_time, " ", force_time, " ",
-                 comm_time, " ", integrate_time, " ", energy_time, " ",
-                 neigh_time, " ", output_time, " ", std::scientific,
+                 neigh_time, " ", comm_time, " ", integrate_time, " ",
+                 energy_time, " ", output_time, " ", std::scientific,
                  p_steps_per_sec );
             out.close();
         }
@@ -529,7 +531,8 @@ class Solver
             double force_time = force->time();
             double energy_time = force->timeEnergy();
             double output_time = particles.timeOutput();
-            double neighbor_time = _neighbor_timer.time();
+            // Init neighbor build and later (contact) rebuilds.
+            double neigh_time = _neighbor_timer.time() + force->timeNeighbor();
             _total_time = _init_time + comm_time + integrate_time + force_time +
                           energy_time + output_time + particles.time();
 
@@ -539,17 +542,18 @@ class Solver
             double p_steps_per_sec =
                 static_cast<double>( particles.numGlobal() ) * steps_per_sec;
             log( out, std::fixed, std::setprecision( 2 ),
-                 "\n#Procs Particles | Total Force Comm Integrate Energy "
-                 "Output Init Init_Neighbor |\n",
+                 "\n#Procs Particles | Total Force Neighbor Comm Integrate "
+                 "Energy "
+                 "Output Init |\n",
                  comm->mpi_size, " ", particles.numGlobal(), " | \t",
-                 _total_time, " ", force_time, " ", comm_time, " ",
-                 integrate_time, " ", energy_time, " ", output_time, " ",
-                 _init_time, " ", neighbor_time, " | PERFORMANCE\n", std::fixed,
-                 comm->mpi_size, " ", particles.numGlobal(), " | \t", 1.0, " ",
-                 force_time / _total_time, " ", comm_time / _total_time, " ",
-                 integrate_time / _total_time, " ", energy_time / _total_time,
-                 " ", output_time / _total_time, " ", _init_time / _total_time,
-                 " ", neighbor_time / _total_time, " | FRACTION\n\n",
+                 _total_time, " ", force_time, " ", neigh_time, " ", comm_time,
+                 " ", integrate_time, " ", energy_time, " ", output_time, " ",
+                 _init_time, " | PERFORMANCE\n", std::fixed, comm->mpi_size,
+                 " ", particles.numGlobal(), " | \t", 1.0, " ",
+                 force_time / _total_time, " ", neigh_time / _total_time, " ",
+                 comm_time / _total_time, " ", integrate_time / _total_time,
+                 " ", energy_time / _total_time, " ", output_time / _total_time,
+                 " ", _init_time / _total_time, " | FRACTION\n\n",
                  "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
                  std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
                  p_steps_per_sec / comm->mpi_size );
