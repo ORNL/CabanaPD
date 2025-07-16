@@ -719,6 +719,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         Cabana::remove( execution_space(), num_keep, keep, _aosoa_nofail,
                         numFrozen() );
         resize( frozen_offset + num_keep, 0 );
+        updateGlobal();
     }
 
     auto getPosition( const bool use_reference )
