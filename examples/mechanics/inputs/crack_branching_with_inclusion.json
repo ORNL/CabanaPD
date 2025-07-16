@@ -1,0 +1,18 @@
+{
+    "num_cells"              : {"value": [400, 160, 8]},
+    "system_size"            : {"value": [0.1, 0.04, 0.002], "unit": "m"},
+    "insertion_center"       : {"value": [0.025, 0.0], "unit": "m"}, 
+    "insertion_radius"       : {"value": 0.01, "unit": "m"}, 
+    "density"                : {"value": [2440, 2440], "unit": "kg/m^3"},
+    "elastic_modulus"        : {"value": [72e+9, 144e+9], "unit": "Pa"},
+    "fracture_energy"        : {"value": [3.8, 38.0], "unit": "J/m^2"},
+    "horizon"                : {"value": 0.001, "unit": "m"},   
+    "traction"               : {"value": 2e6, "unit": "Pa"},
+    "final_time_ref"             : {"value": 43e-6, "unit": "s"},
+    "final_time"             : {"value": 1e-4, "unit": "s"},
+    "timestep"               : {"value": 4.5e-8, "unit": "s"},
+    "timestep_safety_factor" : {"value": 0.85},
+    "output_frequency_ref"       : {"value": 5},
+    "output_frequency"       : {"value": 10},
+    "output_reference"       : {"value": true}
+}

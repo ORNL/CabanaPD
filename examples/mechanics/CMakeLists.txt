@@ -19,4 +19,10 @@ target_link_libraries(DogboneTensileTest LINK_PUBLIC CabanaPD)
 add_executable(PlateWithHole plate_with_hole.cpp)
 target_link_libraries(PlateWithHole LINK_PUBLIC CabanaPD)
 
-install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DogboneTensileTest PlateWithHole DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(FiberReinforcedComposite fiber_reinforced_composite.cpp)
+target_link_libraries(FiberReinforcedComposite LINK_PUBLIC CabanaPD)
+
+add_executable(CrackBranchingWithInclusion crack_branching_with_inclusion.cpp)
+target_link_libraries(CrackBranchingWithInclusion LINK_PUBLIC CabanaPD)
+
+install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DogboneTensileTest PlateWithHole FiberReinforcedComposite CrackBranchingWithInclusion DESTINATION ${CMAKE_INSTALL_BINDIR})

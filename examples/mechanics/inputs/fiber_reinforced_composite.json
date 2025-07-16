@@ -1,0 +1,17 @@
+{
+    "num_cells"              : {"value": [101, 101, 101]},
+    "system_size"            : {"value": [0.025, 0.025, 0.025], "unit": "m"},
+    "density"                : {"value": [1200, 1780], "unit": "kg/m^3"},
+    "elastic_modulus"        : {"value": [3.25e+9, 276e+9], "unit": "Pa"},
+    "shear_modulus_matrix"   : {"value": 1.5e+9, "unit": "Pa"},
+    "fracture_energy"        : {"value": [109, 1e+5], "unit": "J/m^2"},
+    "horizon"                : {"value": 7.5e-4, "unit": "m"},
+    "fibers_per_dimension"   : {"value": 4},
+    "fiber_diameter"         : {"value": 0.004, "unit": "m"},
+    "velocity_bc"            : {"value": 1e-1, "unit": "m/s"},
+    "final_time"             : {"value": 1.0e-5, "unit": "s"},
+    "timestep"               : {"value": 1.5e-8, "unit": "s"},
+    "timestep_safety_factor" : {"value": 0.85},
+    "output_frequency"       : {"value": 20},
+    "output_reference"       : {"value": false}
+}
