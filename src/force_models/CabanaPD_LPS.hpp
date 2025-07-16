@@ -37,11 +37,10 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
 
     using base_type::K;
     double G;
-    // Store coefficients for both i and j for multi-material systems.
-    double theta_coeff_i;
-    double s_coeff_i;
-    double theta_coeff_j;
-    double s_coeff_j;
+    // Store coefficients for multi-material systems.
+    // TODO: this currently only supports bi-material systems.
+    Kokkos::Array<double, 2> theta_coeff;
+    Kokkos::Array<double, 2> s_coeff;
 
     BaseForceModelLPS( LPS, NoFracture, const double _delta, const double _K,
                        const double _G, const int _influence = 0 )
@@ -68,10 +67,10 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
         : base_type( model1, model2 )
     {
         G = ( model1.G + model2.G ) / 2.0;
-        theta_coeff_i = 3.0 * model1.K - 5.0 * model1.G;
-        s_coeff_i = 15.0 * model1.G;
-        theta_coeff_j = 3.0 * model2.K - 5.0 * model2.G;
-        s_coeff_j = 15.0 * model2.G;
+        theta_coeff[0] = 3.0 * model1.K - 5.0 * model1.G;
+        s_coeff[0] = 15.0 * model1.G;
+        theta_coeff[1] = 3.0 * model2.K - 5.0 * model2.G;
+        s_coeff[1] = 15.0 * model2.G;
 
         influence_type = model1.influence_type;
         if ( model2.influence_type != model1.influence_type )
@@ -82,10 +81,11 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
 
     void init()
     {
-        theta_coeff_i = 3.0 * K - 5.0 * G;
-        s_coeff_i = 15.0 * G;
-        theta_coeff_j = theta_coeff_i;
-        s_coeff_j = s_coeff_i;
+        theta_coeff[0] = 3.0 * K - 5.0 * G;
+        s_coeff[0] = 15.0 * G;
+        // Set extra coefficients for multi-material.
+        theta_coeff[1] = theta_coeff[0];
+        s_coeff[1] = s_coeff[0];
 
         if ( influence_type > 1 || influence_type < 0 )
             log_err( std::cout, "Influence function type must be 0 or 1." );
@@ -124,25 +124,71 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
         return 3.0 * theta_i / m_i;
     }
 
-    KOKKOS_INLINE_FUNCTION auto operator()( ForceCoeffTag, const int, const int,
-                                            const double s, const double xi,
-                                            const double vol, const double m_i,
-                                            const double m_j,
-                                            const double theta_i,
-                                            const double theta_j ) const
+    // In this case, we know that we only have one material so we use the first.
+    // This must be separate from the multi-material interface because no type
+    // information was passed here.
+    KOKKOS_INLINE_FUNCTION auto
+    operator()( ForceCoeffTag, SingleMaterial, const int, const int,
+                const double s, const double xi, const double vol,
+                const double m_i, const double m_j, const double theta_i,
+                const double theta_j ) const
     {
         auto influence = ( *this )( influence_tag, xi );
+
+        return ( theta_coeff[0] * ( theta_i / m_i + theta_j / m_j ) +
+                 s_coeff[0] * s * ( 1.0 / m_i + 1.0 / m_j ) ) *
+               influence * xi * vol;
+    }
+
+    // In this case we may have any combination of material types. These
+    // coefficients may still be the same for some interaction pairs.
+    KOKKOS_INLINE_FUNCTION auto
+    operator()( ForceCoeffTag, MultiMaterial, const int type_i,
+                const int type_j, const double s, const double xi,
+                const double vol, const double m_i, const double m_j,
+                const double theta_i, const double theta_j ) const
+    {
+        KOKKOS_ASSERT( type_i < 2 );
+        KOKKOS_ASSERT( type_j < 2 );
+        auto influence = ( *this )( influence_tag, xi );
+        double theta_coeff_i = theta_coeff[type_i];
+        double theta_coeff_j = theta_coeff[type_j];
+        double s_coeff_i = s_coeff[type_i];
+        double s_coeff_j = s_coeff[type_j];
+
         return ( theta_coeff_i * theta_i / m_i + theta_coeff_j * theta_j / m_j +
                  s * ( s_coeff_i / m_i + s_coeff_j / m_j ) ) *
                influence * xi * vol;
     }
 
+    // In this case, we know that we only have one material so we use the first.
+    // This must be separate from the multi-material interface because no type
+    // information was passed here.
     KOKKOS_INLINE_FUNCTION
-    auto operator()( EnergyTag, const int, const int, const double s,
-                     const double xi, const double vol, const double m_i,
-                     const double theta_i, const double num_bonds ) const
+    auto operator()( EnergyTag, SingleMaterial, const int, const int,
+                     const double s, const double xi, const double vol,
+                     const double m_i, const double theta_i,
+                     const double num_bonds ) const
     {
         auto influence = ( *this )( influence_tag, xi );
+        return 1.0 / num_bonds * 0.5 * theta_coeff[0] / 3.0 *
+                   ( theta_i * theta_i ) +
+               0.5 * ( s_coeff[0] / m_i ) * influence * s * s * xi * xi * vol;
+    }
+
+    // In this case we may have any combination of material types. These
+    // coefficients may still be the same for some interaction pairs.
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( EnergyTag, MultiMaterial, const int type_i, const int,
+                     const double s, const double xi, const double vol,
+                     const double m_i, const double theta_i,
+                     const double num_bonds ) const
+    {
+        auto influence = ( *this )( influence_tag, xi );
+
+        KOKKOS_ASSERT( type_i < 2 );
+        double theta_coeff_i = theta_coeff[type_i];
+        double s_coeff_i = s_coeff[type_i];
         return 1.0 / num_bonds * 0.5 * theta_coeff_i / 3.0 *
                    ( theta_i * theta_i ) +
                0.5 * ( s_coeff_i / m_i ) * influence * s * s * xi * xi * vol;

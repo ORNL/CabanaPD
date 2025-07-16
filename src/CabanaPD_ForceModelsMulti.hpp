@@ -93,6 +93,34 @@ struct ForceModels
             Kokkos::abort( "Invalid model index." );
     }
 
+    // This is only for LPS force/energy, currently the only cases that require
+    // type information. When running models individually, the SingleMaterial
+    // tag is used in the model directly; here it is replaced with the
+    // MultiMaterial tag instead.
+    template <typename Tag, typename... Args>
+    KOKKOS_INLINE_FUNCTION auto operator()( Tag tag, SingleMaterial,
+                                            const int i, const int j,
+                                            Args... args ) const
+    {
+        const int type_i = type( i );
+        const int type_j = type( j );
+
+        auto t = getIndex( i, j );
+        MultiMaterial mtag;
+        // Call individual model.
+        if ( t == 0 )
+            return model1( tag, mtag, type_i, type_j,
+                           std::forward<Args>( args )... );
+        else if ( t == 1 )
+            return model2( tag, mtag, type_i, type_j,
+                           std::forward<Args>( args )... );
+        else if ( t == 2 )
+            return model12( tag, mtag, type_i, type_j,
+                            std::forward<Args>( args )... );
+        else
+            Kokkos::abort( "Invalid model index." );
+    }
+
     auto horizon( const int ) { return delta; }
     auto maxHorizon() { return delta; }
 
