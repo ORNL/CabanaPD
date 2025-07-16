@@ -246,6 +246,24 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 user_create, exec_space, 0, create_frozen );
     }
 
+    // Constructor which initializes particles on regular grid with
+    // customization, randomly per cell, with base output tag.
+    template <class ModelType, class InitType, class UserFunctor,
+              class ExecSpace>
+    Particles( MemorySpace, ModelType, BaseOutput,
+               std::array<double, dim> low_corner,
+               std::array<double, dim> high_corner,
+               const std::array<int, dim> num_cells, const int max_halo_width,
+               InitType init_type, UserFunctor user_create,
+               const ExecSpace exec_space, const bool create_frozen = false )
+        : halo_width( max_halo_width )
+        , _plist_x( "positions" )
+        , _plist_f( "forces" )
+    {
+        create( low_corner, high_corner, num_cells, max_halo_width, init_type,
+                user_create, exec_space, 0, create_frozen );
+    }
+
     // Constructor with existing particle data.
     template <class ModelType, class ExecSpace, class PositionType,
               class VolumeType>
@@ -350,28 +368,23 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     }
 
     template <class ExecSpace, class InitType>
-    void
-    createParticles( const ExecSpace& exec_space, InitType init_type,
-                     const std::size_t num_previous,
-                     const bool create_frozen = false,
-                     typename std::enable_if<
-                         ( std::is_same<InitType, Cabana::InitUniform>::value ||
-                           std::is_same<InitType, Cabana::InitRandom>::value ),
-                         int>::type* = 0 )
+    void createParticles(
+        const ExecSpace& exec_space, InitType init_type,
+        const std::size_t num_previous, const bool create_frozen = false,
+        typename std::enable_if<is_particle_init<InitType>::value, int>::type* =
+            0 )
     {
         createParticles( exec_space, init_type, *this, num_previous,
                          create_frozen );
     }
 
     template <class ExecSpace, class InitType, class UserFunctor>
-    void
-    createParticles( const ExecSpace& exec_space, InitType init_type,
-                     UserFunctor user_create, const std::size_t num_previous,
-                     const bool create_frozen = false,
-                     typename std::enable_if<
-                         ( std::is_same<InitType, Cabana::InitUniform>::value ||
-                           std::is_same<InitType, Cabana::InitRandom>::value ),
-                         int>::type* = 0 )
+    void createParticles(
+        const ExecSpace& exec_space, InitType init_type,
+        UserFunctor user_create, const std::size_t num_previous,
+        const bool create_frozen = false,
+        typename std::enable_if<is_particle_init<InitType>::value, int>::type* =
+            0 )
     {
         _init_timer.start();
         // Create a local mesh and owned space.
