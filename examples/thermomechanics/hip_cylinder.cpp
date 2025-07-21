@@ -105,7 +105,9 @@ void HIPCylinderExample( const std::string filename )
 
     // Use time to seed random number generator
     // std::srand( std::time( nullptr ) );
-    double rho_perturb_factor = 0.02;
+
+    // double rho_perturb_factor = 0.02;
+    double rho_perturb_factor = 0.2;
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
@@ -127,6 +129,8 @@ void HIPCylinderExample( const std::string filename )
             //      ( 1 + ( -1 + 2 * ( (double)std::rand() / ( RAND_MAX ) ) ) *
             //                 rho_perturb_factor );
             rho( pid ) *= factor;
+            // std::cout << factor << std::endl;
+            std::cout << "rand: " << rand << std::endl;
         }
         else
         { // Container density
@@ -240,6 +244,43 @@ void HIPCylinderExample( const std::string filename )
         // -----------------------
         double Rmid = 0.5 * ( Rin + Rout );
 
+        // Fix x- and y-displacement on top surface: only enable motion in
+        // z-direction if ( x( pid, 2 ) > high_corner[2] - dz && x( pid, 2 ) <
+        // high_corner[2] + dz )
+        if ( x( pid, 2 ) > z_center + 0.5 * H - W )
+        {
+            u( pid, 0 ) = 0.0;
+            u( pid, 1 ) = 0.0;
+        }
+
+        // Fix x- and y-displacement on bottom surface: only enable motion in
+        // z-direction
+        if ( x( pid, 2 ) < z_center - 0.5 * H + W )
+        // if ( x( pid, 2 ) > low_corner[2] - dz && x( pid, 2 ) < low_corner[2]
+        // + dz )
+        {
+            u( pid, 0 ) = 0.0;
+            u( pid, 1 ) = 0.0;
+        }
+
+        // Fix z-displacement on mid surface
+        if ( x( pid, 2 ) > z_center - dz && x( pid, 2 ) < z_center + dz )
+        {
+            u( pid, 2 ) = 0.0;
+        }
+
+        /*
+        if ( x( pid, 2 ) > low_corner[0] - dz && x( pid, 2 ) < low_corner[0] +
+        dz && rsq > ( Rmid - dx ) * ( Rmid - dx ) && rsq < ( Rmid + dx ) * (
+        Rmid + dx ) )
+        {
+            u( pid, 0 ) = 0.0;
+            u( pid, 1 ) = 0.0;
+            u( pid, 2 ) = 0.0;
+        }
+        */
+
+        /*
         if ( x( pid, 2 ) > z_center - dz && x( pid, 2 ) < z_center + dz &&
              rsq > ( Rmid - dx ) * ( Rmid - dx ) &&
              rsq < ( Rmid + dx ) * ( Rmid + dx ) )
@@ -248,6 +289,21 @@ void HIPCylinderExample( const std::string filename )
             u( pid, 1 ) = 0.0;
             u( pid, 2 ) = 0.0;
         }
+        */
+
+        /*
+        if ( x( pid, 2 ) > z_center - dz && x( pid, 2 ) < z_center + dz )
+        {
+            u( pid, 2 ) = 0.0;
+
+            if ( rsq > ( Rmid - dx ) * ( Rmid - dx ) && rsq < ( Rmid + dx ) * (
+        Rmid + dx ) )
+             {
+                u( pid, 0 ) = 0.0;
+                u( pid, 1 ) = 0.0;
+             }
+        }
+        */
     };
     CabanaPD::BodyTerm body_term( force_temp_func, solver.particles.size(),
                                   true );

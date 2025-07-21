@@ -20,6 +20,6 @@
     "final_time"               : {"value": 2.5e-2, "unit": "s"},
     "timestep"                 : {"value": 3.0e-07, "unit": "s"},
     "timestep_safety_factor"   : {"value": 0.70},
-    "output_frequency"         : {"value": 50},
+    "output_frequency"         : {"value": 1},
     "output_reference"         : {"value": false}
 }
