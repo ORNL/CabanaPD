@@ -63,7 +63,6 @@
 #include <chrono>
 #include <ctime>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 
 #include <CabanaPD_config.hpp>
@@ -110,7 +109,6 @@ class Solver
     using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
     using contact_model_type = ContactModelType;
     using contact_model_tag = typename contact_model_type::model_type;
-    using contact_base_model_type = typename contact_model_type::base_model;
     using contact_fracture_type = typename contact_model_type::fracture_type;
     using contact_type = Force<memory_space, contact_model_type,
                                contact_model_tag, contact_fracture_type>;
@@ -121,28 +119,34 @@ class Solver
     using integrator_type =
         VelocityVerlet<typename either_contact<force_model_type,
                                                contact_model_type>::base_type>;
+    // Different timings are output based on models.
+    using output_type = TimingOutput<force_model_type, contact_model_type>;
 
     Solver( Inputs _inputs, ParticleType _particles,
             force_model_type force_model )
         : particles( _particles )
         , inputs( _inputs )
-        , _init_time( 0.0 )
+        , _other_time( 0.0 )
+        , _total_time( 0.0 )
     {
+        _total_timer.start();
         setup( force_model );
+        _total_timer.stop();
     }
 
     Solver( Inputs _inputs, ParticleType _particles,
             force_model_type force_model, contact_model_type contact_model )
         : particles( _particles )
         , inputs( _inputs )
-        , _init_time( 0.0 )
+        , _other_time( 0.0 )
+        , _total_time( 0.0 )
     {
+        _total_timer.start();
         setup( force_model );
 
-        _neighbor_timer.start();
         contact = std::make_shared<contact_type>( inputs["half_neigh"],
                                                   particles, contact_model );
-        _neighbor_timer.stop();
+        _total_timer.stop();
     }
 
     void setup( force_model_type force_model )
@@ -184,7 +188,6 @@ class Solver
                                               force_model );
         _neighbor_timer.stop();
 
-        _init_timer.start();
         unsigned max_neighbors;
         unsigned long long total_neighbors;
         force->getNeighborStatistics( max_neighbors, total_neighbors );
@@ -223,11 +226,11 @@ class Solver
                  ", Total neighbors: ", total_neighbors, "\n" );
             out.close();
         }
-        _init_timer.stop();
     }
 
     void init( const bool initial_output = true )
     {
+        _total_timer.start();
         // Compute and communicate weighted volume for LPS (does nothing for
         // PMB). Only computed once without fracture (and inside updateForce for
         // fracture).
@@ -244,12 +247,14 @@ class Solver
 
         if ( initial_output )
             particles.output( 0, 0.0, output_reference );
+        _total_timer.stop();
     }
 
     template <typename BoundaryType>
     void init( BoundaryType boundary_condition,
                const bool initial_output = true )
     {
+        _total_timer.start();
         // Add non-force boundary condition.
         if ( !boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space(), particles, 0.0 );
@@ -261,16 +266,19 @@ class Solver
         if constexpr ( is_temperature_dependent<
                            typename force_model_type::thermal_type>::value )
             comm->gatherTemperature();
+        _total_timer.stop();
 
         // Force init without particle output.
         init( false );
 
+        _total_timer.start();
         // Add force boundary condition.
         if ( boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space(), particles, 0.0 );
 
         if ( initial_output )
             particles.output( 0, 0.0, output_reference );
+        _total_timer.stop();
     }
 
     // Initialize with prenotch, but no BC.
@@ -294,6 +302,7 @@ class Solver
     // Given a user functor, remove certain particles.
     void remove( const double threshold, const bool use_frozen = false )
     {
+        _total_timer.start();
         // Remove any points that are too close.
         Kokkos::View<int*, memory_space> keep( "keep_points",
                                                particles.numLocal() );
@@ -319,6 +328,8 @@ class Solver
         Kokkos::fence();
         particles.remove( num_keep, keep );
         // FIXME: Will need to rebuild ghosts.
+        _total_timer.stop();
+        _other_time += _total_timer.lastTime();
     }
 
     void updateNeighbors() { force->update( particles, 0.0, true ); }
@@ -400,6 +411,7 @@ class Solver
     void run( OutputType&... region_output )
     {
         init_output();
+        _total_timer.start();
 
         // Main timestep loop.
         for ( int step = 1; step <= num_steps; step++ )
@@ -411,13 +423,16 @@ class Solver
         }
 
         // Final output and timings.
+        _total_timer.stop();
         final_output( region_output... );
     }
 
     template <typename BoundaryType, typename... OutputType>
     void run( BoundaryType& boundary_condition, OutputType&... region_output )
     {
-        init_output( boundary_condition.timeInit() );
+        init_output();
+        _total_timer.start();
+        _other_time += boundary_condition.timeInit();
 
         // Main timestep loop.
         for ( int step = 1; step <= num_steps; step++ )
@@ -429,6 +444,7 @@ class Solver
         }
 
         // Final output and timings.
+        _total_timer.stop();
         final_output( region_output... );
     }
 
@@ -482,20 +498,17 @@ class Solver
         }
     }
 
-    void init_output( double boundary_init_time = 0.0 )
+    void init_output()
     {
-        // Output after construction and initial forces.
-        std::ofstream out( output_file, std::ofstream::app );
-        _init_time += _init_timer.time() + particles.timeInit() +
-                      comm->timeInit() + integrator->timeInit() +
-                      boundary_init_time;
-        log( out, "Init-Time(s): ", _init_time );
-        log( out, "Init-Neighbor-Time(s): ", _neighbor_timer.time(), "\n" );
-        log( out, "#Timestep/Total-steps Simulation-time Total-strain-energy "
-                  "Total-Damage "
-                  "Step-Time(s) Force-Time(s) Neighbor-Time(s) Comm-Time(s) "
-                  "Integrate-Time(s) Energy-Time(s) Output-Time(s) "
-                  "Particle*steps/s" );
+        // Add timings that aren't included elsewhere (particles are created
+        // prior to the solver and therefore not included in any other timers).
+        double particle_time = particles.timeInit() + particles.time();
+        // All time up to now is init.
+        double total_init_time = _total_timer.time() + particle_time;
+        _step_timer.set( total_init_time );
+
+        // Use total init time here.
+        timing_output.header( output_file, total_init_time );
     }
 
     void step_output( const int step )
@@ -513,32 +526,26 @@ class Solver
 
         if ( print )
         {
-            std::ofstream out( output_file, std::ofstream::app );
-            log( std::cout, step, "/", num_steps, " ", std::scientific,
-                 std::setprecision( 2 ), step * dt );
-
             double step_time = _step_timer.time();
-            double comm_time = comm->time();
-            double integrate_time = integrator->time();
-            double force_time = force->time();
-            double energy_time = force->timeEnergy();
-            // Init neighbor build and later (contact) rebuilds.
-            double neigh_time = _neighbor_timer.time() + force->timeNeighbor();
-            double output_time = particles.timeOutput();
-            _total_time += step_time;
+
             // Instantaneous rate.
             double p_steps_per_sec =
                 static_cast<double>( particles.numGlobal() ) *
                 output_frequency / step_time;
 
-            _step_timer.reset();
-            log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
-                 " ", std::scientific, std::setprecision( 2 ), step * dt, " ",
-                 total_strain_energy, " ", relative_damage, " ", std::fixed,
-                 _total_time, " ", force_time, " ", neigh_time, " ", comm_time,
-                 " ", integrate_time, " ", energy_time, " ", output_time, " ",
-                 std::scientific, p_steps_per_sec );
-            out.close();
+            double contact_time = 0.0;
+            double neigh_time = force->timeNeighbor() + _neighbor_timer.time();
+            if constexpr ( is_contact<contact_model_type>::value )
+            {
+                contact_time = contact->time();
+                neigh_time += contact->timeNeighbor();
+            }
+
+            timing_output.step(
+                output_file, step, num_steps, dt, total_strain_energy,
+                relative_damage, step_time, force->time(), contact_time,
+                neigh_time, comm->time(), integrator->time(),
+                force->timeEnergy(), particles.timeOutput(), p_steps_per_sec );
         }
     }
 
@@ -546,40 +553,36 @@ class Solver
     {
         if ( print )
         {
-            // Add the last steps and initialization to total.
-            _total_time += _step_timer.time() + _init_time;
-
-            std::ofstream out( output_file, std::ofstream::app );
-            double comm_time = comm->time();
-            double integrate_time = integrator->time();
-            double force_time = force->time();
-            double energy_time = force->timeEnergy();
-            double output_time = particles.timeOutput();
-            // Init neighbor build and later (contact) rebuilds.
-            double neigh_time = _neighbor_timer.time() + force->timeNeighbor();
+            // Add timings that aren't included elsewhere (particles are created
+            // prior to the solver and therefore not included in any other
+            // timers).
+            double particle_time = particles.timeInit() + particles.time();
+            double total_time = _total_timer.time() + particle_time;
+            // Already included in total, but not in other.
+            _other_time +=
+                comm->timeInit() + integrator->timeInit() + particle_time;
 
             // Rates over the whole simulation.
             double steps_per_sec =
-                static_cast<double>( num_steps ) / _total_time;
+                static_cast<double>( num_steps ) / total_time;
             double p_steps_per_sec =
                 static_cast<double>( particles.numGlobal() ) * steps_per_sec;
-            log( out, std::fixed, std::setprecision( 2 ),
-                 "\n#Procs Particles | Total Force Neighbor Comm Integrate "
-                 "Energy "
-                 "Output Init |\n",
-                 comm->mpi_size, " ", particles.numGlobal(), " | \t",
-                 _total_time, " ", force_time, " ", neigh_time, " ", comm_time,
-                 " ", integrate_time, " ", energy_time, " ", output_time, " ",
-                 _init_time, " | PERFORMANCE\n", std::fixed, comm->mpi_size,
-                 " ", particles.numGlobal(), " | \t", 1.0, " ",
-                 force_time / _total_time, " ", neigh_time / _total_time, " ",
-                 comm_time / _total_time, " ", integrate_time / _total_time,
-                 " ", energy_time / _total_time, " ", output_time / _total_time,
-                 " ", _init_time / _total_time, " | FRACTION\n\n",
-                 "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
-                 std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
-                 p_steps_per_sec / comm->mpi_size );
-            out.close();
+
+            double neigh_time = _neighbor_timer.time();
+            double contact_time = 0.0;
+            double contact_neigh_time = force->timeNeighbor();
+            if constexpr ( is_contact<contact_model_type>::value )
+            {
+                contact_time = contact->time();
+                contact_neigh_time += contact->timeNeighbor();
+            }
+
+            timing_output.final(
+                output_file, comm->mpi_size, particles.numGlobal(), total_time,
+                force->time(), contact_time, neigh_time, contact_neigh_time,
+                comm->time(), integrator->time(), force->timeEnergy(),
+                particles.timeOutput(), _other_time, steps_per_sec,
+                p_steps_per_sec );
         }
     }
 
@@ -623,13 +626,15 @@ class Solver
     template <std::size_t NumPrenotch>
     void init_prenotch( Prenotch<NumPrenotch> prenotch )
     {
+        _total_timer.start();
         static_assert(
             is_fracture<typename force_model_type::fracture_type>::value,
             "Cannot create prenotch in system without fracture." );
 
         // Create prenotch.
         force->prenotch( exec_space{}, particles, prenotch );
-        _init_time += prenotch.time();
+        _other_time += prenotch.time();
+        _total_timer.stop();
     }
 
     // Core modules.
@@ -645,13 +650,14 @@ class Solver
     std::string output_file;
     std::string error_file;
 
-    // Note: init_time is combined from many class timers.
-    double _init_time;
-    Timer _init_timer;
+    // Note: _other_time is combined from many class timers.
+    double _other_time;
+    double _total_time;
     Timer _neighbor_timer;
     Timer _step_timer;
-    double _total_time;
+    Timer _total_timer;
     bool print;
+    output_type timing_output;
 };
 
 } // namespace CabanaPD

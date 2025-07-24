@@ -23,12 +23,20 @@ struct NoFracture
 struct Fracture
 {
 };
-template <class>
+template <class, class SFINAE = void>
 struct is_fracture : public std::false_type
 {
 };
 template <>
 struct is_fracture<Fracture> : public std::true_type
+{
+};
+template <typename ModelType>
+struct is_fracture<
+    ModelType,
+    typename std::enable_if<( std::is_same<typename ModelType::fracture_type,
+                                           Fracture>::value )>::type>
+    : public std::true_type
 {
 };
 

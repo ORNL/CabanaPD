@@ -546,7 +546,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     void updateParticles( const ExecSpace, const FunctorType init_functor,
                           const bool update_frozen = false )
     {
-        _timer.start();
+        _init_timer.start();
         std::size_t start = frozen_offset;
         if ( update_frozen )
             start = 0;
@@ -555,7 +555,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             "CabanaPD::Particles::update_particles", policy,
             KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
         Kokkos::fence();
-        _timer.stop();
+        _init_timer.stop();
     }
 
     // Particles are always in order frozen, local, ghost.
