@@ -70,17 +70,26 @@ void HIPCylinderExample( const std::string filename )
     double x_center = 0.5 * ( low_corner[0] + high_corner[0] );
     double y_center = 0.5 * ( low_corner[1] + high_corner[1] );
     double z_center = 0.5 * ( low_corner[2] + high_corner[2] );
-    double Rout = inputs["cylinder_outer_radius"];
-    double Rin = inputs["cylinder_inner_radius"];
-    double H = inputs["cylinder_height"];
+    // double Rout = inputs["cylinder_outer_radius"];
+    // double Rin = inputs["cylinder_inner_radius"];
+    // double H = inputs["cylinder_height"];
+    double L = inputs["cube_side"];
 
-    // Do not create particles outside given cylindrical region
+    // // Do not create particles outside given cylindrical region
+    // Do not create particles outside given cube region
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
     {
+        /*
         double rsq = ( x[0] - x_center ) * ( x[0] - x_center ) +
                      ( x[1] - y_center ) * ( x[1] - y_center );
         if ( rsq < Rin * Rin || rsq > Rout * Rout ||
              x[2] > z_center + 0.5 * H || x[2] < z_center - 0.5 * H )
+            return false;
+            */
+
+        if ( Kokkos::abs( x[0] - x_center ) > 0.5 * L ||
+             Kokkos::abs( x[1] - y_center ) > 0.5 * L ||
+             Kokkos::abs( x[2] - z_center ) > 0.5 * L )
             return false;
         return true;
     };
@@ -109,12 +118,17 @@ void HIPCylinderExample( const std::string filename )
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
-        double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center ) +
-                     ( x( pid, 1 ) - y_center ) * ( x( pid, 1 ) - y_center );
-        if ( rsq > ( Rin + W ) * ( Rin + W ) &&
-             rsq < ( Rout - W ) * ( Rout - W ) &&
-             x( pid, 2 ) < z_center + 0.5 * H - W &&
-             x( pid, 2 ) > z_center - 0.5 * H + W )
+        // double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center )
+        // +
+        //              ( x( pid, 1 ) - y_center ) * ( x( pid, 1 ) - y_center );
+        // if ( rsq > ( Rin + W ) * ( Rin + W ) &&
+        //      rsq < ( Rout - W ) * ( Rout - W ) &&
+        //      x( pid, 2 ) < z_center + 0.5 * H - W &&
+        //      x( pid, 2 ) > z_center - 0.5 * H + W )
+
+        if ( Kokkos::abs( x( pid, 0 ) - x_center ) < 0.5 * L - W &&
+             Kokkos::abs( x( pid, 1 ) - y_center ) < 0.5 * L - W &&
+             Kokkos::abs( x( pid, 2 ) - z_center ) < 0.5 * L - W )
         {
             // Powder density
             rho( pid ) = D0 * rho0;
@@ -198,7 +212,8 @@ void HIPCylinderExample( const std::string filename )
     double Tmax = inputs["maximum_temperature"];
     double dx = solver.particles.dx[0];
     double dz = solver.particles.dx[2];
-    double b0max = Pmax / dx;
+    // double b0max = Pmax / dx;
+    double b0max = Pmax / W;
     x = solver.particles.sliceReferencePosition();
     auto f = solver.particles.sliceForce();
     auto u = solver.particles.sliceDisplacement();
@@ -223,11 +238,37 @@ void HIPCylinderExample( const std::string filename )
         // -----------------------
         //  Isostatic pressure BC
         // -----------------------
-        double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center ) +
-                     ( x( pid, 1 ) - y_center ) * ( x( pid, 1 ) - y_center );
-        double theta =
-            Kokkos::atan2( x( pid, 1 ) - y_center, x( pid, 0 ) - x_center );
+        // double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center )
+        // +
+        //             ( x( pid, 1 ) - y_center ) * ( x( pid, 1 ) - y_center );
+        // double theta =
+        //    Kokkos::atan2( x( pid, 1 ) - y_center, x( pid, 0 ) - x_center );
 
+        // if ( kokkos::abs(x[0] - x_center) < 0.5*L && kokkos::abs(x[1] -
+        // y_center) < 0.5*L && kokkos::abs(x[2] - z_center) < 0.5*L )
+
+        // Pressure in x-direction
+        if ( x( pid, 0 ) > x_center + 0.5 * L - W )
+            f( pid, 0 ) += -b0;
+
+        if ( x( pid, 0 ) < x_center - 0.5 * L + W )
+            f( pid, 0 ) += b0;
+
+        // Pressure in y-direction
+        if ( x( pid, 1 ) > y_center + 0.5 * L - W )
+            f( pid, 1 ) += -b0;
+
+        if ( x( pid, 1 ) < y_center - 0.5 * L + W )
+            f( pid, 1 ) += b0;
+
+        // Pressure in z-direction
+        if ( x( pid, 2 ) > z_center + 0.5 * L - W )
+            f( pid, 2 ) += -b0;
+
+        if ( x( pid, 2 ) < z_center - 0.5 * L + W )
+            f( pid, 2 ) += b0;
+
+        /*
         // BC on outer boundary
         if ( rsq > ( Rout - W ) * ( Rout - W ) )
         {
@@ -251,6 +292,7 @@ void HIPCylinderExample( const std::string filename )
         {
             f( pid, 2 ) += b0;
         };
+        */
 
         // -----------------------
         //      Temperature BC
@@ -260,9 +302,36 @@ void HIPCylinderExample( const std::string filename )
         // -----------------------
         // Constrain displacements
         // -----------------------
+
+        // Only enable motion in x-direction on surfaces with x-normal
+        if ( x( pid, 0 ) > x_center + 0.5 * L - W ||
+             x( pid, 0 ) < x_center - 0.5 * L + W )
+        {
+            u( pid, 1 ) = 0.0;
+            u( pid, 2 ) = 0.0;
+        }
+
+        // Only enable motion in y-direction on surfaces with y-normal
+        if ( x( pid, 1 ) > y_center + 0.5 * L - W ||
+             x( pid, 1 ) < y_center - 0.5 * L + W )
+        {
+            u( pid, 0 ) = 0.0;
+            u( pid, 2 ) = 0.0;
+        }
+
+        // Only enable motion in z-direction on surfaces with z-normal
+        if ( x( pid, 2 ) > z_center + 0.5 * L - W ||
+             x( pid, 2 ) < z_center - 0.5 * L + W )
+        {
+            u( pid, 0 ) = 0.0;
+            u( pid, 1 ) = 0.0;
+        }
+
+        /*
         // Fix x- and y-displacement on top surface: only enable motion in
         // z-direction
-        if ( x( pid, 2 ) > z_center + 0.5 * H - W )
+        // if ( x( pid, 2 ) > z_center + 0.5 * H - W )
+        if ( x( pid, 2 ) > z_center + 0.5 * L - W )
         {
             u( pid, 0 ) = 0.0;
             u( pid, 1 ) = 0.0;
@@ -270,7 +339,8 @@ void HIPCylinderExample( const std::string filename )
 
         // Fix x- and y-displacement on bottom surface: only enable motion in
         // z-direction
-        if ( x( pid, 2 ) < z_center - 0.5 * H + W )
+        // if ( x( pid, 2 ) < z_center - 0.5 * H + W )
+        if ( x( pid, 2 ) < z_center - 0.5 * L + W )
         {
             u( pid, 0 ) = 0.0;
             u( pid, 1 ) = 0.0;
@@ -281,6 +351,7 @@ void HIPCylinderExample( const std::string filename )
         {
             u( pid, 2 ) = 0.0;
         }
+            */
     };
     CabanaPD::BodyTerm body_term( force_temp_func, solver.particles.size(),
                                   true );

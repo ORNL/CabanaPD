@@ -13,4 +13,8 @@ target_link_libraries(ThermalDeformationHeatTransferPrenotched LINK_PUBLIC Caban
 add_executable(HIPCylinder hip_cylinder.cpp)
 target_link_libraries(HIPCylinder LINK_PUBLIC CabanaPD)
 
-install(TARGETS ThermalDeformation ThermalCrack ThermalDeformationHeatTransfer ThermalDeformationHeatTransferPrenotched HIPCylinder DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(HIPRveCube hip_rve_cube.cpp)
+target_link_libraries(HIPRveCube LINK_PUBLIC CabanaPD)
+
+
+install(TARGETS ThermalDeformation ThermalCrack ThermalDeformationHeatTransfer ThermalDeformationHeatTransferPrenotched HIPCylinder HIPRveCube DESTINATION ${CMAKE_INSTALL_BINDIR})
