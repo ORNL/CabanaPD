@@ -64,6 +64,7 @@ void angleOfReposeExample( const std::string filename )
     double min_height = inputs["min_height"];
     double max_height = inputs["max_height"];
     double diameter = inputs["cylinder_diameter"];
+    int feed_freq = inputs["feed_frequency"];
     double cylinder_radius = 0.5 * diameter;
     auto create = KOKKOS_LAMBDA( const int, const double x[3] )
     {
@@ -82,10 +83,14 @@ void angleOfReposeExample( const std::string filename )
     // Set density/volumes.
     auto rho = particles.sliceDensity();
     auto vol = particles.sliceVolume();
+    auto vel = particles.sliceVelocity();
+    auto y_init = particles.sliceCurrentPosition();
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         rho( pid ) = rho0;
         vol( pid ) = vol0;
+        vel( pid, 2 ) =
+            -Kokkos::sqrt( 2.0 * 9.8 * ( max_height - y_init( pid, 2 ) ) );
     };
     particles.updateParticles( exec_space{}, init_functor );
 
@@ -162,7 +167,15 @@ void angleOfReposeExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
-    solver.run( body );
+    for ( int step = 1; step <= solver.num_steps; ++step )
+    {
+        solver.runStep( step, body );
+        if ( step % feed_freq == 0 )
+        {
+            particles.createParticles( exec_space{}, Cabana::InitRandom{},
+                                       create, particles.localOffset() );
+        }
+    }
 }
 
 // Initialize MPI+Kokkos.
