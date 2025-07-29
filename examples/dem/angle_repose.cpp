@@ -65,36 +65,19 @@ void angleOfReposeExample( const std::string filename )
     double max_height = inputs["max_height"];
     double diameter = inputs["cylinder_diameter"];
     double cylinder_radius = 0.5 * diameter;
-    double wall_thickness = inputs["wall_thickness"];
-    double particle_radius = cylinder_radius - wall_thickness;
-    auto create_container = KOKKOS_LAMBDA( const int, const double x[3] )
-    {
-        // Only create particles for container.
-        double rsq = x[0] * x[0] + x[1] * x[1];
-        if ( ( x[2] > min_height && rsq // > particle_radius * particle_radius
-                                        // && rsq
-                                        < cylinder_radius * cylinder_radius ) )
-            return true;
-        if ( ( rsq < particle_radius * particle_radius &&
-               x[2] > high_corner[2] - wall_thickness ) )
-            return true;
-        return false;
-    };
-    CabanaPD::Particles particles(
-        memory_space{}, model_type{}, CabanaPD::BaseOutput{}, low_corner,
-        high_corner, num_cells, halo_width, Cabana::InitRandom{},
-        create_container, exec_space{}, false );
     auto create = KOKKOS_LAMBDA( const int, const double x[3] )
     {
         // Only create particles inside cylinder.
         double rsq = x[0] * x[0] + x[1] * x[1];
         if ( x[2] > min_height && x[2] < max_height &&
-             rsq < particle_radius * particle_radius )
+             rsq < cylinder_radius * cylinder_radius )
             return true;
         return false;
     };
-    // particles.createParticles( exec_space{}, Cabana::InitRandom{}, create,
-    //                            particles.localOffset() );
+    CabanaPD::Particles particles(
+        memory_space{}, model_type{}, CabanaPD::BaseOutput{}, low_corner,
+        high_corner, num_cells, halo_width, Cabana::InitRandom{}, create,
+        exec_space{}, false );
 
     // Set density/volumes.
     auto rho = particles.sliceDensity();
@@ -133,6 +116,45 @@ void angleOfReposeExample( const std::string filename )
 
             f( p, 2 ) +=
                 -contact_model.forceCoeff( rz + radius, vn, vol0, rho0 );
+        }
+
+        // Interact with a cylindrical tube
+        double r = Kokkos::hypot( y( p, 0 ), y( p, 1 ) );
+        if ( rz > min_height && cylinder_radius + radius - r < 0.0 )
+        {
+            // Get components of unit normal vector
+            double nx = -y( p, 0 ) / r;
+            double ny = -y( p, 1 ) / r;
+
+            // Normal velocity
+            double vn = v( p, 0 ) * nx + v( p, 1 ) * ny;
+
+            double fn = -contact_model.forceCoeff( cylinder_radius - r + radius,
+                                                   vn, vol0, rho0 );
+
+            f( p, 0 ) += fn * nx;
+            f( p, 1 ) += fn * ny;
+        }
+
+        // Interact with vertical boundary walls.
+        double rx = y( p, 0 ) >= 0.0 ? high_corner[0] - y( p, 0 )
+                                     : y( p, 0 ) - low_corner[0];
+        double ry = y( p, 1 ) >= 0.0 ? high_corner[1] - y( p, 1 )
+                                     : y( p, 1 ) - low_corner[1];
+
+        if ( rx - radius < 0.0 )
+        {
+            double nx = y( p, 0 ) >= 0.0 ? -1.0 : 1.0;
+            double vn = v( p, 0 ) * nx;
+            f( p, 0 ) +=
+                -contact_model.forceCoeff( rx + radius, vn, vol0, rho0 );
+        }
+        if ( ry - radius < 0.0 )
+        {
+            double ny = y( p, 1 ) >= 0.0 ? -1.0 : 1.0;
+            double vn = v( p, 1 ) * ny;
+            f( p, 1 ) +=
+                -contact_model.forceCoeff( ry + radius, vn, vol0, rho0 );
         }
     };
     CabanaPD::BodyTerm body( body_func, solver.particles.size(), true );
