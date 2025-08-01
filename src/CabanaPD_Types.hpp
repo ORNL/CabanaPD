@@ -127,10 +127,13 @@ struct Contact
 {
     using base_type = Pair;
 };
+struct Empty
+{
+};
 struct NoContact
 {
-    using base_model = std::false_type;
-    using model_type = std::false_type;
+    using base_model = Empty;
+    using model_type = Empty;
     using thermal_type = TemperatureIndependent;
     using fracture_type = NoFracture;
 };
