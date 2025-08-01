@@ -140,6 +140,10 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
                influence * xi * vol;
     }
 
+    // CI failures for gcc-13 in release show an apparent false-positive warning
+    // for array bounds of the coefficients.
+#pragma GCC diagnostic warning "-Warray-bounds"
+#pragma GCC diagnostic push
     // In this case we may have any combination of material types. These
     // coefficients may still be the same for some interaction pairs.
     KOKKOS_INLINE_FUNCTION auto
@@ -193,6 +197,7 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
                    ( theta_i * theta_i ) +
                0.5 * ( s_coeff_i / m_i ) * influence * s * s * xi * xi * vol;
     }
+#pragma GCC diagnostic pop
 };
 
 template <>
