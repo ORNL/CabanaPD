@@ -459,7 +459,7 @@ class Solver
     void addParticles( const ExecSpace& exec_space, InitType init_type,
                        UserFunctor user_create )
     {
-        particles.createParticles( exec_space, init_type, user_create );
+        particles.createParticles( exec_space, init_type, user_create, particles.localOffset() );
     }
 
     void output( const int step )

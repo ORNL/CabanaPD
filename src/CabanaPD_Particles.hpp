@@ -570,6 +570,19 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         _timer.stop();
     }
 
+    template <class ExecSpace, class FunctorType>
+    void updateParticles( const ExecSpace, const int num_previous,
+                         const FunctorType init_functor)
+    {
+        _timer.start();
+        Kokkos::RangePolicy<ExecSpace> policy( num_previous, local_offset );
+        Kokkos::parallel_for(
+            "CabanaPD::Particles::update_particles", policy,
+            KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
+        Kokkos::fence();
+        _timer.stop();
+    }
+
     // Particles are always in order frozen, local, ghost.
     // Values for offsets are distinguished from separate (num) values.
     auto numFrozen() const { return frozen_offset; }
