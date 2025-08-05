@@ -48,6 +48,14 @@ struct State
 {
 };
 
+// Material option tags.
+struct SingleMaterial
+{
+};
+struct MultiMaterial
+{
+};
+
 // Thermal tags.
 struct TemperatureIndependent
 {

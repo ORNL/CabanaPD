@@ -19,6 +19,7 @@
 #include <CabanaPD_Fields.hpp>
 #include <CabanaPD_Force.hpp>
 #include <CabanaPD_ForceModels.hpp>
+#include <CabanaPD_ForceModelsMulti.hpp>
 #include <CabanaPD_Geometry.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Integrate.hpp>

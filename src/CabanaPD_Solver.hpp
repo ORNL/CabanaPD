@@ -99,9 +99,11 @@ class Solver
     using force_fracture_type = typename force_model_type::fracture_type;
     using force_type = Force<memory_space, force_model_type, force_model_tag,
                              force_fracture_type>;
+    using force_thermal_type =
+        typename force_model_type::thermal_type::base_type;
     using comm_type =
         Comm<ParticleType, typename force_model_type::base_model::base_type,
-             typename ParticleType::thermal_type>;
+             typename force_model_type::material_type, force_thermal_type>;
     using neigh_iter_tag = Cabana::SerialOpTag;
 
     // Optional module types.
@@ -167,6 +169,10 @@ class Solver
                     "Contact with MPI is currently disabled." );
         }
 
+        // Update optional property ghost sizes if needed.
+        if constexpr ( std::is_same<typename force_model_type::material_type,
+                                    MultiMaterial>::value )
+            force_model.update( particles.sliceType() );
         // Update temperature ghost size if needed.
         if constexpr ( is_temperature_dependent<
                            typename force_model_type::thermal_type>::value )
@@ -248,7 +254,10 @@ class Solver
         if ( !boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space(), particles, 0.0 );
 
-        // Communicate temperature.
+        // Communicate optional properties.
+        if constexpr ( std::is_same<typename force_model_type::material_type,
+                                    MultiMaterial>::value )
+            comm->gatherMaterial();
         if constexpr ( is_temperature_dependent<
                            typename force_model_type::thermal_type>::value )
             comm->gatherTemperature();
