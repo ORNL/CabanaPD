@@ -18,25 +18,44 @@
 
 #include <CabanaPD.hpp>
 
-template <class SolverType, class ContactType>
-createBodyTerm( const SolverType& solver,
-                    const ContactType& contact_model,
-                    CabanaPD::Inputs inputs) -> auto
+template <typename ContactType, typename DensityType, typename ForceType,
+          typename VelType, typename PosType>
+struct CustomBodyTerm
 {
-    double rho0 = inputs["density"];
-    double vol0 = inputs["volume"];
-    double radius = inputs["radius"];
-    double min_height = inputs["min_height"];
-    double max_height = inputs["max_height"];
-    double diameter = inputs["cylinder_diameter"];
-    double cylinder_radius = 0.5 * diameter;
-    double vel_init = inputs["velocity_init"];
+    ContactType contact_model;
+    DensityType rho;
+    ForceType f;
+    VelType v;
+    PosType y;
+    double rho0;
+    double vol0;
+    double radius;
+    double min_height;
+    double diameter;
+    double cylinder_radius;
+    std::array<double, 3> low_corner;
+    std::array<double, 3> high_corner;
 
-    auto f = solver.particles.sliceForce();
-    auto v = solver.particles.sliceVelocity();
-    auto y = solver.particles.sliceCurrentPosition();
+    CustomBodyTerm( CabanaPD::Inputs inputs, ContactType c, DensityType _rho,
+                    ForceType _f, VelType _v, PosType _y )
+        : contact_model( c )
+        , rho( _rho )
+        , f( _f )
+        , v( _v )
+        , y( _y )
+    {
+        rho0 = inputs["density"];
+        vol0 = inputs["volume"];
+        radius = inputs["radius"];
+        min_height = inputs["min_height"];
+        diameter = inputs["cylinder_diameter"];
+        cylinder_radius = 0.5 * diameter;
+        low_corner = inputs["low_corner"];
+        high_corner = inputs["high_corner"];
+    }
 
-    auto body_func = KOKKOS_LAMBDA( const int p, const double )
+    KOKKOS_FUNCTION
+    void operator()( const int p, const double ) const
     {
         // Gravity force.
         f( p, 2 ) -= 9.8 * rho( p );
@@ -91,27 +110,54 @@ createBodyTerm( const SolverType& solver,
             f( p, 1 ) +=
                 -contact_model.forceCoeff( ry + radius, vn, vol0, rho0 ) * ny;
         }
-    };
-
-    return CabanaPD::BodyTerm( body_func, solver.particles.size(), true );
-}
+    }
+};
 
 template <class SolverType, class ContactType>
-auto createInit( const auto solver, const auto contact_model)
+auto createBodyTerm( const SolverType& solver, const ContactType& contact_model,
+                     CabanaPD::Inputs inputs )
 {
-    auto rho = particles.sliceDensity();
-    auto vol = particles.sliceVolume();
-    auto vel = particles.sliceVelocity();
-    auto y_init = particles.sliceCurrentPosition();
+    auto rho = solver.particles.sliceDensity();
+    auto f = solver.particles.sliceForce();
+    auto v = solver.particles.sliceVelocity();
+    auto y = solver.particles.sliceCurrentPosition();
+
+    return CustomBodyTerm( inputs, contact_model, rho, f, v, y );
+}
+
+template <class SolverType>
+void addParticles( SolverType& solver )
+{
+    auto init_functor = KOKKOS_LAMBDA( const int, const double[3] )
+    {
+        return true;
+    };
+    using exec_space = Kokkos::DefaultExecutionSpace;
+    solver.addParticles( exec_space{}, Cabana::InitRandom{}, init_functor );
+}
+
+template <class SolverType>
+void updateParticles( SolverType& solver, CabanaPD::Inputs inputs )
+{
+    double rho0 = inputs["density"];
+    double vol0 = inputs["volume"];
+    double vel_init = inputs["velocity_init"];
+    double max_height = inputs["max_height"];
+    auto rho = solver.particles.sliceDensity();
+    auto vol = solver.particles.sliceVolume();
+    auto vel = solver.particles.sliceVelocity();
+    auto y_init = solver.particles.sliceCurrentPosition();
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         rho( pid ) = rho0;
         vol( pid ) = vol0;
         vel( pid, 2 ) =
-            vel_init - Kokkos::sqrt( 2.0 * 9.8 * ( max_height - y_init( pid, 2 ) ) );
+            vel_init -
+            Kokkos::sqrt( 2.0 * 9.8 * ( max_height - y_init( pid, 2 ) ) );
+        return true;
     };
-
-    return init_functor;
+    using exec_space = Kokkos::DefaultExecutionSpace;
+    solver.particles.updateParticles( exec_space{}, init_functor );
 }
 
 // Simulate powder settling for angle of repose calculation.
@@ -131,9 +177,6 @@ void angleOfReposeExample( const std::string filename )
     // ====================================================
     //                Material parameters
     // ====================================================
-    double rho0 = inputs["density"];
-    double vol0 = inputs["volume"];
-
     double radius = inputs["radius"];
     double radius_extend = inputs["radius_extend"];
 
@@ -162,7 +205,6 @@ void angleOfReposeExample( const std::string filename )
     double cylinder_radius = 0.5 * diameter;
 
     int feed_freq = inputs["feed_frequency"];
-    double vel_init = inputs["velocity_init"];
 
     // ====================================================
     //                   Creation
@@ -182,20 +224,18 @@ void angleOfReposeExample( const std::string filename )
         exec_space{}, false );
 
     // ====================================================
-    //                   Initialization
-    // ====================================================
-    particles.updateParticles( exec_space{}, init_functor );
-
-    // ====================================================
     //                   Create solver
     // ====================================================
     CabanaPD::Solver solver( inputs, particles, contact_model );
+    addParticles( solver );
+    updateParticles( solver, inputs );
     solver.init();
 
     // ====================================================
     //                   Boundary condition
     // ====================================================
-    auto body = createBodyTerm(solver, contact_model, inputs);
+    auto body_func = createBodyTerm( solver, contact_model, inputs );
+    CabanaPD::BodyTerm body( body_func, solver.particles.size(), false );
 
     // ====================================================
     //                   Simulation run
@@ -205,23 +245,10 @@ void angleOfReposeExample( const std::string filename )
         solver.runStep( step, body );
         if ( step % feed_freq == 0 )
         {
-            auto num_previous = solver.particles.localOffset();
-            solver.addParticles( exec_space{}, Cabana::InitRandom{},
-                                       create );
-            auto rho = solver.particles.sliceDensity();
-            auto vol = solver.particles.sliceVolume();
-            auto vel = solver.particles.sliceVelocity();
-            auto y_init = solver.particles.sliceCurrentPosition();
-            auto init_functor = KOKKOS_LAMBDA( const int pid )
-            {
-                rho( pid ) = rho0;
-                vol( pid ) = vol0;
-                vel( pid, 2 ) =
-                    vel_init - Kokkos::sqrt( 2.0 * 9.8 * ( max_height - y_init( pid, 2 ) ) );
-            };
-
-            body = createBodyTerm( solver, contact_model, inputs );
-            solver.particles.updateParticles( exec_space{}, num_previous, init_functor );
+            addParticles( solver );
+            updateParticles( solver, inputs );
+            auto func = createBodyTerm( solver, contact_model, inputs );
+            body.update( body_func, solver.particles.size(), true );
         }
     }
 }
