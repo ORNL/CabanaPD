@@ -470,7 +470,7 @@ class Solver
         if ( step % output_frequency == 0 )
         {
             _step_timer.start();
-            auto W = computeEnergy( *force, particles, neigh_iter_tag() );
+            computeEnergy( *force, particles, neigh_iter_tag() );
             computeStress( *force, particles, neigh_iter_tag() );
 
             particles.output( step / output_frequency, step * dt,
@@ -478,7 +478,7 @@ class Solver
 
             // Timer has to be stopped before printing output.
             _step_timer.stop();
-            step_output( step, W );
+            step_output( step );
         }
     }
 
@@ -492,12 +492,13 @@ class Solver
         log( out, "Init-Time(s): ", _init_time );
         log( out, "Init-Neighbor-Time(s): ", _neighbor_timer.time(), "\n" );
         log( out, "#Timestep/Total-steps Simulation-time Total-strain-energy "
+                  "Total-Damage "
                   "Step-Time(s) Force-Time(s) Neighbor-Time(s) Comm-Time(s) "
                   "Integrate-Time(s) Energy-Time(s) Output-Time(s) "
                   "Particle*steps/s" );
     }
 
-    void step_output( const int step, const double W )
+    void step_output( const int step )
     {
         if ( print )
         {
@@ -519,13 +520,20 @@ class Solver
                 static_cast<double>( particles.numGlobal() ) *
                 output_frequency / step_time;
 
+            double relative_damage = 0.0;
+            if constexpr ( is_fracture<typename force_model_type::
+                                           fracture_type>::value )
+            {
+                relative_damage = force->totalDamage() / particles.numGlobal();
+            }
+
             _step_timer.reset();
             log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
                  " ", std::scientific, std::setprecision( 2 ), step * dt, " ",
-                 W, " ", std::fixed, _total_time, " ", force_time, " ",
-                 neigh_time, " ", comm_time, " ", integrate_time, " ",
-                 energy_time, " ", output_time, " ", std::scientific,
-                 p_steps_per_sec );
+                 force->totalStrainEnergy(), " ", relative_damage, " ",
+                 std::fixed, _total_time, " ", force_time, " ", neigh_time, " ",
+                 comm_time, " ", integrate_time, " ", energy_time, " ",
+                 output_time, " ", std::scientific, p_steps_per_sec );
             out.close();
         }
     }

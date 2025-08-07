@@ -874,7 +874,7 @@ void testForce( ModelType model, const double dx, const double m,
     force.getNeighborStatistics( max_neighbors, total_neighbors );
 
     computeForce( force, particles, Cabana::SerialOpTag() );
-    double Phi = computeEnergy( force, particles, Cabana::SerialOpTag() );
+    computeEnergy( force, particles, Cabana::SerialOpTag() );
     computeStress( force, particles, Cabana::SerialOpTag() );
 
     // Make a copy of final results on the host
@@ -902,7 +902,7 @@ void testForce( ModelType model, const double dx, const double m,
     double local_max[3] = { particles.local_mesh_hi[0],
                             particles.local_mesh_hi[1],
                             particles.local_mesh_hi[2] };
-
+    double Phi = force.totalStrainEnergy();
     checkResults( aosoa_host, local_min, local_max, test_tag, model, m, inputs,
                   Phi );
 }
