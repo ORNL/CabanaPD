@@ -572,7 +572,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
     template <class ExecSpace, class FunctorType>
     void updateParticles( const ExecSpace, const int num_previous,
-                         const FunctorType init_functor)
+                          const FunctorType init_functor )
     {
         _timer.start();
         Kokkos::RangePolicy<ExecSpace> policy( num_previous, local_offset );
@@ -1410,21 +1410,21 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
 ******************************************************************************/
 template <typename MemorySpace, typename ModelType, typename ExecSpace,
           typename OutputType>
-Particles( MemorySpace, ModelType, CabanaPD::Inputs, OutputType, ExecSpace )
-    -> Particles<MemorySpace, typename ModelType::base_model,
-                 TemperatureIndependent, OutputType>;
+Particles( MemorySpace, ModelType, CabanaPD::Inputs, OutputType,
+           ExecSpace ) -> Particles<MemorySpace, typename ModelType::base_model,
+                                    TemperatureIndependent, OutputType>;
 
 // Backwards compatible versions with energy output by default.
 template <typename MemorySpace, typename ModelType, typename ExecSpace>
-Particles( MemorySpace, ModelType, CabanaPD::Inputs, ExecSpace )
-    -> Particles<MemorySpace, typename ModelType::base_model,
-                 TemperatureIndependent, EnergyOutput>;
+Particles( MemorySpace, ModelType, CabanaPD::Inputs,
+           ExecSpace ) -> Particles<MemorySpace, typename ModelType::base_model,
+                                    TemperatureIndependent, EnergyOutput>;
 
 template <typename MemorySpace, typename ModelType, typename ExecSpace,
           typename OutputType>
-Particles( MemorySpace, ModelType, OutputType, Inputs, ExecSpace )
-    -> Particles<MemorySpace, typename ModelType::base_model,
-                 TemperatureIndependent, OutputType>;
+Particles( MemorySpace, ModelType, OutputType, Inputs,
+           ExecSpace ) -> Particles<MemorySpace, typename ModelType::base_model,
+                                    TemperatureIndependent, OutputType>;
 
 template <typename MemorySpace, typename ModelType, typename ThermalType,
           typename ExecSpace, std::size_t Dim, typename OutputType>
