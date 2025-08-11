@@ -509,6 +509,7 @@ class Solver
             global_damage = updateGlobal( force->totalDamage() );
         }
         double relative_damage = global_damage / particles.numGlobal();
+        double total_strain_energy = updateGlobal( force->totalStrainEnergy() );
 
         if ( print )
         {
@@ -533,10 +534,10 @@ class Solver
             _step_timer.reset();
             log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
                  " ", std::scientific, std::setprecision( 2 ), step * dt, " ",
-                 force->totalStrainEnergy(), " ", relative_damage, " ",
-                 std::fixed, _total_time, " ", force_time, " ", neigh_time, " ",
-                 comm_time, " ", integrate_time, " ", energy_time, " ",
-                 output_time, " ", std::scientific, p_steps_per_sec );
+                 total_strain_energy, " ", relative_damage, " ", std::fixed,
+                 _total_time, " ", force_time, " ", neigh_time, " ", comm_time,
+                 " ", integrate_time, " ", energy_time, " ", output_time, " ",
+                 std::scientific, p_steps_per_sec );
             out.close();
         }
     }
