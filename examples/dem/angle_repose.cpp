@@ -11,6 +11,8 @@
 
 #include <fstream>
 #include <iostream>
+#include <limits>
+#include <random>
 
 #include "mpi.h"
 
@@ -130,7 +132,7 @@ auto createBodyTerm( const SolverType& solver, const ContactType& contact_model,
 }
 
 template <class SolverType>
-void addParticles( SolverType& solver, CabanaPD::Inputs inputs )
+void addParticles( SolverType& solver, CabanaPD::Inputs inputs, const int seed )
 {
     double min_height = inputs["min_height"];
     double max_height = inputs["max_height"];
@@ -147,7 +149,9 @@ void addParticles( SolverType& solver, CabanaPD::Inputs inputs )
         return false;
     };
     using exec_space = Kokkos::DefaultExecutionSpace;
-    solver.addParticles( exec_space{}, Cabana::InitRandom{}, create );
+    solver.particles.createParticles( exec_space{}, Cabana::InitRandom{},
+                                      create, solver.particles.localOffset(),
+                                      false, seed );
 }
 
 template <class SolverType>
@@ -255,13 +259,17 @@ void angleOfReposeExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
+    int seed = 3837485;
+    std::mt19937 gen( seed );
+    std::uniform_int_distribution<int> dist( 0,
+                                             std::numeric_limits<int>::max() );
     for ( int step = 1; step <= solver.num_steps; ++step )
     {
         solver.runStep( step, body );
         if ( step % feed_freq == 0 )
         {
             auto num_previous = solver.particles.localOffset();
-            addParticles( solver, inputs );
+            addParticles( solver, inputs, dist( gen ) );
             updateParticles( solver, inputs, num_previous );
             auto func = createBodyTerm( solver, contact_model, inputs );
             body.update( func, solver.particles.size(), true );

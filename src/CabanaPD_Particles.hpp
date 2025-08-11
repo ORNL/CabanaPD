@@ -383,6 +383,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         const ExecSpace& exec_space, InitType init_type,
         UserFunctor user_create, const std::size_t num_previous,
         const bool create_frozen = false,
+        [[maybe_unused]] const bool seed = 123456,
         typename std::enable_if<is_particle_init<InitType>::value, int>::type* =
             0 )
     {
@@ -438,9 +439,16 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             return create;
         };
         // Fence inside create.
-        local_offset = Cabana::Grid::createParticles(
-            init_type, exec_space, create_functor, _plist_x, particles_per_cell,
-            *local_grid, num_previous, false );
+        // Need to pass seed for random case only.
+        if constexpr ( std::is_same<InitType, Cabana::InitRandom>::value )
+            local_offset = Cabana::Grid::createParticles(
+                init_type, exec_space, create_functor, _plist_x,
+                particles_per_cell, *local_grid, num_previous, false, seed );
+        else
+            local_offset = Cabana::Grid::createParticles(
+                init_type, exec_space, create_functor, _plist_x,
+                particles_per_cell, *local_grid, num_previous, false );
+
         resize( local_offset, 0, create_frozen );
 
         updateGlobal();
