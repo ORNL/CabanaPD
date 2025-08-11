@@ -170,10 +170,9 @@ class Force<MemorySpace, ModelType, NormalRepulsionModel, NoFracture>
     // FIXME: implement energy
     template <class PosType, class WType, class ParticleType,
               class ParallelType>
-    double computeEnergyFull( WType&, const PosType&, const PosType&,
-                              ParticleType&, const int, ParallelType& )
+    void computeEnergyFull( WType&, const PosType&, const PosType&,
+                            ParticleType&, const int, ParallelType& )
     {
-        return 0.0;
     }
 
   protected:
@@ -254,10 +253,9 @@ class Force<MemorySpace, ModelType, HertzianModel, NoFracture>
     // FIXME: implement energy
     template <class PosType, class WType, class ParticleType,
               class ParallelType>
-    double computeEnergyFull( WType&, const PosType&, const PosType&,
-                              ParticleType&, ParallelType& )
+    void computeEnergyFull( WType&, const PosType&, const PosType&,
+                            ParticleType&, ParallelType& )
     {
-        return 0.0;
     }
 
   protected:
@@ -266,6 +264,7 @@ class Force<MemorySpace, ModelType, HertzianModel, NoFracture>
     using base_type::_neigh_list;
     using base_type::_neigh_timer;
     using base_type::_timer;
+    using base_type::_total_strain_energy;
 };
 
 } // namespace CabanaPD

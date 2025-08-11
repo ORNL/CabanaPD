@@ -82,6 +82,7 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
     using base_type::_energy_timer;
     using base_type::_stress_timer;
     using base_type::_timer;
+    using base_type::_total_strain_energy;
 
   public:
     // Using the default exec_space.
@@ -204,9 +205,9 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
 
     template <class PosType, class WType, class ParticleType,
               class ParallelType>
-    double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              const ParticleType& particles,
-                              ParallelType& neigh_op_tag )
+    void computeEnergyFull( WType& W, const PosType& x, const PosType& u,
+                            const ParticleType& particles,
+                            ParallelType& neigh_op_tag )
     {
         _energy_timer.start();
 
@@ -233,17 +234,14 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
             Phi += w * vol( i );
         };
 
-        double strain_energy = 0.0;
-
         Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
                                                 particles.localOffset() );
         Cabana::neighbor_parallel_reduce(
             policy, energy_full, _neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, strain_energy,
+            neigh_op_tag, _total_strain_energy,
             "CabanaPD::ForceLPS::computeEnergyFull" );
         Kokkos::fence();
         _energy_timer.stop();
-        return strain_energy;
     }
 
     template <class ParticleType, class ParallelType>
@@ -317,6 +315,8 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
     using base_type::_energy_timer;
     using base_type::_stress_timer;
     using base_type::_timer;
+    using base_type::_total_strain_energy;
+    double _total_damage;
 
   public:
     // Using the default exec_space.
@@ -502,8 +502,8 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
 
     template <class PosType, class WType, class ParticleType,
               class ParallelType>
-    double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              ParticleType& particles, ParallelType& )
+    void computeEnergyFull( WType& W, const PosType& x, const PosType& u,
+                            ParticleType& particles, ParallelType& )
     {
         _energy_timer.start();
 
@@ -516,7 +516,7 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
         auto m = particles.sliceWeightedVolume();
         auto phi = particles.sliceDamage();
 
-        auto energy_full = KOKKOS_LAMBDA( const int i, double& Phi )
+        auto energy_full = KOKKOS_LAMBDA( const int i, double& Phi, double& D )
         {
             std::size_t num_neighbors =
                 Cabana::NeighborList<neighbor_list_type>::numNeighbor(
@@ -546,16 +546,16 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
             }
             Phi += W( i ) * vol( i );
             phi( i ) = 1 - phi_i / vol_H_i;
+            D += phi( i );
         };
 
-        double strain_energy = 0.0;
         Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
                                                 particles.localOffset() );
         Kokkos::parallel_reduce( "CabanaPD::ForceLPSDamage::computeEnergyFull",
-                                 policy, energy_full, strain_energy );
+                                 policy, energy_full, _total_strain_energy,
+                                 _total_damage );
         Kokkos::fence();
         _energy_timer.stop();
-        return strain_energy;
     }
 
     template <class ParticleType, class ParallelType>
@@ -625,6 +625,8 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
         Kokkos::fence();
         _stress_timer.stop();
     }
+
+    auto totalDamage() { return _total_damage; };
 };
 
 template <class MemorySpace, class ModelType>
@@ -639,6 +641,7 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
     using base_type::_energy_timer;
     using base_type::_stress_timer;
     using base_type::_timer;
+    using base_type::_total_strain_energy;
 
   public:
     // Using the default exec_space.
@@ -702,9 +705,9 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
 
     template <class PosType, class WType, class ParticleType,
               class ParallelType>
-    double computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                              const ParticleType& particles,
-                              ParallelType& neigh_op_tag )
+    void computeEnergyFull( WType& W, const PosType& x, const PosType& u,
+                            const ParticleType& particles,
+                            ParallelType& neigh_op_tag )
     {
         _energy_timer.start();
 
@@ -732,17 +735,14 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
             Phi += w * vol( i );
         };
 
-        double strain_energy = 0.0;
-
         Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
                                                 particles.localOffset() );
         Cabana::neighbor_parallel_reduce(
             policy, energy_full, _neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, strain_energy,
+            neigh_op_tag, _total_strain_energy,
             "CabanaPD::ForceLPS::computeEnergyFull" );
         Kokkos::fence();
         _energy_timer.stop();
-        return strain_energy;
     }
 
     template <class ParticleType, class ParallelType>
