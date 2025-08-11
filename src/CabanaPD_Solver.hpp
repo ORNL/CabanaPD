@@ -500,6 +500,16 @@ class Solver
 
     void step_output( const int step )
     {
+        // All ranks must reduce - do this outside the if block since only rank
+        // 0 will print below.
+        double global_damage = 0.0;
+        if constexpr ( is_fracture<
+                           typename force_model_type::fracture_type>::value )
+        {
+            global_damage = updateGlobal( force->totalDamage() );
+        }
+        double relative_damage = global_damage / particles.numGlobal();
+
         if ( print )
         {
             std::ofstream out( output_file, std::ofstream::app );
@@ -519,13 +529,6 @@ class Solver
             double p_steps_per_sec =
                 static_cast<double>( particles.numGlobal() ) *
                 output_frequency / step_time;
-
-            double relative_damage = 0.0;
-            if constexpr ( is_fracture<typename force_model_type::
-                                           fracture_type>::value )
-            {
-                relative_damage = force->totalDamage() / particles.numGlobal();
-            }
 
             _step_timer.reset();
             log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
@@ -596,6 +599,15 @@ class Solver
     void printRegion( RegionType region )
     {
         region.print( particles.comm() );
+    }
+
+    auto updateGlobal( double local )
+    {
+        double global = 0.0;
+        // Not using Allreduce because global values are only used for printing.
+        MPI_Reduce( &local, &global, 1, MPI_DOUBLE, MPI_SUM, 0,
+                    MPI_COMM_WORLD );
+        return global;
     }
 
     int num_steps;
