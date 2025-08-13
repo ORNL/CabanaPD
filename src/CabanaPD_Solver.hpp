@@ -234,8 +234,7 @@ class Solver
         // Compute and communicate weighted volume for LPS (does nothing for
         // PMB). Only computed once without fracture (and inside updateForce for
         // fracture).
-        if constexpr ( !is_fracture<
-                           typename force_model_type::fracture_type>::value )
+        if constexpr ( !is_fracture<force_model_type>::value )
         {
             force->computeWeightedVolume( particles, neigh_iter_tag{} );
             comm->gatherWeightedVolume();
@@ -466,8 +465,7 @@ class Solver
     {
         // Compute and communicate weighted volume for LPS (does nothing for
         // PMB). Only computed once without fracture.
-        if constexpr ( is_fracture<
-                           typename force_model_type::fracture_type>::value )
+        if constexpr ( is_fracture<force_model_type>::value )
         {
             force->computeWeightedVolume( particles, neigh_iter_tag{} );
             comm->gatherWeightedVolume();
@@ -516,8 +514,7 @@ class Solver
         // All ranks must reduce - do this outside the if block since only rank
         // 0 will print below.
         double global_damage = 0.0;
-        if constexpr ( is_fracture<
-                           typename force_model_type::fracture_type>::value )
+        if constexpr ( is_fracture<force_model_type>::value )
         {
             global_damage = updateGlobal( force->totalDamage() );
         }
@@ -627,9 +624,8 @@ class Solver
     void init_prenotch( Prenotch<NumPrenotch> prenotch )
     {
         _total_timer.start();
-        static_assert(
-            is_fracture<typename force_model_type::fracture_type>::value,
-            "Cannot create prenotch in system without fracture." );
+        static_assert( is_fracture<force_model_type>::value,
+                       "Cannot create prenotch in system without fracture." );
 
         // Create prenotch.
         force->prenotch( exec_space{}, particles, prenotch );
