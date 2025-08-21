@@ -223,8 +223,8 @@ class Inputs
 
         // Support for multi-material: find the minimum density-bulk modulus
         // ratio for the correct critical timestep.
-        std::vector<double> rho_over_K;
         auto rho = getVector( "density" );
+        std::vector<double> rho_over_K( rho.size() );
         for ( std::size_t i = 0; i < rho.size(); i++ )
             rho_over_K[i] = rho[i] / K[i];
         min_index = std::distance( std::begin( rho_over_K ),
