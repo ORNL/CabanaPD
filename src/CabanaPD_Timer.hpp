@@ -48,6 +48,11 @@ class Timer
         _running = false;
     }
     void reset() { _time = 0.0; }
+    void set( const double val )
+    {
+        _time = val;
+        _last_time = val;
+    }
     bool running() { return _running; }
     auto time() { return _time; }
     auto minTime() { return _min_time; }

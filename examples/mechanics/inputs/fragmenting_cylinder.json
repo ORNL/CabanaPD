@@ -15,7 +15,7 @@
     "max_radial_velocity"      : {"value": 200, "unit": "m/s"}, 
     "min_radial_velocity"      : {"value": 50, "unit": "m/s"},
     "max_vertical_velocity"    : {"value": 100, "unit": "m/s"}, 
-    "final_time"               : {"value": 2.5e-4, "unit": "s"},
+    "final_time"               : {"value": 2.4e-4, "unit": "s"},
     "timestep"                 : {"value": 1.7e-07, "unit": "s"},
     "timestep_safety_factor"   : {"value": 0.70},
     "output_frequency"         : {"value": 50},
