@@ -375,10 +375,12 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, TemperatureDependent,
     using base_type::operator();
     using base_temperature_type::operator();
 
-    ForceModel( const double _delta, const double _K, const double _G0,
+    ForceModel( PMB model, ElasticPerfectlyPlastic mechanics,
+                const double _delta, const double _K, const double _G0,
                 const double sigma_y, const TemperatureType _temp,
                 const double _alpha, const double _temp0 = 0.0 )
-        : base_type( _delta, _K, _G0, sigma_y )
+        : base_type( model, mechanics, typename TemperatureType::memory_space{},
+                     _delta, _K, sigma_y )
         , base_temperature_type( _delta, _K, _G0, _temp, _alpha, _temp0 )
     {
     }
@@ -397,6 +399,14 @@ ForceModel( ModelType, const double delta, const double K, const double _G0,
             const double temp0 = 0.0 )
     -> ForceModel<ModelType, Elastic, Fracture, TemperatureDependent,
                   TemperatureType>;
+
+template <typename ModelType, typename TemperatureType>
+ForceModel( ModelType, ElasticPerfectlyPlastic, const double delta,
+            const double K, const double _G0, const double sigma_y,
+            const TemperatureType& temp, const double alpha,
+            const double temp0 = 0.0 )
+    -> ForceModel<ModelType, ElasticPerfectlyPlastic, Fracture,
+                  TemperatureDependent, TemperatureType>;
 
 template <typename TemperatureType>
 struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
