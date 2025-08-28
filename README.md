@@ -109,18 +109,18 @@ ctest
 
 CabanaPD currently includes the following:
   - Force models
-    - PD Bond-based (pairwise): prototype microelastic brittle (PMB)
-    - PD State-based (many-body): linear peridynamic solid (LPS)
-    - DEM contact: normal repulsion, Hertzian 
-    - Hybrid DEM-PD
+    - PD bond-based (pairwise): PMB (prototype microelastic brittle)
+    - PD state-based (many-body): LPS (linear peridynamic solid)
+    - DEM (contact): normal repulsion, Hertzian, HertzianJKR (Johnson–Kendall–Roberts)
+    - Hybrid PD-DEM
     - Multi-material systems can be constructed for any models of the **same category** 
       (bond-based, state-based, contact) above (*Currently 2-material systems only*)
-      - Cross-term interactions can be averaged, requiring they use **identical model** types
+      - Cross-term interactions can be averaged, requiring **identical model** types
  - Mechanical response:
    - Elastic only (no failure)
    - Brittle fracture
-   - Elastic-perfectly plastic (bond-based only)
- - Thermomechanics (Currently bond-based only, single material only)
+   - Elastic-perfectly plastic (*Currently bond-based only*)
+ - Thermomechanics (*Currently bond-based only, single material only*)
    - Optional heat transfer
  - Time integration
    - Velocity Verlet
@@ -130,15 +130,21 @@ CabanaPD currently includes the following:
  - Grid-based particle generation supporting custom geometry
  - Output options
    - Total strain energy density
+   - Total damage (if fracture is enabled)
    - Per particle output using HDF5 or SILO
-     - Base fields: position (reference or current), velocity, force
+     - Base fields: position (reference or current), displacement, velocity, force, material type
      - Strain energy density, damage
+     - Stress
+     - LPS fields (if used): weighted volume, dilatation
+     - Thermal fields (if used): temperature
+
 
 ## Examples
 
 Once built and installed, CabanaPD `examples/` can be run. Timing and energy
-information is output to file and particle output is written to files (if enabled within Cabana) that can be visualized with Paraview and similar applications. 
-New examples can be created by using any of the current cases as a template. All inputs are specified in the example JSON files within the relevant `inputs/` subdirectory.
+information is output to file and particle output is written to files (if enabled within Cabana) that can be [visualized](#visualizing-with-paraview).
+New examples can be created by using any of the current cases as a template.
+Most inputs are specified in the example JSON files within the relevant `inputs/` subdirectory; some inputs are set within the `.cpp` files directly.
 
 ### Mechanics
 Examples which only include mechanics and fracture are within `examples/mechanics`.
@@ -214,6 +220,8 @@ The second example is pseudo-1d heat transfer (no mechanics) in a pre-notched cu
 ```
 ./CabanaPD/build/install/bin/ThermalDeformationHeatTransferPrenotched CabanaPD/examples/thermomechanics/heat_transfer.json
 ```
+
+
 ## Visualizing with Paraview
 
 As mentioned above, the simulation results can be visualized with Paraview or similar applications.  
