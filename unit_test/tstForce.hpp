@@ -989,6 +989,12 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
         CabanaPD::ForceModel force_model( CabanaPD::PMB{}, delta, K, G0, temp,
                                           kappa, cp, alpha, temp0 );
     }
+    {
+        //  With EPP.
+        CabanaPD::ForceModel force_model(
+            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{}, delta, K, G0,
+            sigma_y, temp, kappa, cp, alpha, temp0 );
+    }
 }
 
 // Test construction of all LPS models.

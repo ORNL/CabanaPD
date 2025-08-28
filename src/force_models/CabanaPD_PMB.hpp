@@ -502,6 +502,48 @@ ForceModel( ModelType, const double delta, const double K, const double G0,
     -> ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
                   TemperatureType>;
 
+template <typename TemperatureType>
+struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, DynamicTemperature,
+                  TemperatureType>
+    : public BaseForceModelPMB<ElasticPerfectlyPlastic,
+                               typename TemperatureType::memory_space>,
+      public ThermalFractureModel<TemperatureType>,
+      BaseDynamicTemperatureModel
+{
+    using base_type = BaseForceModelPMB<ElasticPerfectlyPlastic,
+                                        typename TemperatureType::memory_space>;
+    using base_temperature_type = ThermalFractureModel<TemperatureType>;
+    using base_heat_transfer_type = BaseDynamicTemperatureModel;
+
+    // Necessary to distinguish between TemperatureDependent
+    using thermal_type = DynamicTemperature;
+
+    using base_type::operator();
+    using base_temperature_type::operator();
+
+    ForceModel( PMB model, ElasticPerfectlyPlastic mechanics,
+                const double _delta, const double _K, const double _G0,
+                const double sigma_y, const TemperatureType _temp,
+                const double _kappa, const double _cp, const double _alpha,
+                const double _temp0 = 0.0,
+                const bool _constant_microconductivity = true )
+        : base_type( model, mechanics, typename TemperatureType::memory_space{},
+                     _delta, _K, sigma_y )
+        , base_temperature_type( _delta, _K, _G0, _temp, _alpha, _temp0 )
+        , base_heat_transfer_type( _delta, _kappa, _cp,
+                                   _constant_microconductivity )
+    {
+    }
+};
+
+template <typename ModelType, typename TemperatureType>
+ForceModel( ModelType, ElasticPerfectlyPlastic, const double delta,
+            const double K, const double G0, const double sigma_y,
+            const TemperatureType& temp, const double kappa, const double cp,
+            const double alpha, const double temp0 = 0.0,
+            const bool constant_microconductivity = true )
+    -> ForceModel<ModelType, ElasticPerfectlyPlastic, Fracture,
+                  DynamicTemperature, TemperatureType>;
 } // namespace CabanaPD
 
 #endif
