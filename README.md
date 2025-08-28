@@ -194,6 +194,12 @@ An example demonstrating the peridynamic stress tensor computation simulates a s
 ./CabanaPD/build/install/bin/PlateWithHole CabanaPD/examples/mechanics/inputs/plate_with_hole.json
 ```
 
+An example of multi-material simulation demonstrates crack propagation in a pre-notched plate with a stiff inclusion under traction loading.
+
+```
+./CabanaPD/build/install/bin/CrackInclusion CabanaPD/examples/mechanics/inputs/crack_inclusion.json
+```
+
 ### Powder dynamics
 Examples which only include mechanics and fracture are within `examples/dem`.
 An example using DEM only demonstrates powder filling in a container:
