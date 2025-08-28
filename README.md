@@ -175,7 +175,8 @@ A similar case, but with multiple random pre-notches, can be run with:
 ./CabanaPD/build/install/bin/RandomCracks CabanaPD/examples/mechanics/inputs/random_cracks.json
 ```
 
-The next example is a fragmenting cylinder due to internal pressure [4]. The example can be run with:
+The next example is a fragmenting cylinder due to internal pressure [4]. 
+This problem can either run with PD only or with hybrid PD-DEM contact with:
 
 ```
 ./CabanaPD/build/install/bin/FragmentingCylinder CabanaPD/examples/mechanics/inputs/fragmenting_cylinder.json
@@ -186,10 +187,19 @@ An example highlighting plasticity simulates a tensile test based on an ASTM sta
 ```
 ./CabanaPD/build/install/bin/DogboneTensileTest CabanaPD/examples/mechanics/inputs/dogbone_tensile_test.json
 ```
+
 An example demonstrating the peridynamic stress tensor computation simulates a square plate under tension with a circular hole at its center [5].
 
 ```
 ./CabanaPD/build/install/bin/PlateWithHole CabanaPD/examples/mechanics/inputs/plate_with_hole.json
+```
+
+### Powder dynamics
+Examples which only include mechanics and fracture are within `examples/dem`.
+An example using DEM only demonstrates powder filling in a container:
+
+```
+./CabanaPD/build/install/bin/PowderFill CabanaPD/examples/mechanics/inputs/powder_fill.json
 ```
 
 ### Thermomechanics
@@ -247,6 +257,7 @@ Below are some basic guidelines for how to perform the initial steps in order to
 3. Different output fields can be selected within the Coloring menu below Representation. 
 
 4. To control the size of the visualized points, scroll down within the Properties window until the Point Gaussian menu and choose a value for Gaussian Radius.
+
 
 ## References
 
