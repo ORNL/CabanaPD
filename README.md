@@ -282,7 +282,7 @@ We encourage you to contribute to CabanaPD! Please check the
 
 ## Citing CabanaPD
 
-If you use CabanaPD in your work, please cite the [Zenodo release](https://zenodo.org/record/7087781#.Y309w7LMLKI).
+If you use CabanaPD in your work, please cite the [Zenodo release](https://doi.org/10.5281/zenodo.7087780).
 
 ## License
 
