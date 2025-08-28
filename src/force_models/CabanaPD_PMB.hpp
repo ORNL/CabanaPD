@@ -197,6 +197,20 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
     {
     }
 
+    ForceModel( PMB model, Fracture, const double delta, const double K,
+                const double G0, const int influence_type = 1 )
+        : base_type( model, Elastic{}, NoFracture{}, delta, K )
+        , base_fracture_type( delta, K, G0, influence_type )
+    {
+    }
+
+    ForceModel( PMB model, Elastic, Fracture, const double delta,
+                const double K, const double G0, const int influence_type = 1 )
+        : base_type( model, NoFracture{}, delta, K )
+        , base_fracture_type( delta, K, G0, influence_type )
+    {
+    }
+
     // Constructor to work with plasticity.
     ForceModel( PMB model, Elastic elastic, const double delta, const double K,
                 const double G0, const double s0 )
@@ -290,6 +304,10 @@ struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
 template <typename ModelType>
 ForceModel( ModelType, Elastic, NoFracture, const double delta, const double K )
     -> ForceModel<ModelType, Elastic, NoFracture>;
+
+template <typename ModelType>
+ForceModel( ModelType, Elastic, Fracture, const double delta, const double K,
+            const double G0 ) -> ForceModel<ModelType, Elastic>;
 
 // Default to fracture.
 template <typename ModelType>

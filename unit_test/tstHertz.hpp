@@ -135,6 +135,17 @@ void testHertzianContact( const std::string filename )
     EXPECT_NEAR( std::sqrt( ke_f / ke_i ), e, 1e-3 );
 }
 
+// Test construction.
+TEST( TEST_CATEGORY, test_force_lps_construct )
+{
+    double radius = 5.0;
+    double extend = 1.0;
+    double nu = 2.0;
+    double E = 100.0;
+    double e = 1.0;
+    CabanaPD::HertzianModel contact_model( radius, extend, nu, E, e );
+}
+
 TEST( TEST_CATEGORY, test_hertzian_contact )
 {
     std::string input = "hertzian_contact.json";

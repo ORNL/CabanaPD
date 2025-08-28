@@ -262,6 +262,14 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
         init();
     }
 
+    ForceModel( LPS model, Elastic, const double _delta, const double _K,
+                const double _G, const double _G0, const int _influence = 0 )
+        : base_type( model, NoFracture{}, _delta, _K, _G, _influence )
+        , base_fracture_type( _delta, _K, _G0, _influence )
+    {
+        init();
+    }
+
     ForceModel( LPS model, Elastic elastic, Fracture, const double _delta,
                 const double _K, const double _G, const double _G0,
                 const int _influence = 0 )
@@ -342,13 +350,23 @@ ForceModel( ModelType, NoFracture, const double delta, const double K,
 
 template <typename ModelType>
 ForceModel( ModelType, Elastic, const double delta, const double K,
-            const double G, const int influence = 0 )
+            const double G, const double _G0, const int influence = 0,
+            typename std::enable_if<( is_state_based<ModelType>::value ),
+                                    int>::type* = 0 )
+    -> ForceModel<ModelType, Elastic>;
+
+template <typename ModelType>
+ForceModel( ModelType, Elastic, Fracture, const double delta, const double K,
+            const double G, const double _G0, const int influence = 0,
+            typename std::enable_if<( is_state_based<ModelType>::value ),
+                                    int>::type* = 0 )
     -> ForceModel<ModelType, Elastic>;
 
 template <typename ModelType>
 ForceModel( ModelType, const double _delta, const double _K, const double _G,
-            const double _G0, const int _influence = 0 )
-    -> ForceModel<ModelType>;
+            const double _G0, const int _influence = 0,
+            typename std::enable_if<( is_state_based<ModelType>::value ),
+                                    int>::type* = 0 ) -> ForceModel<ModelType>;
 
 } // namespace CabanaPD
 

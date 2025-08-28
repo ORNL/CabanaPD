@@ -910,6 +910,120 @@ void testForce( ModelType model, const double dx, const double m,
 //---------------------------------------------------------------------------//
 // GTest tests.
 //---------------------------------------------------------------------------//
+
+// Test construction of all PMB models.
+TEST( TEST_CATEGORY, test_force_pmb_construct )
+{
+    double delta = 5.0;
+    double K = 1.0;
+    double G0 = 100.0;
+
+    {
+        // With defaults.
+        CabanaPD::ForceModel model( CabanaPD::PMB{}, delta, K, G0 );
+    }
+    {
+        // With mechanics input.
+        CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::Elastic{}, delta,
+                                    K, G0 );
+    }
+    {
+        // With all inputs.
+        CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::Elastic{},
+                                    CabanaPD::Fracture{}, delta, K, G0 );
+    }
+    // Without fracture.
+    {
+        CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::Elastic{},
+                                    CabanaPD::NoFracture{}, delta, K );
+    }
+    {
+        CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::NoFracture{},
+                                    delta, K );
+    }
+    // With EPP (cannot be run without fracture).
+    double sigma_y = 10.0;
+    {
+        CabanaPD::ForceModel force_model(
+            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{},
+            TEST_MEMSPACE{}, delta, K, G0, sigma_y );
+    }
+
+    // With thermomechanics.
+    double alpha = 1.0;
+    double temp0 = 0.0;
+    std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
+    std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
+    std::array<int, 3> num_cells = { 10, 10, 10 };
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, CabanaPD::PMB{},
+                                   CabanaPD::TemperatureDependent{}, box_min,
+                                   box_max, num_cells, 0, TEST_EXECSPACE{} );
+    auto temp = particles.sliceTemperature();
+    {
+        //  With elastic, without fracture.
+        CabanaPD::ForceModel force_model( CabanaPD::PMB{},
+                                          CabanaPD::NoFracture{}, delta, K,
+                                          temp, alpha, temp0 );
+    }
+    {
+        //  With elastic.
+        CabanaPD::ForceModel force_model( CabanaPD::PMB{}, delta, K, G0, temp,
+                                          alpha, temp0 );
+    }
+    {
+        //  With EPP.
+        CabanaPD::ForceModel force_model(
+            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{}, delta, K, G0,
+            sigma_y, temp, alpha, temp0 );
+    }
+
+    // With heat transfer.
+    double kappa = 1.0;
+    double cp = 1.0;
+    {
+        CabanaPD::ForceModel force_model( CabanaPD::PMB{},
+                                          CabanaPD::NoFracture{}, delta, K,
+                                          temp, kappa, cp, alpha, temp0 );
+    }
+    {
+        CabanaPD::ForceModel force_model( CabanaPD::PMB{}, delta, K, G0, temp,
+                                          kappa, cp, alpha, temp0 );
+    }
+}
+
+// Test construction of all LPS models.
+TEST( TEST_CATEGORY, test_force_lps_construct )
+{
+    double delta = 5.0;
+    double K = 1.0;
+    double G = 2.0;
+    double G0 = 100.0;
+
+    {
+        // LPS with defaults.
+        CabanaPD::ForceModel model( CabanaPD::LPS{}, delta, K, G, G0, 1 );
+    }
+    {
+        // LPS with mechanics input.
+        CabanaPD::ForceModel model( CabanaPD::LPS{}, CabanaPD::Elastic{}, delta,
+                                    K, G, G0, 1 );
+    }
+    {
+        // LPS with all inputs.
+        CabanaPD::ForceModel model( CabanaPD::LPS{}, CabanaPD::Elastic{},
+                                    CabanaPD::Fracture{}, delta, K, G, G0, 1 );
+    }
+    // LPS without fracture.
+    {
+        CabanaPD::ForceModel model( CabanaPD::LPS{}, CabanaPD::Elastic{},
+                                    CabanaPD::NoFracture{}, delta, K, G, 1 );
+    }
+    {
+        CabanaPD::ForceModel model( CabanaPD::LPS{}, CabanaPD::NoFracture{},
+                                    delta, K, G, 1 );
+    }
+}
+
 TEST( TEST_CATEGORY, test_force_pmb )
 {
     // dx needs to be decreased for increased m: boundary particles are ignored.
