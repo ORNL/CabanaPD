@@ -136,7 +136,7 @@ void testHertzianContact( const std::string filename )
 }
 
 // Test construction.
-TEST( TEST_CATEGORY, test_force_lps_construct )
+TEST( TEST_CATEGORY, test_force_hertz_construct )
 {
     double radius = 5.0;
     double extend = 1.0;
