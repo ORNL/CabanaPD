@@ -2,6 +2,57 @@
 
 Peridynamics and discrete element method with the Cabana library
 
+
+## Citing CabanaPD
+
+If you use CabanaPD in your work, please cite the [Zenodo release](https://doi.org/10.5281/zenodo.7087780).
+
+
+## License
+
+CabanaPD is distributed under an [open source 3-clause BSD license](LICENSE).
+
+
+## Contributing
+
+We encourage you to contribute to CabanaPD! Please check the
+[guidelines](CONTRIBUTING.md) on how to do so.
+
+
+## Features
+
+CabanaPD currently includes the following:
+  - Force models
+    - PD bond-based (pairwise): PMB (prototype microelastic brittle)
+    - PD state-based (many-body): LPS (linear peridynamic solid)
+    - DEM (contact): normal repulsion, Hertzian, HertzianJKR (Johnson–Kendall–Roberts)
+    - Hybrid PD-DEM
+    - Multi-material systems can be constructed for any models of the **same category** 
+      (bond-based, state-based, contact) above (*Currently 2-material systems only*)
+      - Cross-term interactions can be averaged, requiring **identical model** types
+ - Mechanical response:
+   - Elastic only (no failure)
+   - Brittle fracture
+   - Elastic-perfectly plastic (*Currently bond-based only*)
+ - Thermomechanics (*Currently bond-based only, single material only*)
+   - Optional heat transfer
+ - Time integration
+   - Velocity Verlet
+ - Pre-crack creation
+ - Particle boundary conditions
+   - Body terms which apply to all particles
+ - Grid-based particle generation supporting custom geometry
+ - Output options
+   - Total strain energy density
+   - Total damage (if fracture is enabled)
+   - Per particle output using HDF5 or SILO
+     - Base fields: position (reference or current), displacement, velocity, force, material type
+     - Strain energy density, damage
+     - Stress
+     - LPS fields (if used): weighted volume, dilatation
+     - Thermal fields (if used): temperature
+
+
 ## Dependencies
 CabanaPD has the following dependencies:
 
@@ -104,39 +155,6 @@ the CabanaPD unit test suite with:
 cd CabanaPD/build
 ctest
 ```
-
-## Features
-
-CabanaPD currently includes the following:
-  - Force models
-    - PD bond-based (pairwise): PMB (prototype microelastic brittle)
-    - PD state-based (many-body): LPS (linear peridynamic solid)
-    - DEM (contact): normal repulsion, Hertzian, HertzianJKR (Johnson–Kendall–Roberts)
-    - Hybrid PD-DEM
-    - Multi-material systems can be constructed for any models of the **same category** 
-      (bond-based, state-based, contact) above (*Currently 2-material systems only*)
-      - Cross-term interactions can be averaged, requiring **identical model** types
- - Mechanical response:
-   - Elastic only (no failure)
-   - Brittle fracture
-   - Elastic-perfectly plastic (*Currently bond-based only*)
- - Thermomechanics (*Currently bond-based only, single material only*)
-   - Optional heat transfer
- - Time integration
-   - Velocity Verlet
- - Pre-crack creation
- - Particle boundary conditions
-   - Body terms which apply to all particles
- - Grid-based particle generation supporting custom geometry
- - Output options
-   - Total strain energy density
-   - Total damage (if fracture is enabled)
-   - Per particle output using HDF5 or SILO
-     - Base fields: position (reference or current), displacement, velocity, force, material type
-     - Strain energy density, damage
-     - Stress
-     - LPS fields (if used): weighted volume, dilatation
-     - Thermal fields (if used): temperature
 
 
 ## Examples
@@ -274,16 +292,3 @@ Kunze, and L.W. Meyer, eds., Vol 1, DGM Informationsgesellschaft Verlag (1988)
 [6] D. He, D. Huang, and D. Jiang, Modeling and studies of fracture in functionally graded materials under thermal shock loading using peridynamics, Theoretical and Applied Fracture Mechanics 111 (2021): 102852.
 
 [7] C.P. Jiang, X.F. Wu, J. Li, F. Song, Y.F. Shao, X.H. Xu, and P. Yan, A study of the mechanism of formation and numerical simulations of crack patterns in ceramics subjected to thermal shock, Acta Materialia 60 (2012): 4540–4550.
-
-## Contributing
-
-We encourage you to contribute to CabanaPD! Please check the
-[guidelines](CONTRIBUTING.md) on how to do so.
-
-## Citing CabanaPD
-
-If you use CabanaPD in your work, please cite the [Zenodo release](https://doi.org/10.5281/zenodo.7087780).
-
-## License
-
-CabanaPD is distributed under an [open source 3-clause BSD license](LICENSE).
