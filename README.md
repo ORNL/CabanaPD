@@ -1,6 +1,6 @@
 # CabanaPD
 
-Peridynamics with the Cabana library
+Peridynamics and discrete element method with the Cabana library
 
 ## Dependencies
 CabanaPD has the following dependencies:
