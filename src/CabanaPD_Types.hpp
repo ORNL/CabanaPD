@@ -55,6 +55,22 @@ struct Pair
 struct State
 {
 };
+template <class, class SFINAE = void>
+struct is_state_based : public std::false_type
+{
+};
+template <>
+struct is_state_based<State> : public std::true_type
+{
+};
+template <typename ModelType>
+struct is_state_based<
+    ModelType,
+    typename std::enable_if<(
+        std::is_same<typename ModelType::base_type, State>::value )>::type>
+    : public std::true_type
+{
+};
 
 // Material option tags.
 struct SingleMaterial
