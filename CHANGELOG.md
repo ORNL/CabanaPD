@@ -1,3 +1,31 @@
+# Version 0.4.0
+
+## New Features
+ - Added discrete element method (DEM) support, either as stand-alone or as contact forces for peridynamics
+ - Added support for multi-material systems (currently only using the same model form)
+ - Added mechanics models with plasticity (elastic-perfectly plastic as a reference implementation)
+ - Added heat transfer
+ - Added optional calculation of peridynamic stress tensor per particle
+ - Added interfaces for output of particle fields within subvolumes as a function of time
+ - New examples for all new features above
+
+## Bug Fixes and Improvements
+- Fixed CMake installs for downstream packages
+- Fixed bug for regions and boundary conditions that encompass >50% of the system
+- Added Kokkos fences for parallel consistency
+- Enabled pre-notches of any orientation
+- Enabled custom particle creation during class construction
+- Renamed model tags to clarify `Fracture` vs `NoFracture` and `Elastic` vs other mechanics models
+- Added output for total system damage
+- Fixed output for total system strain energy density (previously only from rank 0)
+- Added consistency checks for system size inputs
+- Added option to input m-ratio instead of horizon
+- Enforced consistent particle counts for boundary conditions and body terms
+- Made energy calculation and output optional
+
+## Minimum dependency version updates
+ - Cabana 0.7.0 or later is required
+
 
 # Version 0.3.0
 
