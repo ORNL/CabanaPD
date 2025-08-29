@@ -1,6 +1,57 @@
 # CabanaPD
 
-Peridynamics with the Cabana library
+Peridynamics and discrete element method with the Cabana library
+
+
+## Citing CabanaPD
+
+If you use CabanaPD in your work, please cite the [Zenodo release](https://doi.org/10.5281/zenodo.7087780).
+
+
+## License
+
+CabanaPD is distributed under an [open source 3-clause BSD license](LICENSE).
+
+
+## Contributing
+
+We encourage you to contribute to CabanaPD! Please check the
+[guidelines](CONTRIBUTING.md) on how to do so.
+
+
+## Features
+
+CabanaPD currently includes the following:
+  - Force models
+    - PD bond-based (pairwise): PMB (prototype microelastic brittle)
+    - PD state-based (many-body): LPS (linear peridynamic solid)
+    - DEM (contact): normal repulsion, Hertzian, HertzianJKR (Johnson–Kendall–Roberts)
+    - Hybrid PD-DEM
+    - Multi-material systems can be constructed for any models of the **same category** 
+      (bond-based, state-based, contact) above (*Currently 2-material systems only*)
+      - Cross-term interactions can be averaged, requiring **identical model** types
+ - Mechanical response:
+   - Elastic only (no failure)
+   - Brittle fracture
+   - Elastic-perfectly plastic (*Currently bond-based only*)
+ - Thermomechanics (*Currently bond-based only, single material only*)
+   - Optional heat transfer
+ - Time integration
+   - Velocity Verlet
+ - Pre-crack creation
+ - Particle boundary conditions
+   - Body terms which apply to all particles
+ - Grid-based particle generation supporting custom geometry
+ - Output options
+   - Total strain energy density
+   - Total damage (if fracture is enabled)
+   - Per particle output using HDF5 or SILO
+     - Base fields: position (reference or current), displacement, velocity, force, material type
+     - Strain energy density, damage
+     - Stress
+     - LPS fields (if used): weighted volume, dilatation
+     - Thermal fields (if used): temperature
+
 
 ## Dependencies
 CabanaPD has the following dependencies:
@@ -105,115 +156,94 @@ cd CabanaPD/build
 ctest
 ```
 
-## Features
-
-CabanaPD currently includes the following:
-  - Force models
-    - PD Bond-based (pairwise): prototype microelastic brittle (PMB)
-    - PD State-based (many-body): linear peridynamic solid (LPS)
-    - DEM contact: normal repulsion, Hertzian 
-    - Hybrid DEM-PD
-    - Multi-material systems can be constructed for any models of the **same category** 
-      (bond-based, state-based, contact) above (*Currently 2-material systems only*)
-      - Cross-term interactions can be averaged, requiring they use **identical model** types
- - Mechanical response:
-   - Elastic only (no failure)
-   - Brittle fracture
-   - Elastic-perfectly plastic (bond-based only)
- - Thermomechanics (Currently bond-based only, single material only)
-   - Optional heat transfer
- - Time integration
-   - Velocity Verlet
- - Pre-crack creation
- - Particle boundary conditions
-   - Body terms which apply to all particles
- - Grid-based particle generation supporting custom geometry
- - Output options
-   - Total strain energy density
-   - Per particle output using HDF5 or SILO
-     - Base fields: position (reference or current), velocity, force
-     - Strain energy density, damage
 
 ## Examples
 
 Once built and installed, CabanaPD `examples/` can be run. Timing and energy
-information is output to file and particle output is written to files (if enabled within Cabana) that can be visualized with Paraview and similar applications. 
-New examples can be created by using any of the current cases as a template. All inputs are specified in the example JSON files within the relevant `inputs/` subdirectory.
+information is output to file and particle output is written to files (if enabled within Cabana) that can be [visualized](#visualizing-with-paraview).
+New examples can be created by using any of the current cases as a template.
+Most inputs are specified in the example JSON files within the relevant `inputs/` subdirectory; some inputs are set within the `.cpp` files directly.
 
 ### Mechanics
 Examples which only include mechanics and fracture are within `examples/mechanics`.
 
-The first example is an elastic wave propagating through a cube from an initial Gaussian radial displacement profile from [1]. Assuming the build paths above, the example can be run with:
+ -  The first example is an elastic wave propagating through a cube from an initial Gaussian radial displacement profile from [1]. Assuming the build paths above, the example can be run with:
+    ```
+    ./CabanaPD/build/install/bin/ElasticWave CabanaPD/examples/mechanics/inputs/elastic_wave.json
+    ```
 
-```
-./CabanaPD/build/install/bin/ElasticWave CabanaPD/examples/mechanics/inputs/elastic_wave.json
-```
+ -  The next example is the Kalthoff-Winkler experiment [2], where an impactor causes crack propagation at an angle from two pre-notches on a steel plate.
+    ```
+    ./CabanaPD/build/install/bin/KalthoffWinkler CabanaPD/examples/mechanics/inputs/kalthoff_winkler.json
+    ```
 
-The next example is the Kalthoff-Winkler experiment [2], where an impactor
-causes crack propagation at an angle from two pre-notches on a steel plate. The
-example can be run with:
+ -  Another example is crack branching in a pre-notched soda-lime glass plate due to traction loading [3].
+    ```
+    ./CabanaPD/build/install/bin/CrackBranching CabanaPD/examples/mechanics/inputs/crack_branching.json
+    ```
 
-```
-./CabanaPD/build/install/bin/KalthoffWinkler CabanaPD/examples/mechanics/inputs/kalthoff_winkler.json
-```
+ -  An example with multiple random pre-notches is also available.
+    ```
+    ./CabanaPD/build/install/bin/RandomCracks CabanaPD/examples/mechanics/inputs/random_cracks.json
+    ```
 
-Another example is crack branching in a pre-notched soda-lime glass plate due to traction loading [3]. The example can be run with:
+ -  The next example is a fragmenting cylinder due to internal pressure [4]. 
+    This problem can either run with PD only or with hybrid PD-DEM contact.
+    ```
+    ./CabanaPD/build/install/bin/FragmentingCylinder CabanaPD/examples/mechanics/inputs/fragmenting_cylinder.json
+    ```
 
-```
-./CabanaPD/build/install/bin/CrackBranching CabanaPD/examples/mechanics/inputs/crack_branching.json
-```
+ -  An example highlighting plasticity simulates a tensile test based on an ASTM standard dogbone specimen.
+    ```
+    ./CabanaPD/build/install/bin/DogboneTensileTest CabanaPD/examples/mechanics/inputs/dogbone_tensile_test.json
+    ```
 
-A similar case, but with multiple random pre-notches, can be run with:
+ -  An example demonstrating the peridynamic stress tensor computation simulates a square plate under tension with a circular hole at its center [5].
+    ```
+    ./CabanaPD/build/install/bin/PlateWithHole CabanaPD/examples/mechanics/inputs/plate_with_hole.json
+    ```
 
-```
-./CabanaPD/build/install/bin/RandomCracks CabanaPD/examples/mechanics/inputs/random_cracks.json
-```
+ -  An example of multi-material simulation demonstrates crack propagation in a pre-notched plate with a stiff inclusion under traction loading.
+    ```
+    ./CabanaPD/build/install/bin/CrackInclusion CabanaPD/examples/mechanics/inputs/crack_inclusion.json
+    ```
 
-The next example is a fragmenting cylinder due to internal pressure [4]. The example can be run with:
+### Powder dynamics
+Examples which only include mechanics and fracture are within `examples/dem`.
 
-```
-./CabanaPD/build/install/bin/FragmentingCylinder CabanaPD/examples/mechanics/inputs/fragmenting_cylinder.json
-```
-
-An example highlighting plasticity simulates a tensile test based on an ASTM standard dogbone specimen:
-
-```
-./CabanaPD/build/install/bin/DogboneTensileTest CabanaPD/examples/mechanics/inputs/dogbone_tensile_test.json
-```
-An example demonstrating the peridynamic stress tensor computation simulates a square plate under tension with a circular hole at its center [5].
-
-```
-./CabanaPD/build/install/bin/PlateWithHole CabanaPD/examples/mechanics/inputs/plate_with_hole.json
-```
+ -  An example using DEM-only demonstrates powder filling in a container.
+    ```
+    ./CabanaPD/build/install/bin/PowderFill CabanaPD/examples/mechanics/inputs/powder_fill.json
+    ```
 
 ### Thermomechanics
 Examples which demonstrate temperature-dependent mechanics and fracture are within `examples/thermomechanics`.
 
-The first example is thermoelastic deformation in a homogeneous plate due to linear thermal loading [6]. The example can be run with:
+ -  The first example is thermoelastic deformation in a homogeneous plate due to linear thermal loading [6].
+    ```
+    ./CabanaPD/build/install/bin/ThermalDeformation CabanaPD/examples/thermomechanics/thermal_deformation.json
+    ```
 
-```
-./CabanaPD/build/install/bin/ThermalDeformation CabanaPD/examples/thermomechanics/thermal_deformation.json
-```
-
-The second example is crack initiation and propagation in an alumina ceramic plate due to a thermal shock caused by water quenching [7]. The example can be run with:
-
-```
-./CabanaPD/build/install/bin/ThermalCrack CabanaPD/examples/thermomechanics/thermal_crack.json
-```
+ -  The second example is crack initiation and propagation in an alumina ceramic plate due to a thermal shock caused by water quenching [7].
+    ```
+    ./CabanaPD/build/install/bin/ThermalCrack CabanaPD/examples/thermomechanics/thermal_crack.json
+    ```
 
 ### Thermomechanics with heat transfer
 Examples with heat transfer are within `examples/thermomechanics`.
 
-The first example is pseudo-1d heat transfer (no mechanics) in a cube. The example can be run with: 
-```
-./CabanaPD/build/install/bin/ThermalDeformationHeatTransfer CabanaPD/examples/thermomechanics/heat_transfer.json
-```
-The same example with fully coupled thermomechanics can be run (with a much smaller timestep) using `thermal_deformation_heat_transfer.json`.
+ -  The first example is pseudo-1d heat transfer (no mechanics) in a cube.
+    ```
+    ./CabanaPD/build/install/bin/ThermalDeformationHeatTransfer CabanaPD/examples/thermomechanics/heat_transfer.json
+    ```
+    The same example with fully coupled thermomechanics can be run (with a much smaller timestep) using `thermal_deformation_heat_transfer.json`.
 
-The second example is pseudo-1d heat transfer (no mechanics) in a pre-notched cube. The example can be run with: 
-```
-./CabanaPD/build/install/bin/ThermalDeformationHeatTransferPrenotched CabanaPD/examples/thermomechanics/heat_transfer.json
-```
+ -  The second example is pseudo-1d heat transfer (no mechanics) in a pre-notched cube.
+    ```
+    ./CabanaPD/build/install/bin/ThermalDeformationHeatTransferPrenotched CabanaPD/examples/thermomechanics/heat_transfer.json
+    ```
+
+
 ## Visualizing with Paraview
 
 As mentioned above, the simulation results can be visualized with Paraview or similar applications.  
@@ -240,6 +270,7 @@ Below are some basic guidelines for how to perform the initial steps in order to
 
 4. To control the size of the visualized points, scroll down within the Properties window until the Point Gaussian menu and choose a value for Gaussian Radius.
 
+
 ## References
 
 [1] P. Seleson and D.J. Littlewood, Numerical tools for improved convergence
@@ -261,16 +292,3 @@ Kunze, and L.W. Meyer, eds., Vol 1, DGM Informationsgesellschaft Verlag (1988)
 [6] D. He, D. Huang, and D. Jiang, Modeling and studies of fracture in functionally graded materials under thermal shock loading using peridynamics, Theoretical and Applied Fracture Mechanics 111 (2021): 102852.
 
 [7] C.P. Jiang, X.F. Wu, J. Li, F. Song, Y.F. Shao, X.H. Xu, and P. Yan, A study of the mechanism of formation and numerical simulations of crack patterns in ceramics subjected to thermal shock, Acta Materialia 60 (2012): 4540–4550.
-
-## Contributing
-
-We encourage you to contribute to CabanaPD! Please check the
-[guidelines](CONTRIBUTING.md) on how to do so.
-
-## Citing CabanaPD
-
-If you use CabanaPD in your work, please cite the [Zenodo release](https://zenodo.org/record/7087781#.Y309w7LMLKI).
-
-## License
-
-CabanaPD is distributed under an [open source 3-clause BSD license](LICENSE).
