@@ -106,7 +106,8 @@ class Solver
     using neigh_iter_tag = Cabana::SerialOpTag;
 
     // Optional module types.
-    using heat_transfer_type = HeatTransfer<memory_space, force_model_type>;
+    using heat_transfer_type =
+        HeatTransfer<memory_space, force_model_type, force_fracture_type>;
     using contact_model_type = ContactModelType;
     using contact_model_tag = typename contact_model_type::model_type;
     using contact_fracture_type = typename contact_model_type::fracture_type;

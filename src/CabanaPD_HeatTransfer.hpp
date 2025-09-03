@@ -19,21 +19,19 @@
 namespace CabanaPD
 {
 
-template <class MemorySpace, class ModelType>
+template <class MemorySpace, class ModelType, class FractureType>
 class HeatTransfer;
 
 // Peridynamic heat transfer with forward-Euler time integration.
 // Inherits only because this is a similar neighbor-based kernel.
-template <class MemorySpace, class MechanicsType, class... ModelParams>
-class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, NoFracture,
-                                           DynamicTemperature, ModelParams...>>
+template <class MemorySpace, class ModelType>
+class HeatTransfer<MemorySpace, ModelType, NoFracture>
     : public BaseForce<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ForceModel<PMB, MechanicsType, NoFracture,
-                                  DynamicTemperature, ModelParams...>;
+    using model_type = ModelType;
     using base_type = BaseForce<MemorySpace>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
 
@@ -107,24 +105,17 @@ class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, NoFracture,
     }
 };
 
-template <class MemorySpace, class MechanicsType, class... ModelParams>
-class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, Fracture,
-                                           DynamicTemperature, ModelParams...>>
-    : public HeatTransfer<MemorySpace,
-                          ForceModel<PMB, MechanicsType, NoFracture,
-                                     DynamicTemperature, ModelParams...>>,
+template <class MemorySpace, class ModelType>
+class HeatTransfer<MemorySpace, ModelType, Fracture>
+    : public HeatTransfer<MemorySpace, ModelType, NoFracture>,
       BaseFracture<MemorySpace>
 
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ForceModel<PMB, MechanicsType, Fracture,
-                                  DynamicTemperature, ModelParams...>;
-    using base_type =
-        HeatTransfer<MemorySpace,
-                     ForceModel<PMB, MechanicsType, NoFracture,
-                                DynamicTemperature, ModelParams...>>;
+    using model_type = ModelType;
+    using base_type = HeatTransfer<MemorySpace, ModelType, NoFracture>;
     using neighbor_list_type = typename base_type::neighbor_list_type;
 
   protected:
@@ -143,11 +134,7 @@ class HeatTransfer<MemorySpace, ForceModel<PMB, MechanicsType, Fracture,
     template <class ForceType>
     HeatTransfer( const bool half_neigh, const ForceType& force,
                   const model_type model )
-        : base_type( half_neigh, force,
-                     typename base_type::model_type(
-                         PMB{}, NoFracture{}, model.cutoff(), model.K,
-                         model.temperature, model.kappa, model.cp, model.alpha,
-                         model.temp0, model.constant_microconductivity ) )
+        : base_type( half_neigh, force, model )
         , fracture_type( force.getBrokenBonds() )
         , _model( model )
     {
