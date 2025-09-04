@@ -91,7 +91,7 @@ struct HertzianJKRModel : public ContactModel
         // https://docs.itascacg.com/pfc700/common/contactmodel/jkr/doc/manual/cmjkr.html
         // which is itself taken from E. Parteli (2014).
 
-        auto a = [=]( const double delta_n )
+        auto a = [&]( const double delta_n )
         {
             double c0 = Kokkos::pow( Rs * delta_n, 2.0 );
             double c1 = -4.0 * ( 1.0 - Kokkos::pow( nu, 2.0 ) ) * pi * Gamma *
