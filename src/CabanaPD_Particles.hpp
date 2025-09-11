@@ -383,7 +383,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         const ExecSpace& exec_space, InitType init_type,
         UserFunctor user_create, const std::size_t num_previous,
         const bool create_frozen = false,
-        [[maybe_unused]] const bool seed = 123456,
+        [[maybe_unused]] const int seed = 123456,
         typename std::enable_if<is_particle_init<InitType>::value, int>::type* =
             0 )
     {
