@@ -247,6 +247,24 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 user_create, exec_space, 0, create_frozen );
     }
 
+    // Constructor which initializes particles on regular grid with
+    // customization, randomly per cell.
+    template <class ModelType, class ThermalType, class InitType,
+              class UserFunctor, class ExecSpace>
+    Particles( MemorySpace, ModelType, ThermalType,
+               std::array<double, dim> low_corner,
+               std::array<double, dim> high_corner,
+               const std::array<int, dim> num_cells, const int max_halo_width,
+               InitType init_type, UserFunctor user_create,
+               const ExecSpace exec_space, const bool create_frozen = false )
+        : halo_width( max_halo_width )
+        , _plist_x( "positions" )
+        , _plist_f( "forces" )
+    {
+        create( low_corner, high_corner, num_cells, max_halo_width, init_type,
+                user_create, exec_space, 0, create_frozen );
+    }
+
     // Constructor with existing particle data.
     template <class ModelType, class ExecSpace, class PositionType,
               class VolumeType>
@@ -1451,6 +1469,18 @@ Particles( MemorySpace, ModelType, OutputType, std::array<double, Dim>,
                                    int>::type* = 0 )
     -> Particles<MemorySpace, typename ModelType::base_model,
                  TemperatureIndependent, OutputType>;
+
+template <typename MemorySpace, typename ModelType, typename ThermalType,
+          typename ExecSpace, class InitType, class UserFunctor,
+          std::size_t Dim>
+Particles( MemorySpace, ModelType, ThermalType, std::array<double, Dim>,
+           std::array<double, Dim>, const std::array<int, Dim>, const int,
+           InitType, UserFunctor, const ExecSpace, const bool = false,
+           typename std::enable_if<(is_temperature<ThermalType>::value &&
+                                    Kokkos::is_execution_space_v<ExecSpace>),
+                                   int>::type* = 0 )
+    -> Particles<MemorySpace, typename ModelType::base_model,
+                 typename ThermalType::base_type, EnergyOutput>;
 
 template <typename MemorySpace, typename ModelType, typename OutputType,
           typename ExecSpace, std::size_t Dim>
