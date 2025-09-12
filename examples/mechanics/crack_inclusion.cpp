@@ -90,7 +90,8 @@ void crackInclusionExample( const std::string filename )
     // ====================================================
     // Note that individual inputs can be passed instead (see other examples).
     CabanaPD::Particles particles( memory_space{}, model_type{} );
-    particles.create( inputs, exec_space{} );
+    particles.domain( inputs );
+    particles.create( exec_space{} );
 
     // ====================================================
     //                Boundary conditions planes

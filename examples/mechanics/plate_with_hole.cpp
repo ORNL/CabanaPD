@@ -79,8 +79,8 @@ void plateWithHoleExample( const std::string filename )
 
     CabanaPD::Particles particles( memory_space{}, model_type{},
                                    CabanaPD::EnergyStressOutput{} );
-    particles.create( low_corner, high_corner, num_cells, halo_width,
-                      Cabana::InitUniform{}, init_op, exec_space{} );
+    particles.domain( low_corner, high_corner, num_cells, halo_width );
+    particles.create( exec_space{}, Cabana::InitUniform{}, init_op );
 
     // ====================================================
     //                Boundary conditions planes

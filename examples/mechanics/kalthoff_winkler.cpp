@@ -86,8 +86,8 @@ void kalthoffWinklerExample( const std::string filename )
     //                 Particle generation
     // ====================================================
     CabanaPD::Particles particles( memory_space{}, model_type{} );
-    particles.create( low_corner, high_corner, num_cells, halo_width,
-                      exec_space{} );
+    particles.domain( low_corner, high_corner, num_cells, halo_width );
+    particles.create( exec_space{} );
 
     // ====================================================
     //            Custom particle initialization

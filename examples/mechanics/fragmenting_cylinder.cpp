@@ -90,8 +90,8 @@ void fragmentingCylinderExample( const std::string filename )
     {
         using contact_type = CabanaPD::NormalRepulsionModel;
         CabanaPD::Particles particles( memory_space{}, contact_type{} );
-        particles.create( low_corner, high_corner, num_cells, halo_width,
-                          Cabana::InitRandom{}, init_op, exec_space{} );
+        particles.domain( low_corner, high_corner, num_cells, halo_width );
+        particles.create( exec_space{}, Cabana::InitRandom{}, init_op );
 
         auto rho = particles.sliceDensity();
         auto x = particles.sliceReferencePosition();
@@ -140,8 +140,8 @@ void fragmentingCylinderExample( const std::string filename )
     else
     {
         CabanaPD::Particles particles( memory_space{}, model_type{} );
-        particles.create( low_corner, high_corner, num_cells, halo_width,
-                          Cabana::InitRandom{}, init_op, exec_space{} );
+        particles.domain( low_corner, high_corner, num_cells, halo_width );
+        particles.create( exec_space{}, Cabana::InitRandom{}, init_op );
 
         auto rho = particles.sliceDensity();
         auto x = particles.sliceReferencePosition();

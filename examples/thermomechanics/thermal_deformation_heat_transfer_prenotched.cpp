@@ -73,8 +73,8 @@ void thermalDeformationHeatTransferPrenotchedExample(
     // Does not set displacements, velocities, etc.
     CabanaPD::Particles particles( memory_space{}, model_type{},
                                    thermal_type{} );
-    particles.create( low_corner, high_corner, num_cells, halo_width,
-                      exec_space{} );
+    particles.domain( low_corner, high_corner, num_cells, halo_width );
+    particles.create( exec_space{} );
 
     // ====================================================
     //                    Pre-notches

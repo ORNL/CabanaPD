@@ -85,8 +85,8 @@ void powderSettlingExample( const std::string filename )
         return true;
     };
     // Container particles should be frozen, never updated.
-    particles.create( low_corner, high_corner, num_cells, halo_width,
-                      create_container, exec_space{}, true );
+    particles.domain( low_corner, high_corner, num_cells, halo_width );
+    particles.create( exec_space{}, create_container, 0, true );
 
     // Create powder.
     double min_height = inputs["min_height"];
@@ -102,8 +102,8 @@ void powderSettlingExample( const std::string filename )
 
         return false;
     };
-    particles.add( exec_space(), Cabana::InitRandom{}, create_powder,
-                   particles.numFrozen() );
+    particles.create( exec_space{}, Cabana::InitRandom{}, create_powder,
+                      particles.numFrozen() );
 
     // Set density/volumes.
     auto rho = particles.sliceDensity();

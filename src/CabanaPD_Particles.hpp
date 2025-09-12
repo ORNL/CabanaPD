@@ -211,7 +211,27 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 local_mesh.highCorner( Cabana::Grid::Ghost(), d );
             local_mesh_ext[d] = local_mesh.extent( Cabana::Grid::Own(), d );
         }
+
+        // Determine potential number of particles from owned space.
+        auto owned_cells = local_grid->indexSpace(
+            Cabana::Grid::Own(), Cabana::Grid::Cell(), Cabana::Grid::Local() );
+
+        _grid_size = particles_per_cell * owned_cells.size();
+
         _init_timer.stop();
+    }
+
+    void domain( CabanaPD::Inputs inputs )
+    {
+        std::array<double, 3> low_corner = inputs["low_corner"];
+        std::array<double, 3> high_corner = inputs["high_corner"];
+        std::array<int, 3> num_cells = inputs["num_cells"];
+        double delta = inputs["horizon"];
+        int m = std::floor(
+            delta / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
+        halo_width = m + 1; // Just to be safe.
+
+        domain( low_corner, high_corner, num_cells, halo_width );
     }
 
     KOKKOS_INLINE_FUNCTION bool operator()( const int, const double[dim] ) const
@@ -219,36 +239,22 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         return true;
     }
 
-    template <class ExecSpace, class InitType>
-    void add( const ExecSpace& exec_space, InitType init_type,
-              const std::size_t num_previous, const bool create_frozen = false,
-              typename std::enable_if<
-                  ( std::is_same<InitType, Cabana::InitUniform>::value ||
-                    std::is_same<InitType, Cabana::InitRandom>::value ),
-                  int>::type* = 0 )
-    {
-        add( exec_space, init_type, *this, num_previous, create_frozen );
-    }
-
     template <class ExecSpace, class InitType, class UserFunctor>
-    void add( const ExecSpace& exec_space, InitType init_type,
-              UserFunctor user_create, const std::size_t num_previous,
-              const bool create_frozen = false,
-              typename std::enable_if<
-                  ( std::is_same<InitType, Cabana::InitUniform>::value ||
-                    std::is_same<InitType, Cabana::InitRandom>::value ),
-                  int>::type* = 0 )
+    void create( const ExecSpace& exec_space, InitType init_type,
+                 UserFunctor user_create, const std::size_t num_previous,
+                 const bool create_frozen = false,
+                 typename std::enable_if<is_particle_init<InitType>::value,
+                                         int>::type* = 0 )
     {
         _init_timer.start();
-        // Create a local mesh and owned space.
-        auto owned_cells = local_grid->indexSpace(
-            Cabana::Grid::Own(), Cabana::Grid::Cell(), Cabana::Grid::Local() );
-
-        int particles_per_cell = 1;
-        int num_particles = particles_per_cell * owned_cells.size();
 
         // Use default aosoa construction and resize.
         assert( num_previous <= referenceOffset() );
+        auto num_particles = gridSize();
+        if ( num_particles == 0 )
+            throw std::runtime_error(
+                "Cannot create() particles without calling domain() first." );
+
         resize( num_particles + num_previous, 0, create_frozen );
 
         auto x = sliceReferencePosition();
@@ -303,19 +309,26 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     // Store custom created particle positions and volumes.
     template <class ExecSpace, class PositionType, class VolumeType>
     void
-    add( const ExecSpace, const PositionType& x, const VolumeType& vol,
-         const std::size_t num_previous, const bool create_frozen = false,
-         typename std::enable_if<( Cabana::is_slice<PositionType>::value ||
-                                   Kokkos::is_view<PositionType>::value ) &&
-                                     ( Cabana::is_slice<VolumeType>::value ||
-                                       Kokkos::is_view<VolumeType>::value ),
-                                 int>::type* = 0 )
+    create( const ExecSpace, const PositionType& x, const VolumeType& vol,
+            const std::size_t num_previous = 0,
+            const bool create_frozen = false,
+            typename std::enable_if<( Cabana::is_slice<PositionType>::value ||
+                                      Kokkos::is_view<PositionType>::value ) &&
+                                        ( Cabana::is_slice<VolumeType>::value ||
+                                          Kokkos::is_view<VolumeType>::value ),
+                                    int>::type* = 0 )
     {
         // Ensure valid previous particles.
         assert( num_previous <= referenceOffset() );
         // Ensure matching input sizes.
         assert( vol.size() == x.extent( 0 ) );
         resize( vol.size() + num_previous, 0, create_frozen );
+
+        // TODO: box is necessary for neighbor update - calculate box
+        // automatically instead.
+        auto num_particles = gridSize();
+        if ( num_particles == 0 )
+            log( std::cout, "WARNING: call domain() before running dynamics." );
 
         auto p_x = sliceReferencePosition();
         auto p_vol = sliceVolume();
@@ -355,87 +368,53 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     }
 
     template <class ExecSpace>
-    void
-    create( std::array<double, dim> low_corner,
-            std::array<double, dim> high_corner,
-            const std::array<int, dim> num_cells, const int max_halo_width,
-            const ExecSpace exec_space, const bool create_frozen = false,
-            typename std::enable_if<(Kokkos::is_execution_space_v<ExecSpace>),
-                                    int>::type* = 0 )
+    void create( const ExecSpace& exec_space,
+                 const std::size_t num_previous = 0,
+                 const bool create_frozen = false )
     {
-        domain( low_corner, high_corner, num_cells, max_halo_width );
-        add( exec_space, Cabana::InitUniform{}, *this, 0, create_frozen );
+        create( exec_space, Cabana::InitUniform{}, *this, num_previous,
+                create_frozen );
+    }
+
+    template <class ExecSpace, class InitType>
+    void create(
+        const ExecSpace& exec_space, InitType init_type,
+        const std::size_t num_previous = 0, const bool create_frozen = false,
+        typename std::enable_if<is_particle_init<InitType>::value, int>::type* =
+            0 )
+    {
+        create( exec_space, init_type, *this, num_previous, create_frozen );
     }
 
     template <class ExecSpace, class UserFunctor>
     void
-    create( std::array<double, dim> low_corner,
-            std::array<double, dim> high_corner,
-            const std::array<int, dim> num_cells, const int max_halo_width,
-            UserFunctor user_create, const ExecSpace exec_space,
+    create( const ExecSpace exec_space, UserFunctor user_create,
+            const std::size_t num_previous = 0,
             const bool create_frozen = false,
             typename std::enable_if<(Kokkos::is_execution_space_v<ExecSpace>),
                                     int>::type* = 0 )
     {
-        domain( low_corner, high_corner, num_cells, max_halo_width );
-        add( exec_space, Cabana::InitUniform{}, user_create, 0, create_frozen );
+        create( exec_space, Cabana::InitUniform{}, user_create, num_previous,
+                create_frozen );
     }
 
     template <class ExecSpace, class InitType>
-    void create( std::array<double, dim> low_corner,
-                 std::array<double, dim> high_corner,
-                 const std::array<int, dim> num_cells, const int max_halo_width,
-                 InitType init_type, const ExecSpace exec_space,
-                 const bool create_frozen = false,
-                 typename std::enable_if<
-                     (( std::is_same<InitType, Cabana::InitUniform>::value ||
-                        std::is_same<InitType, Cabana::InitRandom>::value ) &&
-                      Kokkos::is_execution_space_v<ExecSpace>),
-                     int>::type* = 0 )
+    void create(
+        const ExecSpace exec_space, InitType init_type,
+        const std::size_t num_previous = 0, const bool create_frozen = false,
+        typename std::enable_if<is_particle_init<InitType>::value, int>::type* =
+            0 )
     {
-        domain( low_corner, high_corner, num_cells, max_halo_width );
-        add( exec_space, init_type, *this, 0, create_frozen );
+        create( exec_space, init_type, *this, num_previous, create_frozen );
     }
 
     template <class ExecSpace, class InitType, class UserFunctor>
-    void
-    create( std::array<double, dim> low_corner,
-            std::array<double, dim> high_corner,
-            const std::array<int, dim> num_cells, const int max_halo_width,
-            InitType init_type, UserFunctor user_create,
-            const ExecSpace exec_space, const bool create_frozen = false,
-            typename std::enable_if<(Kokkos::is_execution_space_v<ExecSpace>),
-                                    int>::type* = 0 )
+    void create( const ExecSpace exec_space, InitType init_type,
+                 UserFunctor user_create, const bool create_frozen = false,
+                 typename std::enable_if<is_particle_init<InitType>::value,
+                                         int>::type* = 0 )
     {
-        domain( low_corner, high_corner, num_cells, max_halo_width );
-        add( exec_space, init_type, user_create, 0, create_frozen );
-    }
-
-    template <class ExecSpace>
-    void create( CabanaPD::Inputs inputs, ExecSpace exec_space )
-    {
-        std::array<double, 3> low_corner = inputs["low_corner"];
-        std::array<double, 3> high_corner = inputs["high_corner"];
-        std::array<int, 3> num_cells = inputs["num_cells"];
-        double delta = inputs["horizon"];
-        int m = std::floor(
-            delta / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
-        halo_width = m + 1; // Just to be safe.
-
-        domain( low_corner, high_corner, num_cells, halo_width );
-        add( exec_space, Cabana::InitUniform{}, *this, 0, false );
-    }
-
-    // Constructor with existing particle data.
-    template <class ExecSpace, class PositionType, class VolumeType>
-    void create( const PositionType& x, const VolumeType& vol,
-                 std::array<double, dim> low_corner,
-                 std::array<double, dim> high_corner,
-                 const std::array<int, dim> num_cells, const int max_halo_width,
-                 const ExecSpace exec_space, const bool create_frozen = false )
-    {
-        domain( low_corner, high_corner, num_cells, max_halo_width );
-        add( exec_space, x, vol, 0, create_frozen );
+        create( exec_space, init_type, user_create, 0, create_frozen );
     }
 
     void updateGlobal()
@@ -672,6 +651,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         _output_timer.stop();
     }
 
+    auto gridSize() { return _grid_size; }
     auto rank() { return local_grid->globalGrid().blockId(); }
     auto comm() { return local_grid->globalGrid().comm(); }
 
@@ -685,6 +665,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     friend class Comm<self_type, Pair, MultiMaterial, TemperatureDependent>;
 
   protected:
+    int particles_per_cell = 1;
+    std::size_t _grid_size = 0;
     aosoa_u_type _aosoa_u;
     aosoa_y_type _aosoa_y;
     aosoa_vol_type _aosoa_vol;
@@ -758,10 +740,10 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
     }
 
     template <typename... Args>
-    void add( Args&&... args )
+    void create( Args&&... args )
     {
         // Forward arguments to standard or custom particle creation.
-        base_type::add( std::forward<Args>( args )... );
+        base_type::create( std::forward<Args>( args )... );
         _init_timer.start();
         _aosoa_m.resize( base_type::localOffset() );
         _aosoa_theta.resize( base_type::localOffset() );
@@ -885,10 +867,10 @@ class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
     }
 
     template <typename... Args>
-    void add( Args&&... args )
+    void create( Args&&... args )
     {
         // Forward arguments to standard or custom particle creation.
-        base_type::add( std::forward<Args>( args )... );
+        base_type::create( std::forward<Args>( args )... );
         _aosoa_temp.resize( base_type::localOffset() );
     }
 
@@ -1003,10 +985,10 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
     }
 
     template <typename... Args>
-    void add( Args&&... args )
+    void create( Args&&... args )
     {
         // Forward arguments to standard or custom particle creation.
-        base_type::add( std::forward<Args>( args )... );
+        base_type::create( std::forward<Args>( args )... );
         _aosoa_u_neigh.resize( base_type::localOffset() );
     }
 
@@ -1146,10 +1128,19 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
     }
 
     template <typename... Args>
+    void create( Args&&... args )
+    {
+        // Must pre-allocate prior to creating particles.
+        resizeImpl( base_type::gridSize() );
+        base_type::create( std::forward<Args>( args )... );
+        resizeImpl( base_type::localOffset() );
+    }
+
+    template <typename... Args>
     void resize( Args&&... args )
     {
         base_type::resize( std::forward<Args>( args )... );
-        _aosoa_output.resize( base_type::localOffset() );
+        resizeImpl( base_type::localOffset() );
     }
 
     template <typename KeepType>
@@ -1186,6 +1177,11 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
         Cabana::deep_copy( energy, 0.0 );
         auto phi = sliceDamage();
         Cabana::deep_copy( phi, 0.0 );
+    }
+
+    void resizeImpl( const std::size_t new_size )
+    {
+        _aosoa_output.resize( new_size );
     }
 
     aosoa_output_type _aosoa_output;
@@ -1253,10 +1249,20 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
         return Cabana::slice<0>( _aosoa_stress, "stress" );
     }
 
-    void resize( int new_local, int new_ghost )
+    template <typename... Args>
+    void create( Args&&... args )
     {
-        base_type::resize( new_local, new_ghost );
-        _aosoa_stress.resize( new_local + new_ghost );
+        // Must pre-allocate prior to creating particles.
+        resizeImpl( base_type::gridSize() );
+        base_type::create( std::forward<Args>( args )... );
+        resizeImpl( base_type::localOffset() );
+    }
+
+    template <typename... Args>
+    void resize( Args&&... args )
+    {
+        base_type::resize( std::forward<Args>( args )... );
+        resizeImpl( base_type::localOffset() );
     }
 
     template <typename KeepType>
@@ -1291,6 +1297,11 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
     {
         auto stress = sliceStress();
         Cabana::deep_copy( stress, 0.0 );
+    }
+
+    void resizeImpl( const std::size_t new_size )
+    {
+        _aosoa_stress.resize( new_size );
     }
 
     aosoa_stress_type _aosoa_stress;

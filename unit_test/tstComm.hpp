@@ -50,7 +50,8 @@ void testHalo()
     int expected_n = 6;
     CabanaPD::Particles particles( memory_space{}, CabanaPD::PMB{},
                                    CabanaPD::TemperatureIndependent{} );
-    particles.create( box_min, box_max, num_cells, halo_width, exec_space{} );
+    particles.domain( box_min, box_max, num_cells, halo_width );
+    particles.create( exec_space{} );
 
     // Set ID equal to MPI rank.
     int current_rank = -1;

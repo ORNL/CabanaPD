@@ -96,8 +96,8 @@ void testHertzianJKRContact( const std::string filename )
     // ====================================================
     int halo_width = 1;
     CabanaPD::Particles particles( memory_space{}, model_type{} );
-    particles.create( position, volume, low_corner, high_corner, num_cells,
-                      halo_width, exec_space{} );
+    particles.domain( low_corner, high_corner, num_cells, halo_width );
+    particles.create( exec_space{}, position, volume );
 
     // ====================================================
     //            Custom particle initialization
