@@ -265,42 +265,6 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     }
 };
 
-template <>
-struct ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>
-    : public ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
-{
-    using base_type =
-        ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>;
-    using model_type = LinearPMB;
-
-    using base_type::base_type;
-    using base_type::operator();
-
-    template <typename... Args>
-    ForceModel( LinearPMB, Args... args )
-        : base_type( base_model{}, args... )
-    {
-    }
-};
-
-template <>
-struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
-    : public ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
-{
-    using base_type =
-        ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>;
-
-    using model_type = LinearPMB;
-
-    using base_type::operator();
-
-    template <typename... Args>
-    ForceModel( LinearPMB, Args... args )
-        : base_type( base_model{}, std::forward<Args>( args )... )
-    {
-    }
-};
-
 template <typename ModelType>
 ForceModel( ModelType, Elastic, NoFracture, const double delta, const double K )
     -> ForceModel<ModelType, Elastic, NoFracture>;
@@ -544,6 +508,89 @@ ForceModel( ModelType, ElasticPerfectlyPlastic, const double delta,
             const bool constant_microconductivity = true )
     -> ForceModel<ModelType, ElasticPerfectlyPlastic, Fracture,
                   DynamicTemperature, TemperatureType>;
+
+/******************************************************************************
+ Linear PMB.
+******************************************************************************/
+template <>
+struct ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>
+    : public ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
+{
+    using base_type =
+        ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>;
+    using model_type = LinearPMB;
+
+    using base_type::base_type;
+    using base_type::operator();
+
+    template <typename... Args>
+    ForceModel( LinearPMB, Args... args )
+        : base_type( typename base_type::base_model{}, args... )
+    {
+    }
+};
+
+template <>
+struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
+    : public ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
+{
+    using base_type =
+        ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>;
+
+    using model_type = LinearPMB;
+
+    using base_type::operator();
+
+    template <typename... Args>
+    ForceModel( LinearPMB, Args... args )
+        : base_type( typename base_type::base_model{},
+                     std::forward<Args>( args )... )
+    {
+    }
+};
+
+template <typename MemorySpace>
+struct ForceModel<LinearPMB, ElasticPerfectlyPlastic, Fracture,
+                  TemperatureIndependent, MemorySpace>
+    : public ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                        TemperatureIndependent, MemorySpace>
+{
+    using base_type = ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                                 TemperatureIndependent, MemorySpace>;
+
+    using model_type = LinearPMB;
+
+    using base_type::operator();
+
+    template <typename... Args>
+    ForceModel( LinearPMB, Args... args )
+        : base_type( typename base_type::base_model{},
+                     std::forward<Args>( args )... )
+    {
+    }
+};
+
+template <typename MechanicsType, typename ThermalType, typename... FieldTypes>
+struct ForceModel<LinearPMB, MechanicsType, Fracture, ThermalType,
+                  FieldTypes...>
+    : public ForceModel<PMB, MechanicsType, Fracture, ThermalType,
+                        FieldTypes...>
+{
+    using base_type =
+        ForceModel<PMB, MechanicsType, Fracture, ThermalType, FieldTypes...>;
+
+    using model_type = LinearPMB;
+
+    using base_type::operator();
+
+    template <typename... Args>
+    ForceModel( LinearPMB, Args... args )
+        : base_type( typename base_type::base_model{},
+                     std::forward<Args>( args )... )
+    {
+    }
+};
+
 } // namespace CabanaPD
 
 #endif

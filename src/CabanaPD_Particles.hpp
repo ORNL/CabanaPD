@@ -745,8 +745,8 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
 
     // Constructor which initializes particles on regular grid.
     template <typename ModelType, typename... Args>
-    Particles( MemorySpace space, ModelType, Args&&... args )
-        : base_type( space, PMB{}, std::forward<Args>( args )... )
+    Particles( MemorySpace space, ModelType, Args&&... )
+        : base_type( space, PMB{} )
     {
         _init_timer.start();
         _aosoa_m = aosoa_m_type( "Particle Weighted Volumes",
@@ -874,11 +874,10 @@ class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
 
     using base_type::halo_width;
 
-    template <typename... Args>
-    Particles( MemorySpace space, ModelType model, TemperatureDependent,
-               Args&&... args )
-        : base_type( space, model, TemperatureIndependent{},
-                     std::forward<Args>( args )... )
+    template <typename SpecificModelType, typename... Args>
+    Particles( MemorySpace space, SpecificModelType model, TemperatureDependent,
+               Args&&... )
+        : base_type( space, model, TemperatureIndependent{} )
     {
         _aosoa_temp =
             aosoa_temp_type( "Particle Temperature", base_type::localOffset() );
@@ -994,9 +993,9 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
     using base_type::halo_width;
 
     // Base constructor.
-    template <typename... Args>
-    Particles( Args&&... args )
-        : base_type( std::forward<Args>( args )... )
+    template <typename ModelType, typename... Args>
+    Particles( MemorySpace space, ModelType, Args&&... )
+        : base_type( space, PMB{} )
     {
         _aosoa_u_neigh = aosoa_u_neigh_type( "Particle Contact Fields",
                                              base_type::localOffset() );
@@ -1095,42 +1094,41 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
     using base_type::halo_width;
 
     // Constructor forwarding.
-    template <typename... Args>
-    Particles( MemorySpace space, ModelType model, ThermalType thermal,
-               EnergyOutput, Args&&... args )
-        : base_type( space, model, thermal, BaseOutput{},
-                     std::forward<Args>( args )... )
+    template <typename SpecifcModelType>
+    Particles( MemorySpace space, SpecifcModelType model, EnergyOutput )
+        : base_type( space, model, BaseOutput{} )
     {
         _aosoa_output = aosoa_output_type( "Particle Output Fields",
                                            base_type::localOffset() );
         init();
     }
 
-    template <typename... Args>
-    Particles( MemorySpace space, ModelType model, EnergyOutput,
-               Args&&... args )
-        : base_type( space, model, std::forward<Args>( args )... )
+    template <typename SpecifcModelType>
+    Particles( MemorySpace space, SpecifcModelType model, ThermalType thermal,
+               EnergyOutput )
+        : base_type( space, model, thermal, BaseOutput{} )
+    {
+        _aosoa_output = aosoa_output_type( "Particle Output Fields",
+                                           base_type::localOffset() );
+        init();
+    }
+    // Default to energy output.
+    template <typename SpecifcModelType>
+    Particles( MemorySpace space, SpecifcModelType model )
+        : base_type( space, model, BaseOutput{} )
     {
         _aosoa_output = aosoa_output_type( "Particle Output Fields",
                                            base_type::localOffset() );
         init();
     }
 
-    template <typename... Args>
-    Particles( Args&&... args )
-        : base_type( std::forward<Args>( args )... )
+    template <typename SpecifcModelType>
+    Particles( MemorySpace space, SpecifcModelType model, ThermalType thermal )
+        : base_type( space, model, thermal, BaseOutput{} )
     {
         _aosoa_output = aosoa_output_type( "Particle Output Fields",
                                            base_type::localOffset() );
         init();
-    }
-
-    template <typename... Args>
-    void add( Args&&... args )
-    {
-        // Forward arguments to standard or custom particle creation.
-        base_type::add( std::forward<Args>( args )... );
-        _aosoa_output.resize( base_type::localOffset() );
     }
 
     auto sliceStrainEnergy()
@@ -1231,22 +1229,18 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
     using base_type::halo_width;
 
     // Constructor forwarding.
-    template <typename... Args>
-    Particles( MemorySpace space, ModelType model, ThermalType thermal,
-               EnergyStressOutput, Args&&... args )
-        : base_type( space, model, thermal, EnergyOutput{},
-                     std::forward<Args>( args )... )
+    template <typename SpecifcModelType>
+    Particles( MemorySpace space, SpecifcModelType model, EnergyStressOutput )
+        : base_type( space, model, EnergyOutput{} )
     {
         _aosoa_stress = aosoa_stress_type( "Particle Output Fields",
                                            base_type::localOffset() );
         init();
     }
-
-    template <typename... Args>
-    Particles( MemorySpace space, ModelType model, EnergyStressOutput,
-               Args&&... args )
-        : base_type( space, model, EnergyOutput{},
-                     std::forward<Args>( args )... )
+    template <typename SpecifcModelType>
+    Particles( MemorySpace space, SpecifcModelType model, ThermalType thermal,
+               EnergyStressOutput )
+        : base_type( space, model, thermal, EnergyOutput{} )
     {
         _aosoa_stress = aosoa_stress_type( "Particle Output Fields",
                                            base_type::localOffset() );

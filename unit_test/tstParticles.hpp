@@ -15,6 +15,10 @@
 #include <Kokkos_Core.hpp>
 
 #include <CabanaPD_Particles.hpp>
+#include <CabanaPD_Types.hpp>
+#include <force_models/CabanaPD_Contact.hpp>
+#include <force_models/CabanaPD_Hertzian.hpp>
+#include <force_models/CabanaPD_HertzianJKR.hpp>
 
 namespace Test
 {
@@ -190,6 +194,73 @@ void testCreateCustomParticles()
     box_max[2] = 1.0;
     checkParticlePositions( particles, box_min, box_max,
                             particles.frozenOffset(), particles.localOffset() );
+}
+
+template <typename ModelType>
+struct AllModelsTypedTest : public ::testing::Test
+{
+};
+
+using ModelTypes =
+    ::testing::Types<CabanaPD::PMB, CabanaPD::LPS, CabanaPD::LinearPMB,
+                     CabanaPD::LinearLPS, CabanaPD::NormalRepulsionModel,
+                     CabanaPD::HertzianModel, CabanaPD::HertzianJKRModel>;
+
+// Need a trailing comma
+// to avoid an error when compiling with clang++
+TYPED_TEST_SUITE( AllModelsTypedTest, ModelTypes, );
+
+TYPED_TEST( AllModelsTypedTest, All )
+{
+    using model_type = TypeParam;
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, model_type{} );
+    }
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, model_type{},
+                                       CabanaPD::BaseOutput{} );
+    }
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, model_type{},
+                                       CabanaPD::EnergyOutput{} );
+    }
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, model_type{},
+                                       CabanaPD::EnergyStressOutput{} );
+    }
+}
+
+template <typename ModelType>
+struct PMBModelsTypedTest : public ::testing::Test
+{
+};
+
+using PMBModelTypes = ::testing::Types<CabanaPD::PMB, CabanaPD::LinearPMB>;
+
+// Need a trailing comma
+// to avoid an error when compiling with clang++
+TYPED_TEST_SUITE( PMBModelsTypedTest, PMBModelTypes, );
+
+TYPED_TEST( PMBModelsTypedTest, Thermal )
+{
+    using model_type = TypeParam;
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, model_type{},
+                                       CabanaPD::TemperatureDependent{},
+                                       CabanaPD::BaseOutput{} );
+    }
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, model_type{},
+                                       CabanaPD::TemperatureDependent{},
+                                       CabanaPD::EnergyOutput{} );
+        CabanaPD::Particles particles2( TEST_MEMSPACE{}, model_type{},
+                                        CabanaPD::TemperatureDependent{} );
+    }
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, model_type{},
+                                       CabanaPD::TemperatureDependent{},
+                                       CabanaPD::EnergyStressOutput{} );
+    }
 }
 
 //---------------------------------------------------------------------------//
