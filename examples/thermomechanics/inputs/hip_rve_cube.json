@@ -2,6 +2,7 @@
     "num_cells"                : {"value": [80, 80, 80]},
     "system_size"              : {"value": [0.1, 0.1, 0.1], "unit": "m"},
     "density"                  : {"value": 7950, "unit": "kg/m^3"},
+    "mass_scaling_factor"      : {"value": 10000.0},
     "powder_initial_relative_density" : {"value": 0.85},
     "elastic_modulus"          : {"value": 195.6e+9, "unit": "Pa"},
     "fracture_energy"          : {"value": 1550e+6, "unit": "J/m^2"},
@@ -16,9 +17,11 @@
     "cube_side"                : {"value": 0.1, "unit": "m"},
     "wall_thickness"           : {"value": 0.0045, "unit": "m"},
     "ramp_pressure_time"       : {"value": 6.0e-3, "unit": "s"},
-    "final_time"               : {"value": 0.0027, "unit": "s"},
-    "timestep"                 : {"value": 1.5e-07, "unit": "s"},
+    "final_time_ref"               : {"value": 0.0027, "unit": "s"},
+    "final_time"               : {"value": 10, "unit": "s"},
+    "timestep_ref"                 : {"value": 1.5e-07, "unit": "s"},
+    "timestep"                 : {"value": 1.5e-06, "unit": "s"},
     "timestep_safety_factor"   : {"value": 0.70},
-    "output_frequency"         : {"value": 250},
+    "output_frequency"         : {"value": 10},
     "output_reference"         : {"value": false}
 }

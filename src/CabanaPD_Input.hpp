@@ -38,6 +38,11 @@ class Inputs
         double tf = inputs["final_time"]["value"];
         double dt = inputs["timestep"]["value"];
 
+        // Mass scaling
+        double ms_factor = inputs["mass_scaling_factor"]["value"];
+        dt *= std::sqrt( ms_factor );
+        std::cout << "dt = " << dt << std::endl;
+
         // m
         // FIXME: this will be slightly different in y/z
         double dx = inputs["dx"]["value"][0];

@@ -36,6 +36,7 @@ void HIPCylinderExample( const std::string filename )
     //                Material parameters
     // ====================================================
     double rho0 = inputs["density"];
+    double ms_factor = inputs["mass_scaling_factor"];
     double E = inputs["elastic_modulus"];
     double nu = 0.25; // Use bond-based model
     double K = E / ( 3 * ( 1 - 2 * nu ) );
@@ -45,6 +46,31 @@ void HIPCylinderExample( const std::string filename )
     delta += 1e-10;
     double alpha = inputs["thermal_expansion_coeff"];
     double temp0 = inputs["reference_temperature"];
+
+    // Mass scaling
+    rho0 *= ms_factor;
+    std::cout << "rho0 = " << rho0 << std::endl;
+
+    /*
+    std::cout << "Original: rho0 = " << rho0 << std::endl;
+
+    double rho0_temp = rho0 * ms_factor;
+
+    std::cout << "rho0_temp = " << rho0_temp << std::endl;
+
+    // inputs["density"]["value"] = rho0_temp;
+   // inputs["density"] = {{"value", rho0 * ms_factor}, {"unit",
+   inputs["density"]["unit"]}};
+    // inputs["density"] = {{"value", rho0 * ms_factor}, {"unit",
+   inputs["density"]["unit"]}};
+   //  inputs["density"]["value"] = rho0_temp;
+
+    // Mass scaling
+    // rho0 *= ms_factor;
+    rho0 = inputs["density"];
+
+    std::cout << "Scaled: rho0 = " << rho0 << std::endl;
+    */
 
     // ====================================================
     //                  Discretization
