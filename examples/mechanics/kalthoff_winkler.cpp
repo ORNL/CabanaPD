@@ -85,9 +85,9 @@ void kalthoffWinklerExample( const std::string filename )
     // ====================================================
     //                 Particle generation
     // ====================================================
-    CabanaPD::Particles particles( memory_space{}, model_type{}, low_corner,
-                                   high_corner, num_cells, halo_width,
-                                   exec_space{} );
+    CabanaPD::Particles particles( memory_space{}, model_type{} );
+    particles.create( low_corner, high_corner, num_cells, halo_width,
+                      exec_space{} );
 
     // ====================================================
     //            Custom particle initialization
@@ -108,7 +108,7 @@ void kalthoffWinklerExample( const std::string filename )
              x( pid, 0 ) < -0.5 * height + dx )
             v( pid, 0 ) = v0;
     };
-    particles.updateParticles( exec_space{}, init_functor );
+    particles.update( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver

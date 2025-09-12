@@ -48,9 +48,9 @@ void testHalo()
     int halo_width = 2;
     // FIXME: This is for m = 1; should be calculated from m
     int expected_n = 6;
-    CabanaPD::Particles particles(
-        memory_space{}, CabanaPD::PMB{}, CabanaPD::TemperatureIndependent{},
-        box_min, box_max, num_cells, halo_width, exec_space{} );
+    CabanaPD::Particles particles( memory_space{}, CabanaPD::PMB{},
+                                   CabanaPD::TemperatureIndependent{} );
+    particles.create( box_min, box_max, num_cells, halo_width, exec_space{} );
 
     // Set ID equal to MPI rank.
     int current_rank = -1;
@@ -64,7 +64,7 @@ void testHalo()
     {
         rank( pid ) = static_cast<double>( current_rank );
     };
-    particles.updateParticles( exec_space{}, init_functor );
+    particles.update( exec_space{}, init_functor );
 
     int init_num_particles = particles.localOffset();
     using HostAoSoA = Cabana::AoSoA<Cabana::MemberTypes<double[3], double>,

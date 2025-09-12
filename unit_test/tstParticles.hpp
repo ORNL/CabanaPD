@@ -72,8 +72,8 @@ void testCreateParticles()
 
     // Frozen or all particles first.
     CabanaPD::Particles particles( TEST_MEMSPACE{}, CabanaPD::PMB{},
-                                   CabanaPD::TemperatureIndependent{}, box_min,
-                                   box_max, num_cells, 0, exec_space{} );
+                                   CabanaPD::TemperatureIndependent{} );
+    particles.create( box_min, box_max, num_cells, 0, exec_space{} );
 
     // Check expected values for each block of particles.
     std::size_t expected_local = num_cells[0] * num_cells[1] * num_cells[2];
@@ -99,9 +99,10 @@ void testCreateFrozenParticles()
             return true;
         return false;
     };
-    CabanaPD::Particles particles(
-        TEST_MEMSPACE{}, CabanaPD::PMB{}, CabanaPD::TemperatureIndependent{},
-        box_min, box_max, num_cells, 0, init_bottom, exec_space{}, true );
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, CabanaPD::PMB{},
+                                   CabanaPD::TemperatureIndependent{} );
+    particles.create( box_min, box_max, num_cells, 0, init_bottom, exec_space{},
+                      true );
 
     // Check expected values for initial particles.
     std::size_t expected_frozen =
@@ -117,8 +118,8 @@ void testCreateFrozenParticles()
         return false;
     };
     // Create more, starting from the current number of frozen points.
-    particles.createParticles( exec_space{}, Cabana::InitUniform{}, init_top,
-                               particles.frozenOffset() );
+    particles.add( exec_space{}, Cabana::InitUniform{}, init_top,
+                   particles.frozenOffset() );
 
     // Check expected values for each block of particles.
     expected_local = expected_frozen;
@@ -157,9 +158,10 @@ void testCreateCustomParticles()
             volume( p ) = 10.2;
         } );
 
-    CabanaPD::Particles particles(
-        TEST_MEMSPACE{}, CabanaPD::PMB{}, CabanaPD::TemperatureIndependent{},
-        position, volume, box_min, box_max, num_cells, 0, exec_space{}, true );
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, CabanaPD::PMB{},
+                                   CabanaPD::TemperatureIndependent{} );
+    particles.create( position, volume, box_min, box_max, num_cells, 0,
+                      exec_space{}, true );
 
     // Check expected values for initial particles.
     std::size_t expected_frozen = num_local;
@@ -174,8 +176,7 @@ void testCreateCustomParticles()
             volume( p ) = 3.1;
         } );
     // Create more, starting from the current number of frozen points.
-    particles.createParticles( exec_space{}, position, volume,
-                               particles.frozenOffset() );
+    particles.add( exec_space{}, position, volume, particles.frozenOffset() );
 
     // Check expected values for each block of particles.
     expected_local = expected_frozen;

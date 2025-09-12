@@ -71,9 +71,10 @@ void crackBranchingExample( const std::string filename )
     // ====================================================
     //                 Particle generation
     // ====================================================
+    CabanaPD::Particles particles( memory_space{}, model_type{} );
+
     // Note that individual inputs can be passed instead (see other examples).
-    CabanaPD::Particles particles( memory_space{}, model_type{}, inputs,
-                                   exec_space{} );
+    particles.create( inputs, exec_space{} );
 
     // ====================================================
     //                Boundary conditions planes
@@ -104,7 +105,7 @@ void crackBranchingExample( const std::string filename )
              x( pid, 1 ) >= plane2.high[1] - delta - 1e-10 )
             nofail( pid ) = 1;
     };
-    particles.updateParticles( exec_space{}, init_functor );
+    particles.update( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver

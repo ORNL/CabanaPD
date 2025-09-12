@@ -138,9 +138,9 @@ void dogboneTensileTestExample( const std::string filename )
         }
     };
 
-    CabanaPD::Particles particles(
-        memory_space{}, model_type{}, low_corner, high_corner, num_cells,
-        halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
+    CabanaPD::Particles particles( memory_space{}, model_type{} );
+    particles.create( low_corner, high_corner, num_cells, halo_width,
+                      Cabana::InitRandom{}, init_op, exec_space{} );
 
     auto rho = particles.sliceDensity();
 
@@ -149,7 +149,7 @@ void dogboneTensileTestExample( const std::string filename )
         // Density
         rho( pid ) = rho0;
     };
-    particles.updateParticles( exec_space{}, init_functor );
+    particles.update( exec_space{}, init_functor );
 
     // ====================================================
     //                    Force model

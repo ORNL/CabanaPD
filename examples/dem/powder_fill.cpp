@@ -65,6 +65,8 @@ void powderSettlingExample( const std::string filename )
     double wall_thickness = inputs["wall_thickness"];
     double bottom = low_corner[2];
 
+    CabanaPD::Particles particles( memory_space{}, model_type{},
+                                   CabanaPD::BaseOutput{} );
     // Create container.
     auto create_container = KOKKOS_LAMBDA( const int, const double x[3] )
     {
@@ -83,10 +85,8 @@ void powderSettlingExample( const std::string filename )
         return true;
     };
     // Container particles should be frozen, never updated.
-    CabanaPD::Particles particles( memory_space{}, model_type{},
-                                   CabanaPD::BaseOutput{}, low_corner,
-                                   high_corner, num_cells, halo_width,
-                                   create_container, exec_space{}, true );
+    particles.create( low_corner, high_corner, num_cells, halo_width,
+                      create_container, exec_space{}, true );
 
     // Create powder.
     double min_height = inputs["min_height"];
@@ -102,8 +102,8 @@ void powderSettlingExample( const std::string filename )
 
         return false;
     };
-    particles.createParticles( exec_space(), Cabana::InitRandom{},
-                               create_powder, particles.numFrozen() );
+    particles.add( exec_space(), Cabana::InitRandom{}, create_powder,
+                   particles.numFrozen() );
 
     // Set density/volumes.
     auto rho = particles.sliceDensity();
@@ -113,7 +113,7 @@ void powderSettlingExample( const std::string filename )
         rho( pid ) = rho0;
         vol( pid ) = vol0;
     };
-    particles.updateParticles( exec_space{}, init_functor );
+    particles.update( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver
