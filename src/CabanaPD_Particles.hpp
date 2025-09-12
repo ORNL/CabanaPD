@@ -742,12 +742,10 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
     template <typename... Args>
     void create( Args&&... args )
     {
-        // Forward arguments to standard or custom particle creation.
+        // Must pre-allocate prior to creating particles.
+        resizeImpl( base_type::gridSize() );
         base_type::create( std::forward<Args>( args )... );
-        _init_timer.start();
-        _aosoa_m.resize( base_type::localOffset() );
-        _aosoa_theta.resize( base_type::localOffset() );
-        _init_timer.stop();
+        resizeImpl( base_type::referenceOffset() );
     }
 
     auto sliceDilatation()
@@ -767,13 +765,11 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
         return Cabana::slice<0>( _aosoa_m, "weighted_volume" );
     }
 
-    void resize( int new_local, int new_ghost )
+    template <typename... Args>
+    void resize( Args&&... args )
     {
-        base_type::resize( new_local, new_ghost );
-        _timer.start();
-        _aosoa_theta.resize( base_type::referenceOffset() );
-        _aosoa_m.resize( base_type::referenceOffset() );
-        _timer.stop();
+        base_type::resize( std::forward<Args>( args )... );
+        resizeImpl( base_type::referenceOffset() );
     }
 
     template <typename KeepType>
@@ -808,6 +804,14 @@ class Particles<MemorySpace, LPS, TemperatureIndependent, BaseOutput, Dimension>
         Cabana::deep_copy( theta, 0.0 );
         auto m = sliceWeightedVolume();
         Cabana::deep_copy( m, 0.0 );
+    }
+
+    void resizeImpl( const std::size_t new_size )
+    {
+        _timer.start();
+        _aosoa_m.resize( new_size );
+        _aosoa_theta.resize( new_size );
+        _timer.stop();
     }
 
     aosoa_theta_type _aosoa_theta;
@@ -861,17 +865,20 @@ class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
                Args&&... )
         : base_type( space, model, TemperatureIndependent{} )
     {
+        _init_timer.start();
         _aosoa_temp =
             aosoa_temp_type( "Particle Temperature", base_type::localOffset() );
         init_temp();
+        _init_timer.stop();
     }
 
     template <typename... Args>
     void create( Args&&... args )
     {
-        // Forward arguments to standard or custom particle creation.
+        // Must pre-allocate prior to creating particles.
+        resizeImpl( base_type::gridSize() );
         base_type::create( std::forward<Args>( args )... );
-        _aosoa_temp.resize( base_type::localOffset() );
+        resizeImpl( base_type::referenceOffset() );
     }
 
     auto sliceTemperature()
@@ -903,7 +910,7 @@ class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
     void resize( Args&&... args )
     {
         base_type::resize( std::forward<Args>( args )... );
-        _aosoa_temp.resize( base_type::referenceOffset() );
+        resizeImpl( base_type::referenceOffset() );
     }
 
     template <typename KeepType>
@@ -936,7 +943,17 @@ class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
         Cabana::deep_copy( temp, 0.0 );
     }
 
+    void resizeImpl( const std::size_t new_size )
+    {
+        _timer.start();
+        _aosoa_temp.resize( new_size );
+        _timer.stop();
+    }
+
     aosoa_temp_type _aosoa_temp;
+
+    using base_type::_init_timer;
+    using base_type::_timer;
 };
 
 template <class MemorySpace, class ThermalType, int Dimension>
@@ -979,17 +996,20 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
     Particles( MemorySpace space, ModelType, Args&&... )
         : base_type( space, PMB{} )
     {
+        _init_timer.start();
         _aosoa_u_neigh = aosoa_u_neigh_type( "Particle Contact Fields",
                                              base_type::localOffset() );
         init();
+        _init_timer.stop();
     }
 
     template <typename... Args>
     void create( Args&&... args )
     {
-        // Forward arguments to standard or custom particle creation.
+        // Must pre-allocate prior to creating particles.
+        resizeImpl( base_type::gridSize() );
         base_type::create( std::forward<Args>( args )... );
-        _aosoa_u_neigh.resize( base_type::localOffset() );
+        resizeImpl( base_type::localOffset() );
     }
 
     auto sliceDisplacementNeighborBuild()
@@ -1005,7 +1025,7 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
     void resize( Args&&... args )
     {
         base_type::resize( std::forward<Args>( args )... );
-        _aosoa_u_neigh.resize( base_type::localOffset() );
+        resizeImpl( base_type::localOffset() );
     }
 
     template <typename KeepType>
@@ -1032,10 +1052,20 @@ class Particles<MemorySpace, Contact, ThermalType, BaseOutput, Dimension>
         Cabana::deep_copy( u_neigh, 0.0 );
     }
 
+    void resizeImpl( const std::size_t new_size )
+    {
+        _timer.start();
+        _aosoa_u_neigh.resize( new_size );
+        _timer.stop();
+    }
+
     // Used for delaying neighbor construction.
     double _max_displacement;
 
     aosoa_u_neigh_type _aosoa_u_neigh;
+
+    using base_type::_init_timer;
+    using base_type::_timer;
 };
 
 template <class MemorySpace, class ModelType, class ThermalType, int Dimension>
@@ -1080,9 +1110,11 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
     Particles( MemorySpace space, SpecifcModelType model, EnergyOutput )
         : base_type( space, model, BaseOutput{} )
     {
+        _init_timer.start();
         _aosoa_output = aosoa_output_type( "Particle Output Fields",
                                            base_type::localOffset() );
         init();
+        _init_timer.stop();
     }
 
     template <typename SpecifcModelType>
@@ -1090,27 +1122,33 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
                EnergyOutput )
         : base_type( space, model, thermal, BaseOutput{} )
     {
+        _init_timer.start();
         _aosoa_output = aosoa_output_type( "Particle Output Fields",
                                            base_type::localOffset() );
         init();
+        _init_timer.stop();
     }
     // Default to energy output.
     template <typename SpecifcModelType>
     Particles( MemorySpace space, SpecifcModelType model )
         : base_type( space, model, BaseOutput{} )
     {
+        _init_timer.start();
         _aosoa_output = aosoa_output_type( "Particle Output Fields",
                                            base_type::localOffset() );
         init();
+        _init_timer.stop();
     }
 
     template <typename SpecifcModelType>
     Particles( MemorySpace space, SpecifcModelType model, ThermalType thermal )
         : base_type( space, model, thermal, BaseOutput{} )
     {
+        _init_timer.start();
         _aosoa_output = aosoa_output_type( "Particle Output Fields",
                                            base_type::localOffset() );
         init();
+        _init_timer.stop();
     }
 
     auto sliceStrainEnergy()
@@ -1181,10 +1219,15 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyOutput, Dimension>
 
     void resizeImpl( const std::size_t new_size )
     {
+        _timer.start();
         _aosoa_output.resize( new_size );
+        _timer.stop();
     }
 
     aosoa_output_type _aosoa_output;
+
+    using base_type::_init_timer;
+    using base_type::_timer;
 };
 
 template <class MemorySpace, class ModelType, class ThermalType, int Dimension>
@@ -1229,18 +1272,22 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
     Particles( MemorySpace space, SpecifcModelType model, EnergyStressOutput )
         : base_type( space, model, EnergyOutput{} )
     {
+        _init_timer.start();
         _aosoa_stress = aosoa_stress_type( "Particle Output Fields",
                                            base_type::localOffset() );
         init();
+        _init_timer.stop();
     }
     template <typename SpecifcModelType>
     Particles( MemorySpace space, SpecifcModelType model, ThermalType thermal,
                EnergyStressOutput )
         : base_type( space, model, thermal, EnergyOutput{} )
     {
+        _init_timer.start();
         _aosoa_stress = aosoa_stress_type( "Particle Output Fields",
                                            base_type::localOffset() );
         init();
+        _init_timer.stop();
     }
 
     auto sliceStress() { return Cabana::slice<0>( _aosoa_stress, "stress" ); }
@@ -1301,10 +1348,15 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
 
     void resizeImpl( const std::size_t new_size )
     {
+        _timer.start();
         _aosoa_stress.resize( new_size );
+        _timer.stop();
     }
 
     aosoa_stress_type _aosoa_stress;
+
+    using base_type::_init_timer;
+    using base_type::_timer;
 };
 
 /******************************************************************************
