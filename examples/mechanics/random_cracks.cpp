@@ -125,8 +125,9 @@ void randomCracksExample( const std::string filename )
     //                 Particle generation
     // ====================================================
     // Note that individual inputs can be passed instead (see other examples).
-    CabanaPD::Particles particles( memory_space{}, model_type{}, inputs,
-                                   exec_space{} );
+    CabanaPD::Particles particles( memory_space{}, model_type{} );
+    particles.domain( inputs );
+    particles.create( exec_space{} );
 
     // ====================================================
     //                Boundary conditions planes
@@ -157,7 +158,7 @@ void randomCracksExample( const std::string filename )
              x( pid, 1 ) >= plane2.high[1] - delta - 1e-10 )
             nofail( pid ) = 1;
     };
-    particles.updateParticles( exec_space{}, init_functor );
+    particles.update( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver

@@ -541,8 +541,9 @@ createParticles( ModelTag model, LinearTag, const double dx, const double s0 )
 
     // Create particles based on the mesh.
     CabanaPD::Particles particles( TEST_MEMSPACE{}, model,
-                                   CabanaPD::EnergyStressOutput{}, box_min,
-                                   box_max, num_cells, 0, TEST_EXECSPACE{} );
+                                   CabanaPD::EnergyStressOutput{} );
+    particles.domain( box_min, box_max, num_cells, 0 );
+    particles.create( TEST_EXECSPACE{} );
 
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
@@ -555,7 +556,7 @@ createParticles( ModelTag model, LinearTag, const double dx, const double s0 )
             v( pid, d ) = 0.0;
         }
     };
-    particles.updateParticles( TEST_EXECSPACE{}, init_functor );
+    particles.update( TEST_EXECSPACE{}, init_functor );
     return particles;
 }
 
@@ -572,8 +573,10 @@ createParticles( ModelTag model, QuadraticTag, const double dx,
 
     // Create particles based on the mesh.
     CabanaPD::Particles particles( TEST_MEMSPACE{}, model,
-                                   CabanaPD::EnergyStressOutput{}, box_min,
-                                   box_max, num_cells, 0, TEST_EXECSPACE{} );
+                                   CabanaPD::EnergyStressOutput{} );
+    particles.domain( box_min, box_max, num_cells, 0 );
+    particles.create( TEST_EXECSPACE{} );
+
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto v = particles.sliceVelocity();
@@ -586,7 +589,7 @@ createParticles( ModelTag model, QuadraticTag, const double dx,
         }
         u( pid, 0 ) = s0 * x( pid, 0 ) * x( pid, 0 );
     };
-    particles.updateParticles( TEST_EXECSPACE{}, init_functor );
+    particles.update( TEST_EXECSPACE{}, init_functor );
     return particles;
 }
 
@@ -956,8 +959,9 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
     std::array<int, 3> num_cells = { 10, 10, 10 };
     CabanaPD::Particles particles( TEST_MEMSPACE{}, CabanaPD::PMB{},
-                                   CabanaPD::TemperatureDependent{}, box_min,
-                                   box_max, num_cells, 0, TEST_EXECSPACE{} );
+                                   CabanaPD::TemperatureDependent{} );
+    particles.domain( box_min, box_max, num_cells, 0 );
+    particles.create( TEST_EXECSPACE{} );
     auto temp = particles.sliceTemperature();
     {
         //  With elastic, without fracture.

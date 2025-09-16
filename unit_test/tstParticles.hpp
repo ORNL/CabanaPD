@@ -15,6 +15,10 @@
 #include <Kokkos_Core.hpp>
 
 #include <CabanaPD_Particles.hpp>
+#include <CabanaPD_Types.hpp>
+#include <force_models/CabanaPD_Contact.hpp>
+#include <force_models/CabanaPD_Hertzian.hpp>
+#include <force_models/CabanaPD_HertzianJKR.hpp>
 
 namespace Test
 {
@@ -72,8 +76,9 @@ void testCreateParticles()
 
     // Frozen or all particles first.
     CabanaPD::Particles particles( TEST_MEMSPACE{}, CabanaPD::PMB{},
-                                   CabanaPD::TemperatureIndependent{}, box_min,
-                                   box_max, num_cells, 0, exec_space{} );
+                                   CabanaPD::TemperatureIndependent{} );
+    particles.domain( box_min, box_max, num_cells, 0 );
+    particles.create( exec_space{} );
 
     // Check expected values for each block of particles.
     std::size_t expected_local = num_cells[0] * num_cells[1] * num_cells[2];
@@ -99,9 +104,10 @@ void testCreateFrozenParticles()
             return true;
         return false;
     };
-    CabanaPD::Particles particles(
-        TEST_MEMSPACE{}, CabanaPD::PMB{}, CabanaPD::TemperatureIndependent{},
-        box_min, box_max, num_cells, 0, init_bottom, exec_space{}, true );
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, CabanaPD::PMB{},
+                                   CabanaPD::TemperatureIndependent{} );
+    particles.domain( box_min, box_max, num_cells, 0 );
+    particles.create( exec_space{}, init_bottom, 0, true );
 
     // Check expected values for initial particles.
     std::size_t expected_frozen =
@@ -117,8 +123,8 @@ void testCreateFrozenParticles()
         return false;
     };
     // Create more, starting from the current number of frozen points.
-    particles.createParticles( exec_space{}, Cabana::InitUniform{}, init_top,
-                               particles.frozenOffset() );
+    particles.create( exec_space{}, Cabana::InitUniform{}, init_top,
+                      particles.frozenOffset() );
 
     // Check expected values for each block of particles.
     expected_local = expected_frozen;
@@ -157,9 +163,10 @@ void testCreateCustomParticles()
             volume( p ) = 10.2;
         } );
 
-    CabanaPD::Particles particles(
-        TEST_MEMSPACE{}, CabanaPD::PMB{}, CabanaPD::TemperatureIndependent{},
-        position, volume, box_min, box_max, num_cells, 0, exec_space{}, true );
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, CabanaPD::PMB{},
+                                   CabanaPD::TemperatureIndependent{} );
+    particles.domain( box_min, box_max, num_cells, 0 );
+    particles.create( exec_space{}, position, volume, 0, true );
 
     // Check expected values for initial particles.
     std::size_t expected_frozen = num_local;
@@ -174,8 +181,8 @@ void testCreateCustomParticles()
             volume( p ) = 3.1;
         } );
     // Create more, starting from the current number of frozen points.
-    particles.createParticles( exec_space{}, position, volume,
-                               particles.frozenOffset() );
+    particles.create( exec_space{}, position, volume,
+                      particles.frozenOffset() );
 
     // Check expected values for each block of particles.
     expected_local = expected_frozen;
@@ -189,6 +196,69 @@ void testCreateCustomParticles()
     box_max[2] = 1.0;
     checkParticlePositions( particles, box_min, box_max,
                             particles.frozenOffset(), particles.localOffset() );
+}
+
+template <typename ModelType>
+struct AllModelsTypedTest : public ::testing::Test
+{
+    ModelType model_tag;
+};
+
+using ModelTypes =
+    ::testing::Types<CabanaPD::PMB, CabanaPD::LPS, CabanaPD::LinearPMB,
+                     CabanaPD::LinearLPS, CabanaPD::NormalRepulsionModel,
+                     CabanaPD::HertzianModel, CabanaPD::HertzianJKRModel>;
+
+// Need a trailing comma to avoid an error when compiling with clang++
+TYPED_TEST_SUITE( AllModelsTypedTest, ModelTypes, );
+
+TYPED_TEST( AllModelsTypedTest, All )
+{
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, this->model_tag,
+                                       CabanaPD::BaseOutput{} );
+    }
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, this->model_tag,
+                                       CabanaPD::EnergyOutput{} );
+        CabanaPD::Particles particles2( TEST_MEMSPACE{}, this->model_tag );
+    }
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, this->model_tag,
+                                       CabanaPD::EnergyStressOutput{} );
+    }
+}
+
+template <typename ModelType>
+struct PMBModelsTypedTest : public ::testing::Test
+{
+    ModelType model_tag;
+};
+
+using PMBModelTypes = ::testing::Types<CabanaPD::PMB, CabanaPD::LinearPMB>;
+
+// Need a trailing comma to avoid an error when compiling with clang++
+TYPED_TEST_SUITE( PMBModelsTypedTest, PMBModelTypes, );
+
+TYPED_TEST( PMBModelsTypedTest, Thermal )
+{
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, this->model_tag,
+                                       CabanaPD::TemperatureDependent{},
+                                       CabanaPD::BaseOutput{} );
+    }
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, this->model_tag,
+                                       CabanaPD::TemperatureDependent{},
+                                       CabanaPD::EnergyOutput{} );
+        CabanaPD::Particles particles2( TEST_MEMSPACE{}, this->model_tag,
+                                        CabanaPD::TemperatureDependent{} );
+    }
+    {
+        CabanaPD::Particles particles( TEST_MEMSPACE{}, this->model_tag,
+                                       CabanaPD::TemperatureDependent{},
+                                       CabanaPD::EnergyStressOutput{} );
+    }
 }
 
 //---------------------------------------------------------------------------//

@@ -89,8 +89,9 @@ void crackInclusionExample( const std::string filename )
     //                 Particle generation
     // ====================================================
     // Note that individual inputs can be passed instead (see other examples).
-    CabanaPD::Particles particles( memory_space{}, model_type{}, inputs,
-                                   exec_space{} );
+    CabanaPD::Particles particles( memory_space{}, model_type{} );
+    particles.domain( inputs );
+    particles.create( exec_space{} );
 
     // ====================================================
     //                Boundary conditions planes
@@ -140,7 +141,7 @@ void crackInclusionExample( const std::string filename )
             rho( pid ) = rho0;
         }
     };
-    particles.updateParticles( exec_space{}, init_functor );
+    particles.update( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver

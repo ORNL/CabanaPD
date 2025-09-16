@@ -61,9 +61,10 @@ void elasticWaveExample( const std::string filename )
     // ====================================================
     //                 Particle generation
     // ====================================================
-    CabanaPD::Particles particles( memory_space{}, model_type{}, low_corner,
-                                   high_corner, num_cells, halo_width,
-                                   exec_space{} );
+    CabanaPD::Particles particles( memory_space{}, model_type{} );
+
+    particles.domain( low_corner, high_corner, num_cells, halo_width );
+    particles.create( exec_space{} );
 
     // ====================================================
     //            Custom particle initialization
@@ -96,7 +97,7 @@ void elasticWaveExample( const std::string filename )
             v( pid, d ) = 0.0;
         }
     };
-    particles.updateParticles( exec_space{}, init_functor );
+    particles.update( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver

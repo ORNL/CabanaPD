@@ -77,10 +77,10 @@ void plateWithHoleExample( const std::string filename )
         return true;
     };
 
-    CabanaPD::Particles particles(
-        memory_space{}, model_type{}, CabanaPD::EnergyStressOutput{},
-        low_corner, high_corner, num_cells, halo_width, Cabana::InitUniform{},
-        init_op, exec_space{} );
+    CabanaPD::Particles particles( memory_space{}, model_type{},
+                                   CabanaPD::EnergyStressOutput{} );
+    particles.domain( low_corner, high_corner, num_cells, halo_width );
+    particles.create( exec_space{}, Cabana::InitUniform{}, init_op );
 
     // ====================================================
     //                Boundary conditions planes
@@ -110,7 +110,7 @@ void plateWithHoleExample( const std::string filename )
              x( pid, 0 ) >= plane2.high[0] - delta - 1e-10 )
             nofail( pid ) = 1;
     };
-    particles.updateParticles( exec_space{}, init_functor );
+    particles.update( exec_space{}, init_functor );
 
     // ====================================================
     //                   Create solver
