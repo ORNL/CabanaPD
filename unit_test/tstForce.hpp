@@ -911,7 +911,7 @@ void testForce( ModelType model, const double dx, const double m,
 // GTest tests.
 //---------------------------------------------------------------------------//
 
-// Test construction of all PMB models.
+// Test construction and init methods of all PMB models.
 TEST( TEST_CATEGORY, test_force_pmb_construct )
 {
     double delta = 5.0;
@@ -921,6 +921,7 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
     {
         // With defaults.
         CabanaPD::ForceModel model( CabanaPD::PMB{}, delta, K, G0 );
+        model.init( delta, K, G0 );
     }
     {
         // With mechanics input.
@@ -936,6 +937,7 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
     {
         CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::Elastic{},
                                     CabanaPD::NoFracture{}, delta, K );
+        model.init( delta, K );
     }
     {
         CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::NoFracture{},
@@ -944,9 +946,10 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
     // With EPP (cannot be run without fracture).
     double sigma_y = 10.0;
     {
-        CabanaPD::ForceModel force_model(
-            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{},
-            TEST_MEMSPACE{}, delta, K, G0, sigma_y );
+        CabanaPD::ForceModel model( CabanaPD::PMB{},
+                                    CabanaPD::ElasticPerfectlyPlastic{},
+                                    TEST_MEMSPACE{}, delta, K, G0, sigma_y );
+        model.init( delta, K, G0, sigma_y );
     }
 
     // With thermomechanics.
@@ -961,39 +964,43 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
     auto temp = particles.sliceTemperature();
     {
         //  With elastic, without fracture.
-        CabanaPD::ForceModel force_model( CabanaPD::PMB{},
-                                          CabanaPD::NoFracture{}, delta, K,
-                                          temp, alpha, temp0 );
+        CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::NoFracture{},
+                                    delta, K, temp, alpha, temp0 );
+        model.init( delta, K, alpha, temp0 );
     }
     {
         //  With elastic.
-        CabanaPD::ForceModel force_model( CabanaPD::PMB{}, delta, K, G0, temp,
-                                          alpha, temp0 );
+        CabanaPD::ForceModel model( CabanaPD::PMB{}, delta, K, G0, temp, alpha,
+                                    temp0 );
+        model.init( delta, K, G0, alpha, temp0 );
     }
     {
         //  With EPP.
-        CabanaPD::ForceModel force_model(
-            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{}, delta, K, G0,
-            sigma_y, temp, alpha, temp0 );
+        CabanaPD::ForceModel model( CabanaPD::PMB{},
+                                    CabanaPD::ElasticPerfectlyPlastic{}, delta,
+                                    K, G0, sigma_y, temp, alpha, temp0 );
+        model.init( delta, K, G0, sigma_y, alpha, temp0 );
     }
 
     // With heat transfer.
     double kappa = 1.0;
     double cp = 1.0;
     {
-        CabanaPD::ForceModel force_model( CabanaPD::PMB{},
-                                          CabanaPD::NoFracture{}, delta, K,
-                                          temp, kappa, cp, alpha, temp0 );
+        CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::NoFracture{},
+                                    delta, K, temp, kappa, cp, alpha, temp0 );
+        model.init( delta, K, kappa, cp, alpha, temp0 );
     }
     {
-        CabanaPD::ForceModel force_model( CabanaPD::PMB{}, delta, K, G0, temp,
-                                          kappa, cp, alpha, temp0 );
+        CabanaPD::ForceModel model( CabanaPD::PMB{}, delta, K, G0, temp, kappa,
+                                    cp, alpha, temp0 );
+        model.init( delta, K, G0, kappa, cp, alpha, temp0 );
     }
     {
         //  With EPP.
-        CabanaPD::ForceModel force_model(
+        CabanaPD::ForceModel model(
             CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{}, delta, K, G0,
             sigma_y, temp, kappa, cp, alpha, temp0 );
+        model.init( delta, K, G0, sigma_y, kappa, cp, alpha, temp0 );
     }
 }
 
@@ -1008,6 +1015,7 @@ TEST( TEST_CATEGORY, test_force_lps_construct )
     {
         // LPS with defaults.
         CabanaPD::ForceModel model( CabanaPD::LPS{}, delta, K, G, G0, 1 );
+        model.init( delta, K, G, G0 );
     }
     {
         // LPS with mechanics input.
@@ -1023,6 +1031,7 @@ TEST( TEST_CATEGORY, test_force_lps_construct )
     {
         CabanaPD::ForceModel model( CabanaPD::LPS{}, CabanaPD::Elastic{},
                                     CabanaPD::NoFracture{}, delta, K, G, 1 );
+        model.init( delta, K, G, 1 );
     }
     {
         CabanaPD::ForceModel model( CabanaPD::LPS{}, CabanaPD::NoFracture{},
