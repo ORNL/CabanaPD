@@ -98,6 +98,12 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
     {
     }
 
+    template <typename... Args>
+    void updateModel( Args&&... args )
+    {
+        _model.init( std::forward<Args>( args )... );
+    }
+
     template <class ParticleType, class ParallelType>
     void computeWeightedVolume( ParticleType& particles,
                                 const ParallelType neigh_op_tag )
@@ -332,6 +338,12 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                          base_type::getMaxLocalNeighbors() )
         , _model( model )
     {
+    }
+
+    template <typename... Args>
+    void updateModel( Args&&... args )
+    {
+        _model.init( std::forward<Args>( args )... );
     }
 
     template <class ExecSpace, class ParticleType, class PrenotchType>

@@ -100,6 +100,12 @@ class Force<MemorySpace, ModelType, PMB, NoFracture>
     {
     }
 
+    template <typename... Args>
+    void updateModel( Args&&... args )
+    {
+        _model.init( std::forward<Args>( args )... );
+    }
+
     template <class ForceType, class PosType, class ParticleType,
               class ParallelType>
     void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
@@ -266,6 +272,12 @@ class Force<MemorySpace, ModelType, PMB, Fracture>
         // Needed only for models which store per-bond information.
         _model.updateBonds( particles.localOffset(),
                             base_type::getMaxLocalNeighbors() );
+    }
+
+    template <typename... Args>
+    void updateModel( Args&&... args )
+    {
+        _model.init( std::forward<Args>( args )... );
     }
 
     template <class ExecSpace, class ParticleType, class PrenotchType>
