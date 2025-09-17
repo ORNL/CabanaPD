@@ -93,6 +93,12 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
     {
     }
 
+    template <typename... Args>
+    void updateModel( Args&&... args )
+    {
+        _model.init( std::forward<Args>( args )... );
+    }
+
     template <class ParticleType, class NeighborType>
     void computeWeightedVolume( ParticleType& particles,
                                 const NeighborType& neighbor )
@@ -302,6 +308,12 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
         : base_type()
         , _model( model )
     {
+    }
+
+    template <typename... Args>
+    void updateModel( Args&&... args )
+    {
+        _model.init( std::forward<Args>( args )... );
     }
 
     template <class ParticleType, class NeighborType>

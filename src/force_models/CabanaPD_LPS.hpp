@@ -91,6 +91,15 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
             log_err( std::cout, "Influence function type must be 0 or 1." );
     }
 
+    void init( const double _delta, const double _K, const double _G,
+               const int _influence = 0 )
+    {
+        base_type::init( _delta, _K );
+        G = _G;
+        influence_type = _influence;
+        init();
+    }
+
     KOKKOS_INLINE_FUNCTION auto operator()( InfluenceFunctionTag,
                                             double xi ) const
     {
@@ -298,6 +307,14 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
             s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / K / delta ); // 1
         }
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+    }
+
+    void init( const double _delta, const double _K, const double _G,
+               const double _G0, const int _influence = 0 )
+    {
+        base_type::init( _delta, _K, _G, _influence );
+        base_fracture_type::init( _delta, _K, _G0, _influence );
+        init();
     }
 };
 

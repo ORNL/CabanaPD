@@ -611,6 +611,12 @@ class Solver
         return global;
     }
 
+    template <typename... Args>
+    void updateForceModel( Args&&... args )
+    {
+        force->updateModel( std::forward<Args>( args )... );
+    }
+
     int num_steps;
     int output_frequency;
     bool output_reference;

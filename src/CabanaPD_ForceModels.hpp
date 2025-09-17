@@ -57,6 +57,12 @@ struct BaseForceModel
         K = ( model1.K + model2.K ) / 2.0;
     }
 
+    void init( const double _delta, const double _K )
+    {
+        delta = _delta;
+        K = _K;
+    }
+
     auto cutoff() const { return delta; }
     auto extend() const { return 0.0; }
 
@@ -90,11 +96,7 @@ struct BaseFractureModel
                        const int influence_type = 1 )
         : G0( _G0 )
     {
-        s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / _K / _delta ); // 1/xi
-        if ( influence_type == 0 )
-            s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / _K / _delta ); // 1
-
-        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+        init( _delta, _K, _G0, influence_type );
     };
 
     // Constructor to work with plasticity.
@@ -102,7 +104,7 @@ struct BaseFractureModel
         : G0( _G0 )
         , s0( _s0 )
     {
-        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+        init();
     }
 
     // Average from existing models.
@@ -113,7 +115,27 @@ struct BaseFractureModel
         s0 = Kokkos::sqrt( ( model1.s0 * model1.s0 * model1.K +
                              model2.s0 * model2.s0 * model2.K ) /
                            ( model1.K + model2.K ) );
-        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+        init();
+    }
+
+    void init() { bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 ); }
+
+    void init( const double _delta, const double _K, const double _G0,
+               const int influence_type = 1 )
+    {
+        G0 = _G0;
+        s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / _K / _delta ); // 1/xi
+        if ( influence_type == 0 )
+            s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / _K / _delta ); // 1
+
+        init();
+    }
+
+    void init( const double _G0, const double _s0 )
+    {
+        G0 = _G0;
+        s0 = _s0;
+        init();
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -177,6 +199,12 @@ struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
 
     void update( const TemperatureType _temp ) { temperature = _temp; }
 
+    void init( const double _alpha, const double _temp0 )
+    {
+        alpha = _alpha;
+        temp0 = _temp0;
+    }
+
     // Update stretch with temperature effects.
     KOKKOS_INLINE_FUNCTION
     double operator()( ThermalStretchTag, const int i, const int j,
@@ -214,6 +242,14 @@ struct ThermalFractureModel
         : base_fracture_type( _delta, _K, _G0, influence_type )
         , base_temperature_type( _temp, _alpha, _temp0 ){};
 
+    void init( const double _delta, const double _K, const double _G0,
+               const double _alpha, const double _temp0,
+               const int influence_type = 1 )
+    {
+        base_fracture_type::init( _delta, _K, _G0, influence_type );
+        base_temperature_type::init( _alpha, _temp0 );
+    }
+
     KOKKOS_INLINE_FUNCTION
     bool operator()( CriticalStretchTag, const int i, const int j,
                      const double r, const double xi ) const
@@ -242,13 +278,27 @@ struct BaseDynamicTemperatureModel
     BaseDynamicTemperatureModel( const double _delta, const double _kappa,
                                  const double _cp,
                                  const bool _constant_microconductivity = true )
+        : delta( _delta )
+        , kappa( _kappa )
+        , cp( _cp )
+        , constant_microconductivity( _constant_microconductivity )
+    {
+    }
+
+    void init()
+    {
+        const double d3 = delta * delta * delta;
+        thermal_coeff = 9.0 / 2.0 * kappa / pi / d3;
+    }
+
+    void init( const double _delta, const double _kappa, const double _cp,
+               const bool _constant_microconductivity = true )
     {
         delta = _delta;
         kappa = _kappa;
         cp = _cp;
-        const double d3 = _delta * _delta * _delta;
-        thermal_coeff = 9.0 / 2.0 * _kappa / pi / d3;
         constant_microconductivity = _constant_microconductivity;
+        init();
     }
 
     KOKKOS_INLINE_FUNCTION double microconductivity_function( double r ) const
