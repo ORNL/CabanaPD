@@ -77,47 +77,6 @@ struct BodyTerm
     auto timeInit() { return 0.0; };
 };
 
-struct GravityTag
-{
-};
-
-template <>
-struct BodyTerm<GravityTag>
-{
-    bool _update_frozen;
-
-    Timer _timer;
-
-    BodyTerm( GravityTag, const bool update_frozen = false )
-        : _update_frozen( update_frozen )
-    {
-    }
-
-    // This function interface purposely matches the boundary conditions in
-    // order to use the two interchangeably in Solvers.
-    template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles, const double )
-    {
-        _timer.start();
-        std::size_t start = particles.frozenOffset();
-        if ( _update_frozen )
-            start = 0;
-        Kokkos::RangePolicy<ExecSpace> policy( start, particles.localOffset() );
-
-        auto f = particles.sliceForce();
-        auto rho = particles.sliceDensity();
-        Kokkos::parallel_for(
-            "CabanaPD::BodyTerm::apply", policy,
-            KOKKOS_LAMBDA( const int p ) { f( p, 2 ) -= 9.8 * rho( p ); } );
-        _timer.stop();
-    }
-
-    auto forceUpdate() { return true; }
-
-    auto time() { return _timer.time(); };
-    auto timeInit() { return 0.0; };
-};
-
 } // namespace CabanaPD
 
 #endif
