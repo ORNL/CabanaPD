@@ -247,6 +247,24 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
                 user_create, exec_space, 0, create_frozen );
     }
 
+    // Constructor which initializes particles on regular grid with
+    // customization, randomly per cell, with base output tag.
+    template <class ModelType, class InitType, class UserFunctor,
+              class ExecSpace>
+    Particles( MemorySpace, ModelType, BaseOutput,
+               std::array<double, dim> low_corner,
+               std::array<double, dim> high_corner,
+               const std::array<int, dim> num_cells, const int max_halo_width,
+               InitType init_type, UserFunctor user_create,
+               const ExecSpace exec_space, const bool create_frozen = false )
+        : halo_width( max_halo_width )
+        , _plist_x( "positions" )
+        , _plist_f( "forces" )
+    {
+        create( low_corner, high_corner, num_cells, max_halo_width, init_type,
+                user_create, exec_space, 0, create_frozen );
+    }
+
     // Constructor with existing particle data.
     template <class ModelType, class ExecSpace, class PositionType,
               class VolumeType>
@@ -351,28 +369,24 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     }
 
     template <class ExecSpace, class InitType>
-    void
-    createParticles( const ExecSpace& exec_space, InitType init_type,
-                     const std::size_t num_previous,
-                     const bool create_frozen = false,
-                     typename std::enable_if<
-                         ( std::is_same<InitType, Cabana::InitUniform>::value ||
-                           std::is_same<InitType, Cabana::InitRandom>::value ),
-                         int>::type* = 0 )
+    void createParticles(
+        const ExecSpace& exec_space, InitType init_type,
+        const std::size_t num_previous, const bool create_frozen = false,
+        typename std::enable_if<is_particle_init<InitType>::value, int>::type* =
+            0 )
     {
         createParticles( exec_space, init_type, *this, num_previous,
                          create_frozen );
     }
 
     template <class ExecSpace, class InitType, class UserFunctor>
-    void
-    createParticles( const ExecSpace& exec_space, InitType init_type,
-                     UserFunctor user_create, const std::size_t num_previous,
-                     const bool create_frozen = false,
-                     typename std::enable_if<
-                         ( std::is_same<InitType, Cabana::InitUniform>::value ||
-                           std::is_same<InitType, Cabana::InitRandom>::value ),
-                         int>::type* = 0 )
+    void createParticles(
+        const ExecSpace& exec_space, InitType init_type,
+        UserFunctor user_create, const std::size_t num_previous,
+        const bool create_frozen = false,
+        [[maybe_unused]] const int seed = 123456,
+        typename std::enable_if<is_particle_init<InitType>::value, int>::type* =
+            0 )
     {
         _init_timer.start();
         // Create a local mesh and owned space.
@@ -426,9 +440,16 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             return create;
         };
         // Fence inside create.
-        local_offset = Cabana::Grid::createParticles(
-            init_type, exec_space, create_functor, _plist_x, particles_per_cell,
-            *local_grid, num_previous, false );
+        // Need to pass seed for random case only.
+        if constexpr ( std::is_same<InitType, Cabana::InitRandom>::value )
+            local_offset = Cabana::Grid::createParticles(
+                init_type, exec_space, create_functor, _plist_x,
+                particles_per_cell, *local_grid, num_previous, false, seed );
+        else
+            local_offset = Cabana::Grid::createParticles(
+                init_type, exec_space, create_functor, _plist_x,
+                particles_per_cell, *local_grid, num_previous, false );
+
         resize( local_offset, 0, create_frozen );
 
         updateGlobal();
@@ -543,19 +564,28 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     }
 
     template <class ExecSpace, class FunctorType>
-    void updateParticles( const ExecSpace, const FunctorType init_functor,
-                          const bool update_frozen = false )
+    void updateParticles( const ExecSpace, const int start,
+                          const FunctorType init_functor )
     {
         _init_timer.start();
-        std::size_t start = frozen_offset;
-        if ( update_frozen )
-            start = 0;
         Kokkos::RangePolicy<ExecSpace> policy( start, local_offset );
         Kokkos::parallel_for(
             "CabanaPD::Particles::update_particles", policy,
             KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
         Kokkos::fence();
         _init_timer.stop();
+    }
+
+    template <class ExecSpace, class FunctorType>
+    void updateParticles( const ExecSpace exec_space,
+                          const FunctorType init_functor,
+                          const bool update_frozen = false )
+    {
+        std::size_t start = frozen_offset;
+        if ( update_frozen )
+            start = 0;
+
+        updateParticles( exec_space, start, init_functor );
     }
 
     // Particles are always in order frozen, local, ghost.

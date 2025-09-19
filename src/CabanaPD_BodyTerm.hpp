@@ -41,6 +41,15 @@ struct BodyTerm
     {
     }
 
+    void update( UserFunctor user, const std::size_t particle_count,
+                 const bool force, const bool update_frozen = false )
+    {
+        _user_functor = user;
+        _particle_count = particle_count;
+        _force_update = force;
+        _update_frozen = update_frozen;
+    }
+
     // This function interface purposely matches the boundary conditions in
     // order to use the two interchangeably in Solvers.
     template <class ExecSpace, class ParticleType>
