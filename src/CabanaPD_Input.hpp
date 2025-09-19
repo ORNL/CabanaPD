@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -202,25 +203,43 @@ class Inputs
         double sum_ht = 0;
 
         // Estimate the bulk modulus if needed.
-        double K;
+        std::size_t min_index;
+        std::vector<double> K;
         if ( inputs.contains( "bulk_modulus" ) )
         {
-            K = inputs["bulk_modulus"]["value"];
+            K = getVector( "bulk_modulus" );
         }
         else
         {
-            double E = inputs["elastic_modulus"]["value"];
+            auto E = getVector( "elastic_modulus" );
             // This is only exact for bond-based (PMB).
             double nu = 0.25;
-            K = E / ( 3 * ( 1 - 2 * nu ) );
+
+            K.resize( E.size() );
+            double denom = ( 3.0 * ( 1.0 - 2.0 * nu ) );
+            for ( std::size_t i = 0; i < E.size(); i++ )
+                K[i] = E[i] / denom;
         }
+
+        // Support for multi-material: find the minimum density-bulk modulus
+        // ratio for the correct critical timestep.
+        auto rho = getVector( "density" );
+        std::vector<double> rho_over_K( rho.size() );
+        for ( std::size_t i = 0; i < rho.size(); i++ )
+            rho_over_K[i] = rho[i] / K[i];
+        min_index = std::distance( std::begin( rho_over_K ),
+                                   std::min_element( std::begin( rho_over_K ),
+                                                     std::end( rho_over_K ) ) );
+        auto min_K = K[min_index];
+        auto min_rho = rho[min_index];
 
         // Run over the neighborhood of a point in the bulk of a body (at the
         // origin).
         int m = inputs["m"]["value"];
         double delta = inputs["horizon"]["value"];
-        // FIXME: this is copied from the forces
-        double c = 18.0 * K / ( pi * delta * delta * delta * delta );
+        // FIXME: this is copied from the forces.
+        // FIXME: if delta is not constant this needs to be updated accordingly.
+        double c = 18.0 * min_K / ( pi * delta * delta * delta * delta );
 
         for ( int i = -( m + 1 ); i < m + 2; i++ )
         {
@@ -267,8 +286,8 @@ class Inputs
         }
 
         double dt = inputs["timestep"]["value"];
-        double rho = inputs["density"]["value"];
-        double dt_crit = std::sqrt( 2.0 * rho / sum );
+        // This supports multi-material.
+        double dt_crit = std::sqrt( 2.0 * min_rho / sum );
         compareCriticalTimeStep( "mechanics", dt, dt_crit );
 
         // Heat transfer timestep.
@@ -278,10 +297,33 @@ class Inputs
             double dt_ht = inputs["thermal_subcycle_steps"]["value"];
             dt_ht *= dt;
 
+            // Does not currently support multi-material.
             double cp = inputs["specific_heat_capacity"]["value"];
+            double rho = inputs["density"]["value"];
             double dt_ht_crit = rho * cp / sum_ht;
             compareCriticalTimeStep( "heat_transfer", dt_ht, dt_ht_crit );
         }
+    }
+
+    // Return vector for either array or scalar inputs to support both single
+    // and multi-material.
+    std::vector<double> getVector( const std::string key )
+    {
+        std::vector<double> v;
+        auto j = inputs[key]["value"];
+        if ( j.is_array() )
+        {
+            // Resize to match
+            v.resize( j.size() );
+            for ( std::size_t i = 0; i < j.size(); i++ )
+                v[i] = j[i];
+        }
+        else
+        {
+            v.resize( 1 );
+            v[0] = j;
+        }
+        return v;
     }
 
     // Parse JSON file.

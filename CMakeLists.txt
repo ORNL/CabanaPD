@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.11)
 project(CabanaPD LANGUAGES CXX C)
-set(PROJECT_VERSION "0.4.0-dev")
+set(PROJECT_VERSION "0.5.0-dev")
 
 cmake_policy(SET CMP0074 NEW)
 

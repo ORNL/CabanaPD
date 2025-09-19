@@ -79,7 +79,7 @@ void testHalo()
     using particles_type =
         CabanaPD::Particles<memory_space, CabanaPD::PMB,
                             CabanaPD::TemperatureIndependent>;
-    CabanaPD::Comm<particles_type, CabanaPD::Pair,
+    CabanaPD::Comm<particles_type, CabanaPD::Pair, CabanaPD::SingleMaterial,
                    CabanaPD::TemperatureIndependent>
         comm( particles );
 

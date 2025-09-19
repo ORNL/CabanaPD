@@ -156,6 +156,7 @@ class BaseForce
     Timer _timer;
     Timer _energy_timer;
     Timer _stress_timer;
+    double _total_strain_energy;
 
   public:
     // Primary constructor: use positions and construct neighbors.
@@ -254,6 +255,7 @@ class BaseForce
     auto time() { return _timer.time(); };
     auto timeEnergy() { return _energy_timer.time(); };
     auto timeNeighbor() { return 0.0; };
+    auto totalStrainEnergy() { return _total_strain_energy; };
 };
 
 template <class MemorySpace>
@@ -321,10 +323,9 @@ void computeForce( ForceType& force, ParticleType& particles,
 }
 
 template <class ForceType, class ParticleType, class ParallelType>
-double computeEnergy( ForceType& force, ParticleType& particles,
-                      const ParallelType& neigh_op_tag )
+void computeEnergy( ForceType& force, ParticleType& particles,
+                    const ParallelType& neigh_op_tag )
 {
-    double energy = 0.0;
     if constexpr ( is_energy_output<typename ParticleType::output_type>::value )
     {
         auto x = particles.sliceReferencePosition();
@@ -340,10 +341,9 @@ double computeEnergy( ForceType& force, ParticleType& particles,
         //    energy = computeEnergy_half( force, x, u,
         //                                   neigh_op_tag );
         // else
-        energy = force.computeEnergyFull( W, x, u, particles, neigh_op_tag );
+        force.computeEnergyFull( W, x, u, particles, neigh_op_tag );
         Kokkos::fence();
     }
-    return energy;
 }
 
 template <class ForceType, class ParticleType, class ParallelType>

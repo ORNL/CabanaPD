@@ -29,13 +29,33 @@ struct CriticalStretchTag
 struct ThermalStretchTag
 {
 };
+struct WeightedVolumeTag
+{
+};
+struct DilatationTag
+{
+};
+struct InfluenceFunctionTag
+{
+};
 
 struct BaseForceModel
 {
+    using material_type = SingleMaterial;
     double delta;
+    double K;
 
-    BaseForceModel( const double _delta )
-        : delta( _delta ){};
+    BaseForceModel( const double _delta, const double _K )
+        : delta( _delta )
+        , K( _K ){};
+
+    // FIXME: use the first model cutoff for now.
+    template <typename ModelType1, typename ModelType2>
+    BaseForceModel( const ModelType1& model1, const ModelType2& model2 )
+    {
+        delta = model1.delta;
+        K = ( model1.K + model2.K ) / 2.0;
+    }
 
     auto cutoff() const { return delta; }
 
@@ -46,6 +66,15 @@ struct BaseForceModel
 struct BaseNoFractureModel
 {
     using fracture_type = NoFracture;
+
+    // This should only be used in multi-material models in which the current
+    // model does not support failure.
+    KOKKOS_INLINE_FUNCTION
+    bool operator()( CriticalStretchTag, const int, const int, const double,
+                     const double ) const
+    {
+        return false;
+    }
 };
 
 struct BaseFractureModel
@@ -72,6 +101,17 @@ struct BaseFractureModel
         : G0( _G0 )
         , s0( _s0 )
     {
+        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+    }
+
+    // Average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    BaseFractureModel( const ModelType1& model1, const ModelType2& model2 )
+    {
+        G0 = ( model1.G0 + model2.G0 ) / 2.0;
+        s0 = Kokkos::sqrt( ( model1.s0 * model1.s0 * model1.K +
+                             model2.s0 * model2.s0 * model2.K ) /
+                           ( model1.K + model2.K ) );
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 
@@ -134,13 +174,6 @@ struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
         , temp0( _temp0 )
         , temperature( _temp ){};
 
-    BaseTemperatureModel( const BaseTemperatureModel& model )
-    {
-        alpha = model.alpha;
-        temp0 = model.temp0;
-        temperature = model.temperature;
-    }
-
     void update( const TemperatureType _temp ) { temperature = _temp; }
 
     // Update stretch with temperature effects.
@@ -178,9 +211,7 @@ struct ThermalFractureModel
                           const double _alpha, const double _temp0,
                           const int influence_type = 1 )
         : base_fracture_type( _delta, _K, _G0, influence_type )
-        , base_temperature_type( _temp, _alpha, _temp0 )
-    {
-    }
+        , base_temperature_type( _temp, _alpha, _temp0 ){};
 
     KOKKOS_INLINE_FUNCTION
     bool operator()( CriticalStretchTag, const int i, const int j,
