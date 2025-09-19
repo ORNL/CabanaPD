@@ -563,13 +563,10 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     }
 
     template <class ExecSpace, class FunctorType>
-    void updateParticles( const ExecSpace, const FunctorType init_functor,
-                          const bool update_frozen = false )
+    void updateParticles( const ExecSpace, const int start,
+                          const FunctorType init_functor )
     {
         _timer.start();
-        std::size_t start = frozen_offset;
-        if ( update_frozen )
-            start = 0;
         Kokkos::RangePolicy<ExecSpace> policy( start, local_offset );
         Kokkos::parallel_for(
             "CabanaPD::Particles::update_particles", policy,
@@ -579,16 +576,15 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
     }
 
     template <class ExecSpace, class FunctorType>
-    void updateParticles( const ExecSpace, const int num_previous,
-                          const FunctorType init_functor )
+    void updateParticles( const ExecSpace exec_space,
+                          const FunctorType init_functor,
+                          const bool update_frozen = false )
     {
-        _timer.start();
-        Kokkos::RangePolicy<ExecSpace> policy( num_previous, local_offset );
-        Kokkos::parallel_for(
-            "CabanaPD::Particles::update_particles", policy,
-            KOKKOS_LAMBDA( const int pid ) { init_functor( pid ); } );
-        Kokkos::fence();
-        _timer.stop();
+        std::size_t start = frozen_offset;
+        if ( update_frozen )
+            start = 0;
+
+        updateParticles( exec_space, start, init_functor );
     }
 
     // Particles are always in order frozen, local, ghost.
