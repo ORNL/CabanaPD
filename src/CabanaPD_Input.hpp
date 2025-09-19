@@ -258,7 +258,14 @@ class Inputs
         }
 
         double dt = inputs["timestep"]["value"];
+
         double rho = inputs["density"]["value"];
+
+        // Mass scaling
+        double ms_factor = inputs["mass_scaling_factor"]["value"];
+        rho *= ms_factor;
+        dt *= std::sqrt( ms_factor );
+
         double dt_crit = std::sqrt( 2.0 * rho / sum );
         compareCriticalTimeStep( "mechanics", dt, dt_crit );
 

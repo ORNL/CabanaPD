@@ -18,10 +18,10 @@
     "wall_thickness"           : {"value": 0.0045, "unit": "m"},
     "ramp_pressure_time"       : {"value": 6.0e-3, "unit": "s"},
     "final_time_ref"               : {"value": 0.0027, "unit": "s"},
-    "final_time"               : {"value": 10, "unit": "s"},
+    "final_time"               : {"value": 1, "unit": "s"},
     "timestep_ref"                 : {"value": 1.5e-07, "unit": "s"},
     "timestep"                 : {"value": 1.5e-06, "unit": "s"},
     "timestep_safety_factor"   : {"value": 0.70},
-    "output_frequency"         : {"value": 10},
+    "output_frequency"         : {"value": 100},
     "output_reference"         : {"value": false}
 }
