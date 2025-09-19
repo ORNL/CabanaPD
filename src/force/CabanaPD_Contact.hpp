@@ -27,17 +27,13 @@ namespace CabanaPD
 Contact helper functions
 ******************************************************************************/
 template <class VelType>
-KOKKOS_INLINE_FUNCTION void getRelativeNormalVelocityComponents(
-    const VelType& vel, const int i, const int j, const double rx,
-    const double ry, const double rz, const double r, double& vx, double& vy,
-    double& vz, double& vn )
+KOKKOS_INLINE_FUNCTION void
+getRelativeVelocityComponents( const VelType& vel, const int i, const int j,
+                               double& vx, double& vy, double& vz )
 {
     vx = vel( j, 0 ) - vel( i, 0 );
     vy = vel( j, 1 ) - vel( i, 1 );
     vz = vel( j, 2 ) - vel( i, 2 );
-
-    vn = vx * rx + vy * ry + vz * rz;
-    vn /= r;
 };
 
 // Contact forces base class.
@@ -227,15 +223,32 @@ class Force<MemorySpace, ModelType, HertzianModel, NoFracture>
             double rx, ry, rz;
             getDistance( x, u, i, j, xi, r, s, rx, ry, rz );
 
-            // Hertz normal force damping component
-            double vx, vy, vz, vn;
-            getRelativeNormalVelocityComponents( vel, i, j, rx, ry, rz, r, vx,
-                                                 vy, vz, vn );
+            double nx, ny, nz;
+            nx = rx / r;
+            ny = ry / r;
+            nz = rz / r;
 
-            const double coeff = model.forceCoeff( r, vn, vol( i ), rho( i ) );
-            fc( i, 0 ) += coeff * rx / r;
-            fc( i, 1 ) += coeff * ry / r;
-            fc( i, 2 ) += coeff * rz / r;
+            double vx, vy, vz;
+            getRelativeVelocityComponents( vel, i, j, vx, vy, vz );
+
+            double vn = vx * nx + vy * ny + vz * nz;
+
+            double fn = model.normalForce( r, vn, vol( i ), rho( i ) );
+            fc( i, 0 ) += fn * nx;
+            fc( i, 1 ) += fn * ny;
+            fc( i, 2 ) += fn * nz;
+
+            double vtx, vty, vtz;
+            vtx = vx - vn * nx;
+            vty = vy - vn * ny;
+            vtz = vz - vn * nz;
+
+            double ftx, fty, ftz;
+            model.tangentialForce( r, vn, vol( i ), rho( i ), vtx, vty, vtz, fn,
+                                   ftx, fty, ftz );
+            fc( i, 0 ) += ftx;
+            fc( i, 1 ) += fty;
+            fc( i, 2 ) += ftz;
         };
 
         _timer.start();
