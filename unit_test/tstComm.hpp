@@ -219,7 +219,7 @@ void testContactHalo()
     using particles_type =
         CabanaPD::Particles<memory_space, CabanaPD::Contact,
                             CabanaPD::TemperatureIndependent>;
-    CabanaPD::Comm<particles_type, CabanaPD::Contact,
+    CabanaPD::Comm<particles_type, CabanaPD::Contact, CabanaPD::SingleMaterial,
                    CabanaPD::TemperatureIndependent>
         comm( particles );
 

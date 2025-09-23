@@ -608,12 +608,12 @@ class Solver
                 contact_neigh_time += contact->timeNeighbor();
             }
 
-            timing_output.final(
-                output_file, comm->mpi_size, particles.numGlobal(), total_time,
-                force->time(), contact_time, neigh_time, contact_neigh_time,
-                comm->time(), integrator->time(), force->timeEnergy(),
-                particles.timeOutput(), _other_time, steps_per_sec,
-                p_steps_per_sec );
+            timing_output.final( output_file, mpi_size, particles.numGlobal(),
+                                 total_time, force->time(), contact_time,
+                                 neigh_time, contact_neigh_time, comm_time,
+                                 integrator->time(), force->timeEnergy(),
+                                 particles.timeOutput(), _other_time,
+                                 steps_per_sec, p_steps_per_sec );
         }
     }
 
