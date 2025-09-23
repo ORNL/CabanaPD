@@ -89,9 +89,9 @@ void fragmentingCylinderExample( const std::string filename )
     if ( inputs["use_contact"] )
     {
         using contact_type = CabanaPD::NormalRepulsionModel;
-        CabanaPD::Particles particles(
-            memory_space{}, contact_type{}, low_corner, high_corner, num_cells,
-            halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
+        CabanaPD::Particles particles( memory_space{}, contact_type{} );
+        particles.domain( low_corner, high_corner, num_cells, halo_width );
+        particles.create( exec_space{}, Cabana::InitRandom{}, init_op );
 
         auto rho = particles.sliceDensity();
         auto x = particles.sliceReferencePosition();
@@ -118,7 +118,7 @@ void fragmentingCylinderExample( const std::string filename )
                 vr * Kokkos::sin( Kokkos::atan2( x( pid, 1 ), x( pid, 0 ) ) );
             v( pid, 2 ) = vzmax * zfactor;
         };
-        particles.updateParticles( exec_space{}, init_functor );
+        particles.update( exec_space{}, init_functor );
 
         // Use contact radius and extension relative to particle spacing.
         double r_c = inputs["contact_horizon_factor"];
@@ -139,9 +139,9 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     else
     {
-        CabanaPD::Particles particles(
-            memory_space{}, model_type{}, low_corner, high_corner, num_cells,
-            halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
+        CabanaPD::Particles particles( memory_space{}, model_type{} );
+        particles.domain( low_corner, high_corner, num_cells, halo_width );
+        particles.create( exec_space{}, Cabana::InitRandom{}, init_op );
 
         auto rho = particles.sliceDensity();
         auto x = particles.sliceReferencePosition();
@@ -167,7 +167,7 @@ void fragmentingCylinderExample( const std::string filename )
                 vr * Kokkos::sin( Kokkos::atan2( x( pid, 1 ), x( pid, 0 ) ) );
             v( pid, 2 ) = vzmax * zfactor;
         };
-        particles.updateParticles( exec_space{}, init_functor );
+        particles.update( exec_space{}, init_functor );
 
         CabanaPD::Solver solver( inputs, particles, force_model );
         solver.init();

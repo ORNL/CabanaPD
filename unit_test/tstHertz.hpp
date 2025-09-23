@@ -97,9 +97,9 @@ void testHertzianContact( const std::string filename )
     //                 Particle generation
     // ====================================================
     int halo_width = 1;
-    CabanaPD::Particles particles( memory_space{}, model_type{}, position,
-                                   volume, low_corner, high_corner, num_cells,
-                                   halo_width, exec_space{} );
+    CabanaPD::Particles particles( memory_space{}, model_type{} );
+    particles.domain( low_corner, high_corner, num_cells, halo_width );
+    particles.create( exec_space{}, position, volume );
 
     // ====================================================
     //            Custom particle initialization
@@ -117,7 +117,7 @@ void testHertzianContact( const std::string filename )
         else
             v( p, 0 ) = 1.0;
     };
-    particles.updateParticles( exec_space{}, init_functor );
+    particles.update( exec_space{}, init_functor );
 
     // Get initial total KE
     double ke_i = calculateKE( v, rho, vo );
