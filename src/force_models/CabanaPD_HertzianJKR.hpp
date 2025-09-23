@@ -94,7 +94,7 @@ struct HertzianJKRModel : public ContactModel
         double coeff = 0.0;
         if ( delta_n >= delta_tear )
         {
-            auto a = patch_radius( delta_n );
+            auto a = patchRadius( delta_n );
             auto a3 = Kokkos::pow( a, 3.0 );
             coeff =
                 -1.0 * ( coeff_h_n * a3 -
@@ -116,10 +116,9 @@ struct HertzianJKRModel : public ContactModel
         return coeff;
     }
     KOKKOS_INLINE_FUNCTION
-    void tangentialForce( const double r, const double vn, const double vol,
-                          const double rho, const double vtx, const double vty,
-                          const double vtz, const double fn, double& ftx,
-                          double& fty, double& ftz ) const
+    void tangentialForce( const double vtx, const double vty, const double vtz,
+                          const double fn, double& ftx, double& fty,
+                          double& ftz ) const
     {
         // // Contact "overlap"
         // const double delta_n = ( 2.0 * radius - r );
@@ -134,33 +133,6 @@ struct HertzianJKRModel : public ContactModel
         ftx = ( vt > 0 ) ? mu_c( vtx ) * fna * vtx / vt : 0.0;
         fty = ( vt > 0 ) ? mu_c( vty ) * fna * vty / vt : 0.0;
         ftz = ( vt > 0 ) ? mu_c( vtz ) * fna * vtz / vt : 0.0;
-
-        // if ( delta_n >= delta_tear )
-        // {
-        //     if ( delta_n <= 0.0 && vn <= 0.0 )
-        //     {
-        //         ftx = 0.0;
-        //         fty = 0.0;
-        //         ftz = 0.0;
-        //     }
-        //     else
-        //     {
-        //         // auto a = patch_radius( delta_n );
-        //         // // Damping force coefficient
-        //         // double kt = 2.0 * Gs * a;
-        //         // double ms = ( rho * vol ) / 2.0;
-        //         // auto coeff = -coeff_h_d * Kokkos::sqrt( kt * ms ) / vol;
-        //         // double ftx_t = coeff * vtx;
-        //         // double fty_t = coeff * vty;
-        //         // double ftz_t = coeff * vtz;
-        //         // // Clamp to Coloumb limit
-        //         // auto ft = Kokkos::hypot( ftx_t, fty_t, ftz_t );
-        //         // double clim = mu * fn;
-        //         // ftx = ( ft > clim ) ? ftx_t / ft * clim : ftx_t;
-        //         // fty = ( ft > clim ) ? fty_t / ft * clim : fty_t;
-        //         // ftz = ( ft > clim ) ? ftz_t / ft * clim : ftz_t;
-        //     }
-        // }
     }
 
     // The normal force for JKR theory is given in terms of the contact
@@ -174,7 +146,7 @@ struct HertzianJKRModel : public ContactModel
     // which is itself taken from E. Parteli (2014).
 
     KOKKOS_INLINE_FUNCTION
-    double patch_radius( const double delta_n ) const
+    double patchRadius( const double delta_n ) const
     {
         double c0 = Kokkos::pow( Rs * delta_n, 2.0 );
         double c1 = -4.0 * ( 1.0 - Kokkos::pow( nu, 2.0 ) ) * pi * Gamma *

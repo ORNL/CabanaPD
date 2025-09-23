@@ -243,9 +243,8 @@ class Force<MemorySpace, ModelType, HertzianModel, NoFracture>
             vty = vy - vn * ny;
             vtz = vz - vn * nz;
 
-            double ftx, fty, ftz;
-            model.tangentialForce( r, vn, vol( i ), rho( i ), vtx, vty, vtz, fn,
-                                   ftx, fty, ftz );
+            double ftx = 0.0, fty = 0.0, ftz = 0.0;
+            model.tangentialForce( vtx, vty, vtz, fn, ftx, fty, ftz );
             fc( i, 0 ) += ftx;
             fc( i, 1 ) += fty;
             fc( i, 2 ) += ftz;

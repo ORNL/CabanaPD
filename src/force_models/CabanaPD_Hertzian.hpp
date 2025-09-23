@@ -81,8 +81,8 @@ struct HertzianModel : public ContactModel
         return coeff;
     }
     KOKKOS_INLINE_FUNCTION
-    auto tangentialForce( const double r, const double vn, const double vol,
-                          const double rho ) const
+    auto tangentialForce( const double, const double, const double,
+                          const double, double&, double&, double& ) const
     {
     }
 };
