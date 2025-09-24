@@ -39,17 +39,23 @@ class Inputs
         double tf = inputs["final_time"]["value"];
         double dt = inputs["timestep"]["value"];
 
-        // Mass scaling
-        if ( inputs.contains( "mass_scaling_factor" ) )
+        // Mass scaling: ensure that the mass scaling is not applied multiple
+        // times.
+        if ( inputs.contains( "mass_scaling_factor" ) &&
+             !inputs.contains( "density_input" ) )
         {
             double ms_factor = inputs["mass_scaling_factor"]["value"];
 
             // Density scaling
             double rho0 = inputs["density"]["value"];
+            inputs["density_input"]["value"] = rho0;
+            inputs["density_input"]["unit"] = inputs["density"]["unit"];
             rho0 *= ms_factor;
             inputs["density"]["value"] = rho0;
 
             // Time step scaling
+            inputs["timestep_input"]["value"] = dt;
+            inputs["timestep_input"]["unit"] = inputs["timestep"]["unit"];
             dt *= std::sqrt( ms_factor );
             inputs["timestep"]["value"] = dt;
         }
