@@ -35,9 +35,30 @@ class Inputs
         // Add additional derived inputs to json. System size.
         setupSize();
 
-        // Number of steps.
+        // Final time and time step.
         double tf = inputs["final_time"]["value"];
         double dt = inputs["timestep"]["value"];
+
+        // Mass scaling: ensure that the mass scaling is not applied multiple
+        // times.
+        if ( inputs.contains( "mass_scaling_factor" ) &&
+             !inputs.contains( "density_input" ) )
+        {
+            double ms_factor = inputs["mass_scaling_factor"]["value"];
+
+            // Density scaling
+            double rho0 = inputs["density"]["value"];
+            inputs["density_input"]["value"] = rho0;
+            inputs["density_input"]["unit"] = inputs["density"]["unit"];
+            rho0 *= ms_factor;
+            inputs["density"]["value"] = rho0;
+
+            // Time step scaling
+            inputs["timestep_input"]["value"] = dt;
+            inputs["timestep_input"]["unit"] = inputs["timestep"]["unit"];
+            dt *= std::sqrt( ms_factor );
+            inputs["timestep"]["value"] = dt;
+        }
 
         // if it contains both m and horizon
         if ( inputs.contains( "horizon" ) && inputs.contains( "m" ) )
@@ -75,6 +96,7 @@ class Inputs
                                       "elastic_modulus." );
         }
 
+        // Number of time steps.
         int num_steps = tf / dt;
         inputs["num_steps"]["value"] = num_steps;
 
