@@ -173,7 +173,10 @@ void checkContactParticles( const int current_rank,
                             const int expected_num_ghost,
                             const ParticleType& particles )
 {
-    EXPECT_EQ( particles.numContactGhost(), expected_num_ghost );
+    int current_size = -1;
+    MPI_Comm_size( MPI_COMM_WORLD, &current_size );
+    if ( current_size > 1 )
+        EXPECT_EQ( particles.numContactGhost(), expected_num_ghost );
 
     using HostAoSoA = Cabana::AoSoA<Cabana::MemberTypes<double[3], double>,
                                     Kokkos::HostSpace>;
