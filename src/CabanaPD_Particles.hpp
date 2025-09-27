@@ -544,7 +544,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         auto u = sliceDisplacement();
         // Frozen particles are included in output so we include them in this
         // loop to guarantee they are correct even though they never change.
-        Kokkos::RangePolicy<execution_space> policy( 0, referenceOffset() );
+        Kokkos::RangePolicy<execution_space> policy( 0, size() );
         auto sum_x_u = KOKKOS_LAMBDA( const std::size_t pid )
         {
             for ( int d = 0; d < 3; d++ )
