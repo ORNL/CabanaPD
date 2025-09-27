@@ -479,11 +479,12 @@ class Comm<ParticleType, Contact, SingleMaterial, TemperatureIndependent>
         particles.resize( particles.localOffset(), particles.numGhost(), false,
                           halo->numGhost() );
 
-        gather_u = std::make_shared<gather_u_type>( *halo, particles._aosoa_y );
+        gather_u =
+            std::make_shared<gather_u_type>( *halo, particles._aosoa_y, 1.1 );
         gather_x = std::make_shared<gather_x_type>(
-            *halo, particles.getReferencePosition().aosoa() );
-        gather_vol =
-            std::make_shared<gather_vol_type>( *halo, particles._aosoa_vol );
+            *halo, particles.getReferencePosition().aosoa(), 1.1 );
+        gather_vol = std::make_shared<gather_vol_type>(
+            *halo, particles._aosoa_vol, 1.1 );
 
         // Communicate fields.
         gather_u->apply();
