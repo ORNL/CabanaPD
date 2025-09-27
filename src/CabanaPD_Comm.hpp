@@ -470,14 +470,12 @@ class Comm<ParticleType, Contact, SingleMaterial, TemperatureIndependent>
     {
         _init_timer.start();
         auto topology = Cabana::Grid::getTopology( *particles.local_grid );
+        // We use referenceOffset because these current frame ghosts are built
+        // on top of the existing, static, reference frame ghosts.
         halo = std::make_shared<halo_type>(
             particles.local_grid->globalGrid().comm(),
             particles.referenceOffset(), halo_ids._ids, halo_ids._destinations,
             topology );
-
-        // We use n_ghost here as the "local" halo count because these current
-        // frame ghosts are built on top of the existing, static, reference
-        // frame ghosts.
         particles.resize( particles.localOffset(), particles.numGhost(), false,
                           halo->numGhost() );
 
@@ -500,11 +498,9 @@ class Comm<ParticleType, Contact, SingleMaterial, TemperatureIndependent>
     void gather( ParticleType& particles )
     {
         _timer.start();
-        // Get the current position. Note this is necessary to get the up to
-        // date current position.
+        // Get the up to date current position.
         auto y = particles.sliceCurrentPosition();
-        // Determine which particles need to be ghosted to neighbors for the
-        // current positions.
+        // Determine which particles need to be ghosted to neighbors.
         halo_ids.build( y );
 
         auto topology = Cabana::Grid::getTopology( *particles.local_grid );
