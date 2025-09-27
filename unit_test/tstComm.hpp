@@ -146,6 +146,7 @@ void testHalo()
                 Cabana::NeighborList<NeighListType>::numNeighbor( nlist, p );
             num_neigh( p ) = n;
         } );
+    Kokkos::fence();
 
     // Check that all local particles (away from global boundaries) have a full
     // set of neighbors.
@@ -167,6 +168,49 @@ void testHalo()
     }
 }
 
+template <typename ParticleType>
+void checkContactParticles( const int current_rank,
+                            const int expected_num_ghost,
+                            const ParticleType& particles )
+{
+    EXPECT_EQ( particles.numContactGhost(), expected_num_ghost );
+
+    using HostAoSoA = Cabana::AoSoA<Cabana::MemberTypes<double[3], double>,
+                                    Kokkos::HostSpace>;
+    HostAoSoA aosoa_host( "host_aosoa", particles.size() );
+    auto y = particles.sliceCurrentPosition();
+    auto rank = particles.sliceVolume();
+    auto y_host = Cabana::slice<0>( aosoa_host );
+    auto rank_host = Cabana::slice<1>( aosoa_host );
+    Cabana::deep_copy( y_host, y );
+    Cabana::deep_copy( rank_host, rank );
+
+    auto x = particles.sliceReferencePosition();
+    auto u = particles.sliceDisplacement();
+    // Check all local particles in the domain.
+    for ( std::size_t p = 0; p < particles.referenceOffset(); ++p )
+    {
+        for ( int d = 0; d < 3; ++d )
+        {
+            EXPECT_GE( y_host( p, d ), particles.local_mesh_lo[d] );
+            EXPECT_LE( y_host( p, d ), particles.local_mesh_hi[d] );
+        }
+        EXPECT_EQ( rank_host( p ), current_rank );
+    }
+
+    // Check all ghost particles in the halo region.
+    for ( std::size_t p = particles.referenceOffset(); p < particles.size();
+          ++p )
+    {
+        for ( int d = 0; d < 3; ++d )
+        {
+            EXPECT_GE( y_host( p, d ), particles.ghost_mesh_lo[d] );
+            EXPECT_LE( y_host( p, d ), particles.ghost_mesh_hi[d] );
+        }
+        EXPECT_NE( rank_host( p ), current_rank );
+    }
+}
+
 void testContactHalo()
 {
     using exec_space = TEST_EXECSPACE;
@@ -176,12 +220,13 @@ void testContactHalo()
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
     std::array<int, 3> num_cells = { 10, 10, 10 };
     int halo_width = 1;
+    double d = ( box_max[0] - box_min[0] ) / num_cells[0];
 
-    double delta = 0.20000001;
-    const int num_particles = 2;
+    const int init_num_particles = 1;
     // Purposely using zero-init here.
-    Kokkos::View<double* [3], memory_space> x_view( "custom_position", 2 );
-    Kokkos::View<double*, memory_space> rank_view( "rank", 2 );
+    Kokkos::View<double* [3], memory_space> x_view( "custom_position",
+                                                    init_num_particles );
+    Kokkos::View<double*, memory_space> rank_view( "rank", init_num_particles );
 
     // Set ID equal to MPI rank.
     int current_rank = -1;
@@ -190,30 +235,25 @@ void testContactHalo()
     // No ints are communicated in CabanaPD. We use the volume field for MPI
     // rank here for convenience.
     Kokkos::parallel_for(
-        "create_particles", Kokkos::RangePolicy<exec_space>( 0, num_particles ),
+        "create_particles",
+        Kokkos::RangePolicy<exec_space>( 0, init_num_particles ),
         KOKKOS_LAMBDA( const int p ) {
-            if ( p == 0 )
-                x_view( p, 0 ) = 5.1e-5;
+            // Start slightly outside the halo range.
+            if ( current_rank == 0 )
+                x_view( p, 0 ) = -d / 2.0; //-d - 1e-5;
             else
-                x_view( p, 0 ) = -5.1e-5;
+                x_view( p, 0 ) = d / 2.0; // d + 1e-5;
+            x_view( p, 1 ) = 0.0;
+            x_view( p, 2 ) = 0.0;
             rank_view( p ) = static_cast<double>( current_rank );
         } );
+    Kokkos::fence();
 
     using model_type = CabanaPD::HertzianModel;
-    CabanaPD::Particles particles(
-        memory_space{}, model_type{}, CabanaPD::BaseOutput{}, x_view, rank_view,
-        box_min, box_max, num_cells, halo_width, exec_space{} );
-
-    int init_num_particles = particles.localOffset();
-    using HostAoSoA = Cabana::AoSoA<Cabana::MemberTypes<double[3], double>,
-                                    Kokkos::HostSpace>;
-    HostAoSoA aosoa_init_host( "host_aosoa", init_num_particles );
-    auto x_init_host = Cabana::slice<0>( aosoa_init_host );
-    auto rank_init_host = Cabana::slice<1>( aosoa_init_host );
-    auto x = particles.sliceReferencePosition();
-    auto rank = particles.sliceVolume();
-    Cabana::deep_copy( x_init_host, x );
-    Cabana::deep_copy( rank_init_host, rank );
+    CabanaPD::Particles particles( memory_space{}, model_type{},
+                                   CabanaPD::BaseOutput{} );
+    particles.domain( box_min, box_max, num_cells, halo_width );
+    particles.create( exec_space{}, x_view, rank_view );
 
     // A gather is performed on construction.
     using particles_type =
@@ -223,50 +263,30 @@ void testContactHalo()
                    CabanaPD::TemperatureIndependent>
         comm( particles );
 
-    HostAoSoA aosoa_host( "host_aosoa", particles.referenceOffset() );
-    x = particles.sliceReferencePosition();
-    rank = particles.sliceVolume();
-    auto x_host = Cabana::slice<0>( aosoa_host );
-    auto rank_host = Cabana::slice<1>( aosoa_host );
-    Cabana::deep_copy( x_host, x );
-    Cabana::deep_copy( rank_host, rank );
+    checkContactParticles( current_rank, 1, particles );
 
-    // Check original particles are unchanged.
-    EXPECT_EQ( particles.localOffset(), init_num_particles );
+    // Now add duplicate particles into the ghost region.
+    particles.create( exec_space{}, x_view, rank_view,
+                      particles.localOffset() );
+    comm.gather( particles );
 
-    int current_size = -1;
-    MPI_Comm_size( MPI_COMM_WORLD, &current_size );
-    // Ghosts should have been created for all but single rank systems.
-    if ( current_size > 1 )
-    {
-        EXPECT_GT( particles.numGhost(), 0 );
-    }
-    // Check all ghost particles in the halo region.
-    for ( std::size_t p = particles.localOffset();
-          p < particles.referenceOffset(); ++p )
-    {
-        for ( int d = 0; d < 3; ++d )
-        {
-            EXPECT_GE( x_host( p, d ), particles.ghost_mesh_lo[d] );
-            EXPECT_LE( x_host( p, d ), particles.ghost_mesh_hi[d] );
-        }
-        EXPECT_NE( rank_host( p ), current_rank );
-    }
+    checkContactParticles( current_rank, 2, particles );
 
-    // Check that all local particles (away from global boundaries) have a full
-    // set of neighbors.
-    for ( std::size_t p = 0; p < particles.localOffset(); ++p )
-    {
-        if ( x_host( p, 0 ) > box_min[0] + delta * 1.01 &&
-             x_host( p, 0 ) < box_max[0] - delta * 1.01 &&
-             x_host( p, 1 ) > box_min[1] + delta * 1.01 &&
-             x_host( p, 1 ) < box_max[1] - delta * 1.01 &&
-             x_host( p, 2 ) > box_min[2] + delta * 1.01 &&
-             x_host( p, 2 ) < box_max[2] - delta * 1.01 )
-        {
-            EXPECT_EQ( 0, 0 );
-        }
-    }
+    // Now move the original particles outside the halo.
+    auto u = particles.sliceDisplacement();
+    Kokkos::parallel_for(
+        "create_particles",
+        Kokkos::RangePolicy<exec_space>( 0, init_num_particles ),
+        KOKKOS_LAMBDA( const int p ) {
+            if ( current_rank == 0 )
+                u( p, 0 ) = -d;
+            else
+                u( p, 0 ) = d;
+        } );
+    Kokkos::fence();
+    comm.gather( particles );
+
+    checkContactParticles( current_rank, 1, particles );
 }
 
 //---------------------------------------------------------------------------//
