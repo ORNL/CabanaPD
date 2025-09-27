@@ -504,11 +504,10 @@ class Comm<ParticleType, Contact, SingleMaterial, TemperatureIndependent>
         halo_ids.build( y );
 
         auto topology = Cabana::Grid::getTopology( *particles.local_grid );
-        // FIXME: missing a build() interface
-        halo = std::make_shared<halo_type>(
-            particles.local_grid->globalGrid().comm(),
-            particles.referenceOffset(), halo_ids._ids, halo_ids._destinations,
-            topology );
+        // We use referenceOffset because these current frame ghosts are built
+        // on top of the existing, static, reference frame ghosts.
+        halo->build( particles.referenceOffset(), halo_ids._ids,
+                     halo_ids._destinations, topology );
         particles.resize( particles.localOffset(), particles.numGhost(), false,
                           halo->numGhost() );
 
