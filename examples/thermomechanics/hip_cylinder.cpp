@@ -46,6 +46,9 @@ void HIPCylinderExample( const std::string filename )
     double alpha = inputs["thermal_expansion_coeff"];
     double temp0 = inputs["reference_temperature"];
 
+    std::cout << "rho0 = " << rho0 << std::endl;
+    std::cout << "dt = " << inputs["timestep"] << std::endl;
+
     // ====================================================
     //                  Discretization
     // ====================================================
