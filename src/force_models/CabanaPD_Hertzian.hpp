@@ -56,8 +56,8 @@ struct HertzianModel : public ContactModel
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto forceCoeff( const double r, const double vn, const double vol,
-                     const double rho ) const
+    auto normalForce( const double r, const double vn, const double vol,
+                      const double rho ) const
     {
         // Contact "overlap"
         const double delta_n = ( r - 2.0 * radius );
@@ -79,6 +79,11 @@ struct HertzianModel : public ContactModel
         double ms = ( rho * vol ) / 2.0;
         coeff -= coeff_h_d * Kokkos::sqrt( Sn * ms ) * vn / vol;
         return coeff;
+    }
+    KOKKOS_INLINE_FUNCTION
+    auto tangentialForce( const double, const double, const double,
+                          const double, double&, double&, double& ) const
+    {
     }
 };
 
