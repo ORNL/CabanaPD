@@ -183,11 +183,6 @@ void computeForce( ForceType& force, ParticleType& particles,
     if ( reset )
         Cabana::deep_copy( f, 0.0 );
 
-    // if ( half_neigh )
-    // Forces must be atomic for half list
-    // computeForce_half( f_a, x, u,
-    //                    neigh_op_tag );
-
     // Forces only atomic if using team threading.
     if constexpr ( std::is_same<typename NeighborType::Tag,
                                 Cabana::TeamOpTag>::value )
@@ -212,10 +207,6 @@ void computeEnergy( ForceType& force, ParticleType& particles,
         // Reset energy.
         Cabana::deep_copy( W, 0.0 );
 
-        // if ( _half_neigh )
-        //    energy = computeEnergy_half( force, x, u,
-        //                                   neigh_op_tag );
-        // else
         force.computeEnergyFull( W, x, u, particles, neighbor );
         Kokkos::fence();
     }

@@ -863,7 +863,7 @@ void testForce( ModelType model, const double dx, const double m,
                     typename ModelType::fracture_type>
         force( model );
     CabanaPD::Neighbor<TEST_MEMSPACE, typename ModelType::fracture_type>
-        neighbor( false, model, particles );
+        neighbor( model, particles );
     auto x = particles.sliceReferencePosition();
     auto f = particles.sliceForce();
     auto W = particles.sliceStrainEnergy();
@@ -919,7 +919,7 @@ void testNeighbor( const double dx, const double m, const double delta )
     auto particles = createParticles( model_tag, LinearTag{}, dx, 0.0 );
 
     CabanaPD::Neighbor<TEST_MEMSPACE, CabanaPD::NoFracture> neighbor(
-        false, model, particles );
+        model, particles );
 
     auto expected_num_neighbors = computeReferenceNeighbors( model.delta, m );
     EXPECT_EQ( expected_num_neighbors, neighbor.getMaxLocal() );

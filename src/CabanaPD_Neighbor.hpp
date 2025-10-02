@@ -33,7 +33,6 @@ class Neighbor<MemorySpace, NoFracture>
 
   protected:
     using exec_space = typename MemorySpace::execution_space;
-    bool _half_neigh;
     list_type _neigh_list;
     double mesh_max[3];
     double mesh_min[3];
@@ -43,9 +42,8 @@ class Neighbor<MemorySpace, NoFracture>
   public:
     // Primary constructor: use positions and construct neighbors.
     template <typename ParticleType, typename ModelType>
-    Neighbor( const bool half_neigh, const ModelType& model,
-              const ParticleType& particles, const double tol = 1e-14 )
-        : _half_neigh( half_neigh )
+    Neighbor( const ModelType& model, const ParticleType& particles,
+              const double tol = 1e-14 )
     {
         _timer.start();
         for ( int d = 0; d < particles.dim; d++ )
@@ -199,9 +197,9 @@ class Neighbor<MemorySpace, Fracture> : public Neighbor<MemorySpace, NoFracture>
 
   public:
     template <typename ParticleType, typename ModelType>
-    Neighbor( const bool half_neigh, const ModelType& model,
-              const ParticleType& particles, const double tol = 1e-14 )
-        : base_type( half_neigh, model, particles, tol )
+    Neighbor( const ModelType& model, const ParticleType& particles,
+              const double tol = 1e-14 )
+        : base_type( model, particles, tol )
     {
         // Create View to track broken bonds.
         // TODO: this could be optimized to ignore frozen particle bonds.

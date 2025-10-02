@@ -147,8 +147,8 @@ class Solver
         setup( force_model );
 
         contact = std::make_shared<contact_type>( contact_model );
-        contact_neighbor = std::make_shared<contact_neighbor_type>(
-            inputs["half_neigh"], contact_model, particles );
+        contact_neighbor =
+            std::make_shared<contact_neighbor_type>( contact_model, particles );
         _total_timer.stop();
     }
 
@@ -185,8 +185,7 @@ class Solver
                            typename force_model_type::thermal_type>::value )
             force_model.update( particles.sliceTemperature() );
 
-        neighbor = std::make_shared<neighbor_type>( inputs["half_neigh"],
-                                                    force_model, particles );
+        neighbor = std::make_shared<neighbor_type>( force_model, particles );
         // Plastic models need correct size for the bond array.
         force_model.updateBonds( particles.localOffset(),
                                  neighbor->getMaxLocal() );
