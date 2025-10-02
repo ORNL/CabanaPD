@@ -13,6 +13,7 @@
 #define HEATTRANSFER_H
 
 #include <CabanaPD_Force.hpp>
+#include <CabanaPD_Neighbor.hpp>
 #include <CabanaPD_Timer.hpp>
 #include <CabanaPD_Types.hpp>
 
@@ -26,38 +27,30 @@ class HeatTransfer;
 // Inherits only because this is a similar neighbor-based kernel.
 template <class MemorySpace, class ModelType>
 class HeatTransfer<MemorySpace, ModelType, NoFracture>
-    : public BaseForce<MemorySpace>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
     using model_type = ModelType;
-    using base_type = BaseForce<MemorySpace>;
-    using neighbor_list_type = typename base_type::neighbor_list_type;
 
   protected:
-    using base_type::_half_neigh;
-    using base_type::_neigh_list;
-    using base_type::_timer;
-    Timer _euler_timer = base_type::_energy_timer;
+    Timer _timer;
+    Timer _euler_timer;
     model_type _model;
 
   public:
     // Running with mechanics as well; no reason to rebuild neighbors.
-    template <class ForceType>
-    HeatTransfer( const bool half_neigh, const ForceType& force,
-                  const model_type model )
-        : base_type( half_neigh, force.getNeighbors() )
-        , _model( model )
+    HeatTransfer( const model_type model )
+        : _model( model )
     {
     }
 
     template <class TemperatureType, class PosType, class ParticleType,
-              class ParallelType>
+              class NeighborType>
     void computeHeatTransferFull( TemperatureType& conduction, const PosType& x,
                                   const PosType& u,
                                   const ParticleType& particles,
-                                  ParallelType& neigh_op_tag )
+                                  NeighborType& neighbor )
     {
         _timer.start();
 
@@ -75,11 +68,8 @@ class HeatTransfer<MemorySpace, ModelType, NoFracture>
                 coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
         };
 
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Cabana::neighbor_parallel_for(
-            policy, temp_func, _neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::HeatTransfer::computeFull" );
+        neighbor.iterate( exec_space{}, temp_func, particles,
+                          "CabanaPD::HeatTransfer::computeFull" );
         Kokkos::fence();
         _timer.stop();
     }
@@ -107,52 +97,43 @@ class HeatTransfer<MemorySpace, ModelType, NoFracture>
 
 template <class MemorySpace, class ModelType>
 class HeatTransfer<MemorySpace, ModelType, Fracture>
-    : public HeatTransfer<MemorySpace, ModelType, NoFracture>,
-      BaseFracture<MemorySpace>
-
+    : public HeatTransfer<MemorySpace, ModelType, NoFracture>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
     using model_type = ModelType;
     using base_type = HeatTransfer<MemorySpace, ModelType, NoFracture>;
-    using neighbor_list_type = typename base_type::neighbor_list_type;
 
   protected:
-    using base_type::_euler_timer;
-    using base_type::_half_neigh;
-    using base_type::_neigh_list;
-    using base_type::_timer;
-    model_type _model;
+    using base_type::_model;
 
-    using fracture_type = BaseFracture<MemorySpace>;
-    using fracture_type::_mu;
+    using base_type::_euler_timer;
+    using base_type::_timer;
 
   public:
     // Explicit base model construction is necessary because of the indirect
     // model inheritance. This could be avoided with a BaseHeatTransfer object.
-    template <class ForceType>
-    HeatTransfer( const bool half_neigh, const ForceType& force,
-                  const model_type model )
-        : base_type( half_neigh, force, model )
-        , fracture_type( force.getBrokenBonds() )
-        , _model( model )
+    HeatTransfer( const model_type model )
+        : base_type( model )
     {
     }
 
     template <class TemperatureType, class PosType, class ParticleType,
-              class ParallelType>
+              class NeighborType>
     void computeHeatTransferFull( TemperatureType& conduction, const PosType& x,
                                   const PosType& u,
-                                  const ParticleType& particles, ParallelType& )
+                                  const ParticleType& particles,
+                                  NeighborType& neighbor )
     {
         _timer.start();
+        using neighbor_list_type = typename NeighborType::list_type;
+        auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
 
         auto model = _model;
-        const auto neigh_list = _neigh_list;
         const auto vol = particles.sliceVolume();
         const auto temp = particles.sliceTemperature();
-        const auto mu = _mu;
 
         auto temp_func = KOKKOS_LAMBDA( const int i )
         {
@@ -179,20 +160,18 @@ class HeatTransfer<MemorySpace, ModelType, Fracture>
             }
         };
 
-        Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
-                                                particles.localOffset() );
-        Kokkos::parallel_for( "CabanaPD::HeatTransfer::computeFull", policy,
-                              temp_func );
+        neighbor.iterateLinear( exec_space{}, temp_func, particles,
+                                "CabanaPD::HeatTransfer::computeFull" );
         Kokkos::fence();
         _timer.stop();
     }
 };
 
 // Heat transfer free functions.
-template <class HeatTransferType, class ParticleType, class ParallelType>
+template <class HeatTransferType, class ParticleType, class NeighborType>
 void computeHeatTransfer( HeatTransferType& heat_transfer,
-                          ParticleType& particles,
-                          const ParallelType& neigh_op_tag, const double dt )
+                          ParticleType& particles, const NeighborType& neighbor,
+                          const double dt )
 {
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
@@ -203,12 +182,13 @@ void computeHeatTransfer( HeatTransferType& heat_transfer,
     Cabana::deep_copy( conduction, 0.0 );
 
     // Temperature only needs to be atomic if using team threading.
-    if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
+    if ( std::is_same<typename NeighborType::Tag, Cabana::TeamOpTag>::value )
         heat_transfer.computeHeatTransferFull( conduction_a, x, u, particles,
-                                               neigh_op_tag );
+                                               neighbor );
     else
         heat_transfer.computeHeatTransferFull( conduction, x, u, particles,
-                                               neigh_op_tag );
+                                               neighbor );
+    Kokkos::fence();
 
     heat_transfer.forwardEuler( particles, dt );
 }

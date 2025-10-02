@@ -116,9 +116,6 @@ class Inputs
 
         if ( !inputs.contains( "output_reference" ) )
             inputs["output_reference"]["value"] = true;
-
-        // Not yet a user option.
-        inputs["half_neigh"]["value"] = false;
     }
 
     void setupSize()
