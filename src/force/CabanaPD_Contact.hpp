@@ -171,6 +171,8 @@ class Force<MemorySpace, ModelType, NormalRepulsionModel, NoFracture>
     {
     }
 
+    auto neighTime() { return _neigh_timer.time(); }
+
   protected:
     ModelType _model;
     using base_type::_half_neigh;
