@@ -106,10 +106,17 @@ class Neighbor<MemorySpace, NoFracture>
     const auto& list() const { return _neigh_list; }
 
     // Only rebuild neighbor list as needed.
-    template <class ParticleType>
-    void update( const ParticleType& particles, const double search_radius,
-                 const double radius_extend, const bool require_update = false )
+    template <class ParticleType, class ModelType>
+    void update( const ParticleType& particles, const ModelType& model,
+                 const bool require_update = false )
     {
+        // There should never be a need to update if this is a reference
+        // neighbor list.
+        if constexpr ( !is_contact<ModelType>::value )
+            static_assert( "Cannot update a non-contact neighbor list." );
+
+        const double search_radius = model.cutoff();
+        const double radius_extend = model.extend();
         double max_displacement = particles.getMaxDisplacement();
         if ( max_displacement > radius_extend || require_update )
         {

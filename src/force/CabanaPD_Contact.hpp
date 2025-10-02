@@ -63,7 +63,7 @@ class Force<MemorySpace, ModelType, NormalRepulsionModel, NoFracture>
         auto model = _model;
         const auto vol = particles.sliceVolume();
 
-        neighbor.update( particles, model.cutoff(), model.extend() );
+        neighbor.update( particles, model );
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -137,7 +137,7 @@ class Force<MemorySpace, ModelType, HertzianModel, NoFracture>
         const auto rho = particles.sliceDensity();
         const auto vel = particles.sliceVelocity();
 
-        neighbor.update( particles, model.cutoff(), model.extend() );
+        neighbor.update( particles, model );
 
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {
