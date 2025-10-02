@@ -48,9 +48,6 @@ struct HertzianJKRModel : public ContactModel
     double delta_tear; // Maximum separation distance to break contact
     double fc;         // Maximum cohesion (pull-off) force
 
-    // TODO: Add dt as function parameter to computeForce in Solver
-    double dt; // Integrator time increment
-
     HertzianJKRModel() {}
     HertzianJKRModel( const double _radius, const double _extend,
                       const double _nu, const double _E, const double _e,
@@ -120,9 +117,6 @@ struct HertzianJKRModel : public ContactModel
                           const double fn, double& ftx, double& fty,
                           double& ftz ) const
     {
-        // // Contact "overlap"
-        // const double delta_n = ( 2.0 * radius - r );
-
         // Coloumb sliding (kinetic) friction
         auto mu_c = [&]( const double v )
         { return Kokkos::abs( mu * Kokkos::tanh( 10 * v ) ); };
