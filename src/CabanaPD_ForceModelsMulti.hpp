@@ -17,41 +17,93 @@
 namespace CabanaPD
 {
 
-/******************************************************************************
-  Multi-material models
-******************************************************************************/
-struct AverageTag
+namespace Impl
 {
+template <std::size_t current, typename FunctorType, typename ParameterPackType,
+          typename... ARGS,
+          std::enable_if_t<current<ParameterPackType::size - 1, int> = 0>
+              KOKKOS_INLINE_FUNCTION auto
+                  recursion_functor_for_index_in_pack_with_args(
+                      FunctorType const& functor, std::size_t index,
+                      ParameterPackType& parameterPack, ARGS... args )
+{
+    if ( index == current )
+    {
+        return functor( Cabana::get<current>( parameterPack ), args... );
+    }
+    else
+    {
+        return recursion_functor_for_index_in_pack_with_args<current + 1>(
+            functor, index, parameterPack, args... );
+    }
+}
+
+template <std::size_t current, typename FunctorType, typename ParameterPackType,
+          typename... ARGS,
+          std::enable_if_t<current == ParameterPackType::size - 1, int> = 0>
+KOKKOS_INLINE_FUNCTION auto recursion_functor_for_index_in_pack_with_args(
+    FunctorType const& functor, std::size_t index,
+    ParameterPackType& parameterPack, ARGS... args )
+{
+    if ( index == current )
+    {
+        return functor( Cabana::get<current>( parameterPack ), args... );
+    }
+    else
+    {
+        Kokkos::abort( "Requested index not contained in ParameterPack" );
+        return functor( Cabana::get<current>( parameterPack ), args... );
+    }
+}
+
+template <typename FunctorType, typename ParameterPackType, typename... ARGS>
+KOKKOS_INLINE_FUNCTION auto run_functor_for_index_in_pack_with_args(
+    FunctorType const& functor, std::size_t index,
+    ParameterPackType& parameterPack, ARGS... args )
+{
+    return recursion_functor_for_index_in_pack_with_args<0>(
+        functor, index, parameterPack, args... );
+}
+
+struct IdentityFunctor
+{
+    template <typename Model, typename... ARGS>
+    KOKKOS_FUNCTION auto operator()( Model& model, ARGS... args ) const
+    {
+        return model( args... );
+    }
 };
 
 // Wrap multiple models in a single object.
-// TODO: this currently only supports bi-material systems.
-template <typename MaterialType, typename ModelType1, typename ModelType2,
-          typename ModelType12>
-struct ForceModels
+template <typename MaterialType, typename ParameterPackType, typename Sequence>
+struct ForceModelsImpl
+{
+};
+
+template <typename MaterialType, typename ParameterPackType,
+          std::size_t... Indices>
+struct ForceModelsImpl<MaterialType, ParameterPackType,
+                       std::index_sequence<Indices...>>
 {
     using material_type = MultiMaterial;
 
-    using first_model = ModelType1;
+    // TODO how to decide this?
+    using first_model = typename ParameterPackType::value_type<0>;
     using model_type = typename first_model::model_type;
     using base_model = typename first_model::base_model;
     using thermal_type = typename first_model::thermal_type;
     using fracture_type = typename first_model::fracture_type;
 
-    static_assert( ( std::is_same<typename ModelType1::thermal_type,
-                                  TemperatureIndependent>::value ||
-                     std::is_same<typename ModelType2::thermal_type,
-                                  TemperatureIndependent>::value ||
-                     std::is_same<typename ModelType12::thermal_type,
-                                  TemperatureIndependent>::value ),
-                   "Thermomechanics does not yet support multiple materials!" );
+    static_assert(
+        ( std::is_same_v<
+              typename ParameterPackType::value_type<Indices>::thermal_type,
+              TemperatureIndependent> ||
+          ... ),
+        "Thermomechanics does not yet support multiple materials!" );
 
-    ForceModels( MaterialType t, const ModelType1 m1, ModelType2 m2,
-                 ModelType12 m12 )
+    ForceModelsImpl( MaterialType t, ParameterPackType const& m )
         : type( t )
-        , model1( m1 )
-        , model2( m2 )
-        , model12( m12 )
+        , models( m )
     {
         setHorizon();
     }
@@ -60,13 +112,14 @@ struct ForceModels
 
     void updateBonds( const int num_local, const int max_neighbors )
     {
-        model1.updateBonds( num_local, max_neighbors );
-        model2.updateBonds( num_local, max_neighbors );
-        model12.updateBonds( num_local, max_neighbors );
+        ( Cabana::get<Indices>( models ).updateBounds( num_local,
+                                                       max_neighbors ),
+          ... );
     }
 
     KOKKOS_INLINE_FUNCTION int getIndex( const int i, const int j ) const
     {
+        // TODO
         const int type_i = type( i );
         const int type_j = type( j );
         // FIXME: only for binary.
@@ -83,14 +136,8 @@ struct ForceModels
     {
         auto t = getIndex( i, j );
         // Call individual model.
-        if ( t == 0 )
-            return model1( tag, i, j, std::forward<Args>( args )... );
-        else if ( t == 1 )
-            return model2( tag, i, j, std::forward<Args>( args )... );
-        else if ( t == 2 )
-            return model12( tag, i, j, std::forward<Args>( args )... );
-        else
-            Kokkos::abort( "Invalid model index." );
+        return run_functor_for_index_in_pack_with_args(
+            IdentityFunctor{}, t, models, tag, i, j, args... );
     }
 
     // This is only for LPS force/energy, currently the only cases that require
@@ -108,17 +155,8 @@ struct ForceModels
         auto t = getIndex( i, j );
         MultiMaterial mtag;
         // Call individual model.
-        if ( t == 0 )
-            return model1( tag, mtag, type_i, type_j,
-                           std::forward<Args>( args )... );
-        else if ( t == 1 )
-            return model2( tag, mtag, type_i, type_j,
-                           std::forward<Args>( args )... );
-        else if ( t == 2 )
-            return model12( tag, mtag, type_i, type_j,
-                            std::forward<Args>( args )... );
-        else
-            Kokkos::abort( "Invalid model index." );
+        return run_functor_for_index_in_pack_with_args(
+            IdentityFunctor{}, t, models, tag, mtag, type_i, type_j, args... );
     }
 
     auto horizon( const int ) { return delta; }
@@ -128,35 +166,50 @@ struct ForceModels
 
     double delta;
     MaterialType type;
-    ModelType1 model1;
-    ModelType2 model2;
-    ModelType12 model12;
+    ParameterPackType models;
 
   protected:
     void setHorizon()
     {
         // Enforce equal cutoff for now.
-        delta = model1.delta;
-        checkDelta( model2 );
-        checkDelta( model12 );
-    }
+        const double tol = 1e-10;
+        delta = Cabana::get<1>( models ).delta;
 
-    template <typename Model>
-    auto checkDelta( Model m, const double tol = 1e-10 )
-    {
-        if ( std::abs( m.delta - delta ) > tol )
+        if ( ( ( std::abs( Cabana::get<Indices>( models ).delta - delta ) >
+                 tol ) ||
+               ... ) )
+        {
             log_err( std::cout, "Horizon for each model must match for "
                                 "multi-material systems." );
+        }
+    }
+};
+} // namespace Impl
+
+/******************************************************************************
+  Multi-material models
+******************************************************************************/
+struct AverageTag
+{
+};
+template <typename MaterialType, typename ParameterPackType>
+struct ForceModels : CabanaPD::Impl::ForceModelsImpl<
+                         MaterialType, ParameterPackType,
+                         std::make_index_sequence<ParameterPackType::size - 1>>
+{
+    ForceModels( MaterialType t, ParameterPackType const& m )
+        : CabanaPD::Impl::ForceModelsImpl<
+              MaterialType, ParameterPackType,
+              std::make_index_sequence<ParameterPackType::size - 1>>( t, m )
+    {
     }
 };
 
-template <typename ParticleType, typename ModelType1, typename ModelType2,
-          typename ModelType12>
-auto createMultiForceModel( ParticleType particles, ModelType1 m1,
-                            ModelType2 m2, ModelType12 m12 )
+template <typename ParticleType, typename... ModelTypes>
+auto createMultiForceModel( ParticleType particles, ModelTypes... m )
 {
     auto type = particles.sliceType();
-    return ForceModels( type, m1, m2, m12 );
+    return ForceModels( type, Cabana::makeParameterPack( m... ) );
 }
 
 template <typename ParticleType, typename ModelType1, typename ModelType2>
@@ -164,9 +217,7 @@ auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
                             ModelType2 m2 )
 {
     ModelType1 m12( m1, m2 );
-
-    auto type = particles.sliceType();
-    return ForceModels( type, m1, m2, m12 );
+    return createMultiForceModel( particles, m1, m2, m12 );
 }
 
 } // namespace CabanaPD
