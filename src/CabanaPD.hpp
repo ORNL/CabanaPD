@@ -23,6 +23,7 @@
 #include <CabanaPD_Geometry.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Integrate.hpp>
+#include <CabanaPD_Neighbor.hpp>
 #include <CabanaPD_Output.hpp>
 #include <CabanaPD_OutputProfiles.hpp>
 #include <CabanaPD_Particles.hpp>
