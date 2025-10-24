@@ -44,10 +44,14 @@ void HIPCylinderExample( const std::string filename )
     double delta = inputs["horizon"];
     delta += 1e-10;
     double alpha = inputs["thermal_expansion_coeff"];
+    double kappa = inputs["thermal_conductivity"];
+    double cp = inputs["specific_heat_capacity"];
+
+    // Problem parameters
     double temp0 = inputs["reference_temperature"];
 
-    std::cout << "rho0 = " << rho0 << std::endl;
-    std::cout << "dt = " << inputs["timestep"] << std::endl;
+    // std::cout << "rho0 = " << rho0 << std::endl;
+    // std::cout << "dt = " << inputs["timestep"] << std::endl;
 
     // ====================================================
     //                  Discretization
@@ -146,10 +150,10 @@ void HIPCylinderExample( const std::string filename )
             rho( pid ) = rho0;
         };
 
-        // Temperature
+        // Initial temperature
         temp( pid ) = temp0;
 
-        // No fail
+        // No fail: we enforce no-failure
         nofail( pid ) = 1;
     };
     particles.updateParticles( exec_space{}, init_functor );
@@ -170,6 +174,7 @@ void HIPCylinderExample( const std::string filename )
     CabanaPD::ForceDensityModel force_model(
         model_type{}, mechanics_type{}, rho, rho_current, delta, K, G0, sigma_y,
         rho0, temp, alpha, temp0 );
+    // Note: we need to solve heat transfer!!!
 
     // ====================================================
     //                   Create solver
@@ -197,8 +202,9 @@ void HIPCylinderExample( const std::string filename )
     // ====================================================
     // Create BC last to ensure ghost particles are included.
     double Pmax = inputs["maximum_pressure"];
-    double trampP = inputs["ramp_pressure_time"];
-    double Tmax = inputs["maximum_temperature"];
+    double trampup = inputs["ramp_up_bc_time"];
+    double trampdown = inputs["ramp_down_bc_time"];
+    double tempmax = inputs["maximum_temperature"];
     double dx = solver.particles.dx[0];
     double dz = solver.particles.dx[2];
     double b0max = Pmax / dx;
@@ -206,21 +212,33 @@ void HIPCylinderExample( const std::string filename )
     auto f = solver.particles.sliceForce();
     auto u = solver.particles.sliceDisplacement();
     temp = solver.particles.sliceTemperature();
+    double tf = inputs["final_time"];
 
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
     auto force_temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
         double b0;
+        double temp_bc;
 
-        // Pressure ramping
-        if ( t < trampP )
+        // Pressure and temperature ramping
+        // Linear profile: f(x) = f(a) + (x-a) * (f(b)-f(a))/(b-a) for x in
+        // [a,b]
+        if ( t < trampup )
         {
-            b0 = b0max * t / trampP;
+            b0 = t * b0max / trampup;
+            temp_bc = temp0 + t * ( tempmax - temp0 ) / trampup;
+        }
+        else if ( t > tf - trampdown )
+        {
+            b0 = b0max - ( t - ( tf - trampdown ) ) * b0max / trampdown;
+            temp_bc = tempmax - ( t - ( tf - trampdown ) ) *
+                                    ( tempmax - temp0 ) / trampdown;
         }
         else
         {
             b0 = b0max;
+            temp_bc = tempmax;
         }
 
         // -----------------------
@@ -258,28 +276,28 @@ void HIPCylinderExample( const std::string filename )
         // -----------------------
         //      Temperature BC
         // -----------------------
-        temp( pid ) = Tmax;
+        // temp( pid ) = Tmax;
 
         // -----------------------
         // Constrain displacements
         // -----------------------
-        // Fix x- and y-displacement on top surface: only enable motion in
-        // z-direction
+        // Constraint I: fix x- and y-displacement on top surface: only enable
+        // motion in z-direction
         if ( x( pid, 2 ) > z_center + 0.5 * H - W )
         {
             u( pid, 0 ) = 0.0;
             u( pid, 1 ) = 0.0;
         }
 
-        // Fix x- and y-displacement on bottom surface: only enable motion in
-        // z-direction
+        // Constraint II: Fix x- and y-displacement on bottom surface: only
+        // enable motion in z-direction
         if ( x( pid, 2 ) < z_center - 0.5 * H + W )
         {
             u( pid, 0 ) = 0.0;
             u( pid, 1 ) = 0.0;
         }
 
-        // Fix z-displacement on mid surface
+        // Constraint III: fix z-displacement on mid surface
         if ( x( pid, 2 ) > z_center - dz && x( pid, 2 ) < z_center + dz )
         {
             u( pid, 2 ) = 0.0;
