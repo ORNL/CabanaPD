@@ -51,6 +51,12 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
 
     void init() { c = 18.0 * K / ( pi * delta * delta * delta * delta ); }
 
+    void init( const double _delta, const double _K )
+    {
+        base_type::init( _delta, _K );
+        init();
+    }
+
     // Constructor to average from existing models.
     template <typename ModelType1, typename ModelType2>
     BaseForceModelPMB( const ModelType1& model1, const ModelType2& model2 )
@@ -96,8 +102,8 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
                        const double sigma_y )
         : base_type( model, NoFracture{}, delta, K )
         , base_plasticity_type()
-        , s_Y( sigma_y / 3.0 / K )
     {
+        init( sigma_y );
     }
 
     // Constructor to average from existing models.
@@ -107,6 +113,14 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
         , base_plasticity_type()
     {
         s_Y = ( model1.s_Y + model2.s_Y ) / 2.0;
+    }
+
+    void init( const double sigma_y ) { s_Y = sigma_y / 3.0 / K; }
+
+    void init( const double _delta, const double _K, const double _sigma_y )
+    {
+        base_type::init( _delta, _K );
+        init( _sigma_y );
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -226,6 +240,13 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
         , base_fracture_type( model1, model2 )
     {
     }
+
+    void init( const double _delta, const double _K, const double _G0,
+               const int influence_type = 1 )
+    {
+        base_type::init( _delta, _K );
+        base_fracture_type::init( _delta, _K, _G0, influence_type );
+    }
 };
 
 template <typename MemorySpace>
@@ -248,10 +269,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
                 const double delta, const double K, const double G0,
                 const double sigma_y )
         : base_type( model, mechanics, space, delta, K, sigma_y )
-        , base_fracture_type( G0,
-                              // s0
-                              ( 5.0 * G0 / sigma_y / delta + sigma_y / K ) /
-                                  6.0 )
+        , base_fracture_type( G0, init( delta, K, G0, sigma_y ) )
         , base_temperature_type()
     {
     }
@@ -262,6 +280,17 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
         : base_type( model1, model2 )
         , base_fracture_type( model1, model2 )
     {
+    }
+
+    // Return in order to use in the constructor.
+    auto init( const double _delta, const double _K, const double _G0,
+               const double _sigma_y )
+    {
+        base_type::init( _delta, _K, _sigma_y );
+
+        auto _s0 = ( 5.0 * _G0 / _sigma_y / _delta + _sigma_y / _K ) / 6.0;
+        base_fracture_type::init( _G0, _s0 );
+        return _s0;
     }
 };
 
@@ -314,6 +343,13 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
         , base_temperature_type( _temp, _alpha, _temp0 )
     {
     }
+
+    void init( const double _delta, const double _K, const double _alpha,
+               const double _temp0 )
+    {
+        base_type::init( _delta, _K );
+        base_temperature_type::init( _alpha, _temp0 );
+    }
 };
 
 template <typename TemperatureType>
@@ -341,6 +377,15 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
         , base_temperature_type( model1, model2 )
     {
     }
+
+    void init( const double _delta, const double _K, const double _G0,
+               const double _alpha, const double _temp0,
+               const int influence_type = 1 )
+    {
+        base_type::init( _delta, _K );
+        base_temperature_type::init( _delta, _K, _G0, _alpha, _temp0,
+                                     influence_type );
+    }
 };
 
 template <typename TemperatureType>
@@ -365,6 +410,13 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, TemperatureDependent,
                      _delta, _K, sigma_y )
         , base_temperature_type( _delta, _K, _G0, _temp, _alpha, _temp0 )
     {
+    }
+
+    void init( const double _delta, const double _K, const double _G0,
+               const double sigma_y, const double _alpha, const double _temp0 )
+    {
+        base_type::init( _delta, _K, sigma_y );
+        base_temperature_type::init( _delta, _K, _G0, _alpha, _temp0 );
     }
 };
 
@@ -419,6 +471,16 @@ struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
                                    _constant_microconductivity )
     {
     }
+
+    void init( const double _delta, const double _K, const double _kappa,
+               const double _cp, const double _alpha, const double _temp0 = 0.0,
+               const bool _constant_microconductivity = true )
+    {
+        base_type::init( _delta, _K );
+        base_temperature_type::init( _alpha, _temp0 );
+        base_heat_transfer_type::init( _delta, _kappa, _cp,
+                                       _constant_microconductivity );
+    }
 };
 
 template <typename ModelType, typename TemperatureType>
@@ -455,6 +517,17 @@ struct ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
         , base_heat_transfer_type( _delta, _kappa, _cp,
                                    _constant_microconductivity )
     {
+    }
+
+    void init( const double _delta, const double _K, const double _G0,
+               const double _kappa, const double _cp, const double _alpha,
+               const double _temp0 = 0.0,
+               const bool _constant_microconductivity = true )
+    {
+        base_type::init( _delta, _K );
+        base_temperature_type::init( _delta, _K, _G0, _alpha, _temp0 );
+        base_heat_transfer_type::init( _delta, _kappa, _cp,
+                                       _constant_microconductivity );
     }
 };
 
@@ -497,6 +570,17 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, DynamicTemperature,
         , base_heat_transfer_type( _delta, _kappa, _cp,
                                    _constant_microconductivity )
     {
+    }
+
+    void init( const double _delta, const double _K, const double _G0,
+               const double sigma_y, const double _kappa, const double _cp,
+               const double _alpha, const double _temp0 = 0.0,
+               const bool _constant_microconductivity = true )
+    {
+        base_type::init( _delta, _K, sigma_y );
+        base_temperature_type::init( _delta, _K, _G0, _alpha, _temp0 );
+        base_heat_transfer_type::init( _delta, _kappa, _cp,
+                                       _constant_microconductivity );
     }
 };
 

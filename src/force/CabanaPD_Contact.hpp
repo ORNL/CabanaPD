@@ -51,6 +51,12 @@ class Force<MemorySpace, ModelType, NormalRepulsionModel, NoFracture>
     {
     }
 
+    template <typename... Args>
+    void updateModel( Args&&... args )
+    {
+        _model.init( std::forward<Args>( args )... );
+    }
+
     template <class ForceType, class PosType, class ParticleType,
               class NeighborType>
     void computeForceFull( ForceType& fc, const PosType& x, const PosType& u,
@@ -120,6 +126,12 @@ class Force<MemorySpace, ModelType, HertzianModel, NoFracture>
     Force( const ModelType model )
         : _model( model )
     {
+    }
+
+    template <typename... Args>
+    void updateModel( Args&&... args )
+    {
+        _model.init( std::forward<Args>( args )... );
     }
 
     template <class ForceType, class PosType, class ParticleType,
