@@ -18,11 +18,12 @@
     "maximum_pressure"                : {"value": 110e6, "unit": "Pa"},
     "reference_temperature"           : {"value": 20, "unit": "oC"},
     "maximum_temperature"             : {"value": 1125, "unit": "oC"},
+    "maximum_temperature_ref"         : {"value": 20, "unit": "oC"},
     "ramp_up_bc_time"                 : {"value": 0.2, "unit": "s"},
     "ramp_down_bc_time"               : {"value": 0.1, "unit": "s"},
-    "final_time"                      : {"value": 0.7, "unit": "s"},
+    "final_time"                      : {"value": 1.05, "unit": "s"},
     "timestep"                        : {"value": 3.0e-07, "unit": "s"},
     "timestep_safety_factor"          : {"value": 0.70},
-    "output_frequency"                : {"value": 100},
+    "output_frequency"                : {"value": 200},
     "output_reference"                : {"value": false}
 }

@@ -50,9 +50,6 @@ void HIPCylinderExample( const std::string filename )
     // Problem parameters
     double temp0 = inputs["reference_temperature"];
 
-    // std::cout << "rho0 = " << rho0 << std::endl;
-    // std::cout << "dt = " << inputs["timestep"] << std::endl;
-
     // ====================================================
     //                  Discretization
     // ====================================================
@@ -109,7 +106,6 @@ void HIPCylinderExample( const std::string filename )
     pool_type pool;
     int seed = 456854;
     pool.init( seed, particles.numLocal() );
-
     // Use time to seed random number generator
     // std::srand( std::time( nullptr ) );
     double rho_perturb_factor = 0.02;
@@ -207,7 +203,8 @@ void HIPCylinderExample( const std::string filename )
     double tempmax = inputs["maximum_temperature"];
     double dx = solver.particles.dx[0];
     double dz = solver.particles.dx[2];
-    double b0max = Pmax / dx;
+    // double b0max = Pmax / dx;
+    double b0max = Pmax / W;
     x = solver.particles.sliceReferencePosition();
     auto f = solver.particles.sliceForce();
     auto u = solver.particles.sliceDisplacement();
@@ -241,9 +238,9 @@ void HIPCylinderExample( const std::string filename )
             temp_bc = tempmax;
         }
 
-        // -----------------------
-        //  Isostatic pressure BC
-        // -----------------------
+        // --------------------------------------
+        //  Isostatic pressure and temperature BC
+        // --------------------------------------
         double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center ) +
                      ( x( pid, 1 ) - y_center ) * ( x( pid, 1 ) - y_center );
         double theta =
@@ -252,25 +249,37 @@ void HIPCylinderExample( const std::string filename )
         // BC on outer boundary
         if ( rsq > ( Rout - W ) * ( Rout - W ) )
         {
+            // Force BC
             f( pid, 0 ) += -b0 * Kokkos::cos( theta );
             f( pid, 1 ) += -b0 * Kokkos::sin( theta );
+            // Temperature BC
+            temp( pid ) = temp_bc;
         }
         // BC on inner boundary
         else if ( rsq < ( Rin + W ) * ( Rin + W ) )
         {
+            // Force BC
             f( pid, 0 ) += b0 * Kokkos::cos( theta );
             f( pid, 1 ) += b0 * Kokkos::sin( theta );
+            // Temperature BC
+            temp( pid ) = temp_bc;
         };
 
         // BC on top boundary
         if ( x( pid, 2 ) > z_center + 0.5 * H - W )
         {
+            // Force BC
             f( pid, 2 ) += -b0;
+            // Temperature BC
+            temp( pid ) = temp_bc;
         }
         // BC on bottom boundary
         else if ( x( pid, 2 ) < z_center - 0.5 * H + W )
         {
+            // Force BC
             f( pid, 2 ) += b0;
+            // Temperature BC
+            temp( pid ) = temp_bc;
         };
 
         // -----------------------
@@ -281,20 +290,30 @@ void HIPCylinderExample( const std::string filename )
         // -----------------------
         // Constrain displacements
         // -----------------------
+
+        // Compute average radius
+        double Rmid = 0.5 * ( Rin + Rout );
+
         // Constraint I: fix x- and y-displacement on top surface: only enable
-        // motion in z-direction
-        if ( x( pid, 2 ) > z_center + 0.5 * H - W )
+        // motion in z-direction - constrain ring with radius Rmid and width
+        // delta if ( x( pid, 2 ) > z_center + 0.5 * H - W )
+        if ( x( pid, 2 ) > z_center + 0.5 * H - W &&
+             rsq > ( Rmid - delta ) * ( Rmid - delta ) &&
+             rsq < ( Rmid + delta ) * ( Rmid + delta ) )
         {
-            u( pid, 0 ) = 0.0;
-            u( pid, 1 ) = 0.0;
+            //    u( pid, 0 ) = 0.0;
+            //    u( pid, 1 ) = 0.0;
         }
 
         // Constraint II: Fix x- and y-displacement on bottom surface: only
-        // enable motion in z-direction
-        if ( x( pid, 2 ) < z_center - 0.5 * H + W )
+        // enable motion in z-direction - constrain ring with radius Rmid and
+        // width delta if ( x( pid, 2 ) < z_center - 0.5 * H + W )
+        if ( x( pid, 2 ) < z_center - 0.5 * H + W &&
+             rsq > ( Rmid - delta ) * ( Rmid - delta ) &&
+             rsq < ( Rmid + delta ) * ( Rmid + delta ) )
         {
-            u( pid, 0 ) = 0.0;
-            u( pid, 1 ) = 0.0;
+            //    u( pid, 0 ) = 0.0;
+            //    u( pid, 1 ) = 0.0;
         }
 
         // Constraint III: fix z-displacement on mid surface
