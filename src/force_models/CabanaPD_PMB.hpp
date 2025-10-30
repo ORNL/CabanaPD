@@ -677,6 +677,59 @@ ForceDensityModel( PMB, ElasticPerfectlyPlastic, DensityType rho,
                          TemperatureDependent, TemperatureType, DensityType,
                          CurrentDensityType>;
 
+// Force models with evolving density with heat transfer.
+template <typename TemperatureType, typename DensityType,
+          typename CurrentDensityType>
+struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                         DynamicTemperature, TemperatureType, DensityType,
+                         CurrentDensityType>
+    : public BaseDynamicTemperatureModel,
+      public ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                               TemperatureDependent, TemperatureType,
+                               DensityType, CurrentDensityType>
+{
+    using base_type = ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                                        TemperatureDependent, TemperatureType,
+                                        DensityType, CurrentDensityType>;
+    using base_temperature_type = BaseDynamicTemperatureModel;
+
+    using typename base_type::model_type;
+    using base_model = typename base_type::base_model;
+    using fracture_type = typename base_type::fracture_type;
+    using mechanics_type = typename base_type::mechanics_type;
+    using thermal_type = typename base_type::thermal_type;
+    using density_type = typename base_type::density_type;
+
+    // Explicitly use the temperature-dependent stretch.
+    using base_type::thermalStretch;
+
+    ForceDensityModel( PMB model, ElasticPerfectlyPlastic mechanics,
+                       const DensityType& _rho,
+                       const CurrentDensityType& _rho_c, const double _delta,
+                       const double _K, const double _G0, const double _sigma_y,
+                       const double _rho0, const TemperatureType _temp,
+                       const double _kappa, const double _cp,
+                       const double _alpha, const double _temp0 = 0.0,
+                       const bool _constant_microconductivity = true )
+        : base_temperature_type( _delta, _kappa, _cp,
+                                 _constant_microconductivity )
+        , base_type( model, mechanics, _rho, _rho_c, _delta, _K, _G0, _sigma_y,
+                     _rho0, _temp, _alpha, _temp0 )
+    {
+    }
+};
+
+template <typename DensityType, typename CurrentDensityType,
+          typename TemperatureType>
+ForceDensityModel( PMB, ElasticPerfectlyPlastic, DensityType rho,
+                   const CurrentDensityType& rho_c, const double delta,
+                   const double K, const double G0, const double sigma_y,
+                   const double rho0, TemperatureType temp, const double _kappa,
+                   const double _cp, const double _alpha, const double _temp0 )
+    -> ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                         DynamicTemperature, TemperatureType, DensityType,
+                         CurrentDensityType>;
+
 } // namespace CabanaPD
 
 #endif
