@@ -170,7 +170,6 @@ void HIPCylinderExample( const std::string filename )
     CabanaPD::ForceDensityModel force_model(
         model_type{}, mechanics_type{}, rho, rho_current, delta, K, G0, sigma_y,
         rho0, temp, kappa, cp, alpha, temp0 );
-    // Note: we need to solve heat transfer!!!
 
     // ====================================================
     //                   Create solver
@@ -314,6 +313,13 @@ void HIPCylinderExample( const std::string filename )
         {
             //    u( pid, 0 ) = 0.0;
             //    u( pid, 1 ) = 0.0;
+        }
+
+        if ( x( pid, 2 ) < z_center - 0.5 * H + W )
+        {
+            // u( pid, 0 ) = 0.0;
+            // u( pid, 1 ) = 0.0;
+            // u( pid, 2 ) = 0.0;
         }
 
         // Constraint III: fix z-displacement on mid surface

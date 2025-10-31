@@ -618,7 +618,7 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
 
         // Young's modulus from C. Van Nguyen et al., Journal of Materials
         // Processing Technology 226 (2015): 134-145.
-        // double T = temp( i );
+        // double T = temperature( i );
         // double E = ( 199510 - 65.63 * T - 0.0276 * T * T - 1.754E-6 * T * T *
         // T ) * RD;
         //
