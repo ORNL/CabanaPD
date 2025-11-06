@@ -80,25 +80,24 @@ struct BaseForceModelPMB<Elastic, Isotropic> : public BaseForceModel
 };
 
 template <>
-struct BaseForceModelPMB<Elastic, Anisotropic> : public BaseForceModel
+struct BaseForceModelPMB<Elastic, Anisotropic>
+    : public BaseForceModelPMB<Elastic, Isotropic>
 {
-    using base_type = BaseForceModel;
-    using model_type = PMB;
-    using base_model = PMB;
-    using mechanics_type = Elastic;
+    using base_type = BaseForceModelPMB<Elastic, Isotropic>;
 
     using base_type::delta;
     using base_type::K;
 
-    BaseForceModelPMB( PMB, NoFracture, const double delta, const double _K )
-        : base_type( delta, _K )
+    BaseForceModelPMB( PMB model, NoFracture fracture, const double delta,
+                       const double _K )
+        : base_type( model, fracture, delta, _K )
     {
         init();
     }
 
-    BaseForceModelPMB( PMB, Elastic, NoFracture, const double delta,
-                       const double _K )
-        : base_type( delta, _K )
+    BaseForceModelPMB( PMB model, Elastic, NoFracture fracture,
+                       const double delta, const double _K )
+        : base_type( model, fracture, delta, _K )
     {
         init();
     }
@@ -113,22 +112,6 @@ struct BaseForceModelPMB<Elastic, Anisotropic> : public BaseForceModel
     }
 
     auto c() const { return 0.0; }
-
-    KOKKOS_INLINE_FUNCTION
-    auto operator()( ForceCoeffTag, const int, const int, const double s,
-                     const double vol, const int = -1 ) const
-    {
-        return c() * s * vol;
-    }
-
-    KOKKOS_INLINE_FUNCTION
-    auto operator()( EnergyTag, const int, const int, const double s,
-                     const double xi, const double vol, const int = -1 ) const
-    {
-        // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
-        // the integrand (pairwise potential).
-        return 0.25 * c() * s * s * xi * vol;
-    }
 };
 
 template <typename MemorySpace, typename AnisotropyType>
