@@ -111,7 +111,7 @@ struct BaseForceModelPMB<Elastic, Anisotropic>
     {
     }
 
-    auto c() const { return 0.0; }
+    auto c() const { return add_orientation_dependence_here; }
 };
 
 template <typename MemorySpace, typename AnisotropyType>
