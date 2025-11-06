@@ -138,8 +138,7 @@ getLinearizedDistance( const PosType& x, const PosType& u, const int i,
 }
 
 // Forward declaration.
-template <class MemorySpace, class ModelType, class ModelTag,
-          class FractureType>
+template <class MemorySpace, class ModelTag, class FractureType>
 class Force;
 
 template <class MemorySpace>
@@ -153,12 +152,14 @@ class BaseForce
 
   public:
     // Default to no-op.
-    template <class ParticleType, class NeighborType>
-    void computeWeightedVolume( ParticleType&, const NeighborType ) const
+    template <class ModelType, class ParticleType, class NeighborType>
+    void computeWeightedVolume( const ModelType&, ParticleType&,
+                                const NeighborType ) const
     {
     }
-    template <class ParticleType, class NeighborType>
-    void computeDilatation( ParticleType&, const NeighborType ) const
+    template <class ModelType, class ParticleType, class NeighborType>
+    void computeDilatation( const ModelType&, ParticleType&,
+                            const NeighborType ) const
     {
     }
 
@@ -170,9 +171,11 @@ class BaseForce
 /******************************************************************************
   Force free functions.
 ******************************************************************************/
-template <class ForceType, class ParticleType, class NeighborType>
-void computeForce( ForceType& force, ParticleType& particles,
-                   NeighborType& neighbor, const bool reset = true )
+template <class ModelType, class ForceType, class ParticleType,
+          class NeighborType>
+void computeForce( const ModelType& model, ForceType& force,
+                   ParticleType& particles, NeighborType& neighbor,
+                   const bool reset = true )
 {
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
@@ -186,15 +189,16 @@ void computeForce( ForceType& force, ParticleType& particles,
     // Forces only atomic if using team threading.
     if constexpr ( std::is_same<typename NeighborType::Tag,
                                 Cabana::TeamOpTag>::value )
-        force.computeForceFull( f_a, x, u, particles, neighbor );
+        force.computeForceFull( model, f_a, x, u, particles, neighbor );
     else
-        force.computeForceFull( f, x, u, particles, neighbor );
+        force.computeForceFull( model, f, x, u, particles, neighbor );
     Kokkos::fence();
 }
 
-template <class ForceType, class ParticleType, class NeighborType>
-void computeEnergy( ForceType& force, ParticleType& particles,
-                    const NeighborType& neighbor )
+template <class ModelType, class ForceType, class ParticleType,
+          class NeighborType>
+void computeEnergy( const ModelType& model, ForceType& force,
+                    ParticleType& particles, const NeighborType& neighbor )
 {
     if constexpr ( is_energy_output<typename ParticleType::output_type>::value )
     {
@@ -207,14 +211,15 @@ void computeEnergy( ForceType& force, ParticleType& particles,
         // Reset energy.
         Cabana::deep_copy( W, 0.0 );
 
-        force.computeEnergyFull( W, x, u, particles, neighbor );
+        force.computeEnergyFull( model, W, x, u, particles, neighbor );
         Kokkos::fence();
     }
 }
 
-template <class ForceType, class ParticleType, class ParallelType>
-void computeStress( ForceType& force, ParticleType& particles,
-                    const ParallelType& neigh_op_tag )
+template <class ModelType, class ForceType, class ParticleType,
+          class ParallelType>
+void computeStress( const ModelType& model, ForceType& force,
+                    ParticleType& particles, const ParallelType& neigh_op_tag )
 {
     if constexpr ( is_stress_output<typename ParticleType::output_type>::value )
     {
@@ -223,7 +228,7 @@ void computeStress( ForceType& force, ParticleType& particles,
         // Reset stress.
         Cabana::deep_copy( stress, 0.0 );
 
-        force.computeStressFull( particles, neigh_op_tag );
+        force.computeStressFull( model, particles, neigh_op_tag );
         Kokkos::fence();
     }
 }

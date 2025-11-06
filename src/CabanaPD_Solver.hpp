@@ -93,69 +93,68 @@ class Solver
     using exec_space = typename memory_space::execution_space;
 
     // Core module types - required for all problems.
-    using force_model_type = ForceModelType;
-    using force_model_tag = typename force_model_type::model_type;
-    using force_fracture_type = typename force_model_type::fracture_type;
-    using force_type = Force<memory_space, force_model_type, force_model_tag,
-                             force_fracture_type>;
-    using force_thermal_type =
-        typename force_model_type::thermal_type::base_type;
+    using force_model_tag = typename ForceModelType::model_type;
+    using force_fracture_type = typename ForceModelType::fracture_type;
+    using force_type =
+        Force<memory_space, force_model_tag, force_fracture_type>;
+    using force_thermal_type = typename ForceModelType::thermal_type::base_type;
     using comm_type =
-        Comm<ParticleType, typename force_model_type::base_model::base_type,
-             typename force_model_type::material_type, force_thermal_type>;
+        Comm<ParticleType, typename ForceModelType::base_model::base_type,
+             typename ForceModelType::material_type, force_thermal_type>;
     using neighbor_type = Neighbor<memory_space, force_fracture_type>;
 
     // Optional module types.
     using heat_transfer_type =
-        HeatTransfer<memory_space, force_model_type, force_fracture_type>;
-    using contact_model_type = ContactModelType;
-    using contact_model_tag = typename contact_model_type::model_type;
-    using contact_fracture_type = typename contact_model_type::fracture_type;
-    using contact_type = Force<memory_space, contact_model_type,
-                               contact_model_tag, contact_fracture_type>;
+        HeatTransfer<memory_space, ForceModelType, force_fracture_type>;
+    using contact_model_tag = typename ContactModelType::model_type;
+    using contact_fracture_type = typename ContactModelType::fracture_type;
+    using contact_type =
+        Force<memory_space, contact_model_tag, contact_fracture_type>;
     using contact_neighbor_type = Neighbor<memory_space, contact_fracture_type>;
 
     // Flexible module types.
     // Integration should include max displacement tracking if either model
     // involves contact.
-    using integrator_type =
-        VelocityVerlet<typename either_contact<force_model_type,
-                                               contact_model_type>::base_type>;
+    using integrator_type = VelocityVerlet<
+        typename either_contact<ForceModelType, ContactModelType>::base_type>;
     // Different timings are output based on models.
-    using output_type = TimingOutput<force_model_type, contact_model_type>;
+    using output_type = TimingOutput<ForceModelType, ContactModelType>;
 
     Solver( Inputs _inputs, ParticleType _particles,
-            force_model_type force_model )
+            ForceModelType _force_model )
         : particles( _particles )
         , inputs( _inputs )
+        , force_model( _force_model )
         , _other_time( 0.0 )
         , _total_time( 0.0 )
     {
         _total_timer.start();
-        setup( force_model );
+        setup();
         _total_timer.stop();
     }
 
     Solver( Inputs _inputs, ParticleType _particles,
-            force_model_type force_model, contact_model_type contact_model )
+            ForceModelType _force_model, ContactModelType _contact_model )
         : particles( _particles )
         , inputs( _inputs )
+        , force_model( _force_model )
         , _other_time( 0.0 )
         , _total_time( 0.0 )
     {
         _total_timer.start();
-        setup( force_model );
+        setup();
 
-        contact = std::make_shared<contact_type>( contact_model );
-        contact_neighbor =
-            std::make_shared<contact_neighbor_type>( contact_model, particles );
+        contact_model = std::make_unique<ContactModelType>( _contact_model );
+        contact = std::make_shared<contact_type>();
+        contact_neighbor = std::make_shared<contact_neighbor_type>(
+            *contact_model, particles );
         _total_timer.stop();
     }
 
-    void setup( force_model_type force_model )
+    void setup()
     {
         // This timestep is not valid for DEM-only.
-        if constexpr ( !is_contact<force_model_type>::value )
+        if constexpr ( !is_contact<ForceModelType>::value )
             inputs.computeCriticalTimeStep( force_model );
 
         num_steps = inputs["num_steps"];
@@ -169,7 +168,7 @@ class Solver
         // Add ghosts from other MPI ranks.
         comm = std::make_shared<comm_type>( particles );
 
-        if constexpr ( is_contact<contact_model_type>::value )
+        if constexpr ( is_contact<ContactModelType>::value )
         {
             if ( comm->size() > 1 )
                 throw std::runtime_error(
@@ -177,12 +176,12 @@ class Solver
         }
 
         // Update optional property ghost sizes if needed.
-        if constexpr ( std::is_same<typename force_model_type::material_type,
+        if constexpr ( std::is_same<typename ForceModelType::material_type,
                                     MultiMaterial>::value )
             force_model.update( particles.sliceType() );
         // Update temperature ghost size if needed.
         if constexpr ( is_temperature_dependent<
-                           typename force_model_type::thermal_type>::value )
+                           typename ForceModelType::thermal_type>::value )
             force_model.update( particles.sliceTemperature() );
 
         neighbor = std::make_shared<neighbor_type>( force_model, particles );
@@ -191,7 +190,7 @@ class Solver
                                  neighbor->getMaxLocal() );
 
         // This will either be PD or DEM forces.
-        force = std::make_shared<force_type>( force_model );
+        force = std::make_shared<force_type>();
 
         unsigned max_neighbors;
         unsigned long long total_neighbors;
@@ -200,7 +199,7 @@ class Solver
         // Create heat transfer if needed, using the same neighbor list as
         // the mechanics.
         if constexpr ( is_heat_transfer<
-                           typename force_model_type::thermal_type>::value )
+                           typename ForceModelType::thermal_type>::value )
         {
             thermal_subcycle_steps = inputs["thermal_subcycle_steps"];
             heat_transfer = std::make_shared<heat_transfer_type>( force_model );
@@ -238,15 +237,15 @@ class Solver
         // Compute and communicate weighted volume for LPS (does nothing for
         // PMB). Only computed once without fracture (and inside updateForce for
         // fracture).
-        if constexpr ( !is_fracture<force_model_type>::value )
+        if constexpr ( !is_fracture<ForceModelType>::value )
         {
-            force->computeWeightedVolume( particles, *neighbor );
+            force->computeWeightedVolume( force_model, particles, *neighbor );
             comm->gatherWeightedVolume();
         }
         // Compute initial internal forces and energy.
         updateForce();
-        computeEnergy( *force, particles, *neighbor );
-        computeStress( *force, particles, *neighbor );
+        computeEnergy( force_model, *force, particles, *neighbor );
+        computeStress( force_model, *force, particles, *neighbor );
 
         if ( initial_output )
             particles.output( 0, 0.0, output_reference );
@@ -263,11 +262,11 @@ class Solver
             boundary_condition.apply( exec_space(), particles, 0.0 );
 
         // Communicate optional properties.
-        if constexpr ( std::is_same<typename force_model_type::material_type,
+        if constexpr ( std::is_same<typename ForceModelType::material_type,
                                     MultiMaterial>::value )
             comm->gatherMaterial();
         if constexpr ( is_temperature_dependent<
-                           typename force_model_type::thermal_type>::value )
+                           typename ForceModelType::thermal_type>::value )
             comm->gatherTemperature();
         _total_timer.stop();
 
@@ -346,7 +345,7 @@ class Solver
         comm->gatherDisplacement();
 
         if constexpr ( is_heat_transfer<
-                           typename force_model_type::thermal_type>::value )
+                           typename ForceModelType::thermal_type>::value )
         {
             if ( step % thermal_subcycle_steps == 0 )
                 computeHeatTransfer( *heat_transfer, particles, *neighbor,
@@ -358,14 +357,15 @@ class Solver
             boundary_condition.apply( exec_space(), particles, step * dt );
 
         if constexpr ( is_temperature_dependent<
-                           typename force_model_type::thermal_type>::value )
+                           typename ForceModelType::thermal_type>::value )
             comm->gatherTemperature();
 
         // Compute internal forces.
         updateForce();
 
-        if constexpr ( is_contact<contact_model_type>::value )
-            computeForce( *contact, particles, *contact_neighbor, false );
+        if constexpr ( is_contact<ContactModelType>::value )
+            computeForce( *contact_model, *contact, particles,
+                          *contact_neighbor, false );
 
         // Add force boundary condition.
         if ( boundary_condition.forceUpdate() )
@@ -392,11 +392,12 @@ class Solver
         // Compute internal forces.
         updateForce();
 
-        if constexpr ( is_contact<contact_model_type>::value )
-            computeForce( *contact, particles, *contact_neighbor, false );
+        if constexpr ( is_contact<ContactModelType>::value )
+            computeForce( *contact_model, *contact, particles,
+                          *contact_neighbor, false );
 
         if constexpr ( is_temperature_dependent<
-                           typename force_model_type::thermal_type>::value )
+                           typename ForceModelType::thermal_type>::value )
             comm->gatherTemperature();
 
         // Integrate - velocity Verlet second half.
@@ -466,17 +467,17 @@ class Solver
     {
         // Compute and communicate weighted volume for LPS (does nothing for
         // PMB). Only computed once without fracture.
-        if constexpr ( is_fracture<force_model_type>::value )
+        if constexpr ( is_fracture<ForceModelType>::value )
         {
-            force->computeWeightedVolume( particles, *neighbor );
+            force->computeWeightedVolume( force_model, particles, *neighbor );
             comm->gatherWeightedVolume();
         }
         // Compute and communicate dilatation for LPS (does nothing for PMB).
-        force->computeDilatation( particles, *neighbor );
+        force->computeDilatation( force_model, particles, *neighbor );
         comm->gatherDilatation();
 
         // Compute internal forces.
-        computeForce( *force, particles, *neighbor );
+        computeForce( force_model, *force, particles, *neighbor );
     }
 
     void output( const int step )
@@ -485,8 +486,8 @@ class Solver
         if ( step % output_frequency == 0 )
         {
             _step_timer.start();
-            computeEnergy( *force, particles, *neighbor );
-            computeStress( *force, particles, *neighbor );
+            computeEnergy( force_model, *force, particles, *neighbor );
+            computeStress( force_model, *force, particles, *neighbor );
 
             particles.output( step / output_frequency, step * dt,
                               output_reference );
@@ -515,7 +516,7 @@ class Solver
         // All ranks must reduce - do this outside the if block since only rank
         // 0 will print below.
         double global_damage = 0.0;
-        if constexpr ( is_fracture<force_model_type>::value )
+        if constexpr ( is_fracture<ForceModelType>::value )
         {
             global_damage = updateGlobal( force->totalDamage() );
         }
@@ -532,7 +533,7 @@ class Solver
 
             double contact_time = 0.0;
             double neigh_time = neighbor->time();
-            if constexpr ( is_contact<contact_model_type>::value )
+            if constexpr ( is_contact<ContactModelType>::value )
             {
                 contact_time = contact->time();
                 neigh_time += contact_neighbor->time();
@@ -568,7 +569,7 @@ class Solver
             double neigh_time = neighbor->time();
             double contact_time = 0.0;
             double contact_neigh_time = 0.0;
-            if constexpr ( is_contact<contact_model_type>::value )
+            if constexpr ( is_contact<ContactModelType>::value )
             {
                 contact_time = contact->time();
                 contact_neigh_time += contact_neighbor->time();
@@ -624,7 +625,7 @@ class Solver
     void init_prenotch( Prenotch<NumPrenotch> prenotch )
     {
         _total_timer.start();
-        static_assert( is_fracture<force_model_type>::value,
+        static_assert( is_fracture<ForceModelType>::value,
                        "Cannot create prenotch in system without fracture." );
 
         // Create prenotch.
@@ -639,9 +640,11 @@ class Solver
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<neighbor_type> neighbor;
     std::shared_ptr<force_type> force;
+    ForceModelType force_model;
     // Optional modules.
     std::shared_ptr<heat_transfer_type> heat_transfer;
     std::shared_ptr<contact_type> contact;
+    std::unique_ptr<ContactModelType> contact_model;
     std::shared_ptr<contact_neighbor_type> contact_neighbor;
 
     // Output files.

@@ -824,12 +824,13 @@ void checkAnalyticalDilatation( ModelType, QuadraticTag, const double,
 {
 }
 
-template <class ForceType, class ParticleType, class NeighborType>
-void initializeForce( ForceType& force, ParticleType& particles,
-                      const NeighborType& neighbor )
+template <class ModelType, class ForceType, class ParticleType,
+          class NeighborType>
+void initializeForce( const ModelType& model, ForceType& force,
+                      ParticleType& particles, const NeighborType& neighbor )
 {
-    force.computeWeightedVolume( particles, neighbor );
-    force.computeDilatation( particles, neighbor );
+    force.computeWeightedVolume( model, particles, neighbor );
+    force.computeDilatation( model, particles, neighbor );
 }
 
 template <class ParticleType, class AoSoAType>
@@ -860,9 +861,9 @@ void testForce( ModelType model, const double dx, const double m,
 
     // This needs to exactly match the mesh spacing to compare with the single
     // particle calculation.
-    CabanaPD::Force<TEST_MEMSPACE, ModelType, typename ModelType::base_model,
+    CabanaPD::Force<TEST_MEMSPACE, typename ModelType::base_model,
                     typename ModelType::fracture_type>
-        force( model );
+        force;
     CabanaPD::Neighbor<TEST_MEMSPACE, typename ModelType::fracture_type>
         neighbor( model, particles );
     auto x = particles.sliceReferencePosition();
@@ -872,11 +873,11 @@ void testForce( ModelType model, const double dx, const double m,
     auto vol = particles.sliceVolume();
     //  No communication needed (as in the main solver) since this test is only
     //  intended for one rank.
-    initializeForce( force, particles, neighbor );
+    initializeForce( model, force, particles, neighbor );
 
-    computeForce( force, particles, neighbor );
-    computeEnergy( force, particles, neighbor );
-    computeStress( force, particles, neighbor );
+    computeForce( model, force, particles, neighbor );
+    computeEnergy( model, force, particles, neighbor );
+    computeStress( model, force, particles, neighbor );
 
     // Make a copy of final results on the host
     std::size_t num_particle = x.size();
