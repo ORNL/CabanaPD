@@ -21,11 +21,12 @@
 namespace CabanaPD
 {
 
-template <typename MechanicsModelType, typename... DataTypes>
+template <typename MechanicsModelType, typename AnisotropyType,
+          typename... DataTypes>
 struct BaseForceModelPMB;
 
 template <>
-struct BaseForceModelPMB<Elastic> : public BaseForceModel
+struct BaseForceModelPMB<Elastic, Isotropic> : public BaseForceModel
 {
     using base_type = BaseForceModel;
     using model_type = PMB;
@@ -34,7 +35,7 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
 
     using base_type::delta;
     using base_type::K;
-    double c;
+    double _c;
 
     BaseForceModelPMB( PMB, NoFracture, const double delta, const double _K )
         : base_type( delta, _K )
@@ -49,21 +50,21 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
         init();
     }
 
-    void init() { c = 18.0 * K / ( pi * delta * delta * delta * delta ); }
+    void init() { _c = 18.0 * K / ( pi * delta * delta * delta * delta ); }
 
     // Constructor to average from existing models.
     template <typename ModelType1, typename ModelType2>
     BaseForceModelPMB( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
     {
-        c = ( model1.c + model2.c ) / 2.0;
+        _c = ( model1.c + model2.c ) / 2.0;
     }
 
     KOKKOS_INLINE_FUNCTION
     auto operator()( ForceCoeffTag, const int, const int, const double s,
                      const double vol, const int = -1 ) const
     {
-        return c * s * vol;
+        return c() * s * vol;
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -72,15 +73,70 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
     {
         // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
         // the integrand (pairwise potential).
-        return 0.25 * c * s * s * xi * vol;
+        return 0.25 * c() * s * s * xi * vol;
     }
+
+    auto c() const { return _c; }
 };
 
-template <typename MemorySpace>
-struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
-    : public BaseForceModelPMB<Elastic>, public BasePlasticity<MemorySpace>
+template <>
+struct BaseForceModelPMB<Elastic, Anisotropic> : public BaseForceModel
 {
-    using base_type = BaseForceModelPMB<Elastic>;
+    using base_type = BaseForceModel;
+    using model_type = PMB;
+    using base_model = PMB;
+    using mechanics_type = Elastic;
+
+    using base_type::delta;
+    using base_type::K;
+
+    BaseForceModelPMB( PMB, NoFracture, const double delta, const double _K )
+        : base_type( delta, _K )
+    {
+        init();
+    }
+
+    BaseForceModelPMB( PMB, Elastic, NoFracture, const double delta,
+                       const double _K )
+        : base_type( delta, _K )
+    {
+        init();
+    }
+
+    void init() {}
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    BaseForceModelPMB( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+    {
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( ForceCoeffTag, const int, const int, const double s,
+                     const double vol, const int = -1 ) const
+    {
+        return c() * s * vol;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( EnergyTag, const int, const int, const double s,
+                     const double xi, const double vol, const int = -1 ) const
+    {
+        // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
+        // the integrand (pairwise potential).
+        return 0.25 * c() * s * s * xi * vol;
+    }
+
+    auto c() const { return orientation_dependent_function; }
+};
+
+template <typename MemorySpace, typename AnisotropyType>
+struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
+    : public BaseForceModelPMB<Elastic, AnisotropyType>,
+      public BasePlasticity<MemorySpace>
+{
+    using base_type = BaseForceModelPMB<Elastic, AnisotropyType>;
     using base_plasticity_type = BasePlasticity<MemorySpace>;
 
     using mechanics_type = ElasticPerfectlyPlastic;
@@ -152,13 +208,13 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
     }
 };
 
-template <>
+template <typename AnisotropyType>
 struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
-    : public BaseForceModelPMB<Elastic>,
+    : public BaseForceModelPMB<Elastic, AnisotropyType>,
       BaseNoFractureModel,
       BaseTemperatureModel<TemperatureIndependent>
 {
-    using base_type = BaseForceModelPMB<Elastic>;
+    using base_type = BaseForceModelPMB<Elastic, AnisotropyType>;
     using base_fracture_type = BaseNoFractureModel;
     using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
 
@@ -169,13 +225,13 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
     using base_temperature_type::operator();
 };
 
-template <>
+template <typename AnisotropyType>
 struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
-    : public BaseForceModelPMB<Elastic>,
+    : public BaseForceModelPMB<Elastic, AnisotropyType>,
       BaseFractureModel,
       BaseTemperatureModel<TemperatureIndependent>
 {
-    using base_type = BaseForceModelPMB<Elastic>;
+    using base_type = BaseForceModelPMB<Elastic, AnisotropyType>;
     using base_fracture_type = BaseFractureModel;
     using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
 
