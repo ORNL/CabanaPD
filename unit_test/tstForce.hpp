@@ -119,7 +119,8 @@ auto computeReferenceStress(
                     // This i/j indexing has to be valid for the multi-material
                     // cases, but everything is the same type so it doesn't
                     // matter which particle we check.
-                    f_mag = model( CabanaPD::ForceCoeffTag{}, 0, 0, s0, vol );
+                    f_mag = model( CabanaPD::ForceCoeffTag{}, 0, 0, s0, vol,
+                                   0.0, xi, xi_x, xi_y, xi_z );
                     f_x = f_mag * xi_x / xi;
                     f_y = f_mag * xi_y / xi;
                     f_z = f_mag * xi_z / xi;
@@ -232,7 +233,8 @@ double computeReferenceForceX(
                 double s = ( r - xi ) / xi;
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
-                    fx += model( CabanaPD::ForceCoeffTag{}, 0, 0, s, vol ) *
+                    fx += model( CabanaPD::ForceCoeffTag{}, 0, 0, s, vol, r, xi,
+                                 xi_x, xi_y, xi_z ) *
                           rx / r;
             }
     return fx;

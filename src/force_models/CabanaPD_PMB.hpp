@@ -64,7 +64,8 @@ struct BaseForceModelPMB<Elastic, Isotropic> : public BaseForceModel
 
     KOKKOS_INLINE_FUNCTION
     auto operator()( ForceCoeffTag, const int, const int, const double s,
-                     const double vol, const int = -1 ) const
+                     const double vol, const double, const double, const double,
+                     const double, const double, const int = -1 ) const
     {
         return c() * s * vol;
     }
@@ -86,23 +87,35 @@ struct BaseForceModelPMB<Elastic, Anisotropic>
     using base_type = BaseForceModelPMB<Elastic, Isotropic>;
 
     using base_type::delta;
-    using base_type::K;
+    double C11;
+    double C12;
+    double A1111;
+    double A1122;
 
     BaseForceModelPMB( PMB model, NoFracture fracture, const double delta,
-                       const double _K )
-        : base_type( model, fracture, delta, _K )
+                       const double _C11, const double _C12 )
+        : base_type( model, fracture, delta, 1.0 / 3.0 * ( _C11 + 2.0 * _C12 ) )
+        , C11( _C11 )
+        , C12( _C12 )
     {
         init();
     }
 
     BaseForceModelPMB( PMB model, Elastic, NoFracture fracture,
-                       const double delta, const double _K )
-        : base_type( model, fracture, delta, _K )
+                       const double delta, const double _C11,
+                       const double _C12 )
+        : base_type( model, fracture, delta, 1.0 / 3.0 * ( _C11 + 2.0 * _C12 ) )
+        , C11( _C11 )
+        , C12( _C12 )
     {
         init();
     }
 
-    void init() {}
+    void init()
+    {
+        A1111 = 75.0 / 2.0 * C11 - 165.0 / 2.0 * C12;
+        A1122 = -55.0 / 4.0 * C11 - 205.0 / 4.0 * C12;
+    }
 
     // Constructor to average from existing models.
     template <typename ModelType1, typename ModelType2>
@@ -111,7 +124,29 @@ struct BaseForceModelPMB<Elastic, Anisotropic>
     {
     }
 
-    auto c() const { return add_orientation_dependence_here; }
+    // This is currently written for cubic anisotropy only. This is not a fully
+    // general case.
+    auto lambda( const double r, const double xi, const double xi1,
+                 const double xi2, const double xi3 ) const
+    {
+        const double A0 =
+            A1111 * ( Kokkos::pow( xi1, 4.0 ) + Kokkos::pow( xi2, 4.0 ) ) +
+            6.0 * A1122 * Kokkos::pow( xi1, 2.0 ) * Kokkos::pow( xi2, 2.0 );
+        const double A2 = 6.0 * A1122 * Kokkos::pow( r, 2.0 );
+        const double A4 = A1111;
+        return ( A0 + A2 * Kokkos::pow( xi3, 2.0 ) +
+                 A4 * Kokkos::pow( xi3, 4.0 ) ) /
+               Kokkos::pow( xi, 4.0 );
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( ForceCoeffTag, const int, const int, const double s,
+                     const double vol, const double r, const double xi,
+                     const double xi_x, const double xi_y, const double xi_z,
+                     const int = -1 ) const
+    {
+        return lambda( r, xi, xi_x, xi_y, xi_z ) * s * vol;
+    }
 };
 
 template <typename MemorySpace, typename AnisotropyType>
@@ -150,7 +185,8 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, AnisotropyType, MemorySpace>
 
     KOKKOS_INLINE_FUNCTION
     auto operator()( ForceCoeffTag, const int i, const int, const double s,
-                     const double vol, const int n ) const
+                     const double vol, const double, const double, const double,
+                     const double, const double, const int n ) const
     {
         // Update bond plastic stretch.
         auto s_p = _s_p( i, n );
