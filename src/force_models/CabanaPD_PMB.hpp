@@ -60,6 +60,7 @@ struct BaseForceModelPMB<Elastic, Isotropic> : public BaseForceModel
         _c = ( model1.c() + model2.c() ) / 2.0;
     }
 
+    KOKKOS_FUNCTION
     auto c() const { return _c; }
 
     KOKKOS_INLINE_FUNCTION
@@ -126,6 +127,7 @@ struct BaseForceModelPMB<Elastic, Anisotropic>
 
     // This is currently written for cubic anisotropy only. This is not a fully
     // general case.
+    KOKKOS_FUNCTION
     auto lambda( const double r, const double xi, const double xi1,
                  const double xi2, const double xi3 ) const
     {
