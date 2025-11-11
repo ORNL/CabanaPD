@@ -53,10 +53,12 @@ struct ElasticPerfectlyPlastic
 {
     using base_type = Plastic;
 };
+//! Fully isotropic.
 struct Isotropic
 {
 };
-struct Anisotropic
+//! Cubic anisotropy.
+struct Cubic
 {
 };
 

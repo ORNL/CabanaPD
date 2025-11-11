@@ -82,7 +82,7 @@ struct BaseForceModelPMB<Elastic, Isotropic> : public BaseForceModel
 };
 
 template <>
-struct BaseForceModelPMB<Elastic, Anisotropic>
+struct BaseForceModelPMB<Elastic, Cubic>
     : public BaseForceModelPMB<Elastic, Isotropic>
 {
     using base_type = BaseForceModelPMB<Elastic, Isotropic>;
@@ -125,8 +125,6 @@ struct BaseForceModelPMB<Elastic, Anisotropic>
     {
     }
 
-    // This is currently written for cubic anisotropy only. This is not a fully
-    // general case.
     KOKKOS_FUNCTION
     auto lambda( const double r, const double xi, const double xi1,
                  const double xi2, const double xi3 ) const
