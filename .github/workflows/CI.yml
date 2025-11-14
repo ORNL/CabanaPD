@@ -100,7 +100,8 @@ jobs:
             -D CMAKE_PREFIX_PATH="$HOME/Cabana" \
             -D MPIEXEC_MAX_NUMPROCS=2 \
             -D MPIEXEC_PREFLAGS="--oversubscribe" \
-            -D CabanaPD_ENABLE_TESTING=ON
+            -D CabanaPD_ENABLE_TESTING=ON \
+            -D CabanaPD_ENABLE_EXAMPLES=ON
           cmake --build build --parallel 2
           cmake --install build
       - name: Test CabanaPD
@@ -189,7 +190,8 @@ jobs:
             -D CMAKE_SHARED_LINKER_FLAGS="-L${MPI_LOCATION}/lib -lmpi" \
             -D MPIEXEC_MAX_NUMPROCS=2 \
             -D MPIEXEC_PREFLAGS="--oversubscribe" \
-            -D CabanaPD_ENABLE_TESTING=ON
+            -D CabanaPD_ENABLE_TESTING=ON \
+            -D CabanaPD_ENABLE_EXAMPLES=ON
           cmake --build build --parallel 2
           cmake --install build
   CUDA:
@@ -263,6 +265,7 @@ jobs:
             -D CMAKE_PREFIX_PATH="$HOME/Cabana;$HOME/json" \
             -D MPIEXEC_MAX_NUMPROCS=2 \
             -D MPIEXEC_PREFLAGS="--oversubscribe" \
-            -D CabanaPD_ENABLE_TESTING=ON
+            -D CabanaPD_ENABLE_TESTING=ON \
+            -D CabanaPD_ENABLE_EXAMPLES=ON
           cmake --build build --parallel 2
           cmake --install build

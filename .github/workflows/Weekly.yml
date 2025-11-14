@@ -58,7 +58,8 @@ jobs:
             -D CMAKE_PREFIX_PATH="$HOME/Cabana" \
             -D MPIEXEC_MAX_NUMPROCS=2 \
             -D MPIEXEC_PREFLAGS="--oversubscribe" \
-            -D CabanaPD_ENABLE_TESTING=ON
+            -D CabanaPD_ENABLE_TESTING=ON \
+            -D CabanaPD_ENABLE_EXAMPLES=ON
           cmake --build build --parallel 2
           cmake --install build
       - name: Test CabanaPD

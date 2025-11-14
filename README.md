@@ -138,30 +138,20 @@ must be used:
 
 Note that `hipcc` should be used for Kokkos, Cabana, and CabanaPD.
 
-## Tests
+## Examples
 
-Unit tests can be built by updating the CabanaPD CMake configuration in the
+CabanaPD includes many examples (described in detail below).
+New examples can be created by using any of the current cases as a template.
+Examples can be built by updating the CabanaPD CMake configuration in the
 script above with:
 
 ```
--D CabanaPD_ENABLE_TESTING=ON
+-D CabanaPD_ENABLE_EXAMPLES=ON
 ```
-
-GTest is required for CabanaPD unit tests, with build instructions
-[here](https://github.com/google/googletest). If tests are enabled, you can run
-the CabanaPD unit test suite with:
-
-```
-cd CabanaPD/build
-ctest
-```
-
-
-## Examples
 
 Once built and installed, CabanaPD `examples/` can be run. Timing and energy
-information is output to file and particle output is written to files (if enabled within Cabana) that can be [visualized](#visualizing-with-paraview).
-New examples can be created by using any of the current cases as a template.
+information is written to file and particle output is written if enabled within Cabana in formats which can be [visualized](#visualizing-with-paraview).
+
 Most inputs are specified in the example JSON files within the relevant `inputs/` subdirectory; some inputs are set within the `.cpp` files directly.
 
 ### Mechanics
@@ -242,6 +232,24 @@ Examples with heat transfer are within `examples/thermomechanics`.
     ```
     ./CabanaPD/build/install/bin/ThermalDeformationHeatTransferPrenotched CabanaPD/examples/thermomechanics/heat_transfer.json
     ```
+
+## Tests
+
+Unit tests can be built by updating the CabanaPD CMake configuration in the
+script above with:
+
+```
+-D CabanaPD_ENABLE_TESTING=ON
+```
+
+GTest is required for CabanaPD unit tests, with build instructions
+[here](https://github.com/google/googletest). If tests are enabled, you can run
+the CabanaPD unit test suite with:
+
+```
+cd CabanaPD/build
+ctest
+```
 
 
 ## Visualizing with Paraview
