@@ -125,20 +125,21 @@ class OutputTimeSeries
         _profile = profile_type( "time_output", output_steps );
     }
 
-    KOKKOS_INLINE_FUNCTION
-    void operator()( const int b, double& px ) const
-    {
-        auto p = _indices._view( b );
-        px += _output( p );
-    }
-
     void update()
     {
         Kokkos::RangePolicy<typename memory_space::execution_space> policy(
             0, _indices.size() );
+        // Local copies for lambda. Avoiding functor due to string name member.
+        auto indices = _indices;
+        auto output = _output;
         // Reduce into host view.
-        Kokkos::parallel_reduce( "time_series", policy, *this,
-                                 _profile( index ) );
+        Kokkos::parallel_reduce(
+            "time_series", policy,
+            KOKKOS_LAMBDA( const int b, double& px ) {
+                auto p = indices._view( b );
+                px += output( p );
+            },
+            _profile( index ) );
         Kokkos::fence();
         index++;
     }
