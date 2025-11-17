@@ -39,24 +39,19 @@ getRelativeVelocityComponents( const VelType& vel, const int i, const int j,
 /******************************************************************************
   Normal repulsion forces
 ******************************************************************************/
-template <class MemorySpace, class ModelType>
-class Force<MemorySpace, ModelType, NormalRepulsionModel, NoFracture>
+template <class MemorySpace>
+class Force<MemorySpace, NormalRepulsionModel, NoFracture>
     : public BaseForce<MemorySpace>
 {
   public:
     using base_type = BaseForce<MemorySpace>;
 
-    Force( const NormalRepulsionModel model )
-        : _model( model )
-    {
-    }
-
-    template <class ForceType, class PosType, class ParticleType,
-              class NeighborType>
-    void computeForceFull( ForceType& fc, const PosType& x, const PosType& u,
+    template <class ModelType, class ForceType, class PosType,
+              class ParticleType, class NeighborType>
+    void computeForceFull( const ModelType& model, ForceType& fc,
+                           const PosType& x, const PosType& u,
                            ParticleType& particles, NeighborType& neighbor )
     {
-        auto model = _model;
         const auto vol = particles.sliceVolume();
 
         neighbor.update( particles, model );
@@ -95,40 +90,35 @@ class Force<MemorySpace, ModelType, NormalRepulsionModel, NoFracture>
     }
 
     // FIXME: implement energy
-    template <class PosType, class WType, class ParticleType,
+    template <class ModelType, class PosType, class WType, class ParticleType,
               class NeighborType>
-    void computeEnergyFull( WType&, const PosType&, const PosType&,
-                            ParticleType&, const int, NeighborType& )
+    void computeEnergyFull( const ModelType&, WType&, const PosType&,
+                            const PosType&, ParticleType&, const int,
+                            NeighborType& )
     {
     }
 
   protected:
-    ModelType _model;
     using base_type::_timer;
 };
 
 /******************************************************************************
   Hertzian contact forces
 ******************************************************************************/
-template <class MemorySpace, class ModelType>
-class Force<MemorySpace, ModelType, HertzianModel, NoFracture>
+template <class MemorySpace>
+class Force<MemorySpace, HertzianModel, NoFracture>
     : public BaseForce<MemorySpace>
 {
   public:
     using base_type = BaseForce<MemorySpace>;
 
-    Force( const ModelType model )
-        : _model( model )
-    {
-    }
-
-    template <class ForceType, class PosType, class ParticleType,
-              class NeighborType>
-    void computeForceFull( ForceType& fc, const PosType& x, const PosType& u,
+    template <class ModelType, class ForceType, class PosType,
+              class ParticleType, class NeighborType>
+    void computeForceFull( const ModelType& model, ForceType& fc,
+                           const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            NeighborType& neighbor )
     {
-        auto model = _model;
         const auto vol = particles.sliceVolume();
         const auto rho = particles.sliceDensity();
         const auto vel = particles.sliceVelocity();
@@ -180,15 +170,14 @@ class Force<MemorySpace, ModelType, HertzianModel, NoFracture>
     }
 
     // FIXME: implement energy
-    template <class PosType, class WType, class ParticleType,
+    template <class ModelType, class PosType, class WType, class ParticleType,
               class ParallelType>
-    void computeEnergyFull( WType&, const PosType&, const PosType&,
-                            ParticleType&, ParallelType& )
+    void computeEnergyFull( const ModelType&, WType&, const PosType&,
+                            const PosType&, ParticleType&, ParallelType& )
     {
     }
 
   protected:
-    ModelType _model;
     using base_type::_timer;
     using base_type::_total_strain_energy;
 };
