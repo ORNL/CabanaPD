@@ -75,7 +75,10 @@ MESSAGE(STATUS "CabanaPD Revision = '${CabanaPD_GIT_COMMIT_HASH}'")
 ## Build CabanaPD
 ##---------------------------------------------------------------------------##
 add_subdirectory(src)
-add_subdirectory(examples)
+option(CabanaPD_ENABLE_EXAMPLES "Build examples" OFF)
+if(CabanaPD_ENABLE_EXAMPLES)
+  add_subdirectory(examples)
+endif()
 
 ##---------------------------------------------------------------------------##
 ## Unit tests
