@@ -261,7 +261,7 @@ struct BaseDynamicTemperatureModel
 };
 
 template <typename PeridynamicsModelType, typename MechanicsModelType = Elastic,
-          typename DamageType = Fracture,
+          typename AnisotropyType = Isotropic, typename DamageType = Fracture,
           typename ThermalType = TemperatureIndependent, typename... DataTypes>
 struct ForceModel;
 

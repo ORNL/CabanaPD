@@ -20,11 +20,11 @@
 
 namespace CabanaPD
 {
-template <typename MechanicsModelType>
+template <typename MechanicsModelType, typename AnisotropyType>
 struct BaseForceModelLPS;
 
 template <>
-struct BaseForceModelLPS<Elastic> : public BaseForceModel
+struct BaseForceModelLPS<Elastic, Isotropic> : public BaseForceModel
 {
     using base_type = BaseForceModel;
     using model_type = LPS;
@@ -200,14 +200,15 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
 #pragma GCC diagnostic pop
 };
 
-template <>
-struct ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
-    : public BaseForceModelLPS<Elastic>,
+template <typename AnisotropyType>
+struct ForceModel<LPS, Elastic, AnisotropyType, NoFracture,
+                  TemperatureIndependent>
+    : public BaseForceModelLPS<Elastic, AnisotropyType>,
       BaseNoFractureModel,
       BaseTemperatureModel<TemperatureIndependent>
 
 {
-    using base_type = BaseForceModelLPS<Elastic>;
+    using base_type = BaseForceModelLPS<Elastic, AnisotropyType>;
     using base_fracture_type = BaseNoFractureModel;
     using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
     using fracture_type = NoFracture;
@@ -221,13 +222,14 @@ struct ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
     using base_type::influence_type;
 };
 
-template <>
-struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
-    : public BaseForceModelLPS<Elastic>,
+template <typename AnisotropyType>
+struct ForceModel<LPS, Elastic, AnisotropyType, Fracture,
+                  TemperatureIndependent>
+    : public BaseForceModelLPS<Elastic, AnisotropyType>,
       BaseFractureModel,
       BaseTemperatureModel<TemperatureIndependent>
 {
-    using base_type = BaseForceModelLPS<Elastic>;
+    using base_type = BaseForceModelLPS<Elastic, AnisotropyType>;
     using base_fracture_type = BaseFractureModel;
     using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
 
@@ -301,12 +303,15 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
     }
 };
 
-template <>
-struct ForceModel<LinearLPS, Elastic, NoFracture, TemperatureIndependent>
-    : public ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
+template <typename AnisotropyType>
+struct ForceModel<LinearLPS, Elastic, AnisotropyType, NoFracture,
+                  TemperatureIndependent>
+    : public ForceModel<LPS, Elastic, AnisotropyType, NoFracture,
+                        TemperatureIndependent>
 {
-    using base_type =
-        ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>;
+    using base_type = ForceModel<LPS, Elastic, AnisotropyType, NoFracture,
+                                 TemperatureIndependent>;
+    using typename base_type::base_model;
     using model_type = LinearLPS;
 
     template <typename... Args>
@@ -319,12 +324,15 @@ struct ForceModel<LinearLPS, Elastic, NoFracture, TemperatureIndependent>
     using base_type::operator();
 };
 
-template <>
-struct ForceModel<LinearLPS, Elastic, Fracture, TemperatureIndependent>
-    : public ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
+template <typename AnisotropyType>
+struct ForceModel<LinearLPS, Elastic, AnisotropyType, Fracture,
+                  TemperatureIndependent>
+    : public ForceModel<LPS, Elastic, AnisotropyType, Fracture,
+                        TemperatureIndependent>
 {
-    using base_type =
-        ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>;
+    using base_type = ForceModel<LPS, Elastic, AnisotropyType, Fracture,
+                                 TemperatureIndependent>;
+    using typename base_type::base_model;
 
     using model_type = LinearLPS;
 
@@ -341,12 +349,12 @@ struct ForceModel<LinearLPS, Elastic, Fracture, TemperatureIndependent>
 template <typename ModelType>
 ForceModel( ModelType, Elastic, NoFracture, const double delta, const double K,
             const double G, const int influence = 0 )
-    -> ForceModel<ModelType, Elastic, NoFracture>;
+    -> ForceModel<ModelType, Elastic, Isotropic, NoFracture>;
 
 template <typename ModelType>
 ForceModel( ModelType, NoFracture, const double delta, const double K,
             const double G, const int influence = 0 )
-    -> ForceModel<ModelType, Elastic, NoFracture>;
+    -> ForceModel<ModelType, Elastic, Isotropic, NoFracture>;
 
 template <typename ModelType>
 ForceModel( ModelType, Elastic, const double delta, const double K,
