@@ -345,17 +345,18 @@ struct AbortIfOutsideRangeFunctor
     }
 };
 
-template <typename MaterialType, typename Indexing, typename ParameterPackType,
+template <typename MaterialType, typename IndexingType,
+          typename ParameterPackType,
           typename OutsideRangeFunctorType = AbortIfOutsideRangeFunctor>
-struct ForceModels
-    : CabanaPD::Impl::ForceModelsImpl<
-          MaterialType, Indexing, ParameterPackType, OutsideRangeFunctorType,
-          std::make_index_sequence<ParameterPackType::size>>
+struct ForceModels : CabanaPD::Impl::ForceModelsImpl<
+                         MaterialType, IndexingType, ParameterPackType,
+                         OutsideRangeFunctorType,
+                         std::make_index_sequence<ParameterPackType::size>>
 {
-    ForceModels( MaterialType t, Indexing i, ParameterPackType const& m,
+    ForceModels( MaterialType t, IndexingType i, ParameterPackType const& m,
                  OutsideRangeFunctorType const& o = OutsideRangeFunctorType() )
         : CabanaPD::Impl::ForceModelsImpl<
-              MaterialType, Indexing, ParameterPackType,
+              MaterialType, IndexingType, ParameterPackType,
               OutsideRangeFunctorType,
               std::make_index_sequence<ParameterPackType::size>>( t, i, m, o )
     {
@@ -366,8 +367,8 @@ struct AverageTag
 {
 };
 
-template <typename ParticleType, typename Indexing, typename... ModelTypes>
-auto createMultiForceModel( ParticleType particles, Indexing indexing,
+template <typename ParticleType, typename IndexingType, typename... ModelTypes>
+auto createMultiForceModel( ParticleType particles, IndexingType indexing,
                             ModelTypes... m )
 {
     auto type = particles.sliceType();
