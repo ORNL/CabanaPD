@@ -65,7 +65,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: ECP-CoPA/Cabana
-          ref: 0.7.0
+          ref: edb0c7cd2ca32baecf09151ded2ed1ba6070c6fe
           path: cabana
       - name: Build Cabana
         working-directory: cabana
@@ -159,7 +159,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: ECP-CoPA/Cabana
-          ref: 0.7.0
+          ref: edb0c7cd2ca32baecf09151ded2ed1ba6070c6fe
           path: cabana
       - name: Build Cabana
         working-directory: cabana
@@ -241,7 +241,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: ECP-CoPA/Cabana
-          ref: 0.7.0
+          ref: edb0c7cd2ca32baecf09151ded2ed1ba6070c6fe
           path: cabana
       - name: Build Cabana
         working-directory: cabana
