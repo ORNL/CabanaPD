@@ -186,7 +186,7 @@ auto generateAllModelCombinationsForDiagonalIndexing(
         // index in the pair and will get the basemodels of the first and second
         // index in the pair as constructor arguments
         (
-            typename BaseModelPackType::value_type<
+            typename BaseModelPackType::template value_type<
                 IndexingType::template getInverseIndexPair<AveragingIndices>()
                     .first>{
                 Cabana::get<IndexingType::template getInverseIndexPair<
