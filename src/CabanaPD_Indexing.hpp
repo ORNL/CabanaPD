@@ -15,6 +15,9 @@
 namespace CabanaPD
 {
 
+template <typename T, typename... Args>
+static constexpr bool is_Indexing = false;
+
 template <unsigned FIRST, unsigned SECOND>
 struct IndexPair
 {
@@ -28,7 +31,7 @@ constexpr auto getDiagonalIndexPair()
     if constexpr ( Index < N )
         return IndexPair<Index, Index + Diagonal>{};
     else
-        return getDiagonalIndexPair<N-1, Index - N, Diagonal + 1>();
+        return getDiagonalIndexPair<N - 1, Index - N, Diagonal + 1>();
 }
 
 // Index along each diagonal sequentially (symmetric).
@@ -93,6 +96,8 @@ struct FullIndexing
     }
 };
 
+template <unsigned NumBaseModels>
+static constexpr bool is_Indexing<DiagonalIndexing<NumBaseModels>> = true;
 } // namespace CabanaPD
 
 #endif

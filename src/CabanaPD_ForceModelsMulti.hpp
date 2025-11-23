@@ -388,9 +388,8 @@ template <
 auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
                             ModelType2 m2 )
 {
-    using IndexingType = DiagonalIndexing<sizeof...( ModelTypes )>;
-    IndexingType indexing; // needs to support NumTotalModels and
-                           // getInverseIndexPair as constexpr.
+    // IndexingType needs to support NumTotalModels and
+    // getInverseIndexPair as constexpr.
     auto type = particles.sliceType();
     auto baseModels = Cabana::makeParameterPack( m... );
 
@@ -399,7 +398,7 @@ auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
         CabanaPD::Impl::generateAllModelCombinationsForDiagonalIndexing(
             baseModels, indexing,
             std::make_index_sequence<sizeof...( ModelTypes )>{},
-            std::make_index_sequence<IndexingType::NumTotalModels -
+            std::make_index_sequence<indexing.NumTotalModels -
                                      sizeof...( ModelTypes )>{} ) );
 }
 template <
