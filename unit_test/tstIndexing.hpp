@@ -20,6 +20,7 @@
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
+
 #include <gtest/gtest.h>
 
 #include <Cabana_Core.hpp>
@@ -42,12 +43,18 @@ TEST( TEST_CATEGORY, test_diagonalIndexing )
     // valid for higher values of N.
 
     // test diagonal indexing for N=1
-    CabanaPD::DiagonalIndexing<1> indexing1;
+    using IndexingType1 = CabanaPD::DiagonalIndexing<1>;
+    IndexingType1 indexing1;
 
     ASSERT_EQ( indexing1( 0, 0 ), 0 );
 
+    // test inverse indexing
+    ASSERT_EQ( IndexingType1::template getInverseIndexPair<0>().first, 0 );
+    ASSERT_EQ( IndexingType1::template getInverseIndexPair<0>().second, 0 );
+
     // test diagonal indexing for N=2
-    CabanaPD::DiagonalIndexing<2> indexing2;
+    using IndexingType2 = CabanaPD::DiagonalIndexing<2>;
+    IndexingType2 indexing2;
 
     // main diagonal
     ASSERT_EQ( indexing2( 0, 0 ), 0 );
@@ -57,8 +64,13 @@ TEST( TEST_CATEGORY, test_diagonalIndexing )
     ASSERT_EQ( indexing2( 0, 1 ), 2 );
     ASSERT_EQ( indexing2( 1, 0 ), 2 );
 
+    // test inverse indexing
+    ASSERT_EQ( IndexingType2::template getInverseIndexPair<2>().first, 0 );
+    ASSERT_EQ( IndexingType2::template getInverseIndexPair<2>().second, 1 );
+
     // test diagonal indexing for N=3
-    CabanaPD::DiagonalIndexing<3> indexing3;
+    using IndexingType3 = CabanaPD::DiagonalIndexing<3>;
+    IndexingType3 indexing3;
 
     // main diagonal
     ASSERT_EQ( indexing3( 0, 0 ), 0 );
@@ -74,6 +86,16 @@ TEST( TEST_CATEGORY, test_diagonalIndexing )
     // second minor diagonal (incl symmetric terms)
     ASSERT_EQ( indexing3( 0, 2 ), 5 );
     ASSERT_EQ( indexing3( 2, 0 ), 5 );
+
+    // test inverse indexing
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<3>().first, 0 );
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<3>().second, 1 );
+
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<4>().first, 1 );
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<4>().second, 2 );
+
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<5>().first, 0 );
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<5>().second, 2 );
 }
 
 TEST( TEST_CATEGORY, test_diagonalIndexing_death )
