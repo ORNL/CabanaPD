@@ -398,7 +398,7 @@ auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
         CabanaPD::Impl::generateAllModelCombinationsForDiagonalIndexing(
             baseModels, indexing,
             std::make_index_sequence<sizeof...( ModelTypes )>{},
-            std::make_index_sequence<indexing.NumTotalModels -
+            std::make_index_sequence<IndexingType::NumTotalModels -
                                      sizeof...( ModelTypes )>{} ) );
 }
 template <
