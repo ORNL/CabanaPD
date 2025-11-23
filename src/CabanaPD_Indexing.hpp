@@ -18,8 +18,8 @@ namespace CabanaPD
 template <unsigned FIRST, unsigned SECOND>
 struct IndexPair
 {
-    static const unsigned first = FIRST;
-    static const unsigned second = SECOND;
+    static constexpr unsigned first = FIRST;
+    static constexpr unsigned second = SECOND;
 };
 
 template <unsigned N, unsigned Index, unsigned Diagonal = 0>
@@ -28,7 +28,7 @@ constexpr auto getDiagonalIndexPair()
     if constexpr ( Index < N )
         return IndexPair<Index, Index + Diagonal>{};
     else
-        return getDiagonalIndexPair<N, Index - N, Diagonal + 1>();
+        return getDiagonalIndexPair<N-1, Index - N, Diagonal + 1>();
 }
 
 // Index along each diagonal sequentially (symmetric).
