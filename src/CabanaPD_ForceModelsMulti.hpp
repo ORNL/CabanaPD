@@ -179,7 +179,12 @@ auto generateAllModelCombinationsForDiagonalIndexing(
     std::index_sequence<AveragingIndices...> )
 {
     return Cabana::makeParameterPack(
+        // first unpack the base models
         ( Cabana::get<BaseIndices>( baseModels ), ... ),
+        // then create one model per index pair for each index in the averaging
+        // indices the model is created as type of the basemodels of the first
+        // index in the pair and will get the basemodels of the first and second
+        // index in the pair as constructor arguments
         (
             typename BaseModelPackType::value_type<
                 IndexingType::template getInverseIndexPair<AveragingIndices>()
@@ -384,7 +389,8 @@ auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
                             ModelType2 m2 )
 {
     using IndexingType = DiagonalIndexing<sizeof...( ModelTypes )>;
-    IndexingType indexing;
+    IndexingType indexing; // needs to support NumTotalModels and
+                           // getInverseIndexPair as constexpr.
     auto type = particles.sliceType();
     auto baseModels = Cabana::makeParameterPack( m... );
 
