@@ -233,7 +233,7 @@ class Dilatation<MemorySpace, ModelType, NoFracture>
             // Get the bond distance, displacement, and stretch.
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
-            theta( i ) += model.dilatation( i, s, xi, vol( j ), m( i ) );
+            theta( i ) += model.dilatation( i, j, s, xi, vol( j ), m( i ) );
         };
 
         neighbor.iterate( exec_space{}, dilatation, particles,
@@ -343,8 +343,9 @@ class Dilatation<MemorySpace, ModelType, Fracture>
                 // broken, because m=0 only occurs when all bonds are broken.
                 // mu is still included to account for individual bond breaking.
                 if ( m( i ) > 0 )
-                    theta( i ) += mu( i, n ) * model.dilatation(
-                                                   i, s, xi, vol( j ), m( i ) );
+                    theta( i ) +=
+                        mu( i, n ) *
+                        model.dilatation( i, n, s, xi, vol( j ), m( i ) );
             }
         };
 

@@ -171,8 +171,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
 
     // FIXME: avoiding multiple inheritance.
     KOKKOS_INLINE_FUNCTION
-    auto forceCoeff( const int i, const int n, const double s,
-                     const double vol ) const
+    auto plasticStretch( const int i, const double s, const int n ) const
     {
         // Update bond plastic stretch.
         auto s_p = _s_p( i, n );
@@ -184,8 +183,14 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
             _s_p( i, n ) = s + s_Y;
         // else: Elastic (in between), do not modify.
 
-        // Must extract again if in the plastic regime.
-        s_p = _s_p( i, n );
+        return _s_p( i, n );
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto forceCoeff( const int i, const int n, const double s,
+                     const double vol ) const
+    {
+        auto s_p = plasticStretch( i, s, n );
         return c * ( s - s_p ) * vol;
     }
 
@@ -640,11 +645,13 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     }
 
     // Update plastic dilatation.
-    KOKKOS_INLINE_FUNCTION auto dilatation( const int, const double s,
-                                            const double xi, const double vol,
+    KOKKOS_INLINE_FUNCTION auto dilatation( const int i, const int n,
+                                            const double s, const double xi,
+                                            const double vol,
                                             const double ) const
     {
-        return coeff * s * xi * vol;
+        auto s_p = base_type::plasticStretch( i, s, n );
+        return coeff / 6.0 * s_p * xi * vol;
     }
 
     // Density update using plastic dilatation.
