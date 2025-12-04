@@ -1353,10 +1353,7 @@ namespace
 struct FirstTestTag
 {
 };
-struct BaseModelDummyOne
-{
-};
-struct BaseModelDummyTwo
+struct BaseModelDummy
 {
 };
 
@@ -1367,12 +1364,11 @@ struct TestModelType
     KOKKOS_INLINE_FUNCTION auto operator()( int index ) const { return index; }
 };
 
-template <typename ModelType, typename BaseModel, typename FractureType,
-          typename ThermalType>
+template <typename ModelType, typename FractureType, typename ThermalType>
 struct TestModel
 {
     using model_type = ModelType;
-    using base_model = BaseModel;
+    using base_model = typename model_type::base_model;
     using fracture_type = FractureType;
     using thermal_type = ThermalType;
 
@@ -1409,24 +1405,20 @@ struct TestModel
 TEST( TEST_CATEGORY, test_forceModelsMulti_binary )
 {
     int parameter[3] = { 1, 2, 3 };
-    TestModel<TestModelType<BaseModelDummyOne>, CabanaPD::Elastic,
-              CabanaPD::NoFracture, CabanaPD::TemperatureIndependent>
+    TestModel<TestModelType<BaseModelDummy>, CabanaPD::NoFracture,
+              CabanaPD::TemperatureIndependent>
         model1{ 0, 0, parameter[0] };
-    TestModel<TestModelType<BaseModelDummyOne>, CabanaPD::Elastic,
-              CabanaPD::NoFracture, CabanaPD::TemperatureDependent>
+    TestModel<TestModelType<BaseModelDummy>, CabanaPD::NoFracture,
+              CabanaPD::TemperatureDependent>
         model2{ 1, 1, parameter[1] };
-    TestModel<TestModelType<BaseModelDummyTwo>, CabanaPD::Elastic,
-              CabanaPD::Fracture, CabanaPD::TemperatureIndependent>
+    TestModel<TestModelType<BaseModelDummy>, CabanaPD::Fracture,
+              CabanaPD::TemperatureIndependent>
         model12{ 0, 1, parameter[2] };
 
     CabanaPD::ForceModels models(
-        TestModelType<BaseModelDummyOne>{}, CabanaPD::DiagonalIndexing<2>{},
+        TestModelType<BaseModelDummy>{}, CabanaPD::DiagonalIndexing<2>{},
         Cabana::makeParameterPack( model1, model2, model12 ) );
 
-    static_assert( std::is_same_v<CabanaPD::Elastic,
-                                  typename decltype( models )::model_type> );
-    static_assert( std::is_same_v<CabanaPD::Elastic,
-                                  typename decltype( models )::base_model> );
     static_assert( std::is_same_v<CabanaPD::Fracture,
                                   typename decltype( models )::fracture_type> );
     static_assert( std::is_same_v<CabanaPD::TemperatureDependent,
