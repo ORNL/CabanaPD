@@ -36,26 +36,26 @@ class Inputs
         setupSize();
 
         // Final time and time step.
-        double tf = inputs["final_time"]["value"];
-        double dt = inputs["timestep"]["value"];
+        double tf = inputs.at( "final_time" )["value"];
+        double dt = inputs.at( "timestep" )["value"];
 
         // Mass scaling: ensure that the mass scaling is not applied multiple
         // times.
         if ( inputs.contains( "mass_scaling_factor" ) &&
              !inputs.contains( "density_input" ) )
         {
-            double ms_factor = inputs["mass_scaling_factor"]["value"];
+            double ms_factor = inputs.at( "mass_scaling_factor" )["value"];
 
             // Density scaling
-            double rho0 = inputs["density"]["value"];
+            double rho0 = inputs.at( "density" )["value"];
             inputs["density_input"]["value"] = rho0;
-            inputs["density_input"]["unit"] = inputs["density"]["unit"];
+            inputs["density_input"]["unit"] = inputs.at( "density" )["unit"];
             rho0 *= ms_factor;
             inputs["density"]["value"] = rho0;
 
             // Time step scaling
             inputs["timestep_input"]["value"] = dt;
-            inputs["timestep_input"]["unit"] = inputs["timestep"]["unit"];
+            inputs["timestep_input"]["unit"] = inputs.at( "timestep" )["unit"];
             dt *= std::sqrt( ms_factor );
             inputs["timestep"]["value"] = dt;
         }
@@ -68,7 +68,7 @@ class Inputs
 
         // m
         // FIXME: this will be slightly different in y/z
-        double dx = inputs["dx"]["value"][0];
+        double dx = inputs.at( "dx" )["value"][0];
         if ( inputs.contains( "horizon" ) )
         {
             double horizon = inputs["horizon"]["value"];
@@ -254,8 +254,8 @@ class Inputs
 
         // Run over the neighborhood of a point in the bulk of a body (at the
         // origin).
-        int m = inputs["m"]["value"];
-        double horizon = inputs["horizon"]["value"];
+        int m = inputs.at( "m" )["value"];
+        double horizon = inputs.at( "horizon" )["value"];
         // FIXME: this is copied from the forces.
         // FIXME: if horizon is not constant this needs to be updated
         // accordingly.
@@ -306,7 +306,7 @@ class Inputs
             }
         }
 
-        double dt = inputs["timestep"]["value"];
+        double dt = inputs.at( "timestep" )["value"];
         // This supports multi-material.
         double dt_crit = std::sqrt( 2.0 * min_rho / sum );
         compareCriticalTimeStep( "mechanics", dt, dt_crit );
@@ -315,12 +315,12 @@ class Inputs
         if constexpr ( is_heat_transfer<
                            typename ForceModel::thermal_type>::value )
         {
-            double dt_ht = inputs["thermal_subcycle_steps"]["value"];
+            double dt_ht = inputs.at( "thermal_subcycle_steps" )["value"];
             dt_ht *= dt;
 
             // Does not currently support multi-material.
-            double cp = inputs["specific_heat_capacity"]["value"];
-            double rho = inputs["density"]["value"];
+            double cp = inputs.at( "specific_heat_capacity" )["value"];
+            double rho = inputs.at( "density" )["value"];
             double dt_ht_crit = rho * cp / sum_ht;
             compareCriticalTimeStep( "heat_transfer", dt_ht, dt_ht_crit );
         }
@@ -331,7 +331,7 @@ class Inputs
     std::vector<double> getVector( const std::string key )
     {
         std::vector<double> v;
-        auto j = inputs[key]["value"];
+        auto j = inputs.at( key )["value"];
         if ( j.is_array() )
         {
             // Resize to match
@@ -355,12 +355,15 @@ class Inputs
     }
 
     // Get a single input.
-    auto operator[]( std::string label ) { return inputs[label]["value"]; }
+    auto operator[]( std::string label )
+    {
+        return inputs.at( label ).at( "value" );
+    }
 
-    // Get a single input.
+    // Get input units. Not currently enforced to be consistent.
     std::string units( std::string label )
     {
-        if ( inputs[label].contains( "units" ) )
+        if ( inputs.at( label ).contains( "units" ) )
             return inputs[label]["units"];
         else
             return "";
@@ -372,7 +375,7 @@ class Inputs
   protected:
     void compareCriticalTimeStep( std::string name, double dt, double dt_crit )
     {
-        double safety_factor = inputs["timestep_safety_factor"]["value"];
+        double safety_factor = inputs.at( "timestep_safety_factor" )["value"];
         double dt_crit_safety = safety_factor * dt_crit;
 
         if ( dt > dt_crit_safety )
