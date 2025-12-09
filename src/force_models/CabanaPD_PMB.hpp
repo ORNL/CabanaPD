@@ -93,8 +93,11 @@ struct BaseForceModelPMB<Elastic, Cubic>
     double A1111;
     double A1122;
 
-    BaseForceModelPMB( PMB model, NoFracture fracture, const double delta,
-                       const double _C11, const double _C12 )
+    using base_type::operator();
+
+    BaseForceModelPMB( PMB model, NoFracture fracture, Cubic,
+                       const double delta, const double _C11,
+                       const double _C12 )
         : base_type( model, fracture, delta, 1.0 / 3.0 * ( _C11 + 2.0 * _C12 ) )
         , C11( _C11 )
         , C12( _C12 )
@@ -102,7 +105,7 @@ struct BaseForceModelPMB<Elastic, Cubic>
         init();
     }
 
-    BaseForceModelPMB( PMB model, Elastic, NoFracture fracture,
+    BaseForceModelPMB( PMB model, Elastic, NoFracture fracture, Cubic,
                        const double delta, const double _C11,
                        const double _C12 )
         : base_type( model, fracture, delta, 1.0 / 3.0 * ( _C11 + 2.0 * _C12 ) )
@@ -371,6 +374,15 @@ ForceModel( ModelType, ElasticPerfectlyPlastic, MemorySpace, const double delta,
             const double K, const double G0, const double sigma_y )
     -> ForceModel<ModelType, ElasticPerfectlyPlastic, Isotropic, Fracture,
                   TemperatureIndependent, MemorySpace>;
+
+template <typename ModelType>
+ForceModel( ModelType, Elastic, NoFracture, Cubic, const double delta,
+            const double, const double )
+    -> ForceModel<ModelType, Elastic, Cubic, NoFracture>;
+
+template <typename ModelType>
+ForceModel( ModelType, NoFracture, Cubic, const double delta, const double,
+            const double ) -> ForceModel<ModelType, Elastic, Cubic, NoFracture>;
 
 template <typename AnisotropyType, typename TemperatureType>
 struct ForceModel<PMB, Elastic, AnisotropyType, NoFracture,
