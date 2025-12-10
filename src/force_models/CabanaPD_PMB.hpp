@@ -28,9 +28,11 @@ template <>
 struct BaseForceModelPMB<Elastic> : public BaseForceModel
 {
     using base_type = BaseForceModel;
-    using model_type = PMB;
-    using base_model = PMB;
     using mechanics_type = Elastic;
+
+    // Tags for creating particle fields and dispatch to force iteration.
+    using model_tag = PMB;
+    using force_tag = PMB;
 
     using base_type::delta;
     using base_type::K;
@@ -518,14 +520,15 @@ struct ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>
 {
     using base_type =
         ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>;
-    using model_type = LinearPMB;
+    // Tag to dispatch to force iteration.
+    using force_tag = LinearPMB;
 
     using base_type::base_type;
     using base_type::operator();
 
     template <typename... Args>
     ForceModel( LinearPMB, Args... args )
-        : base_type( typename base_type::base_model{}, args... )
+        : base_type( typename base_type::model_tag{}, args... )
     {
     }
 };
@@ -537,13 +540,14 @@ struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
     using base_type =
         ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>;
 
-    using model_type = LinearPMB;
+    // Tag to dispatch to force iteration.
+    using force_tag = LinearPMB;
 
     using base_type::operator();
 
     template <typename... Args>
     ForceModel( LinearPMB, Args... args )
-        : base_type( typename base_type::base_model{},
+        : base_type( typename base_type::model_tag{},
                      std::forward<Args>( args )... )
     {
     }
@@ -558,7 +562,8 @@ struct ForceModel<LinearPMB, ElasticPerfectlyPlastic, Fracture,
     using base_type = ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
                                  TemperatureIndependent, MemorySpace>;
 
-    using model_type = LinearPMB;
+    // Tag to dispatch to force iteration.
+    using force_tag = LinearPMB;
 
     using base_type::operator();
 
@@ -579,7 +584,8 @@ struct ForceModel<LinearPMB, MechanicsType, Fracture, ThermalType,
     using base_type =
         ForceModel<PMB, MechanicsType, Fracture, ThermalType, FieldTypes...>;
 
-    using model_type = LinearPMB;
+    // Tag to dispatch to force iteration.
+    using force_tag = LinearPMB;
 
     using base_type::operator();
 
