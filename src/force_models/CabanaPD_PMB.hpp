@@ -82,18 +82,18 @@ struct BaseForceModelPMB<Elastic, Isotropic> : public BaseForceModel
 };
 
 template <>
-struct BaseForceModelPMB<Elastic, Cubic>
-    : public BaseForceModelPMB<Elastic, Isotropic>
+struct BaseForceModelPMB<Elastic, Cubic> : public BaseForceModel
 {
-    using base_type = BaseForceModelPMB<Elastic, Isotropic>;
+    using base_type = BaseForceModel;
+    using model_type = PMB;
+    using base_model = PMB;
+    using mechanics_type = Elastic;
 
     using base_type::delta;
     double C11;
     double C12;
     double A1111;
     double A1122;
-
-    using base_type::operator();
 
     BaseForceModelPMB( PMB model, NoFracture fracture, Cubic cubic,
                        const double delta, const double _C11,
@@ -103,10 +103,9 @@ struct BaseForceModelPMB<Elastic, Cubic>
     {
     }
 
-    BaseForceModelPMB( PMB model, Elastic, NoFracture fracture, Cubic,
-                       const double delta, const double _C11,
-                       const double _C12 )
-        : base_type( model, fracture, delta, 1.0 / 3.0 * ( _C11 + 2.0 * _C12 ) )
+    BaseForceModelPMB( PMB, Elastic, NoFracture, Cubic, const double delta,
+                       const double _C11, const double _C12 )
+        : base_type( delta, 1.0 / 3.0 * ( _C11 + 2.0 * _C12 ) )
         , C11( _C11 )
         , C12( _C12 )
     {
@@ -141,6 +140,14 @@ struct BaseForceModelPMB<Elastic, Cubic>
                      const int = -1 ) const
     {
         return lambda( xi, xi_x, xi_y, xi_z ) * s * vol;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( EnergyTag, const int, const int, const double,
+                     const double, const double, const int = -1 ) const
+    {
+        // TODO: implement cubic energy.
+        return 0.0;
     }
 };
 
