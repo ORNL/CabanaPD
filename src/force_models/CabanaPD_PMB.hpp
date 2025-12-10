@@ -95,14 +95,12 @@ struct BaseForceModelPMB<Elastic, Cubic>
 
     using base_type::operator();
 
-    BaseForceModelPMB( PMB model, NoFracture fracture, Cubic,
+    BaseForceModelPMB( PMB model, NoFracture fracture, Cubic cubic,
                        const double delta, const double _C11,
                        const double _C12 )
-        : base_type( model, fracture, delta, 1.0 / 3.0 * ( _C11 + 2.0 * _C12 ) )
-        , C11( _C11 )
-        , C12( _C12 )
+        : BaseForceModelPMB( model, Elastic{}, fracture, cubic, delta, _C11,
+                             _C12 )
     {
-        init();
     }
 
     BaseForceModelPMB( PMB model, Elastic, NoFracture fracture, Cubic,
@@ -111,11 +109,6 @@ struct BaseForceModelPMB<Elastic, Cubic>
         : base_type( model, fracture, delta, 1.0 / 3.0 * ( _C11 + 2.0 * _C12 ) )
         , C11( _C11 )
         , C12( _C12 )
-    {
-        init();
-    }
-
-    void init()
     {
         A1111 = 75.0 / 2.0 * C11 - 165.0 / 2.0 * C12;
         A1122 = -55.0 / 4.0 * C11 + 205.0 / 4.0 * C12;
