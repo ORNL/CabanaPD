@@ -61,6 +61,10 @@ struct Isotropic
 struct Cubic
 {
 };
+//! Transversely Isotropic anisotropy.
+struct TransverselyIsotropic
+{
+};
 
 // Model category tags.
 struct Pair

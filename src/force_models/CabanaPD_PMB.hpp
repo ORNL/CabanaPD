@@ -82,6 +82,81 @@ struct BaseForceModelPMB<Elastic, Isotropic> : public BaseForceModel
 };
 
 template <>
+struct BaseForceModelPMB<Elastic, TransverselyIsotropic>
+    : public BaseForceModelPMB<Elastic, Isotropic>
+{
+    using base_type = BaseForceModelPMB<Elastic, Isotropic>;
+
+    using base_type::delta;
+    double C11;
+    double C13;
+    double C33;
+    double A1111;
+    double A1133;
+    double A3333;
+
+    using base_type::operator();
+
+    BaseForceModelPMB( PMB model, NoFracture fracture, TransverselyIsotropic,
+                       const double delta, const double _C11, const double _C13,
+                       const double _C33 )
+        : base_type( model, fracture, delta, 1.0 / 3.0 * ( _C11 + 2.0 * _C13 ) )
+        , C11( _C11 )
+        , C13( _C13 )
+        , C33( _C33 )
+    {
+        init();
+    }
+
+    BaseForceModelPMB( PMB model, Elastic, NoFracture fracture,
+                       TransverselyIsotropic, const double delta,
+                       const double _C11, const double _C13, const double _C33 )
+        : base_type( model, fracture, delta, 1.0 / 3.0 * ( _C11 + 2.0 * _C13 ) )
+        , C11( _C11 )
+        , C13( _C13 )
+        , C33( _C33 )
+    {
+        init();
+    }
+
+    void init()
+    {
+        A1111 = 75.0 / 4.0 * C11 - 75.0 / 2.0 * C13 + 15.0 / 4.0 * C33;
+        A1133 = -25.0 / 3.0 * C11 + 115.0 / 2.0 * C13 + 5.0 / 4.0 * C33;
+        A3333 = 10.0 * C11 - 90.0 * C13 + 30.0 * C33;
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    BaseForceModelPMB( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+    {
+    }
+
+    KOKKOS_FUNCTION
+    auto lambda( const double r, const double xi, const double xi1,
+                 const double xi2, const double xi3 ) const
+    {
+        return ( A1111 * ( Kokkos::pow( xi1, 2.0 ) + Kokkos::pow( xi2, 2.0 ) ) *
+                     ( Kokkos::pow( xi1, 2.0 ) + Kokkos::pow( xi2, 2.0 ) ) +
+                 6.0 * A1133 *
+                     ( Kokkos::pow( xi1, 2.0 ) + Kokkos::pow( xi2, 2.0 ) ) *
+                     Kokkos::pow( xi3, 2.0 ) +
+                 A3333 * Kokkos::pow( xi3, 4.0 ) ) /
+               ( pi * Kokkos::pow( delta, 4.0 ) * Kokkos::pow( xi, 4.0 ) );
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( ForceCoeffTag, const int, const int, const double s,
+                     const double vol, const double r, const double xi,
+                     const double xi_x, const double xi_y, const double xi_z,
+                     const int = -1 ) const
+    {
+        return lambda( r, xi, xi_x, xi_y, xi_z ) * s * vol;
+    }
+};
+
+template <>
 struct BaseForceModelPMB<Elastic, Cubic> : public BaseForceModel
 {
     using base_type = BaseForceModel;
@@ -382,6 +457,16 @@ ForceModel( ModelType, Elastic, NoFracture, Cubic, const double delta,
 template <typename ModelType>
 ForceModel( ModelType, NoFracture, Cubic, const double delta, const double,
             const double ) -> ForceModel<ModelType, Elastic, Cubic, NoFracture>;
+
+template <typename ModelType>
+ForceModel( ModelType, Elastic, NoFracture, TransverselyIsotropic,
+            const double delta, const double, const double )
+    -> ForceModel<ModelType, Elastic, TransverselyIsotropic, NoFracture>;
+
+template <typename ModelType>
+ForceModel( ModelType, NoFracture, TransverselyIsotropic, const double delta,
+            const double, const double )
+    -> ForceModel<ModelType, Elastic, TransverselyIsotropic, NoFracture>;
 
 template <typename AnisotropyType, typename TemperatureType>
 struct ForceModel<PMB, Elastic, AnisotropyType, NoFracture,

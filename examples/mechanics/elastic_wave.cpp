@@ -37,7 +37,9 @@ void elasticWaveExample( const std::string filename )
     // ====================================================
     double rho0 = inputs["density"];
     double C11 = inputs["C11"];
-    double C12 = inputs["C12"];
+    // double C12 = inputs["C12"];
+    double C13 = inputs["C13"];
+    double C33 = inputs["C33"];
     double delta = inputs["horizon"];
     delta += 1e-10;
 
@@ -55,8 +57,11 @@ void elasticWaveExample( const std::string filename )
     //                    Force model
     // ====================================================
     using model_type = CabanaPD::LinearPMB;
+    // CabanaPD::ForceModel force_model( model_type{}, CabanaPD::NoFracture{},
+    //                                  CabanaPD::Cubic{}, delta, C11, C12 );
     CabanaPD::ForceModel force_model( model_type{}, CabanaPD::NoFracture{},
-                                      CabanaPD::Cubic{}, delta, C11, C12 );
+                                      CabanaPD::TransverselyIsotropic{}, delta,
+                                      C11, C13, C33 );
 
     // ====================================================
     //                 Particle generation
