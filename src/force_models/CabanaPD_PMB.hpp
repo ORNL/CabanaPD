@@ -118,7 +118,7 @@ struct BaseForceModelPMB<Elastic, Cubic>
     void init()
     {
         A1111 = 75.0 / 2.0 * C11 - 165.0 / 2.0 * C12;
-        A1122 = -55.0 / 4.0 * C11 - 205.0 / 4.0 * C12;
+        A1122 = -55.0 / 4.0 * C11 + 205.0 / 4.0 * C12;
     }
 
     // Constructor to average from existing models.
@@ -132,23 +132,13 @@ struct BaseForceModelPMB<Elastic, Cubic>
     auto lambda( const double r, const double xi, const double xi1,
                  const double xi2, const double xi3 ) const
     {
-        const double A0 =
-            A1111 * ( Kokkos::pow( xi1, 4.0 ) + Kokkos::pow( xi2, 4.0 ) ) +
-            6.0 * A1122 * Kokkos::pow( xi1, 2.0 ) * Kokkos::pow( xi2, 2.0 );
-        const double A2 = 6.0 * A1122 * Kokkos::pow( r, 2.0 );
-        const double A4 = A1111;
-        return ( A0 + A2 * Kokkos::pow( xi3, 2.0 ) +
-                 A4 * Kokkos::pow( xi3, 4.0 ) ) /
-               Kokkos::pow( xi, 4.0 );
-    }
-
-    KOKKOS_INLINE_FUNCTION
-    auto operator()( ForceCoeffTag, const int, const int, const double s,
-                     const double vol, const double r, const double xi,
-                     const double xi_x, const double xi_y, const double xi_z,
-                     const int = -1 ) const
-    {
-        return lambda( r, xi, xi_x, xi_y, xi_z ) * s * vol;
+        return ( A1111 * ( Kokkos::pow( xi1, 4.0 ) + Kokkos::pow( xi2, 4.0 ) +
+                           Kokkos::pow( xi3, 4.0 ) ) +
+                 6.0 * A1122 *
+                     ( Kokkos::pow( xi1, 2.0 ) * Kokkos::pow( xi2, 2.0 ) +
+                       Kokkos::pow( xi1, 2.0 ) * Kokkos::pow( xi3, 2.0 ) ) +
+                 Kokkos::pow( xi2, 2.0 ) * Kokkos::pow( xi3, 2.0 ) ) /
+               ( pi * Kokkos::pow( delta, 4.0 ) * Kokkos::pow( xi, 4.0 ) );
     }
 };
 

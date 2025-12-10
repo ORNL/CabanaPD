@@ -2,6 +2,8 @@
     "num_cells"              : {"value": [41, 41, 41]},
     "system_size"            : {"value": [1.0, 1.0, 1.0], "unit": ""},
     "density"                : {"value": 100.0,  "unit": ""},
+    "C11"                    : {"value": 1.0, "unit": ""},
+    "C12"                    : {"value": 0.5, "unit": ""},
     "bulk_modulus"           : {"value": 1.0, "unit": ""},
     "shear_modulus"          : {"value": 0.5, "unit": ""},
     "horizon"                : {"value": 0.075, "unit": ""},  
