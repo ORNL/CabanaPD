@@ -140,6 +140,15 @@ struct BaseForceModelPMB<Elastic, Cubic>
                  Kokkos::pow( xi2, 2.0 ) * Kokkos::pow( xi3, 2.0 ) ) /
                ( pi * Kokkos::pow( delta, 4.0 ) * Kokkos::pow( xi, 4.0 ) );
     }
+
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( ForceCoeffTag, const int, const int, const double s,
+                     const double vol, const double r, const double xi,
+                     const double xi_x, const double xi_y, const double xi_z,
+                     const int = -1 ) const
+    {
+        return lambda( r, xi, xi_x, xi_y, xi_z ) * s * vol;
+    }
 };
 
 template <typename MemorySpace, typename AnisotropyType>
