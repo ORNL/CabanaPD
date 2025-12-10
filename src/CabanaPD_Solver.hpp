@@ -93,20 +93,20 @@ class Solver
     using exec_space = typename memory_space::execution_space;
 
     // Core module types - required for all problems.
-    using force_model_tag = typename ForceModelType::model_type;
+    using force_model_tag = typename ForceModelType::force_tag;
     using force_fracture_type = typename ForceModelType::fracture_type;
     using force_type =
         Force<memory_space, force_model_tag, force_fracture_type>;
     using force_thermal_type = typename ForceModelType::thermal_type::base_type;
     using comm_type =
-        Comm<ParticleType, typename ForceModelType::base_model::base_type,
+        Comm<ParticleType, typename ForceModelType::model_tag::base_type,
              typename ForceModelType::material_type, force_thermal_type>;
     using neighbor_type = Neighbor<memory_space, force_fracture_type>;
 
     // Optional module types.
     using heat_transfer_type =
         HeatTransfer<memory_space, ForceModelType, force_fracture_type>;
-    using contact_model_tag = typename ContactModelType::model_type;
+    using contact_model_tag = typename ContactModelType::force_tag;
     using contact_fracture_type = typename ContactModelType::fracture_type;
     using contact_type =
         Force<memory_space, contact_model_tag, contact_fracture_type>;

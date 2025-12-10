@@ -1365,21 +1365,21 @@ class Particles<MemorySpace, ModelType, ThermalType, EnergyStressOutput,
 // Backwards compatible versions with energy output by default.
 template <typename MemorySpace, typename ModelType>
 Particles( MemorySpace, ModelType )
-    -> Particles<MemorySpace, typename ModelType::base_model,
+    -> Particles<MemorySpace, typename ModelType::model_tag,
                  TemperatureIndependent, EnergyOutput>;
 
 template <typename MemorySpace, typename ModelType, typename OutputType>
 Particles(
     MemorySpace, ModelType, OutputType,
     typename std::enable_if<( is_output<OutputType>::value ), int>::type* = 0 )
-    -> Particles<MemorySpace, typename ModelType::base_model,
+    -> Particles<MemorySpace, typename ModelType::model_tag,
                  TemperatureIndependent, OutputType>;
 
 template <typename MemorySpace, typename ModelType, typename ThermalType>
 Particles( MemorySpace, ModelType, ThermalType,
            typename std::enable_if<( is_temperature<ThermalType>::value ),
                                    int>::type* = 0 )
-    -> Particles<MemorySpace, typename ModelType::base_model,
+    -> Particles<MemorySpace, typename ModelType::model_tag,
                  typename ThermalType::base_type, EnergyOutput>;
 
 template <typename MemorySpace, typename ModelType, typename ThermalType,
@@ -1388,7 +1388,7 @@ Particles( MemorySpace, ModelType, ThermalType, OutputType,
            typename std::enable_if<( is_output<OutputType>::value &&
                                      is_temperature<ThermalType>::value ),
                                    int>::type* = 0 )
-    -> Particles<MemorySpace, typename ModelType::base_model,
+    -> Particles<MemorySpace, typename ModelType::model_tag,
                  typename ThermalType::base_type, OutputType>;
 
 } // namespace CabanaPD

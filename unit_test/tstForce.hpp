@@ -93,7 +93,7 @@ template <class ModelType>
 auto computeReferenceStress(
     LinearTag, ModelType model, const int m, const double s0,
     typename std::enable_if<
-        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        ( std::is_same<typename ModelType::model_tag, CabanaPD::PMB>::value ),
         int>::type* = 0 )
 {
     double f_mag;
@@ -137,7 +137,7 @@ template <class ModelType>
 double computeReferenceStrainEnergyDensity(
     LinearTag, ModelType model, const int m, const double s0, const double,
     typename std::enable_if<
-        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        ( std::is_same<typename ModelType::model_tag, CabanaPD::PMB>::value ),
         int>::type* = 0 )
 {
     double W = 0.0;
@@ -166,7 +166,7 @@ double computeReferenceStrainEnergyDensity(
     QuadraticTag, ModelType model, const int m, const double u11,
     const double x,
     typename std::enable_if<
-        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        ( std::is_same<typename ModelType::model_tag, CabanaPD::PMB>::value ),
         int>::type* = 0 )
 {
     double W = 0.0;
@@ -210,7 +210,7 @@ double computeReferenceForceX(
     QuadraticTag, ModelType model, const int m, const double u11,
     const double x,
     typename std::enable_if<
-        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        ( std::is_same<typename ModelType::model_tag, CabanaPD::PMB>::value ),
         int>::type* = 0 )
 {
     double fx = 0.0;
@@ -347,7 +347,7 @@ template <class ModelType>
 auto computeReferenceStress(
     LinearTag, ModelType model, const int m, const double s0,
     typename std::enable_if<
-        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        ( std::is_same<typename ModelType::model_tag, CabanaPD::LPS>::value ),
         int>::type* = 0 )
 {
     double f_mag;
@@ -403,7 +403,7 @@ template <class ModelType>
 double computeReferenceStrainEnergyDensity(
     LinearTag, ModelType model, const int m, const double s0, const double,
     typename std::enable_if<
-        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        ( std::is_same<typename ModelType::model_tag, CabanaPD::LPS>::value ),
         int>::type* = 0 )
 {
     double W = 0.0;
@@ -441,7 +441,7 @@ double computeReferenceStrainEnergyDensity(
     QuadraticTag, ModelType model, const int m, const double u11,
     const double x,
     typename std::enable_if<
-        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        ( std::is_same<typename ModelType::model_tag, CabanaPD::LPS>::value ),
         int>::type* = 0 )
 {
     double W = 0.0;
@@ -486,7 +486,7 @@ double computeReferenceForceX(
     QuadraticTag, ModelType model, const int m, const double u11,
     const double x,
     typename std::enable_if<
-        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        ( std::is_same<typename ModelType::model_tag, CabanaPD::LPS>::value ),
         int>::type* = 0 )
 {
     double fx = 0.0;
@@ -802,7 +802,7 @@ template <class ModelType>
 void checkAnalyticalDilatation(
     ModelType, LinearTag, const double, const double theta,
     typename std::enable_if<
-        ( std::is_same<typename ModelType::base_model, CabanaPD::PMB>::value ),
+        ( std::is_same<typename ModelType::model_tag, CabanaPD::PMB>::value ),
         int>::type* = 0 )
 {
     EXPECT_FLOAT_EQ( 0.0, theta );
@@ -812,7 +812,7 @@ template <class ModelType>
 void checkAnalyticalDilatation(
     ModelType, LinearTag, const double s0, const double theta,
     typename std::enable_if<
-        ( std::is_same<typename ModelType::base_model, CabanaPD::LPS>::value ),
+        ( std::is_same<typename ModelType::model_tag, CabanaPD::LPS>::value ),
         int>::type* = 0 )
 {
     EXPECT_FLOAT_EQ( 3 * s0, theta );
@@ -856,16 +856,16 @@ template <class ModelType, class TestType, class InputType>
 void testForce( ModelType model, const double dx, const double m,
                 const TestType test_tag, const InputType inputs )
 {
-    using model_tag = typename ModelType::base_model;
+    using force_tag = typename ModelType::force_tag;
+    using model_tag = typename ModelType::model_tag;
+    using fracture_tag = typename ModelType::fracture_type;
     auto particles = createParticles( model_tag{}, test_tag, dx, inputs.coeff );
 
     // This needs to exactly match the mesh spacing to compare with the single
     // particle calculation.
-    CabanaPD::Force<TEST_MEMSPACE, typename ModelType::base_model,
-                    typename ModelType::fracture_type>
-        force;
-    CabanaPD::Neighbor<TEST_MEMSPACE, typename ModelType::fracture_type>
-        neighbor( model, particles );
+    CabanaPD::Force<TEST_MEMSPACE, force_tag, fracture_tag> force;
+    CabanaPD::Neighbor<TEST_MEMSPACE, fracture_tag> neighbor( model,
+                                                              particles );
     auto x = particles.sliceReferencePosition();
     auto f = particles.sliceForce();
     auto W = particles.sliceStrainEnergy();
@@ -896,7 +896,7 @@ void testForce( ModelType model, const double dx, const double m,
     Cabana::deep_copy( x_host, x );
     Cabana::deep_copy( W_host, W );
     Cabana::deep_copy( vol_host, vol );
-    copyTheta( typename ModelType::base_model{}, particles, aosoa_host );
+    copyTheta( typename ModelType::model_tag{}, particles, aosoa_host );
 
     double local_min[3] = { particles.local_mesh_lo[0],
                             particles.local_mesh_lo[1],

@@ -27,8 +27,9 @@ template <>
 struct BaseForceModelLPS<Elastic> : public BaseForceModel
 {
     using base_type = BaseForceModel;
-    using model_type = LPS;
-    using base_model = LPS;
+    // Tags for creating particle fields and dispatch to force iteration.
+    using model_tag = LPS;
+    using force_tag = LPS;
 
     using base_type::force_horizon;
 
@@ -311,11 +312,13 @@ struct ForceModel<LinearLPS, Elastic, NoFracture, TemperatureIndependent>
 {
     using base_type =
         ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>;
-    using model_type = LinearLPS;
+    // Tag to dispatch to force iteration.
+    using force_tag = LinearLPS;
 
     template <typename... Args>
     ForceModel( LinearLPS, Args&&... args )
-        : base_type( base_model{}, std::forward<Args>( args )... )
+        : base_type( typename base_type::model_tag{},
+                     std::forward<Args>( args )... )
     {
     }
 
@@ -330,11 +333,13 @@ struct ForceModel<LinearLPS, Elastic, Fracture, TemperatureIndependent>
     using base_type =
         ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>;
 
-    using model_type = LinearLPS;
+    // Tag to dispatch to force iteration.
+    using force_tag = LinearLPS;
 
     template <typename... Args>
     ForceModel( LinearLPS, Args&&... args )
-        : base_type( base_model{}, std::forward<Args>( args )... )
+        : base_type( typename base_type::model_tag{},
+                     std::forward<Args>( args )... )
     {
     }
 

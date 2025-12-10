@@ -33,8 +33,8 @@ struct ForceModels
     using material_type = MultiMaterial;
 
     using first_model = ModelType1;
-    using model_type = typename first_model::model_type;
-    using base_model = typename first_model::base_model;
+    using force_tag = typename first_model::force_tag;
+    using model_tag = typename first_model::model_tag;
     using thermal_type = typename first_model::thermal_type;
     using fracture_type = typename first_model::fracture_type;
 
