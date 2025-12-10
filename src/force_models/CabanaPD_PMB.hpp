@@ -66,7 +66,7 @@ struct BaseForceModelPMB<Elastic, Isotropic> : public BaseForceModel
     KOKKOS_INLINE_FUNCTION
     auto operator()( ForceCoeffTag, const int, const int, const double s,
                      const double vol, const double, const double, const double,
-                     const double, const double, const int = -1 ) const
+                     const double, const int = -1 ) const
     {
         return c() * s * vol;
     }
@@ -122,8 +122,8 @@ struct BaseForceModelPMB<Elastic, Cubic>
     }
 
     KOKKOS_FUNCTION
-    auto lambda( const double r, const double xi, const double xi1,
-                 const double xi2, const double xi3 ) const
+    auto lambda( const double xi, const double xi1, const double xi2,
+                 const double xi3 ) const
     {
         return ( A1111 * ( Kokkos::pow( xi1, 4.0 ) + Kokkos::pow( xi2, 4.0 ) +
                            Kokkos::pow( xi3, 4.0 ) ) +
@@ -136,11 +136,11 @@ struct BaseForceModelPMB<Elastic, Cubic>
 
     KOKKOS_INLINE_FUNCTION
     auto operator()( ForceCoeffTag, const int, const int, const double s,
-                     const double vol, const double r, const double xi,
-                     const double xi_x, const double xi_y, const double xi_z,
+                     const double vol, const double xi, const double xi_x,
+                     const double xi_y, const double xi_z,
                      const int = -1 ) const
     {
-        return lambda( r, xi, xi_x, xi_y, xi_z ) * s * vol;
+        return lambda( xi, xi_x, xi_y, xi_z ) * s * vol;
     }
 };
 
@@ -181,7 +181,7 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, AnisotropyType, MemorySpace>
     KOKKOS_INLINE_FUNCTION
     auto operator()( ForceCoeffTag, const int i, const int, const double s,
                      const double vol, const double, const double, const double,
-                     const double, const double, const int n ) const
+                     const double, const int n ) const
     {
         // Update bond plastic stretch.
         auto s_p = _s_p( i, n );

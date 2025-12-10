@@ -118,8 +118,8 @@ class Force<MemorySpace, ModelType, PMB, NoFracture>
 
             s = model( ThermalStretchTag{}, i, j, s );
 
-            const double coeff = model( ForceCoeffTag{}, i, j, s, vol( j ), r,
-                                        xi, xi_x, xi_y, xi_z );
+            const double coeff = model( ForceCoeffTag{}, i, j, s, vol( j ), xi,
+                                        xi_x, xi_y, xi_z );
             fx_i = coeff * rx / r;
             fy_i = coeff * ry / r;
             fz_i = coeff * rz / r;
@@ -189,9 +189,8 @@ class Force<MemorySpace, ModelType, PMB, NoFracture>
 
             s = model( ThermalStretchTag{}, i, j, s );
 
-            const double coeff =
-                0.5 * model( ForceCoeffTag{}, i, j, s, vol( j ), r, xi, xi_x,
-                             xi_y, xi_z );
+            const double coeff = 0.5 * model( ForceCoeffTag{}, i, j, s,
+                                              vol( j ), xi, xi_x, xi_y, xi_z );
             const double fx_i = coeff * rx / r;
             const double fy_i = coeff * ry / r;
             const double fz_i = coeff * rz / r;
@@ -292,7 +291,7 @@ class Force<MemorySpace, ModelType, PMB, Fracture>
                 else if ( mu( i, n ) > 0 )
                 {
                     const double coeff =
-                        model( ForceCoeffTag{}, i, j, s, vol( j ), r, xi, xi_x,
+                        model( ForceCoeffTag{}, i, j, s, vol( j ), xi, xi_x,
                                xi_y, xi_z, n );
 
                     double muij = mu( i, n );
@@ -400,8 +399,8 @@ class Force<MemorySpace, ModelType, PMB, Fracture>
                 s = model( ThermalStretchTag{}, i, j, s );
 
                 const double coeff =
-                    0.5 * model( ForceCoeffTag{}, i, j, s, vol( j ), r, xi,
-                                 xi_x, xi_y, xi_z, n );
+                    0.5 * model( ForceCoeffTag{}, i, j, s, vol( j ), xi, xi_x,
+                                 xi_y, xi_z, n );
                 const double muij = mu( i, n );
                 const double fx_i = muij * coeff * rx / r;
                 const double fy_i = muij * coeff * ry / r;
@@ -479,7 +478,7 @@ class Force<MemorySpace, ModelType, LinearPMB, NoFracture>
             linear_s = model( ThermalStretchTag{}, i, j, linear_s );
 
             const double coeff = model( ForceCoeffTag{}, i, j, linear_s,
-                                        vol( j ), xi, xi, xi_x, xi_y, xi_z );
+                                        vol( j ), xi, xi_x, xi_y, xi_z );
             fx_i = coeff * xi_x / xi;
             fy_i = coeff * xi_y / xi;
             fz_i = coeff * xi_z / xi;
@@ -546,9 +545,8 @@ class Force<MemorySpace, ModelType, LinearPMB, NoFracture>
 
             linear_s = model( ThermalStretchTag{}, i, j, linear_s );
 
-            const double coeff =
-                0.5 * model( ForceCoeffTag{}, i, j, linear_s, vol( j ), xi, xi,
-                             xi_x, xi_y, xi_z );
+            const double coeff = 0.5 * model( ForceCoeffTag{}, i, j, linear_s,
+                                              vol( j ), xi, xi_x, xi_y, xi_z );
             const double fx_i = coeff * xi_x / xi;
             const double fy_i = coeff * xi_y / xi;
             const double fz_i = coeff * xi_z / xi;
