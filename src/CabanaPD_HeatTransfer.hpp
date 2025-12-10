@@ -20,41 +20,33 @@
 namespace CabanaPD
 {
 
-template <class MemorySpace, class ModelType, class FractureType>
+template <class MemorySpace, class FractureType>
 class HeatTransfer;
 
 // Peridynamic heat transfer with forward-Euler time integration.
 // Inherits only because this is a similar neighbor-based kernel.
-template <class MemorySpace, class ModelType>
-class HeatTransfer<MemorySpace, ModelType, NoFracture>
+template <class MemorySpace>
+class HeatTransfer<MemorySpace, NoFracture>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ModelType;
 
   protected:
     Timer _timer;
     Timer _euler_timer;
-    model_type _model;
 
   public:
-    // Running with mechanics as well; no reason to rebuild neighbors.
-    HeatTransfer( const model_type model )
-        : _model( model )
-    {
-    }
-
-    template <class TemperatureType, class PosType, class ParticleType,
-              class NeighborType>
-    void computeHeatTransferFull( TemperatureType& conduction, const PosType& x,
+    template <class ModelType, class TemperatureType, class PosType,
+              class ParticleType, class NeighborType>
+    void computeHeatTransferFull( const ModelType& model,
+                                  TemperatureType& conduction, const PosType& x,
                                   const PosType& u,
                                   const ParticleType& particles,
                                   NeighborType& neighbor )
     {
         _timer.start();
 
-        auto model = _model;
         const auto vol = particles.sliceVolume();
         const auto temp = particles.sliceTemperature();
 
@@ -74,11 +66,11 @@ class HeatTransfer<MemorySpace, ModelType, NoFracture>
         _timer.stop();
     }
 
-    template <class ParticleType>
-    void forwardEuler( const ParticleType& particles, const double dt )
+    template <class ModelType, class ParticleType>
+    void forwardEuler( const ModelType& model, const ParticleType& particles,
+                       const double dt )
     {
         _euler_timer.start();
-        auto model = _model;
         const auto rho = particles.sliceDensity();
         const auto conduction = particles.sliceTemperatureConduction();
         auto temp = particles.sliceTemperature();
@@ -95,33 +87,24 @@ class HeatTransfer<MemorySpace, ModelType, NoFracture>
     }
 };
 
-template <class MemorySpace, class ModelType>
-class HeatTransfer<MemorySpace, ModelType, Fracture>
-    : public HeatTransfer<MemorySpace, ModelType, NoFracture>
+template <class MemorySpace>
+class HeatTransfer<MemorySpace, Fracture>
+    : public HeatTransfer<MemorySpace, NoFracture>
 {
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
-    using model_type = ModelType;
-    using base_type = HeatTransfer<MemorySpace, ModelType, NoFracture>;
+    using base_type = HeatTransfer<MemorySpace, NoFracture>;
 
   protected:
-    using base_type::_model;
-
     using base_type::_euler_timer;
     using base_type::_timer;
 
   public:
-    // Explicit base model construction is necessary because of the indirect
-    // model inheritance. This could be avoided with a BaseHeatTransfer object.
-    HeatTransfer( const model_type model )
-        : base_type( model )
-    {
-    }
-
-    template <class TemperatureType, class PosType, class ParticleType,
-              class NeighborType>
-    void computeHeatTransferFull( TemperatureType& conduction, const PosType& x,
+    template <class ModelType, class TemperatureType, class PosType,
+              class ParticleType, class NeighborType>
+    void computeHeatTransferFull( const ModelType& model,
+                                  TemperatureType& conduction, const PosType& x,
                                   const PosType& u,
                                   const ParticleType& particles,
                                   NeighborType& neighbor )
@@ -131,7 +114,6 @@ class HeatTransfer<MemorySpace, ModelType, Fracture>
         auto neigh_list = neighbor.list();
         const auto mu = neighbor.brokenBonds();
 
-        auto model = _model;
         const auto vol = particles.sliceVolume();
         const auto temp = particles.sliceTemperature();
 
@@ -168,8 +150,10 @@ class HeatTransfer<MemorySpace, ModelType, Fracture>
 };
 
 // Heat transfer free functions.
-template <class HeatTransferType, class ParticleType, class NeighborType>
-void computeHeatTransfer( HeatTransferType& heat_transfer,
+template <class ModelType, class HeatTransferType, class ParticleType,
+          class NeighborType>
+void computeHeatTransfer( const ModelType& model,
+                          HeatTransferType& heat_transfer,
                           ParticleType& particles, const NeighborType& neighbor,
                           const double dt )
 {
@@ -183,14 +167,14 @@ void computeHeatTransfer( HeatTransferType& heat_transfer,
 
     // Temperature only needs to be atomic if using team threading.
     if ( std::is_same<typename NeighborType::Tag, Cabana::TeamOpTag>::value )
-        heat_transfer.computeHeatTransferFull( conduction_a, x, u, particles,
-                                               neighbor );
+        heat_transfer.computeHeatTransferFull( model, conduction_a, x, u,
+                                               particles, neighbor );
     else
-        heat_transfer.computeHeatTransferFull( conduction, x, u, particles,
-                                               neighbor );
+        heat_transfer.computeHeatTransferFull( model, conduction, x, u,
+                                               particles, neighbor );
     Kokkos::fence();
 
-    heat_transfer.forwardEuler( particles, dt );
+    heat_transfer.forwardEuler( model, particles, dt );
 }
 
 } // namespace CabanaPD

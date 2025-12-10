@@ -104,8 +104,7 @@ class Solver
     using neighbor_type = Neighbor<memory_space, force_fracture_type>;
 
     // Optional module types.
-    using heat_transfer_type =
-        HeatTransfer<memory_space, ForceModelType, force_fracture_type>;
+    using heat_transfer_type = HeatTransfer<memory_space, force_fracture_type>;
     using contact_model_tag = typename ContactModelType::force_tag;
     using contact_fracture_type = typename ContactModelType::fracture_type;
     using contact_type =
@@ -202,7 +201,7 @@ class Solver
                            typename ForceModelType::thermal_type>::value )
         {
             thermal_subcycle_steps = inputs["thermal_subcycle_steps"];
-            heat_transfer = std::make_shared<heat_transfer_type>( force_model );
+            heat_transfer = std::make_shared<heat_transfer_type>();
         }
 
         print = print_rank();
@@ -348,8 +347,8 @@ class Solver
                            typename ForceModelType::thermal_type>::value )
         {
             if ( step % thermal_subcycle_steps == 0 )
-                computeHeatTransfer( *heat_transfer, particles, *neighbor,
-                                     thermal_subcycle_steps * dt );
+                computeHeatTransfer( force_model, *heat_transfer, particles,
+                                     *neighbor, thermal_subcycle_steps * dt );
         }
 
         // Add non-force boundary condition.
