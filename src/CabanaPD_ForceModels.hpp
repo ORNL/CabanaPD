@@ -42,22 +42,22 @@ struct InfluenceFunctionTag
 struct BaseForceModel
 {
     using material_type = SingleMaterial;
-    double delta;
+    double force_horizon;
     double K;
 
-    BaseForceModel( const double _delta, const double _K )
-        : delta( _delta )
+    BaseForceModel( const double _force_horizon, const double _K )
+        : force_horizon( _force_horizon )
         , K( _K ){};
 
     // FIXME: use the first model cutoff for now.
     template <typename ModelType1, typename ModelType2>
     BaseForceModel( const ModelType1& model1, const ModelType2& model2 )
     {
-        delta = model1.delta;
+        force_horizon = model1.force_horizon;
         K = ( model1.K + model2.K ) / 2.0;
     }
 
-    auto cutoff() const { return delta; }
+    auto cutoff() const { return force_horizon; }
     auto extend() const { return 0.0; }
 
     // Only needed for models which store bond properties.
@@ -232,21 +232,22 @@ struct BaseDynamicTemperatureModel
 {
     using thermal_type = DynamicTemperature;
 
-    double delta;
+    double thermal_horizon;
 
     double thermal_coeff;
     double kappa;
     double cp;
     bool constant_microconductivity;
 
-    BaseDynamicTemperatureModel( const double _delta, const double _kappa,
-                                 const double _cp,
+    BaseDynamicTemperatureModel( const double _thermal_horizon,
+                                 const double _kappa, const double _cp,
                                  const bool _constant_microconductivity = true )
     {
-        delta = _delta;
+        thermal_horizon = _thermal_horizon;
         kappa = _kappa;
         cp = _cp;
-        const double d3 = _delta * _delta * _delta;
+        const double d3 =
+            _thermal_horizon * _thermal_horizon * _thermal_horizon;
         thermal_coeff = 9.0 / 2.0 * _kappa / pi / d3;
         constant_microconductivity = _constant_microconductivity;
     }
@@ -256,7 +257,7 @@ struct BaseDynamicTemperatureModel
         if ( constant_microconductivity )
             return thermal_coeff;
         else
-            return 4.0 * thermal_coeff * ( 1.0 - r / delta );
+            return 4.0 * thermal_coeff * ( 1.0 - r / thermal_horizon );
     }
 };
 
