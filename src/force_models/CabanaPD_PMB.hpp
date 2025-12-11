@@ -97,15 +97,12 @@ struct BaseForceModelPMB<Elastic, TransverselyIsotropic>
 
     using base_type::operator();
 
-    BaseForceModelPMB( PMB model, NoFracture fracture, TransverselyIsotropic,
-                       const double delta, const double _C11, const double _C13,
-                       const double _C33 )
-        : base_type( model, fracture, delta, 1.0 / 3.0 * ( _C11 + 2.0 * _C13 ) )
-        , C11( _C11 )
-        , C13( _C13 )
-        , C33( _C33 )
+    BaseForceModelPMB( PMB model, NoFracture fracture,
+                       TransverselyIsotropic aniso, const double delta,
+                       const double _C11, const double _C13, const double _C33 )
+        : BaseForceModelPMB( model, Elastic{}, fracture, aniso, delta, _C11,
+                             _C13, _C33 )
     {
-        init();
     }
 
     BaseForceModelPMB( PMB model, Elastic, NoFracture fracture,
@@ -115,11 +112,6 @@ struct BaseForceModelPMB<Elastic, TransverselyIsotropic>
         , C11( _C11 )
         , C13( _C13 )
         , C33( _C33 )
-    {
-        init();
-    }
-
-    void init()
     {
         A1111 = 75.0 / 4.0 * C11 - 75.0 / 2.0 * C13 + 15.0 / 4.0 * C33;
         A1133 = -25.0 / 3.0 * C11 + 115.0 / 2.0 * C13 + 5.0 / 4.0 * C33;
