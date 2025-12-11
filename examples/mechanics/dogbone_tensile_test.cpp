@@ -36,13 +36,16 @@ void dogboneTensileTestExample( const std::string filename )
     //                Material parameters
     // ====================================================
     double rho0 = inputs["density"];
-    double E = inputs["elastic_modulus"];
-    double nu = 0.25; // Use bond-based model
-    double K = E / ( 3 * ( 1 - 2 * nu ) );
     double G0 = inputs["fracture_energy"];
-    double sigma_y = inputs["yield_stress"];
     double delta = inputs["horizon"];
     delta += 1e-10;
+
+    double C11 = inputs["C11"];
+    double C13 = inputs["C13"];
+    double C33 = inputs["C33"];
+
+    std::array<double, 2> sigma_y_input = inputs["yield_stress"];
+    auto sigma_y = CabanaPD::copy( sigma_y_input );
 
     // ====================================================
     //                  Discretization
@@ -154,8 +157,9 @@ void dogboneTensileTestExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    CabanaPD::ForceModel force_model( model_type{}, mechanics_type{},
-                                      memory_space{}, delta, K, G0, sigma_y );
+    CabanaPD::ForceModel force_model(
+        model_type{}, mechanics_type{}, CabanaPD::TransverselyIsotropic{},
+        memory_space{}, delta, C11, C13, C33, G0, sigma_y );
 
     // ====================================================
     //                   Create solver
