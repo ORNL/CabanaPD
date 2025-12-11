@@ -53,6 +53,18 @@ struct ElasticPerfectlyPlastic
 {
     using base_type = Plastic;
 };
+//! Fully isotropic.
+struct Isotropic
+{
+};
+//! Cubic anisotropy.
+struct Cubic
+{
+};
+//! Transversely Isotropic anisotropy.
+struct TransverselyIsotropic
+{
+};
 
 // Model category tags.
 struct Pair
