@@ -387,6 +387,15 @@ class Inputs
     nlohmann::json inputs;
 };
 
+template <typename ValueType, std::size_t Dim>
+auto copy( std::array<ValueType, Dim> std )
+{
+    Kokkos::Array<ValueType, Dim> kokkos;
+    for ( std::size_t i = 0; i < Dim; i++ )
+        kokkos[i] = std[i];
+    return kokkos;
+}
+
 } // namespace CabanaPD
 
 #endif

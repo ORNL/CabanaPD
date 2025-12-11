@@ -218,12 +218,12 @@ struct BaseForceModelPMB<Elastic, Cubic> : public BaseForceModel
     }
 };
 
-template <typename MemorySpace, typename AnisotropyType>
-struct BaseForceModelPMB<ElasticPerfectlyPlastic, AnisotropyType, MemorySpace>
-    : public BaseForceModelPMB<Elastic, AnisotropyType>,
+template <typename MemorySpace>
+struct BaseForceModelPMB<ElasticPerfectlyPlastic, Isotropic, MemorySpace>
+    : public BaseForceModelPMB<Elastic, Isotropic>,
       public BasePlasticity<MemorySpace>
 {
-    using base_type = BaseForceModelPMB<Elastic, AnisotropyType>;
+    using base_type = BaseForceModelPMB<Elastic, Isotropic>;
     using base_plasticity_type = BasePlasticity<MemorySpace>;
 
     using mechanics_type = ElasticPerfectlyPlastic;
@@ -293,6 +293,75 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, AnisotropyType, MemorySpace>
         // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
         // the integrand (pairwise potential).
         return 0.25 * c() * stretch_term * xi * vol;
+    }
+};
+
+template <typename MemorySpace>
+struct BaseForceModelPMB<ElasticPerfectlyPlastic, TransverselyIsotropic,
+                         MemorySpace>
+    : public BaseForceModelPMB<Elastic, TransverselyIsotropic>,
+      public BasePlasticity<MemorySpace>
+{
+    using base_type = BaseForceModelPMB<Elastic, TransverselyIsotropic>;
+    using base_plasticity_type = BasePlasticity<MemorySpace>;
+
+    using mechanics_type = ElasticPerfectlyPlastic;
+
+    using base_plasticity_type::_s_p;
+    Kokkos::Array<double, 2> s_Y;
+
+    using base_plasticity_type::updateBonds;
+
+    BaseForceModelPMB( PMB model, mechanics_type, MemorySpace,
+                       const double delta, const double _C11, const double _C13,
+                       const double _C33,
+                       const Kokkos::Array<double, 2> sigma_y )
+        : base_type( model, NoFracture{}, TransverselyIsotropic{}, delta, _C11,
+                     _C13, _C33 )
+        , base_plasticity_type()
+        , s_Y( sigma_y )
+    {
+        for ( std::size_t i = 0; i < s_Y.size(); i++ )
+            s_Y[i] /= ( 3.0 * base_type::K );
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    BaseForceModelPMB( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_plasticity_type()
+    {
+        s_Y = ( model1.s_Y + model2.s_Y ) / 2.0;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( ForceCoeffTag, const int i, const int, const double s,
+                     const double vol, const double xi, const double xi_x,
+                     const double xi_y, const double xi_z, const int n ) const
+    {
+        auto s_p = _s_p( i, n );
+        // Update bond plastic stretch for each direction.
+        for ( std::size_t i = 0; i < s_Y.size(); i++ )
+        {
+            // Yield in tension.
+            if ( s >= s_p + s_Y[i] )
+                _s_p( i, n ) = s - s_Y[i];
+            // Yield in compression.
+            else if ( s <= s_p - s_Y[i] )
+                _s_p( i, n ) = s + s_Y[i];
+            // else: Elastic (in between), do not modify.
+        }
+        // Must extract again if in the plastic regime.
+        s_p = _s_p( i, n );
+        return lambda( xi, xi_x, xi_y, xi_z ) * ( s - s_p ) * vol;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( EnergyTag, const int, const int, const double,
+                     const double, const double, const int = -1 ) const
+    {
+        // TODO: implement energy.
+        return 0.0;
     }
 };
 
@@ -374,16 +443,15 @@ struct ForceModel<PMB, Elastic, AnisotropyType, Fracture,
     }
 };
 
-template <typename AnisotropyType, typename MemorySpace>
-struct ForceModel<PMB, ElasticPerfectlyPlastic, AnisotropyType, Fracture,
+template <typename MemorySpace>
+struct ForceModel<PMB, ElasticPerfectlyPlastic, Isotropic, Fracture,
                   TemperatureIndependent, MemorySpace>
-    : public BaseForceModelPMB<ElasticPerfectlyPlastic, AnisotropyType,
-                               MemorySpace>,
+    : public BaseForceModelPMB<ElasticPerfectlyPlastic, Isotropic, MemorySpace>,
       public BaseFractureModel,
       public BaseTemperatureModel<TemperatureIndependent>
 {
     using base_type =
-        BaseForceModelPMB<ElasticPerfectlyPlastic, AnisotropyType, MemorySpace>;
+        BaseForceModelPMB<ElasticPerfectlyPlastic, Isotropic, MemorySpace>;
     using base_fracture_type = BaseFractureModel;
     using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
 
@@ -459,6 +527,54 @@ template <typename ModelType>
 ForceModel( ModelType, NoFracture, TransverselyIsotropic, const double delta,
             const double, const double, const double )
     -> ForceModel<ModelType, Elastic, TransverselyIsotropic, NoFracture>;
+
+template <typename MemorySpace>
+struct ForceModel<PMB, ElasticPerfectlyPlastic, TransverselyIsotropic, Fracture,
+                  TemperatureIndependent, MemorySpace>
+    : public BaseForceModelPMB<ElasticPerfectlyPlastic, TransverselyIsotropic,
+                               MemorySpace>,
+      public BaseFractureModel,
+      public BaseTemperatureModel<TemperatureIndependent>
+{
+    using base_type = BaseForceModelPMB<ElasticPerfectlyPlastic,
+                                        TransverselyIsotropic, MemorySpace>;
+    using base_fracture_type = BaseFractureModel;
+    using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
+
+    using base_type::operator();
+    using base_fracture_type::operator();
+    using base_temperature_type::operator();
+    using base_type::updateBonds;
+
+    ForceModel( PMB model, ElasticPerfectlyPlastic mechanics,
+                TransverselyIsotropic, MemorySpace space, const double delta,
+                const double C11, const double C13, const double C33,
+                const double G0, const Kokkos::Array<double, 2> sigma_y )
+        : base_type( model, mechanics, space, delta, C11, C13, C33, sigma_y )
+        , base_fracture_type(
+              G0,
+              // s0
+              ( 5.0 * G0 / sigma_y[0] / delta + sigma_y[0] / base_type::K ) /
+                  6.0 )
+        , base_temperature_type()
+    {
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_fracture_type( model1, model2 )
+    {
+    }
+};
+
+template <typename ModelType, typename MemorySpace>
+ForceModel( ModelType, ElasticPerfectlyPlastic, TransverselyIsotropic,
+            MemorySpace, const double, const double, const double, const double,
+            const double, const Kokkos::Array<double, 2> )
+    -> ForceModel<ModelType, ElasticPerfectlyPlastic, TransverselyIsotropic,
+                  Fracture, TemperatureIndependent, MemorySpace>;
 
 template <typename AnisotropyType, typename TemperatureType>
 struct ForceModel<PMB, Elastic, AnisotropyType, NoFracture,
