@@ -38,8 +38,8 @@ void elasticWaveExample( const std::string filename )
     double rho0 = inputs["density"];
     auto K = inputs["bulk_modulus"];
     double G = inputs["shear_modulus"];
-    double delta = inputs["horizon"];
-    delta += 1e-10;
+    double horizon = inputs["horizon"];
+    horizon += 1e-10;
 
     // ====================================================
     //                  Discretization
@@ -47,7 +47,7 @@ void elasticWaveExample( const std::string filename )
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
-    int m = std::floor( delta /
+    int m = std::floor( horizon /
                         ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
     int halo_width = m + 1; // Just to be safe.
 
@@ -56,7 +56,7 @@ void elasticWaveExample( const std::string filename )
     // ====================================================
     using model_type = CabanaPD::LinearLPS;
     CabanaPD::ForceModel force_model( model_type{}, CabanaPD::NoFracture{},
-                                      delta, K, G );
+                                      horizon, K, G );
 
     // ====================================================
     //                 Particle generation

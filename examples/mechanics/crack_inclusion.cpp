@@ -51,8 +51,8 @@ void crackInclusionExample( const std::string filename )
     double G_I = E_I / ( 2 * ( 1 + nu_I ) );
     double G0_I = inputs["fracture_energy"][1];
 
-    double delta = inputs["horizon"];
-    delta += 1e-10;
+    double horizon = inputs["horizon"];
+    horizon += 1e-10;
 
     // ====================================================
     //                  Discretization
@@ -79,10 +79,10 @@ void crackInclusionExample( const std::string filename )
     using model_type = CabanaPD::LPS;
 
     // Plate material
-    CabanaPD::ForceModel force_model_plate( model_type{}, delta, K, G, G0 );
+    CabanaPD::ForceModel force_model_plate( model_type{}, horizon, K, G, G0 );
 
     // Inclusion material
-    CabanaPD::ForceModel force_model_inclusion( model_type{}, delta, K_I, G_I,
+    CabanaPD::ForceModel force_model_inclusion( model_type{}, horizon, K_I, G_I,
                                                 G0_I );
 
     // ====================================================
@@ -123,8 +123,8 @@ void crackInclusionExample( const std::string filename )
         // Density
         rho( pid ) = rho0;
         // No-fail zone
-        if ( x( pid, 1 ) <= plane1.low[1] + delta + 1e-10 ||
-             x( pid, 1 ) >= plane2.high[1] - delta - 1e-10 )
+        if ( x( pid, 1 ) <= plane1.low[1] + horizon + 1e-10 ||
+             x( pid, 1 ) >= plane2.high[1] - horizon - 1e-10 )
             nofail( pid ) = 1;
         // Distance squared from inclusion center on the XY-plane
         double rsq = ( x( pid, 0 ) - xI ) * ( x( pid, 0 ) - xI ) +

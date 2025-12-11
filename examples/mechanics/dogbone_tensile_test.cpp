@@ -41,8 +41,8 @@ void dogboneTensileTestExample( const std::string filename )
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double G0 = inputs["fracture_energy"];
     double sigma_y = inputs["yield_stress"];
-    double delta = inputs["horizon"];
-    delta += 1e-10;
+    double horizon = inputs["horizon"];
+    horizon += 1e-10;
 
     // ====================================================
     //                  Discretization
@@ -50,7 +50,7 @@ void dogboneTensileTestExample( const std::string filename )
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
-    int m = std::floor( delta /
+    int m = std::floor( horizon /
                         ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
     int halo_width = m + 1; // Just to be safe.
 
@@ -155,7 +155,7 @@ void dogboneTensileTestExample( const std::string filename )
     //                    Force model
     // ====================================================
     CabanaPD::ForceModel force_model( model_type{}, mechanics_type{},
-                                      memory_space{}, delta, K, G0, sigma_y );
+                                      memory_space{}, horizon, K, G0, sigma_y );
 
     // ====================================================
     //                   Create solver

@@ -41,8 +41,8 @@ void plateWithHoleExample( const std::string filename )
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double G0 = inputs["fracture_energy"];
     // double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
-    double delta = inputs["horizon"];
-    delta += 1e-10;
+    double horizon = inputs["horizon"];
+    horizon += 1e-10;
 
     // ====================================================
     //                  Discretization
@@ -50,7 +50,7 @@ void plateWithHoleExample( const std::string filename )
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
-    int m = std::floor( delta /
+    int m = std::floor( horizon /
                         ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
     int halo_width = m + 1; // Just to be safe.
 
@@ -58,7 +58,7 @@ void plateWithHoleExample( const std::string filename )
     //                    Force model
     // ====================================================
     using model_type = CabanaPD::PMB;
-    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0 );
+    CabanaPD::ForceModel force_model( model_type{}, horizon, K, G0 );
 
     // ====================================================
     //    Custom particle generation and initialization
@@ -106,8 +106,8 @@ void plateWithHoleExample( const std::string filename )
         // Density
         rho( pid ) = rho0;
         // No-fail zone
-        if ( x( pid, 0 ) <= plane1.low[0] + delta + 1e-10 ||
-             x( pid, 0 ) >= plane2.high[0] - delta - 1e-10 )
+        if ( x( pid, 0 ) <= plane1.low[0] + horizon + 1e-10 ||
+             x( pid, 0 ) >= plane2.high[0] - horizon - 1e-10 )
             nofail( pid ) = 1;
     };
     particles.update( exec_space{}, init_functor );
