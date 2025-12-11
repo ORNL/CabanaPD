@@ -121,9 +121,6 @@ struct ForceModels
             Kokkos::abort( "Invalid model index." );
     }
 
-    auto forceHorizon( const int ) { return force_horizon; }
-    auto maxHorizon() { return force_horizon; }
-
     void update( const MaterialType _type ) { type = _type; }
 
     double force_horizon;
@@ -137,12 +134,12 @@ struct ForceModels
     {
         // Enforce equal cutoff for now.
         force_horizon = model1.force_horizon;
-        checkDelta( model2 );
-        checkDelta( model12 );
+        checkHorizon( model2 );
+        checkHorizon( model12 );
     }
 
     template <typename Model>
-    auto checkDelta( Model m, const double tol = 1e-10 )
+    auto checkHorizon( Model m, const double tol = 1e-10 )
     {
         if ( std::abs( m.force_horizon - force_horizon ) > tol )
             log_err( std::cout, "Horizon for each model must match for "
