@@ -339,18 +339,18 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, TransverselyIsotropic,
                      const double vol, const double xi, const double xi_x,
                      const double xi_y, const double xi_z, const int n ) const
     {
+        // Compute orientation-dependent yield stretch
+        s_Y = s_Y[0] + ( s_Y[1] - s_Y[0] ) * xi_z * xi_z / ( xi * xi );
+
         auto s_p = _s_p( i, n );
-        // Update bond plastic stretch for each direction.
-        for ( std::size_t i = 0; i < s_Y.size(); i++ )
-        {
-            // Yield in tension.
-            if ( s >= s_p + s_Y[i] )
-                _s_p( i, n ) = s - s_Y[i];
-            // Yield in compression.
-            else if ( s <= s_p - s_Y[i] )
-                _s_p( i, n ) = s + s_Y[i];
-            // else: Elastic (in between), do not modify.
-        }
+        // Yield in tension.
+        if ( s >= s_p + s_Y )
+            _s_p( i, n ) = s - s_Y[i];
+        // Yield in compression.
+        else if ( s <= s_p - s_Y )
+            _s_p( i, n ) = s + s_Y[i];
+        // else: Elastic (in between), do not modify.
+
         // Must extract again if in the plastic regime.
         s_p = _s_p( i, n );
         return lambda( xi, xi_x, xi_y, xi_z ) * ( s - s_p ) * vol;
