@@ -305,41 +305,23 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
     }
 };
 
-template <>
-struct ForceModel<LinearLPS, Elastic, NoFracture, TemperatureIndependent>
-    : public ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
+template <typename FractureType>
+struct ForceModel<LinearLPS, Elastic, FractureType, TemperatureIndependent>
+    : public ForceModel<LPS, Elastic, FractureType, TemperatureIndependent>
 {
     using base_type =
-        ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>;
+        ForceModel<LPS, Elastic, FractureType, TemperatureIndependent>;
     using model_type = LinearLPS;
-
-    template <typename... Args>
-    ForceModel( LinearLPS, Args&&... args )
-        : base_type( base_model{}, std::forward<Args>( args )... )
-    {
-    }
 
     using base_type::base_type;
     using base_type::operator();
-};
-
-template <>
-struct ForceModel<LinearLPS, Elastic, Fracture, TemperatureIndependent>
-    : public ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
-{
-    using base_type =
-        ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>;
-
-    using model_type = LinearLPS;
 
     template <typename... Args>
     ForceModel( LinearLPS, Args&&... args )
-        : base_type( base_model{}, std::forward<Args>( args )... )
+        : base_type( typename base_type::base_model{},
+                     std::forward<Args>( args )... )
     {
     }
-
-    using base_type::base_type;
-    using base_type::operator();
 };
 
 template <typename ModelType>

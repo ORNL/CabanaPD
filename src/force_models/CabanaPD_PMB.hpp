@@ -519,72 +519,15 @@ ForceModel( ModelType, ElasticPerfectlyPlastic, const double horizon,
 /******************************************************************************
  Linear PMB.
 ******************************************************************************/
-template <>
-struct ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>
-    : public ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
-{
-    using base_type =
-        ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>;
-    using model_type = LinearPMB;
-
-    using base_type::base_type;
-    using base_type::operator();
-
-    template <typename... Args>
-    ForceModel( LinearPMB, Args... args )
-        : base_type( typename base_type::base_model{}, args... )
-    {
-    }
-};
-
-template <>
-struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
-    : public ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
-{
-    using base_type =
-        ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>;
-
-    using model_type = LinearPMB;
-
-    using base_type::operator();
-
-    template <typename... Args>
-    ForceModel( LinearPMB, Args... args )
-        : base_type( typename base_type::base_model{},
-                     std::forward<Args>( args )... )
-    {
-    }
-};
-
-template <typename MemorySpace>
-struct ForceModel<LinearPMB, ElasticPerfectlyPlastic, Fracture,
-                  TemperatureIndependent, MemorySpace>
-    : public ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
-                        TemperatureIndependent, MemorySpace>
-{
-    using base_type = ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
-                                 TemperatureIndependent, MemorySpace>;
-
-    using model_type = LinearPMB;
-
-    using base_type::operator();
-
-    template <typename... Args>
-    ForceModel( LinearPMB, Args... args )
-        : base_type( typename base_type::base_model{},
-                     std::forward<Args>( args )... )
-    {
-    }
-};
-
-template <typename MechanicsType, typename ThermalType, typename... FieldTypes>
-struct ForceModel<LinearPMB, MechanicsType, Fracture, ThermalType,
+template <typename MechanicsType, typename FractureType, typename ThermalType,
+          typename... FieldTypes>
+struct ForceModel<LinearPMB, MechanicsType, FractureType, ThermalType,
                   FieldTypes...>
-    : public ForceModel<PMB, MechanicsType, Fracture, ThermalType,
+    : public ForceModel<PMB, MechanicsType, FractureType, ThermalType,
                         FieldTypes...>
 {
-    using base_type =
-        ForceModel<PMB, MechanicsType, Fracture, ThermalType, FieldTypes...>;
+    using base_type = ForceModel<PMB, MechanicsType, FractureType, ThermalType,
+                                 FieldTypes...>;
 
     using model_type = LinearPMB;
 
