@@ -306,14 +306,16 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
     }
 };
 
-template <>
-struct ForceModel<LinearLPS, Elastic, NoFracture, TemperatureIndependent>
-    : public ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
+template <typename FractureType>
+struct ForceModel<LinearLPS, Elastic, FractureType, TemperatureIndependent>
+    : public ForceModel<LPS, Elastic, FractureType, TemperatureIndependent>
 {
     using base_type =
-        ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>;
-    // Tag to dispatch to force iteration.
-    using force_tag = LinearLPS;
+        ForceModel<LPS, Elastic, FractureType, TemperatureIndependent>;
+    using model_type = LinearLPS;
+
+    using base_type::base_type;
+    using base_type::operator();
 
     template <typename... Args>
     ForceModel( LinearLPS, Args&&... args )
@@ -321,30 +323,6 @@ struct ForceModel<LinearLPS, Elastic, NoFracture, TemperatureIndependent>
                      std::forward<Args>( args )... )
     {
     }
-
-    using base_type::base_type;
-    using base_type::operator();
-};
-
-template <>
-struct ForceModel<LinearLPS, Elastic, Fracture, TemperatureIndependent>
-    : public ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
-{
-    using base_type =
-        ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>;
-
-    // Tag to dispatch to force iteration.
-    using force_tag = LinearLPS;
-
-    template <typename... Args>
-    ForceModel( LinearLPS, Args&&... args )
-        : base_type( typename base_type::model_tag{},
-                     std::forward<Args>( args )... )
-    {
-    }
-
-    using base_type::base_type;
-    using base_type::operator();
 };
 
 template <typename ModelType>
