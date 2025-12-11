@@ -71,8 +71,8 @@ class Inputs
         double dx = inputs["dx"]["value"][0];
         if ( inputs.contains( "horizon" ) )
         {
-            double delta = inputs["horizon"]["value"];
-            int m = std::floor( delta / dx );
+            double horizon = inputs["horizon"]["value"];
+            int m = std::floor( horizon / dx );
             inputs["m"]["value"] = m;
         }
 
@@ -80,8 +80,8 @@ class Inputs
         else if ( inputs.contains( "m" ) )
         {
             int m = inputs["m"]["value"];
-            double delta = static_cast<double>( m ) * dx + 0.01 * dx;
-            inputs["horizon"]["value"] = delta;
+            double horizon = static_cast<double>( m ) * dx + 0.01 * dx;
+            inputs["horizon"]["value"] = horizon;
         }
 
         // Set timestep safety factor if not set by user.
@@ -255,10 +255,12 @@ class Inputs
         // Run over the neighborhood of a point in the bulk of a body (at the
         // origin).
         int m = inputs["m"]["value"];
-        double delta = inputs["horizon"]["value"];
+        double horizon = inputs["horizon"]["value"];
         // FIXME: this is copied from the forces.
-        // FIXME: if delta is not constant this needs to be updated accordingly.
-        double c = 18.0 * min_K / ( pi * delta * delta * delta * delta );
+        // FIXME: if horizon is not constant this needs to be updated
+        // accordingly.
+        double c =
+            18.0 * min_K / ( pi * horizon * horizon * horizon * horizon );
 
         for ( int i = -( m + 1 ); i < m + 2; i++ )
         {
@@ -278,8 +280,8 @@ class Inputs
                     // Bond length squared.
                     double r2 = xi_1 * xi_1 + xi_2 * xi_2 + xi_3 * xi_3;
 
-                    // Check if bond is no longer than delta.
-                    if ( r2 < delta * delta + 1e-10 )
+                    // Check if bond is no longer than horizon.
+                    if ( r2 < horizon * horizon + 1e-10 )
                     {
                         // Check if bond is not 0.
                         if ( r2 > 0 )

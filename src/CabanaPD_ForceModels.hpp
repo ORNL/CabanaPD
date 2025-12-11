@@ -86,13 +86,13 @@ struct BaseFractureModel
     double s0;
     double bond_break_coeff;
 
-    BaseFractureModel( const double _delta, const double _K, const double _G0,
-                       const int influence_type = 1 )
+    BaseFractureModel( const double _force_horizon, const double _K,
+                       const double _G0, const int influence_type = 1 )
         : G0( _G0 )
     {
-        s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / _K / _delta ); // 1/xi
+        s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / _K / _force_horizon ); // 1/xi
         if ( influence_type == 0 )
-            s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / _K / _delta ); // 1
+            s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / _K / _force_horizon ); // 1
 
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     };
@@ -207,11 +207,11 @@ struct ThermalFractureModel
     // Does not use the base critical stretch.
     using base_temperature_type::operator();
 
-    ThermalFractureModel( const double _delta, const double _K,
+    ThermalFractureModel( const double _force_horizon, const double _K,
                           const double _G0, const TemperatureType _temp,
                           const double _alpha, const double _temp0,
                           const int influence_type = 1 )
-        : base_fracture_type( _delta, _K, _G0, influence_type )
+        : base_fracture_type( _force_horizon, _K, _G0, influence_type )
         , base_temperature_type( _temp, _alpha, _temp0 ){};
 
     KOKKOS_INLINE_FUNCTION
