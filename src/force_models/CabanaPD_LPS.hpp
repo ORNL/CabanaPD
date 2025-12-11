@@ -43,19 +43,8 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
     Kokkos::Array<double, 2> theta_coeff;
     Kokkos::Array<double, 2> s_coeff;
 
-    BaseForceModelLPS( LPS, NoFracture, const double _force_horizon,
-                       const double _K, const double _G,
-                       const int _influence = 0 )
-        : base_type( _force_horizon, _K )
-        , influence_type( _influence )
-        , G( _G )
-    {
-        init();
-    }
-
-    BaseForceModelLPS( LPS, Elastic, NoFracture, const double _force_horizon,
-                       const double _K, const double _G,
-                       const int _influence = 0 )
+    BaseForceModelLPS( const double _force_horizon, const double _K,
+                       const double _G, const int _influence = 0 )
         : base_type( _force_horizon, _K )
         , influence_type( _influence )
         , G( _G )
@@ -221,6 +210,18 @@ struct ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
     using base_temperature_type::operator();
 
     using base_type::influence_type;
+
+    ForceModel( LPS, NoFracture, const double _force_horizon, const double _K,
+                const double _G, const int _influence = 0 )
+        : base_type( _force_horizon, _K, _G, _influence )
+    {
+    }
+
+    ForceModel( LPS, Elastic, NoFracture, const double _force_horizon,
+                const double _K, const double _G, const int _influence = 0 )
+        : base_type( _force_horizon, _K, _G, _influence )
+    {
+    }
 };
 
 template <>
@@ -248,51 +249,10 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
     using base_fracture_type::operator();
     using base_temperature_type::operator();
 
-    ForceModel( LPS model, const double _force_horizon, const double _K,
+    ForceModel( LPS, const double _force_horizon, const double _K,
                 const double _G, const double _G0, const int _influence = 0 )
-        : base_type( model, NoFracture{}, _force_horizon, _K, _G, _influence )
+        : base_type( _force_horizon, _K, _G, _influence )
         , base_fracture_type( _force_horizon, _K, _G0, _influence )
-    {
-        init();
-    }
-
-    ForceModel( LPS model, Fracture, const double _force_horizon,
-                const double _K, const double _G, const double _G0,
-                const int _influence = 0 )
-        : base_type( model, NoFracture{}, _force_horizon, _K, _G, _influence )
-        , base_fracture_type( _force_horizon, _K, _G0, _influence )
-    {
-        init();
-    }
-
-    ForceModel( LPS model, Elastic, const double _force_horizon,
-                const double _K, const double _G, const double _G0,
-                const int _influence = 0 )
-        : base_type( model, NoFracture{}, _force_horizon, _K, _G, _influence )
-        , base_fracture_type( _force_horizon, _K, _G0, _influence )
-    {
-        init();
-    }
-
-    ForceModel( LPS model, Elastic elastic, Fracture,
-                const double _force_horizon, const double _K, const double _G,
-                const double _G0, const int _influence = 0 )
-        : base_type( model, elastic, NoFracture{}, _force_horizon, _K, _G,
-                     _influence )
-        , base_fracture_type( _force_horizon, _K, _G0, _influence )
-    {
-        init();
-    }
-
-    // Constructor to average from existing models.
-    template <typename ModelType1, typename ModelType2>
-    ForceModel( const ModelType1& model1, const ModelType2& model2 )
-        : base_type( model1, model2 )
-        , base_fracture_type( model1, model2 )
-    {
-    }
-
-    void init()
     {
         if ( influence_type == 1 )
         {
@@ -303,6 +263,35 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
             s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / K / force_horizon ); // 1
         }
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+    }
+
+    ForceModel( LPS model, Fracture, const double _force_horizon,
+                const double _K, const double _G, const double _G0,
+                const int _influence = 0 )
+        : ForceModel( model, _force_horizon, _K, _G, _G0, _influence )
+    {
+    }
+
+    ForceModel( LPS model, Elastic, const double _force_horizon,
+                const double _K, const double _G, const double _G0,
+                const int _influence = 0 )
+        : ForceModel( model, _force_horizon, _K, _G, _G0, _influence )
+    {
+    }
+
+    ForceModel( LPS model, Elastic, Fracture, const double _force_horizon,
+                const double _K, const double _G, const double _G0,
+                const int _influence = 0 )
+        : ForceModel( model, _force_horizon, _K, _G, _G0, _influence )
+    {
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_fracture_type( model1, model2 )
+    {
     }
 };
 
