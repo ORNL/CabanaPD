@@ -570,9 +570,10 @@ auto createParticles( ModelTag tag, LinearTag, const double dx, const double s0,
     return particles;
 }
 
-template <class ModelTag, class ThermalTag = CabanaPD::TemperatureIndependent>
-auto createParticles( ModelTag tag, QuadraticTag, const double dx,
-                      const double s0, ThermalTag thermal_tag = ThermalTag{} )
+template <class ModelTag>
+CabanaPD::Particles<TEST_MEMSPACE, ModelTag, CabanaPD::TemperatureIndependent,
+                    CabanaPD::EnergyStressOutput>
+createParticles( ModelTag tag, QuadraticTag, const double dx, const double s0 )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -580,7 +581,7 @@ auto createParticles( ModelTag tag, QuadraticTag, const double dx,
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    CabanaPD::Particles particles( TEST_MEMSPACE{}, tag, thermal_tag,
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, tag,
                                    CabanaPD::EnergyStressOutput{} );
     particles.domain( box_min, box_max, num_cells, 0 );
     particles.create( TEST_EXECSPACE{} );
