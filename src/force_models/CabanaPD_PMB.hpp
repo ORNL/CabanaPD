@@ -321,8 +321,8 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, TransverselyIsotropic,
         , base_plasticity_type()
         , s_Y( sigma_y )
     {
-        for ( std::size_t i = 0; i < s_Y.size(); i++ )
-            s_Y[i] /= ( 3.0 * base_type::K );
+        for ( std::size_t d = 0; d < s_Y.size(); d++ )
+            s_Y[d] /= ( 3.0 * base_type::K );
     }
 
     // Constructor to average from existing models.
@@ -331,7 +331,8 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, TransverselyIsotropic,
         : base_type( model1, model2 )
         , base_plasticity_type()
     {
-        s_Y = ( model1.s_Y + model2.s_Y ) / 2.0;
+        for ( std::size_t d = 0; d < s_Y.size(); d++ )
+            s_Y[d] = ( model1.s_Y[d] + model2.s_Y[d] ) / 2.0;
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -340,15 +341,15 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, TransverselyIsotropic,
                      const double xi_y, const double xi_z, const int n ) const
     {
         // Compute orientation-dependent yield stretch
-        s_Y = s_Y[0] + ( s_Y[1] - s_Y[0] ) * xi_z * xi_z / ( xi * xi );
+        auto s_Y_o = s_Y[0] + ( s_Y[1] - s_Y[0] ) * xi_z * xi_z / ( xi * xi );
 
         auto s_p = _s_p( i, n );
         // Yield in tension.
-        if ( s >= s_p + s_Y )
-            _s_p( i, n ) = s - s_Y[i];
+        if ( s >= s_p + s_Y_o )
+            _s_p( i, n ) = s - s_Y_o;
         // Yield in compression.
-        else if ( s <= s_p - s_Y )
-            _s_p( i, n ) = s + s_Y[i];
+        else if ( s <= s_p - s_Y_o )
+            _s_p( i, n ) = s + s_Y_o;
         // else: Elastic (in between), do not modify.
 
         // Must extract again if in the plastic regime.
