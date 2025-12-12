@@ -107,15 +107,15 @@ class Inputs
             inputs["error_file"]["value"] = "cabanaPD.err";
         inputs["input_file"]["value"] = filename;
 
+        if ( !inputs.contains( "output_reference" ) )
+            inputs["output_reference"]["value"] = true;
+
         // Save inputs (including derived) to new file.
         std::string input_file = "cabanaPD.in.json";
         if ( !inputs.contains( "exported_input_file" ) )
             inputs["exported_input_file"]["value"] = input_file;
         std::ofstream in( input_file );
         in << inputs;
-
-        if ( !inputs.contains( "output_reference" ) )
-            inputs["output_reference"]["value"] = true;
     }
 
     void setupSize()
