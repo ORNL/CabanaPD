@@ -529,6 +529,51 @@ double computeReferenceForceX(
 //---------------------------------------------------------------------------//
 // System creation.
 //---------------------------------------------------------------------------//
+namespace
+{
+
+template <class X, class U, class V>
+struct InitFunctor
+{
+    X x;
+    U u;
+    V v;
+    double s0;
+
+    InitFunctor( X _x, U _u, V _v, double _s0 )
+        : x( _x )
+        , u( _u )
+        , v( _v )
+        , s0( _s0 )
+    {
+    }
+
+    KOKKOS_FUNCTION void operator()( const int pid ) const
+    {
+        for ( int d = 0; d < 3; d++ )
+        {
+            u( pid, d ) = s0 * x( pid, d );
+            v( pid, d ) = 0.0;
+        }
+    }
+};
+
+template <class T>
+struct TempInitFunctor
+{
+    T t;
+    double temp0;
+
+    TempInitFunctor( T _t, double _temp0 )
+        : t( _t )
+        , temp0( _temp0 )
+    {
+    }
+
+    KOKKOS_FUNCTION void operator()( const int pid ) const { t( pid ) = temp0; }
+};
+
+} // namespace
 template <class ModelTag, class ThermalTag = CabanaPD::TemperatureIndependent>
 auto createParticles( ModelTag tag, LinearTag, const double dx, const double s0,
                       ThermalTag thermal_tag = ThermalTag{},
@@ -548,24 +593,12 @@ auto createParticles( ModelTag tag, LinearTag, const double dx, const double s0,
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto v = particles.sliceVelocity();
-    auto init_functor = KOKKOS_LAMBDA( const int pid )
-    {
-        for ( int d = 0; d < 3; d++ )
-        {
-            u( pid, d ) = s0 * x( pid, d );
-            v( pid, d ) = 0.0;
-        }
-    };
-    particles.update( TEST_EXECSPACE{}, init_functor );
+    particles.update( TEST_EXECSPACE{}, InitFunctor( x, u, v, s0 ) );
     if constexpr ( !std::is_same_v<ThermalTag,
                                    CabanaPD::TemperatureIndependent> )
     {
         auto t = particles.sliceTemperature();
-        auto temp_init_functor = KOKKOS_LAMBDA( const int pid )
-        {
-            t( pid ) = temp0;
-        };
-        particles.update( TEST_EXECSPACE{}, temp_init_functor );
+        particles.update( TEST_EXECSPACE{}, TempInitFunctor( t, temp0 ) );
     }
     return particles;
 }
