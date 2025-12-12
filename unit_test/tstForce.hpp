@@ -529,19 +529,19 @@ double computeReferenceForceX(
 //---------------------------------------------------------------------------//
 // System creation.
 //---------------------------------------------------------------------------//
-template <class ModelTag>
-CabanaPD::Particles<TEST_MEMSPACE, ModelTag, CabanaPD::TemperatureIndependent,
-                    CabanaPD::EnergyStressOutput>
-createParticles( ModelTag tag, LinearTag, const double dx, const double s0 )
+template <class ModelTag, class ThermalTag = CabanaPD::TemperatureIndependent>
+auto createParticles( ModelTag tag, LinearTag, const double dx, const double s0,
+                      ThermalTag thermal_tag = ThermalTag{},
+                      const double temp0 = 0. )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
     int nc = ( box_max[0] - box_min[0] ) / dx;
     std::array<int, 3> num_cells = { nc, nc, nc };
 
-    // Create particles based on the mesh.
-    CabanaPD::Particles particles( TEST_MEMSPACE{}, tag,
-                                   CabanaPD::EnergyStressOutput{} );
+    // Create particles based on the mesh
+    auto particles = CabanaPD::Particles( TEST_MEMSPACE{}, tag, thermal_tag,
+                                          CabanaPD::EnergyStressOutput{} );
     particles.domain( box_min, box_max, num_cells, 0 );
     particles.create( TEST_EXECSPACE{} );
 
@@ -557,13 +557,22 @@ createParticles( ModelTag tag, LinearTag, const double dx, const double s0 )
         }
     };
     particles.update( TEST_EXECSPACE{}, init_functor );
+    if constexpr ( !std::is_same_v<ThermalTag,
+                                   CabanaPD::TemperatureIndependent> )
+    {
+        auto t = particles.sliceTemperature();
+        auto temp_init_functor = KOKKOS_LAMBDA( const int pid )
+        {
+            t( pid ) = temp0;
+        };
+        particles.update( TEST_EXECSPACE{}, temp_init_functor );
+    }
     return particles;
 }
 
-template <class ModelTag>
-CabanaPD::Particles<TEST_MEMSPACE, ModelTag, CabanaPD::TemperatureIndependent,
-                    CabanaPD::EnergyStressOutput>
-createParticles( ModelTag tag, QuadraticTag, const double dx, const double s0 )
+template <class ModelTag, class ThermalTag = CabanaPD::TemperatureIndependent>
+auto createParticles( ModelTag tag, QuadraticTag, const double dx,
+                      const double s0, ThermalTag thermal_tag = ThermalTag{} )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -571,7 +580,7 @@ createParticles( ModelTag tag, QuadraticTag, const double dx, const double s0 )
     std::array<int, 3> num_cells = { nc, nc, nc };
 
     // Create particles based on the mesh.
-    CabanaPD::Particles particles( TEST_MEMSPACE{}, tag,
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, tag, thermal_tag,
                                    CabanaPD::EnergyStressOutput{} );
     particles.domain( box_min, box_max, num_cells, 0 );
     particles.create( TEST_EXECSPACE{} );
@@ -1206,6 +1215,36 @@ TEST( TEST_CATEGORY, test_force_lps_multi )
     testForce( models, dx, m, LinearTag{}, inputs );
     inputs.update( 0.01 );
     testForce( models, dx, m, QuadraticTag{}, inputs );
+}
+TEST( TEST_CATEGORY, test_force_thermal_pmb_multi )
+{
+    double m = 3;
+    // Need a larger system than PMB because the boundary region is larger.
+    double dx = 2.0 / 15.0;
+    double horizon = dx * m;
+    double K = 1.0;
+    double G0 = 1.0;
+    double kappa = 1.0;
+    double cp = 1.0;
+    double alpha = 1.0;
+    double temp0 = 1.0;
+    using model_type = CabanaPD::PMB;
+    using thermal_type = CabanaPD::DynamicTemperature;
+
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      thermal_type{}, temp0 );
+    auto temp = particles.sliceTemperature();
+
+    CabanaPD::ForceModel model1( CabanaPD::PMB{}, horizon, K, G0, temp, kappa,
+                                 cp, alpha, temp0 );
+    CabanaPD::ForceModel model2( model1 );
+    auto models = CabanaPD::createMultiForceModel(
+        particles, CabanaPD::AverageTag{}, model1, model2 );
+
+    Inputs<model_type> inputs{ horizon, K, 0.1, 1.1 };
+    testForce( models, horizon / m, m, LinearTag{}, inputs );
+    inputs.update( 0.01 );
+    testForce( models, horizon / m, m, QuadraticTag{}, inputs );
 }
 
 } // end namespace Test
