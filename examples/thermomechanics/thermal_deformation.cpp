@@ -40,8 +40,8 @@ void thermalDeformationExample( const std::string filename )
     double E = inputs["elastic_modulus"];
     double nu = 0.25;
     double K = E / ( 3 * ( 1 - 2 * nu ) );
-    double delta = inputs["horizon"];
-    delta += 1e-10;
+    double horizon = inputs["horizon"];
+    horizon += 1e-10;
     double alpha = inputs["thermal_expansion_coeff"];
 
     // Problem parameters
@@ -53,7 +53,7 @@ void thermalDeformationExample( const std::string filename )
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
-    int m = std::floor( delta /
+    int m = std::floor( horizon /
                         ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
     int halo_width = m + 1; // Just to be safe.
 
@@ -84,7 +84,7 @@ void thermalDeformationExample( const std::string filename )
     // ====================================================
     auto temp = particles.sliceTemperature();
     CabanaPD::ForceModel force_model( model_type{}, CabanaPD::NoFracture{},
-                                      delta, K, temp, alpha, temp0 );
+                                      horizon, K, temp, alpha, temp0 );
 
     // ====================================================
     //                   Create solver

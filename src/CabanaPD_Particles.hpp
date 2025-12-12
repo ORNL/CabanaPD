@@ -226,9 +226,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         std::array<double, 3> low_corner = inputs["low_corner"];
         std::array<double, 3> high_corner = inputs["high_corner"];
         std::array<int, 3> num_cells = inputs["num_cells"];
-        double delta = inputs["horizon"];
+        double horizon = inputs["horizon"];
         int m = std::floor(
-            delta / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
+            horizon / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
         halo_width = m + 1; // Just to be safe.
 
         domain( low_corner, high_corner, num_cells, halo_width );

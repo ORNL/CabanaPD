@@ -30,7 +30,7 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
     using model_type = LPS;
     using base_model = LPS;
 
-    using base_type::delta;
+    using base_type::force_horizon;
 
     int influence_type;
     InfluenceFunctionTag influence_tag;
@@ -42,19 +42,20 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
     Kokkos::Array<double, 2> theta_coeff;
     Kokkos::Array<double, 2> s_coeff;
 
-    BaseForceModelLPS( LPS, NoFracture, const double _delta, const double _K,
-                       const double _G, const int _influence = 0 )
-        : base_type( _delta, _K )
+    BaseForceModelLPS( LPS, NoFracture, const double _force_horizon,
+                       const double _K, const double _G,
+                       const int _influence = 0 )
+        : base_type( _force_horizon, _K )
         , influence_type( _influence )
         , G( _G )
     {
         init();
     }
 
-    BaseForceModelLPS( LPS, Elastic, NoFracture, const double _delta,
+    BaseForceModelLPS( LPS, Elastic, NoFracture, const double _force_horizon,
                        const double _K, const double _G,
                        const int _influence = 0 )
-        : base_type( _delta, _K )
+        : base_type( _force_horizon, _K )
         , influence_type( _influence )
         , G( _G )
     {
@@ -238,7 +239,7 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
     using base_fracture_type::G0;
     using base_fracture_type::s0;
     using base_type::base_type;
-    using base_type::delta;
+    using base_type::force_horizon;
     using base_type::influence_type;
     using base_type::K;
 
@@ -246,35 +247,38 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
     using base_fracture_type::operator();
     using base_temperature_type::operator();
 
-    ForceModel( LPS model, const double _delta, const double _K,
+    ForceModel( LPS model, const double _force_horizon, const double _K,
                 const double _G, const double _G0, const int _influence = 0 )
-        : base_type( model, NoFracture{}, _delta, _K, _G, _influence )
-        , base_fracture_type( _delta, _K, _G0, _influence )
+        : base_type( model, NoFracture{}, _force_horizon, _K, _G, _influence )
+        , base_fracture_type( _force_horizon, _K, _G0, _influence )
     {
         init();
     }
 
-    ForceModel( LPS model, Fracture, const double _delta, const double _K,
-                const double _G, const double _G0, const int _influence = 0 )
-        : base_type( model, NoFracture{}, _delta, _K, _G, _influence )
-        , base_fracture_type( _delta, _K, _G0, _influence )
-    {
-        init();
-    }
-
-    ForceModel( LPS model, Elastic, const double _delta, const double _K,
-                const double _G, const double _G0, const int _influence = 0 )
-        : base_type( model, NoFracture{}, _delta, _K, _G, _influence )
-        , base_fracture_type( _delta, _K, _G0, _influence )
-    {
-        init();
-    }
-
-    ForceModel( LPS model, Elastic elastic, Fracture, const double _delta,
+    ForceModel( LPS model, Fracture, const double _force_horizon,
                 const double _K, const double _G, const double _G0,
                 const int _influence = 0 )
-        : base_type( model, elastic, NoFracture{}, _delta, _K, _G, _influence )
-        , base_fracture_type( _delta, _K, _G0, _influence )
+        : base_type( model, NoFracture{}, _force_horizon, _K, _G, _influence )
+        , base_fracture_type( _force_horizon, _K, _G0, _influence )
+    {
+        init();
+    }
+
+    ForceModel( LPS model, Elastic, const double _force_horizon,
+                const double _K, const double _G, const double _G0,
+                const int _influence = 0 )
+        : base_type( model, NoFracture{}, _force_horizon, _K, _G, _influence )
+        , base_fracture_type( _force_horizon, _K, _G0, _influence )
+    {
+        init();
+    }
+
+    ForceModel( LPS model, Elastic elastic, Fracture,
+                const double _force_horizon, const double _K, const double _G,
+                const double _G0, const int _influence = 0 )
+        : base_type( model, elastic, NoFracture{}, _force_horizon, _K, _G,
+                     _influence )
+        , base_fracture_type( _force_horizon, _K, _G0, _influence )
     {
         init();
     }
@@ -291,11 +295,11 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
     {
         if ( influence_type == 1 )
         {
-            s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / K / delta ); // 1/xi
+            s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / K / force_horizon ); // 1/xi
         }
         else
         {
-            s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / K / delta ); // 1
+            s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / K / force_horizon ); // 1
         }
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
@@ -339,32 +343,32 @@ struct ForceModel<LinearLPS, Elastic, Fracture, TemperatureIndependent>
 };
 
 template <typename ModelType>
-ForceModel( ModelType, Elastic, NoFracture, const double delta, const double K,
+ForceModel( ModelType, Elastic, NoFracture, const double force_horizon,
+            const double K, const double G, const int influence = 0 )
+    -> ForceModel<ModelType, Elastic, NoFracture>;
+
+template <typename ModelType>
+ForceModel( ModelType, NoFracture, const double force_horizon, const double K,
             const double G, const int influence = 0 )
     -> ForceModel<ModelType, Elastic, NoFracture>;
 
 template <typename ModelType>
-ForceModel( ModelType, NoFracture, const double delta, const double K,
-            const double G, const int influence = 0 )
-    -> ForceModel<ModelType, Elastic, NoFracture>;
-
-template <typename ModelType>
-ForceModel( ModelType, Elastic, const double delta, const double K,
+ForceModel( ModelType, Elastic, const double force_horizon, const double K,
             const double G, const double _G0, const int influence = 0,
             typename std::enable_if<( is_state_based<ModelType>::value ),
                                     int>::type* = 0 )
     -> ForceModel<ModelType, Elastic>;
 
 template <typename ModelType>
-ForceModel( ModelType, Elastic, Fracture, const double delta, const double K,
-            const double G, const double _G0, const int influence = 0,
-            typename std::enable_if<( is_state_based<ModelType>::value ),
-                                    int>::type* = 0 )
-    -> ForceModel<ModelType, Elastic>;
+ForceModel(
+    ModelType, Elastic, Fracture, const double force_horizon, const double K,
+    const double G, const double _G0, const int influence = 0,
+    typename std::enable_if<( is_state_based<ModelType>::value ), int>::type* =
+        0 ) -> ForceModel<ModelType, Elastic>;
 
 template <typename ModelType>
-ForceModel( ModelType, const double _delta, const double _K, const double _G,
-            const double _G0, const int _influence = 0,
+ForceModel( ModelType, const double _force_horizon, const double _K,
+            const double _G, const double _G0, const int _influence = 0,
             typename std::enable_if<( is_state_based<ModelType>::value ),
                                     int>::type* = 0 ) -> ForceModel<ModelType>;
 

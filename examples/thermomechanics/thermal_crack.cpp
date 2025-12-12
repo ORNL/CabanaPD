@@ -42,8 +42,8 @@ void thermalCrackExample( const std::string filename )
     double nu = 0.25;
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double G0 = inputs["fracture_energy"];
-    double delta = inputs["horizon"];
-    delta += 1e-10;
+    double horizon = inputs["horizon"];
+    horizon += 1e-10;
     double alpha = inputs["thermal_expansion_coeff"];
 
     // Problem parameters
@@ -57,7 +57,7 @@ void thermalCrackExample( const std::string filename )
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
-    int m = std::floor( delta /
+    int m = std::floor( horizon /
                         ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
     int halo_width = m + 1; // Just to be safe.
 
@@ -87,7 +87,7 @@ void thermalCrackExample( const std::string filename )
     //                    Force model
     // ====================================================
     auto temp = particles.sliceTemperature();
-    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0, temp, alpha,
+    CabanaPD::ForceModel force_model( model_type{}, horizon, K, G0, temp, alpha,
                                       temp0 );
 
     // ====================================================

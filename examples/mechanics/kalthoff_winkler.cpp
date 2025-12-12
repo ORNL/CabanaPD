@@ -42,8 +42,8 @@ void kalthoffWinklerExample( const std::string filename )
     double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) );
     double G0 = inputs["fracture_energy"];
     // double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
-    double delta = inputs["horizon"];
-    delta += 1e-10;
+    double horizon = inputs["horizon"];
+    horizon += 1e-10;
 
     // ====================================================
     //                  Discretization
@@ -51,7 +51,7 @@ void kalthoffWinklerExample( const std::string filename )
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
-    int m = std::floor( delta /
+    int m = std::floor( horizon /
                         ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
     int halo_width = m + 1; // Just to be safe.
 
@@ -78,9 +78,9 @@ void kalthoffWinklerExample( const std::string filename )
     //                    Force model
     // ====================================================
     using model_type = CabanaPD::PMB;
-    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0 );
+    CabanaPD::ForceModel force_model( model_type{}, horizon, K, G0 );
     // using model_type = CabanaPD::LPS;
-    // CabanaPD::ForceModel force_model( model_type{}, delta, K, G, G0 );
+    // CabanaPD::ForceModel force_model( model_type{}, horizon, K, G, G0 );
 
     // ====================================================
     //                 Particle generation

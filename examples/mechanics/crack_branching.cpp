@@ -40,8 +40,8 @@ void crackBranchingExample( const std::string filename )
     double nu = 0.25; // Use bond-based model
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double G0 = inputs["fracture_energy"];
-    double delta = inputs["horizon"];
-    delta += 1e-10;
+    double horizon = inputs["horizon"];
+    horizon += 1e-10;
 
     // ====================================================
     //                  Discretization
@@ -66,7 +66,7 @@ void crackBranchingExample( const std::string filename )
     //                    Force model
     // ====================================================
     using model_type = CabanaPD::PMB;
-    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0 );
+    CabanaPD::ForceModel force_model( model_type{}, horizon, K, G0 );
 
     // ====================================================
     //                 Particle generation
@@ -102,8 +102,8 @@ void crackBranchingExample( const std::string filename )
         // Density
         rho( pid ) = rho0;
         // No-fail zone
-        if ( x( pid, 1 ) <= plane1.low[1] + delta + 1e-10 ||
-             x( pid, 1 ) >= plane2.high[1] - delta - 1e-10 )
+        if ( x( pid, 1 ) <= plane1.low[1] + horizon + 1e-10 ||
+             x( pid, 1 ) >= plane2.high[1] - horizon - 1e-10 )
             nofail( pid ) = 1;
     };
     particles.update( exec_space{}, init_functor );

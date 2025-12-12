@@ -53,10 +53,10 @@ struct ForceModels
         , model2( m2 )
         , model12( m12 )
     {
-        setHorizon();
+        setForceHorizon();
     }
 
-    auto cutoff() const { return delta; }
+    auto cutoff() const { return force_horizon; }
 
     void updateBonds( const int num_local, const int max_neighbors )
     {
@@ -121,30 +121,27 @@ struct ForceModels
             Kokkos::abort( "Invalid model index." );
     }
 
-    auto horizon( const int ) { return delta; }
-    auto maxHorizon() { return delta; }
-
     void update( const MaterialType _type ) { type = _type; }
 
-    double delta;
+    double force_horizon;
     MaterialType type;
     ModelType1 model1;
     ModelType2 model2;
     ModelType12 model12;
 
   protected:
-    void setHorizon()
+    void setForceHorizon()
     {
         // Enforce equal cutoff for now.
-        delta = model1.delta;
-        checkDelta( model2 );
-        checkDelta( model12 );
+        force_horizon = model1.force_horizon;
+        checkHorizon( model2 );
+        checkHorizon( model12 );
     }
 
     template <typename Model>
-    auto checkDelta( Model m, const double tol = 1e-10 )
+    auto checkHorizon( Model m, const double tol = 1e-10 )
     {
-        if ( std::abs( m.delta - delta ) > tol )
+        if ( std::abs( m.force_horizon - force_horizon ) > tol )
             log_err( std::cout, "Horizon for each model must match for "
                                 "multi-material systems." );
     }

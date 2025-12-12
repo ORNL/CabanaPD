@@ -39,12 +39,12 @@ void fragmentingCylinderExample( const std::string filename )
     double K = inputs["bulk_modulus"];
     // double G = inputs["shear_modulus"]; // Only for LPS.
     double sc = inputs["critical_stretch"];
-    double delta = inputs["horizon"];
-    delta += 1e-10;
+    double horizon = inputs["horizon"];
+    horizon += 1e-10;
     // For PMB or LPS with influence_type == 1
-    double G0 = 9 * K * delta * ( sc * sc ) / 5;
+    double G0 = 9 * K * horizon * ( sc * sc ) / 5;
     // For LPS with influence_type == 0 (default)
-    // double G0 = 15 * K * delta * ( sc * sc ) / 8;
+    // double G0 = 15 * K * horizon * ( sc * sc ) / 8;
 
     // ====================================================
     //                  Discretization
@@ -52,7 +52,7 @@ void fragmentingCylinderExample( const std::string filename )
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
     std::array<int, 3> num_cells = inputs["num_cells"];
-    int m = std::floor( delta /
+    int m = std::floor( horizon /
                         ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
     int halo_width = m + 1; // Just to be safe.
 
@@ -60,7 +60,7 @@ void fragmentingCylinderExample( const std::string filename )
     //                    Force model
     // ====================================================
     using model_type = CabanaPD::PMB;
-    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0 );
+    CabanaPD::ForceModel force_model( model_type{}, horizon, K, G0 );
 
     // ====================================================
     //    Custom particle generation and initialization
@@ -127,7 +127,7 @@ void fragmentingCylinderExample( const std::string filename )
         r_c *= dx[0] / 2.0;
         r_extend *= dx[0];
 
-        contact_type contact_model( delta, r_c, r_extend, K );
+        contact_type contact_model( horizon, r_c, r_extend, K );
 
         CabanaPD::Solver solver( inputs, particles, force_model,
                                  contact_model );

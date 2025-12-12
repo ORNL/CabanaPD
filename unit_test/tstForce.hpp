@@ -55,7 +55,7 @@ template <>
 struct Inputs<CabanaPD::PMB>
 {
     using base_model = CabanaPD::PMB;
-    double delta;
+    double force_horizon;
     double K;
     double coeff;
     double boundary_width;
@@ -69,7 +69,7 @@ template <>
 struct Inputs<CabanaPD::LPS>
 {
     using base_model = CabanaPD::LPS;
-    double delta;
+    double force_horizon;
     double K;
     double G;
     double coeff;
@@ -100,7 +100,7 @@ auto computeReferenceStress(
     double f_x, f_y, f_z;
     // Components xx, yy, zz
     std::array<double, 3> sigma = { 0.0, 0.0, 0.0 };
-    double dx = model.delta / m;
+    double dx = model.force_horizon / m;
     double vol = dx * dx * dx;
 
     // Stress tensor.
@@ -114,7 +114,7 @@ auto computeReferenceStress(
                 double xi =
                     std::sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
 
-                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
                     // This i/j indexing has to be valid for the multi-material
                     // cases, but everything is the same type so it doesn't
@@ -141,7 +141,7 @@ double computeReferenceStrainEnergyDensity(
         int>::type* = 0 )
 {
     double W = 0.0;
-    double dx = model.delta / m;
+    double dx = model.force_horizon / m;
     double vol = dx * dx * dx;
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
@@ -152,7 +152,7 @@ double computeReferenceStrainEnergyDensity(
                 double xi_z = dx * k;
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
 
-                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
                     W += model( CabanaPD::EnergyTag{}, 0, 0, s0, xi, vol );
                 }
@@ -170,7 +170,7 @@ double computeReferenceStrainEnergyDensity(
         int>::type* = 0 )
 {
     double W = 0.0;
-    double dx = model.delta / m;
+    double dx = model.force_horizon / m;
     double vol = dx * dx * dx;
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
@@ -187,7 +187,7 @@ double computeReferenceStrainEnergyDensity(
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
                 double s = ( r - xi ) / xi;
 
-                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
                     W += model( CabanaPD::EnergyTag{}, 0, 0, s, xi, vol );
                 }
@@ -214,7 +214,7 @@ double computeReferenceForceX(
         int>::type* = 0 )
 {
     double fx = 0.0;
-    double dx = model.delta / m;
+    double dx = model.force_horizon / m;
     double vol = dx * dx * dx;
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
@@ -231,7 +231,7 @@ double computeReferenceForceX(
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
                 double s = ( r - xi ) / xi;
 
-                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                     fx += model( CabanaPD::ForceCoeffTag{}, 0, 0, s, vol ) *
                           rx / r;
             }
@@ -243,7 +243,7 @@ template <class ModelType>
 double computeReferenceWeightedVolume( ModelType model, const int m,
                                        const double vol )
 {
-    double dx = model.delta / m;
+    double dx = model.force_horizon / m;
     double weighted_volume = 0.0;
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
@@ -253,7 +253,7 @@ double computeReferenceWeightedVolume( ModelType model, const int m,
                 double xi_y = dx * j;
                 double xi_z = dx * k;
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
-                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                     weighted_volume +=
                         model( CabanaPD::InfluenceFunctionTag{}, 0, 0, xi ) *
                         xi * xi * vol;
@@ -268,7 +268,7 @@ double computeReferenceDilatation( ModelType model, const int m,
                                    const double s0, const double vol,
                                    const double weighted_volume )
 {
-    double dx = model.delta / m;
+    double dx = model.force_horizon / m;
     double theta = 0.0;
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
@@ -279,7 +279,7 @@ double computeReferenceDilatation( ModelType model, const int m,
                 double xi_z = dx * k;
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
 
-                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                     theta +=
                         3.0 / weighted_volume *
                         model( CabanaPD::InfluenceFunctionTag{}, 0, 0, xi ) *
@@ -295,7 +295,7 @@ double computeReferenceDilatation( ModelType model, const int m,
                                    const double weighted_volume,
                                    const double x )
 {
-    double dx = model.delta / m;
+    double dx = model.force_horizon / m;
     double theta = 0.0;
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
@@ -312,7 +312,7 @@ double computeReferenceDilatation( ModelType model, const int m,
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
                 double s = ( r - xi ) / xi;
 
-                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                     theta +=
                         3.0 / weighted_volume *
                         model( CabanaPD::InfluenceFunctionTag{}, 0, 0, xi ) *
@@ -322,9 +322,9 @@ double computeReferenceDilatation( ModelType model, const int m,
 }
 
 // Get the number of neighbors (at one point).
-double computeReferenceNeighbors( const double delta, const int m )
+double computeReferenceNeighbors( const double horizon, const int m )
 {
-    double dx = delta / m;
+    double dx = horizon / m;
     double num_neighbors = 0.0;
     for ( int i = -m; i < m + 1; ++i )
         for ( int j = -m; j < m + 1; ++j )
@@ -335,7 +335,7 @@ double computeReferenceNeighbors( const double delta, const int m )
                 double xi_z = dx * k;
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
 
-                if ( xi > 0.0 && xi < delta + 1e-14 )
+                if ( xi > 0.0 && xi < horizon + 1e-14 )
                     num_neighbors += 1.0;
             }
     return num_neighbors;
@@ -354,7 +354,7 @@ auto computeReferenceStress(
     double f_x, f_y, f_z;
     // Components xx, yy, zz
     std::array<double, 3> sigma = { 0.0, 0.0, 0.0 };
-    double dx = model.delta / m;
+    double dx = model.force_horizon / m;
     double vol = dx * dx * dx;
 
     auto weighted_volume = computeReferenceWeightedVolume( model, m, vol );
@@ -371,7 +371,7 @@ auto computeReferenceStress(
                 double xi_z = dx * k;
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
 
-                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
                     // We assume the dilatation and weighted volume are constant
                     f_mag =
@@ -407,13 +407,13 @@ double computeReferenceStrainEnergyDensity(
         int>::type* = 0 )
 {
     double W = 0.0;
-    double dx = model.delta / m;
+    double dx = model.force_horizon / m;
     double vol = dx * dx * dx;
 
     auto weighted_volume = computeReferenceWeightedVolume( model, m, vol );
     auto theta =
         computeReferenceDilatation( model, m, s0, vol, weighted_volume );
-    auto num_neighbors = computeReferenceNeighbors( model.delta, m );
+    auto num_neighbors = computeReferenceNeighbors( model.force_horizon, m );
 
     // Strain energy density.
     for ( int i = -m; i < m + 1; ++i )
@@ -425,7 +425,7 @@ double computeReferenceStrainEnergyDensity(
                 double xi_z = dx * k;
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
 
-                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
                     W += model( CabanaPD::EnergyTag{},
                                 CabanaPD::SingleMaterial{}, 0, 0, s0, xi, vol,
@@ -445,11 +445,11 @@ double computeReferenceStrainEnergyDensity(
         int>::type* = 0 )
 {
     double W = 0.0;
-    double dx = model.delta / m;
+    double dx = model.force_horizon / m;
     double vol = dx * dx * dx;
 
     auto weighted_volume = computeReferenceWeightedVolume( model, m, vol );
-    auto num_neighbors = computeReferenceNeighbors( model.delta, m );
+    auto num_neighbors = computeReferenceNeighbors( model.force_horizon, m );
     auto theta_i =
         computeReferenceDilatation( model, m, u11, vol, weighted_volume, x );
 
@@ -469,7 +469,7 @@ double computeReferenceStrainEnergyDensity(
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
                 double s = ( r - xi ) / xi;
 
-                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
                     W += model( CabanaPD::EnergyTag{},
                                 CabanaPD::SingleMaterial{}, 0, 0, s, xi, vol,
@@ -490,7 +490,7 @@ double computeReferenceForceX(
         int>::type* = 0 )
 {
     double fx = 0.0;
-    double dx = model.delta / m;
+    double dx = model.force_horizon / m;
     double vol = dx * dx * dx;
 
     auto weighted_volume = computeReferenceWeightedVolume( model, m, vol );
@@ -514,7 +514,7 @@ double computeReferenceForceX(
                 double x_j = x + xi_x;
                 auto theta_j = computeReferenceDilatation(
                     model, m, u11, vol, weighted_volume, x_j );
-                if ( xi > 0.0 && xi < model.delta + 1e-14 )
+                if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
                     fx += model( CabanaPD::ForceCoeffTag{},
                                  CabanaPD::SingleMaterial{}, 0, 0, s, xi, vol,
@@ -603,7 +603,7 @@ void checkResults( HostParticleType aosoa_host, double local_min[3],
 {
     const double s0 = inputs.coeff;
     const double boundary_width = inputs.boundary_width;
-    double delta = inputs.delta;
+    double force_horizon = inputs.force_horizon;
     double ref_Phi = 0.0;
     auto sigma_host = Cabana::slice<0>( aosoa_host );
     auto f_host = Cabana::slice<1>( aosoa_host );
@@ -618,12 +618,12 @@ void checkResults( HostParticleType aosoa_host, double local_min[3],
         double x = x_host( p, 0 );
         double y = x_host( p, 1 );
         double z = x_host( p, 2 );
-        if ( x > local_min[0] + delta * boundary_width &&
-             x < local_max[0] - delta * boundary_width &&
-             y > local_min[1] + delta * boundary_width &&
-             y < local_max[1] - delta * boundary_width &&
-             z > local_min[2] + delta * boundary_width &&
-             z < local_max[2] - delta * boundary_width )
+        if ( x > local_min[0] + force_horizon * boundary_width &&
+             x < local_max[0] - force_horizon * boundary_width &&
+             y > local_min[1] + force_horizon * boundary_width &&
+             y < local_max[1] - force_horizon * boundary_width &&
+             z > local_min[2] + force_horizon * boundary_width &&
+             z < local_max[2] - force_horizon * boundary_width )
         {
             // These are constant for linear, but vary for quadratic.
             auto ref_sigma = computeReferenceStress( test_tag, model, m, s0 );
@@ -746,7 +746,8 @@ void checkAnalyticalStrainEnergy(
     double K = inputs.K;
     double analytical_W =
         18.0 * K * u11 * u11 *
-        ( 1.0 / 5.0 * x * x + inputs.delta * inputs.delta / 42.0 );
+        ( 1.0 / 5.0 * x * x +
+          inputs.force_horizon * inputs.force_horizon / 42.0 );
     EXPECT_NEAR( W, analytical_W, threshold );
 }
 
@@ -764,7 +765,7 @@ void checkAnalyticalStrainEnergy(
     double analytical_W =
         u11 * u11 *
         ( ( 2.0 * K + 8.0 / 3.0 * G ) * x * x +
-          75.0 / 2.0 * G * inputs.delta * inputs.delta / 49.0 );
+          75.0 / 2.0 * G * inputs.force_horizon * inputs.force_horizon / 49.0 );
     EXPECT_NEAR( W, analytical_W, threshold );
 }
 
@@ -910,18 +911,19 @@ void testForce( ModelType model, const double dx, const double m,
 //---------------------------------------------------------------------------//
 // Neighbor test function.
 //---------------------------------------------------------------------------//
-void testNeighbor( const double dx, const double m, const double delta )
+void testNeighbor( const double dx, const double m, const double force_horizon )
 {
     CabanaPD::PMB model_tag;
     CabanaPD::ForceModel model( model_tag, CabanaPD::Elastic{},
-                                CabanaPD::NoFracture{}, delta, 1.0 );
+                                CabanaPD::NoFracture{}, force_horizon, 1.0 );
 
     auto particles = createParticles( model_tag, LinearTag{}, dx, 0.0 );
 
     CabanaPD::Neighbor<TEST_MEMSPACE, CabanaPD::NoFracture> neighbor(
         model, particles );
 
-    auto expected_num_neighbors = computeReferenceNeighbors( model.delta, m );
+    auto expected_num_neighbors =
+        computeReferenceNeighbors( model.force_horizon, m );
     EXPECT_EQ( expected_num_neighbors, neighbor.getMaxLocal() );
 }
 
@@ -934,51 +936,52 @@ TEST( TEST_CATEGORY, test_neighbor )
     // dx needs to be decreased for increased m: boundary particles are ignored.
     double m = 3;
     double dx = 2.0 / 11.0;
-    double delta = dx * m;
-    testNeighbor( dx, m, delta );
+    double force_horizon = dx * m;
+    testNeighbor( dx, m, force_horizon );
 
     m = 6;
     dx = 2.0 / 15.0;
-    delta = dx * m;
-    testNeighbor( dx, m, delta );
+    force_horizon = dx * m;
+    testNeighbor( dx, m, force_horizon );
 }
 
 // Test construction of all PMB models.
 TEST( TEST_CATEGORY, test_force_pmb_construct )
 {
-    double delta = 5.0;
+    double force_horizon = 5.0;
     double K = 1.0;
     double G0 = 100.0;
 
     {
         // With defaults.
-        CabanaPD::ForceModel model( CabanaPD::PMB{}, delta, K, G0 );
+        CabanaPD::ForceModel model( CabanaPD::PMB{}, force_horizon, K, G0 );
     }
     {
         // With mechanics input.
-        CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::Elastic{}, delta,
-                                    K, G0 );
+        CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::Elastic{},
+                                    force_horizon, K, G0 );
     }
     {
         // With all inputs.
         CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::Elastic{},
-                                    CabanaPD::Fracture{}, delta, K, G0 );
+                                    CabanaPD::Fracture{}, force_horizon, K,
+                                    G0 );
     }
     // Without fracture.
     {
         CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::Elastic{},
-                                    CabanaPD::NoFracture{}, delta, K );
+                                    CabanaPD::NoFracture{}, force_horizon, K );
     }
     {
         CabanaPD::ForceModel model( CabanaPD::PMB{}, CabanaPD::NoFracture{},
-                                    delta, K );
+                                    force_horizon, K );
     }
     // With EPP (cannot be run without fracture).
     double sigma_y = 10.0;
     {
         CabanaPD::ForceModel force_model(
             CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{},
-            TEST_MEMSPACE{}, delta, K, G0, sigma_y );
+            TEST_MEMSPACE{}, force_horizon, K, G0, sigma_y );
     }
 
     // With thermomechanics.
@@ -995,19 +998,19 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
     {
         //  With elastic, without fracture.
         CabanaPD::ForceModel force_model( CabanaPD::PMB{},
-                                          CabanaPD::NoFracture{}, delta, K,
-                                          temp, alpha, temp0 );
+                                          CabanaPD::NoFracture{}, force_horizon,
+                                          K, temp, alpha, temp0 );
     }
     {
         //  With elastic.
-        CabanaPD::ForceModel force_model( CabanaPD::PMB{}, delta, K, G0, temp,
-                                          alpha, temp0 );
+        CabanaPD::ForceModel force_model( CabanaPD::PMB{}, force_horizon, K, G0,
+                                          temp, alpha, temp0 );
     }
     {
         //  With EPP.
         CabanaPD::ForceModel force_model(
-            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{}, delta, K, G0,
-            sigma_y, temp, alpha, temp0 );
+            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{}, force_horizon,
+            K, G0, sigma_y, temp, alpha, temp0 );
     }
 
     // With heat transfer.
@@ -1015,51 +1018,54 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
     double cp = 1.0;
     {
         CabanaPD::ForceModel force_model( CabanaPD::PMB{},
-                                          CabanaPD::NoFracture{}, delta, K,
-                                          temp, kappa, cp, alpha, temp0 );
+                                          CabanaPD::NoFracture{}, force_horizon,
+                                          K, temp, kappa, cp, alpha, temp0 );
     }
     {
-        CabanaPD::ForceModel force_model( CabanaPD::PMB{}, delta, K, G0, temp,
-                                          kappa, cp, alpha, temp0 );
+        CabanaPD::ForceModel force_model( CabanaPD::PMB{}, force_horizon, K, G0,
+                                          temp, kappa, cp, alpha, temp0 );
     }
     {
         //  With EPP.
         CabanaPD::ForceModel force_model(
-            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{}, delta, K, G0,
-            sigma_y, temp, kappa, cp, alpha, temp0 );
+            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{}, force_horizon,
+            K, G0, sigma_y, temp, kappa, cp, alpha, temp0 );
     }
 }
 
 // Test construction of all LPS models.
 TEST( TEST_CATEGORY, test_force_lps_construct )
 {
-    double delta = 5.0;
+    double force_horizon = 5.0;
     double K = 1.0;
     double G = 2.0;
     double G0 = 100.0;
 
     {
         // LPS with defaults.
-        CabanaPD::ForceModel model( CabanaPD::LPS{}, delta, K, G, G0, 1 );
+        CabanaPD::ForceModel model( CabanaPD::LPS{}, force_horizon, K, G, G0,
+                                    1 );
     }
     {
         // LPS with mechanics input.
-        CabanaPD::ForceModel model( CabanaPD::LPS{}, CabanaPD::Elastic{}, delta,
-                                    K, G, G0, 1 );
+        CabanaPD::ForceModel model( CabanaPD::LPS{}, CabanaPD::Elastic{},
+                                    force_horizon, K, G, G0, 1 );
     }
     {
         // LPS with all inputs.
         CabanaPD::ForceModel model( CabanaPD::LPS{}, CabanaPD::Elastic{},
-                                    CabanaPD::Fracture{}, delta, K, G, G0, 1 );
+                                    CabanaPD::Fracture{}, force_horizon, K, G,
+                                    G0, 1 );
     }
     // LPS without fracture.
     {
         CabanaPD::ForceModel model( CabanaPD::LPS{}, CabanaPD::Elastic{},
-                                    CabanaPD::NoFracture{}, delta, K, G, 1 );
+                                    CabanaPD::NoFracture{}, force_horizon, K, G,
+                                    1 );
     }
     {
         CabanaPD::ForceModel model( CabanaPD::LPS{}, CabanaPD::NoFracture{},
-                                    delta, K, G, 1 );
+                                    force_horizon, K, G, 1 );
     }
 }
 
@@ -1068,13 +1074,13 @@ TEST( TEST_CATEGORY, test_force_pmb )
     // dx needs to be decreased for increased m: boundary particles are ignored.
     double m = 3;
     double dx = 2.0 / 11.0;
-    double delta = dx * m;
+    double force_horizon = dx * m;
     double K = 1.0;
     using model_type = CabanaPD::PMB;
     CabanaPD::ForceModel model( model_type{}, CabanaPD::Elastic{},
-                                CabanaPD::NoFracture{}, delta, K );
+                                CabanaPD::NoFracture{}, force_horizon, K );
 
-    Inputs<model_type> inputs{ delta, K, 0.1, 1.1 };
+    Inputs<model_type> inputs{ force_horizon, K, 0.1, 1.1 };
     testForce( model, dx, m, LinearTag{}, inputs );
     inputs.update( 0.01 );
     testForce( model, dx, m, QuadraticTag{}, inputs );
@@ -1083,12 +1089,12 @@ TEST( TEST_CATEGORY, test_force_linear_pmb )
 {
     double m = 3;
     double dx = 2.0 / 11.0;
-    double delta = dx * m;
+    double force_horizon = dx * m;
     double K = 1.0;
     CabanaPD::ForceModel model( CabanaPD::LinearPMB{}, CabanaPD::Elastic{},
-                                CabanaPD::NoFracture{}, delta, K );
+                                CabanaPD::NoFracture{}, force_horizon, K );
 
-    Inputs<CabanaPD::PMB> inputs{ delta, K, 0.1, 1.1 };
+    Inputs<CabanaPD::PMB> inputs{ force_horizon, K, 0.1, 1.1 };
     testForce( model, dx, m, LinearTag{}, inputs );
 }
 TEST( TEST_CATEGORY, test_force_lps )
@@ -1096,14 +1102,15 @@ TEST( TEST_CATEGORY, test_force_lps )
     double m = 3;
     // Need a larger system than PMB because the boundary region is larger.
     double dx = 2.0 / 15.0;
-    double delta = dx * m;
+    double force_horizon = dx * m;
     double K = 1.0;
     double G = 0.5;
     using model_type = CabanaPD::LPS;
     CabanaPD::ForceModel model( model_type{}, CabanaPD::Elastic{},
-                                CabanaPD::NoFracture{}, delta, K, G, 1 );
+                                CabanaPD::NoFracture{}, force_horizon, K, G,
+                                1 );
 
-    Inputs<model_type> inputs{ delta, K, G, 0.1, 2.1 };
+    Inputs<model_type> inputs{ force_horizon, K, G, 0.1, 2.1 };
     testForce( model, dx, m, LinearTag{}, inputs );
     inputs.update( 0.01 );
     testForce( model, dx, m, QuadraticTag{}, inputs );
@@ -1112,12 +1119,12 @@ TEST( TEST_CATEGORY, test_force_linear_lps )
 {
     double m = 3;
     double dx = 2.0 / 15.0;
-    double delta = dx * m;
+    double force_horizon = dx * m;
     double K = 1.0;
     double G = 0.5;
     CabanaPD::ForceModel model( CabanaPD::LinearLPS{}, CabanaPD::NoFracture{},
-                                delta, K, G, 1 );
-    Inputs<CabanaPD::LPS> inputs{ delta, K, G, 0.1, 2.1 };
+                                force_horizon, K, G, 1 );
+    Inputs<CabanaPD::LPS> inputs{ force_horizon, K, G, 0.1, 2.1 };
     testForce( model, dx, m, LinearTag{}, inputs );
 }
 
@@ -1126,14 +1133,14 @@ TEST( TEST_CATEGORY, test_force_pmb_damage )
 {
     double m = 3;
     double dx = 2.0 / 11.0;
-    double delta = dx * m;
+    double force_horizon = dx * m;
     double K = 1.0;
     // Large value to make sure no bonds break.
     double G0 = 1000.0;
     using model_type = CabanaPD::PMB;
-    CabanaPD::ForceModel model( model_type{}, delta, K, G0 );
+    CabanaPD::ForceModel model( model_type{}, force_horizon, K, G0 );
 
-    Inputs<model_type> inputs{ delta, K, 0.1, 1.1 };
+    Inputs<model_type> inputs{ force_horizon, K, 0.1, 1.1 };
     testForce( model, dx, m, LinearTag{}, inputs );
     inputs.update( 0.01 );
     testForce( model, dx, m, QuadraticTag{}, inputs );
@@ -1142,14 +1149,14 @@ TEST( TEST_CATEGORY, test_force_lps_damage )
 {
     double m = 3;
     double dx = 2.0 / 15.0;
-    double delta = dx * m;
+    double force_horizon = dx * m;
     double K = 1.0;
     double G = 0.5;
     double G0 = 1000.0;
     using model_type = CabanaPD::LPS;
-    CabanaPD::ForceModel model( model_type{}, delta, K, G, G0, 1 );
+    CabanaPD::ForceModel model( model_type{}, force_horizon, K, G, G0, 1 );
 
-    Inputs<model_type> inputs{ delta, K, G, 0.1, 2.1 };
+    Inputs<model_type> inputs{ force_horizon, K, G, 0.1, 2.1 };
     testForce( model, dx, m, LinearTag{}, inputs );
     inputs.update( 0.01 );
     testForce( model, dx, m, QuadraticTag{}, inputs );
@@ -1159,18 +1166,18 @@ TEST( TEST_CATEGORY, test_force_pmb_multi )
     // dx needs to be decreased for increased m: boundary particles are ignored.
     double m = 3;
     double dx = 2.0 / 11.0;
-    double delta = dx * m;
+    double force_horizon = dx * m;
     double K = 1.0;
     using model_type = CabanaPD::PMB;
     CabanaPD::ForceModel model1( model_type{}, CabanaPD::Elastic{},
-                                 CabanaPD::NoFracture{}, delta, K );
+                                 CabanaPD::NoFracture{}, force_horizon, K );
     CabanaPD::ForceModel model2( model1 );
 
     auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1 );
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, model1, model2 );
 
-    Inputs<model_type> inputs{ delta, K, 0.1, 1.1 };
+    Inputs<model_type> inputs{ force_horizon, K, 0.1, 1.1 };
     testForce( models, dx, m, LinearTag{}, inputs );
     inputs.update( 0.01 );
     testForce( models, dx, m, QuadraticTag{}, inputs );
@@ -1180,20 +1187,21 @@ TEST( TEST_CATEGORY, test_force_lps_multi )
     double m = 3;
     // Need a larger system than PMB because the boundary region is larger.
     double dx = 2.0 / 15.0;
-    double delta = dx * m;
+    double force_horizon = dx * m;
     double K = 1.0;
     double G = 0.5;
     double G0 = 1000.0;
     using model_type = CabanaPD::LPS;
     CabanaPD::ForceModel model1( model_type{}, CabanaPD::Elastic{},
-                                 CabanaPD::NoFracture{}, delta, K, G, 1 );
-    CabanaPD::ForceModel model2( model_type{}, delta, K, G, G0, 1 );
+                                 CabanaPD::NoFracture{}, force_horizon, K, G,
+                                 1 );
+    CabanaPD::ForceModel model2( model_type{}, force_horizon, K, G, G0, 1 );
 
     auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1 );
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, model1, model2 );
 
-    Inputs<model_type> inputs{ delta, K, G, 0.1, 2.1 };
+    Inputs<model_type> inputs{ force_horizon, K, G, 0.1, 2.1 };
     testForce( models, dx, m, LinearTag{}, inputs );
     inputs.update( 0.01 );
     testForce( models, dx, m, QuadraticTag{}, inputs );
