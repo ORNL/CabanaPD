@@ -282,7 +282,7 @@ class Force<MemorySpace, ModelType, PMB, Fracture>
                 s = model( ThermalStretchTag{}, i, j, s );
 
                 // Break if beyond critical stretch unless in no-fail zone.
-                if ( model( CriticalStretchTag{}, i, j, r, xi ) &&
+                if ( model( CriticalStretchTag{}, i, j, r, xi, xi_z ) &&
                      !nofail( i ) && !nofail( j ) )
                 {
                     mu( i, n ) = 0;

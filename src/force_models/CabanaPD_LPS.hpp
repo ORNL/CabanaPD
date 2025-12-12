@@ -222,15 +222,14 @@ struct ForceModel<LPS, Elastic, AnisotropyType, NoFracture,
     using base_type::influence_type;
 };
 
-template <typename AnisotropyType>
-struct ForceModel<LPS, Elastic, AnisotropyType, Fracture,
-                  TemperatureIndependent>
-    : public BaseForceModelLPS<Elastic, AnisotropyType>,
-      BaseFractureModel,
+template <>
+struct ForceModel<LPS, Elastic, Isotropic, Fracture, TemperatureIndependent>
+    : public BaseForceModelLPS<Elastic, Isotropic>,
+      BaseFractureModel<Isotropic>,
       BaseTemperatureModel<TemperatureIndependent>
 {
-    using base_type = BaseForceModelLPS<Elastic, AnisotropyType>;
-    using base_fracture_type = BaseFractureModel;
+    using base_type = BaseForceModelLPS<Elastic, Isotropic>;
+    using base_fracture_type = BaseFractureModel<Isotropic>;
     using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
 
     using fracture_type = Fracture;

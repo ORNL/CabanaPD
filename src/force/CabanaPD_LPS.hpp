@@ -434,10 +434,12 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
                 // Get the reference positions and displacements.
                 double xi, r, s;
                 double rx, ry, rz;
-                getDistance( x, u, i, j, xi, r, s, rx, ry, rz );
+                double xi_x, xi_y, xi_z;
+                getDistance( x, u, i, j, xi, r, s, rx, ry, rz, xi_x, xi_y,
+                             xi_z );
 
                 // Break if beyond critical stretch unless in no-fail zone.
-                if ( model( CriticalStretchTag{}, i, j, r, xi ) &&
+                if ( model( CriticalStretchTag{}, i, j, r, xi, xi_z ) &&
                      !nofail( i ) && !nofail( i ) )
                 {
                     mu( i, n ) = 0;

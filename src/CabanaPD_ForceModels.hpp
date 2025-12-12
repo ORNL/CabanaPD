@@ -72,13 +72,17 @@ struct BaseNoFractureModel
     // model does not support failure.
     KOKKOS_INLINE_FUNCTION
     bool operator()( CriticalStretchTag, const int, const int, const double,
-                     const double ) const
+                     const double, const double ) const
     {
         return false;
     }
 };
 
-struct BaseFractureModel
+template <typename AnisotropyType>
+struct BaseFractureModel;
+
+template <>
+struct BaseFractureModel<Isotropic>
 {
     using fracture_type = Fracture;
 
@@ -118,8 +122,35 @@ struct BaseFractureModel
 
     KOKKOS_INLINE_FUNCTION
     bool operator()( CriticalStretchTag, const int, const int, const double r,
-                     const double xi ) const
+                     const double xi, const double ) const
     {
+        return r * r >= bond_break_coeff * xi * xi;
+    }
+};
+
+template <>
+struct BaseFractureModel<TransverselyIsotropic>
+{
+    using fracture_type = Fracture;
+
+    Kokkos::Array<double, 2> s0;
+    Kokkos::Array<double, 2> coeff;
+
+    // Constructor to work with plasticity.
+    BaseFractureModel( const Kokkos::Array<double, 2> _s0 )
+        : s0( _s0 )
+    {
+        for ( std::size_t d = 0; d < s0.size(); d++ )
+            coeff[d] = ( 1.0 + s0[d] ) * ( 1.0 + s0[d] );
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    bool operator()( CriticalStretchTag, const int, const int, const double r,
+                     const double xi, const double xi_z ) const
+    {
+        auto bond_break_coeff =
+            coeff[0] + ( coeff[1] - coeff[0] ) * xi_z * xi_z / ( xi * xi );
+
         return r * r >= bond_break_coeff * xi * xi;
     }
 };
@@ -187,12 +218,15 @@ struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
     }
 };
 
+template <typename AnisotropyType, typename TemperatureType>
+struct ThermalFractureModel;
+
 template <typename TemperatureType>
-struct ThermalFractureModel
-    : public BaseFractureModel,
+struct ThermalFractureModel<Isotropic, TemperatureType>
+    : public BaseFractureModel<Isotropic>,
       BaseTemperatureModel<TemperatureDependent, TemperatureType>
 {
-    using base_fracture_type = BaseFractureModel;
+    using base_fracture_type = BaseFractureModel<Isotropic>;
     using base_temperature_type =
         BaseTemperatureModel<TemperatureDependent, TemperatureType>;
     using typename base_fracture_type::fracture_type;
@@ -216,7 +250,7 @@ struct ThermalFractureModel
 
     KOKKOS_INLINE_FUNCTION
     bool operator()( CriticalStretchTag, const int i, const int j,
-                     const double r, const double xi ) const
+                     const double r, const double xi, const double ) const
     {
         double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
         double bond_break_coeff =

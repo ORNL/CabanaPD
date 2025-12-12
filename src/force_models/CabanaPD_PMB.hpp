@@ -388,11 +388,11 @@ template <typename AnisotropyType>
 struct ForceModel<PMB, Elastic, AnisotropyType, Fracture,
                   TemperatureIndependent>
     : public BaseForceModelPMB<Elastic, AnisotropyType>,
-      BaseFractureModel,
+      BaseFractureModel<AnisotropyType>,
       BaseTemperatureModel<TemperatureIndependent>
 {
     using base_type = BaseForceModelPMB<Elastic, AnisotropyType>;
-    using base_fracture_type = BaseFractureModel;
+    using base_fracture_type = BaseFractureModel<AnisotropyType>;
     using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
 
     using base_type::operator();
@@ -448,12 +448,12 @@ template <typename MemorySpace>
 struct ForceModel<PMB, ElasticPerfectlyPlastic, Isotropic, Fracture,
                   TemperatureIndependent, MemorySpace>
     : public BaseForceModelPMB<ElasticPerfectlyPlastic, Isotropic, MemorySpace>,
-      public BaseFractureModel,
+      public BaseFractureModel<Isotropic>,
       public BaseTemperatureModel<TemperatureIndependent>
 {
     using base_type =
         BaseForceModelPMB<ElasticPerfectlyPlastic, Isotropic, MemorySpace>;
-    using base_fracture_type = BaseFractureModel;
+    using base_fracture_type = BaseFractureModel<Isotropic>;
     using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
 
     using base_type::operator();
@@ -534,12 +534,12 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, TransverselyIsotropic, Fracture,
                   TemperatureIndependent, MemorySpace>
     : public BaseForceModelPMB<ElasticPerfectlyPlastic, TransverselyIsotropic,
                                MemorySpace>,
-      public BaseFractureModel,
+      public BaseFractureModel<TransverselyIsotropic>,
       public BaseTemperatureModel<TemperatureIndependent>
 {
     using base_type = BaseForceModelPMB<ElasticPerfectlyPlastic,
                                         TransverselyIsotropic, MemorySpace>;
-    using base_fracture_type = BaseFractureModel;
+    using base_fracture_type = BaseFractureModel<TransverselyIsotropic>;
     using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
 
     using base_type::operator();
@@ -550,13 +550,10 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, TransverselyIsotropic, Fracture,
     ForceModel( PMB model, ElasticPerfectlyPlastic mechanics,
                 TransverselyIsotropic, MemorySpace space, const double delta,
                 const double C11, const double C13, const double C33,
-                const double G0, const Kokkos::Array<double, 2> sigma_y )
+                const Kokkos::Array<double, 2> sigma_y,
+                const Kokkos::Array<double, 2> s0 )
         : base_type( model, mechanics, space, delta, C11, C13, C33, sigma_y )
-        , base_fracture_type(
-              G0,
-              // s0
-              ( 5.0 * G0 / sigma_y[0] / delta + sigma_y[0] / base_type::K ) /
-                  6.0 )
+        , base_fracture_type( s0 )
         , base_temperature_type()
     {
     }
@@ -573,7 +570,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, TransverselyIsotropic, Fracture,
 template <typename ModelType, typename MemorySpace>
 ForceModel( ModelType, ElasticPerfectlyPlastic, TransverselyIsotropic,
             MemorySpace, const double, const double, const double, const double,
-            const double, const Kokkos::Array<double, 2> )
+            const Kokkos::Array<double, 2>, const Kokkos::Array<double, 2> )
     -> ForceModel<ModelType, ElasticPerfectlyPlastic, TransverselyIsotropic,
                   Fracture, TemperatureIndependent, MemorySpace>;
 
@@ -600,14 +597,15 @@ struct ForceModel<PMB, Elastic, AnisotropyType, NoFracture,
     }
 };
 
-template <typename AnisotropyType, typename TemperatureType>
-struct ForceModel<PMB, Elastic, AnisotropyType, Fracture, TemperatureDependent,
+template <typename TemperatureType>
+struct ForceModel<PMB, Elastic, Isotropic, Fracture, TemperatureDependent,
                   TemperatureType>
-    : public BaseForceModelPMB<Elastic, AnisotropyType>,
-      ThermalFractureModel<TemperatureType>
+    : public BaseForceModelPMB<Elastic, Isotropic>,
+      ThermalFractureModel<Isotropic, TemperatureType>
 {
-    using base_type = BaseForceModelPMB<Elastic, AnisotropyType>;
-    using base_temperature_type = ThermalFractureModel<TemperatureType>;
+    using base_type = BaseForceModelPMB<Elastic, Isotropic>;
+    using base_temperature_type =
+        ThermalFractureModel<Isotropic, TemperatureType>;
 
     using base_type::operator();
     using base_temperature_type::operator();
@@ -629,16 +627,17 @@ struct ForceModel<PMB, Elastic, AnisotropyType, Fracture, TemperatureDependent,
     }
 };
 
-template <typename AnisotropyType, typename TemperatureType>
-struct ForceModel<PMB, ElasticPerfectlyPlastic, AnisotropyType, Fracture,
+template <typename TemperatureType>
+struct ForceModel<PMB, ElasticPerfectlyPlastic, Isotropic, Fracture,
                   TemperatureDependent, TemperatureType>
-    : public BaseForceModelPMB<ElasticPerfectlyPlastic, AnisotropyType,
+    : public BaseForceModelPMB<ElasticPerfectlyPlastic, Isotropic,
                                typename TemperatureType::memory_space>,
-      public ThermalFractureModel<TemperatureType>
+      public ThermalFractureModel<Isotropic, TemperatureType>
 {
-    using base_type = BaseForceModelPMB<ElasticPerfectlyPlastic, AnisotropyType,
+    using base_type = BaseForceModelPMB<ElasticPerfectlyPlastic, Isotropic,
                                         typename TemperatureType::memory_space>;
-    using base_temperature_type = ThermalFractureModel<TemperatureType>;
+    using base_temperature_type =
+        ThermalFractureModel<Isotropic, TemperatureType>;
 
     using base_type::operator();
     using base_temperature_type::operator();
@@ -716,15 +715,16 @@ ForceModel( ModelType, NoFracture, const double delta, const double K,
     -> ForceModel<ModelType, Elastic, Isotropic, NoFracture, DynamicTemperature,
                   TemperatureType>;
 
-template <typename ModelType, typename AnisotropyType, typename TemperatureType>
-struct ForceModel<ModelType, Elastic, AnisotropyType, Fracture,
-                  DynamicTemperature, TemperatureType>
-    : public BaseForceModelPMB<Elastic, AnisotropyType>,
-      ThermalFractureModel<TemperatureType>,
+template <typename ModelType, typename TemperatureType>
+struct ForceModel<ModelType, Elastic, Isotropic, Fracture, DynamicTemperature,
+                  TemperatureType>
+    : public BaseForceModelPMB<Elastic, Isotropic>,
+      ThermalFractureModel<Isotropic, TemperatureType>,
       BaseDynamicTemperatureModel
 {
-    using base_type = BaseForceModelPMB<Elastic, AnisotropyType>;
-    using base_temperature_type = ThermalFractureModel<TemperatureType>;
+    using base_type = BaseForceModelPMB<Elastic, Isotropic>;
+    using base_temperature_type =
+        ThermalFractureModel<Isotropic, TemperatureType>;
     using base_heat_transfer_type = BaseDynamicTemperatureModel;
 
     // Necessary to distinguish between TemperatureDependent
@@ -754,17 +754,18 @@ ForceModel( ModelType, const double delta, const double K, const double G0,
     -> ForceModel<ModelType, Elastic, Isotropic, Fracture, DynamicTemperature,
                   TemperatureType>;
 
-template <typename AnisotropyType, typename TemperatureType>
-struct ForceModel<PMB, ElasticPerfectlyPlastic, AnisotropyType, Fracture,
+template <typename TemperatureType>
+struct ForceModel<PMB, ElasticPerfectlyPlastic, Isotropic, Fracture,
                   DynamicTemperature, TemperatureType>
-    : public BaseForceModelPMB<ElasticPerfectlyPlastic, AnisotropyType,
+    : public BaseForceModelPMB<ElasticPerfectlyPlastic, Isotropic,
                                typename TemperatureType::memory_space>,
-      public ThermalFractureModel<TemperatureType>,
+      public ThermalFractureModel<Isotropic, TemperatureType>,
       BaseDynamicTemperatureModel
 {
-    using base_type = BaseForceModelPMB<ElasticPerfectlyPlastic, AnisotropyType,
+    using base_type = BaseForceModelPMB<ElasticPerfectlyPlastic, Isotropic,
                                         typename TemperatureType::memory_space>;
-    using base_temperature_type = ThermalFractureModel<TemperatureType>;
+    using base_temperature_type =
+        ThermalFractureModel<Isotropic, TemperatureType>;
     using base_heat_transfer_type = BaseDynamicTemperatureModel;
 
     // Necessary to distinguish between TemperatureDependent
