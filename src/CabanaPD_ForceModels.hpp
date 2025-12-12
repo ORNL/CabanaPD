@@ -47,7 +47,9 @@ struct BaseForceModel
 
     BaseForceModel( const double _force_horizon, const double _K )
         : force_horizon( _force_horizon )
-        , K( _K ){};
+        , K( _K )
+    {
+    }
 
     // FIXME: use the first model cutoff for now.
     template <typename ModelType1, typename ModelType2>
@@ -173,7 +175,9 @@ struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
                           const double _temp0 )
         : alpha( _alpha )
         , temp0( _temp0 )
-        , temperature( _temp ){};
+        , temperature( _temp )
+    {
+    }
 
     // FIXME: use the first model temperature for now.
     template <typename ModelType1, typename ModelType2>
@@ -221,13 +225,17 @@ struct ThermalFractureModel
                           const double _alpha, const double _temp0,
                           const int influence_type = 1 )
         : base_fracture_type( _force_horizon, _K, _G0, influence_type )
-        , base_temperature_type( _temp, _alpha, _temp0 ){};
+        , base_temperature_type( _temp, _alpha, _temp0 )
+    {
+    }
 
     // FIXME: use the first model horizon and microconductivity for now.
     template <typename ModelType1, typename ModelType2>
     ThermalFractureModel( const ModelType1& model1, const ModelType2& model2 )
         : base_fracture_type( model1, model2 )
-        , base_temperature_type( model1, model2 ){};
+        , base_temperature_type( model1, model2 )
+    {
+    }
 
     KOKKOS_INLINE_FUNCTION
     bool operator()( CriticalStretchTag, const int i, const int j,
