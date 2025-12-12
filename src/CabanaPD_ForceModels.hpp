@@ -273,7 +273,7 @@ struct BaseDynamicTemperatureModel
                                  const ModelType2& model2 )
     {
         constant_microconductivity = model1.constant_microconductivity;
-        thermal_horizon = model1.force_horizon;
+        thermal_horizon = model1.thermal_horizon;
         thermal_coeff = ( model1.thermal_coeff + model2.thermal_coeff ) / 2.0;
         kappa = ( model1.kappa + model2.kappa ) / 2.0;
         cp = ( model1.cp + model2.cp ) / 2.0;
