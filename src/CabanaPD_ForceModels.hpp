@@ -140,8 +140,6 @@ struct BaseFractureModel<TransverselyIsotropic>
     BaseFractureModel( const Kokkos::Array<double, 2> _s0 )
         : s0( _s0 )
     {
-        for ( std::size_t d = 0; d < s0.size(); d++ )
-            coeff[d] = ( 1.0 + s0[d] ) * ( 1.0 + s0[d] );
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -149,7 +147,7 @@ struct BaseFractureModel<TransverselyIsotropic>
                      const double xi, const double xi_z ) const
     {
         auto bond_break_coeff =
-            coeff[0] + ( coeff[1] - coeff[0] ) * xi_z * xi_z / ( xi * xi );
+            s0[0] + ( s0[1] - s0[0] ) * xi_z * xi_z / ( xi * xi );
 
         return r * r >= bond_break_coeff * xi * xi;
     }
