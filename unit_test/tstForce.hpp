@@ -1253,11 +1253,10 @@ TEST( TEST_CATEGORY, test_force_lps_multi )
 TEST( TEST_CATEGORY, test_force_thermal_pmb_multi )
 {
     double m = 3;
-    // Need a larger system than PMB because the boundary region is larger.
-    double dx = 2.0 / 15.0;
+    double dx = 2.0 / 11.0;
     double horizon = dx * m;
     double K = 1.0;
-    double G0 = 1.0;
+    double G0 = 1000.0;
     double kappa = 1.0;
     double cp = 1.0;
     double alpha = 1.0;
