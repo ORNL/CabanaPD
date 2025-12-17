@@ -398,13 +398,14 @@ class Comm<ParticleType, Pair, MaterialType, TemperatureDependent>
     void gatherTemperature() { gather_temp->apply(); }
 };
 
-template <class ParticleType, class ModelType, class ThermalType>
-class Comm<ParticleType, ModelType, MultiMaterial, ThermalType>
-    : public Comm<ParticleType, ModelType, SingleMaterial, ThermalType>
+template <class ParticleType, class ModelType>
+class Comm<ParticleType, ModelType, MultiMaterial, TemperatureIndependent>
+    : public Comm<ParticleType, ModelType, SingleMaterial,
+                  TemperatureIndependent>
 {
   public:
     using base_type =
-        Comm<ParticleType, ModelType, SingleMaterial, ThermalType>;
+        Comm<ParticleType, ModelType, SingleMaterial, TemperatureIndependent>;
     using memory_space = typename base_type::memory_space;
     using halo_type = typename base_type::halo_type;
     using base_type::halo;
