@@ -600,6 +600,7 @@ auto createParticles( ModelTag tag, LinearTag, const double dx, const double s0,
         auto t = particles.sliceTemperature();
         particles.update( TEST_EXECSPACE{}, TempInitFunctor( t, temp0 ) );
     }
+    (void)temp0; // silence unused parameter warning if TemperatureIndependent
     return particles;
 }
 
