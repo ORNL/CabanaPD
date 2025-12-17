@@ -1,0 +1,16 @@
+{
+    "num_cells"               : {"value": [101, 31, 6]},
+    "system_size"             : {"value": [1.0, 0.3, 0.06], "unit": "m"},
+    "density"                 : {"value": 3980,  "unit": "kg/m^3"},
+    "elastic_modulus"         : {"value": 370e+9, "unit": "Pa"},
+    "thermal_expansion_coeff" : {"value": [7.5E-6,3.25E-6], "unit": "oC^{-1}"},
+    "thermal_conductivity"    : {"value": 31, "unit": "W/(m.K)"},
+    "specific_heat_capacity"  : {"value": 880, "unit": "J/(kg.K)"},
+    "reference_temperature"   : {"value": 20.0, "unit": "oC"},
+    "horizon"                 : {"value": 0.03, "unit": "m"},  
+    "final_time"              : {"value": 0.01, "unit": "s"},
+    "timestep"                : {"value": 7.5E-7,  "unit": "s"},
+    "thermal_subcycle_steps": {"value": 100},
+    "output_frequency"        : {"value": 100},
+    "output_reference"        : {"value": true}
+}
