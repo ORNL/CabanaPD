@@ -183,6 +183,10 @@ struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
     template <typename ModelType1, typename ModelType2>
     BaseTemperatureModel( const ModelType1& model1, const ModelType2& model2 )
     {
+        static_assert( std::is_same_v<decltype( model1.temperature ),
+                                      decltype( model2.temperature )>,
+                       "BaseTemperatureModel: Both models must have same "
+                       "TemperatureType" );
         temperature = model1.temperature;
         alpha = ( model1.alpha + model2.alpha ) / 2.0;
         temp0 = ( model1.temp0 + model2.temp0 ) / 2.0;
