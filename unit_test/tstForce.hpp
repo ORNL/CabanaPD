@@ -577,7 +577,7 @@ struct TempInitFunctor
 template <class ModelTag, class ThermalTag = CabanaPD::TemperatureIndependent>
 auto createParticles( ModelTag tag, LinearTag, const double dx, const double s0,
                       ThermalTag thermal_tag = ThermalTag{},
-                      const double temp0 = 0. )
+                      [[maybe_unused]] double temp0 = 0. )
 {
     std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
     std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
@@ -600,7 +600,6 @@ auto createParticles( ModelTag tag, LinearTag, const double dx, const double s0,
         auto t = particles.sliceTemperature();
         particles.update( TEST_EXECSPACE{}, TempInitFunctor( t, temp0 ) );
     }
-    (void)temp0; // silence unused parameter warning if TemperatureIndependent
     return particles;
 }
 
