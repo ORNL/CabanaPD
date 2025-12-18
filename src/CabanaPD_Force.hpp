@@ -151,6 +151,8 @@ class BaseForce
     double _total_strain_energy;
 
   public:
+    BaseForce() = default;
+
     // Default to no-op.
     template <class ModelType, class ParticleType, class NeighborType>
     void computeWeightedVolume( const ModelType&, ParticleType&,

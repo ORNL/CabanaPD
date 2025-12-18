@@ -45,6 +45,7 @@ class Force<MemorySpace, NormalRepulsionModel, NoFracture>
 {
   public:
     using base_type = BaseForce<MemorySpace>;
+    Force() = default;
 
     template <class ModelType, class ForceType, class PosType,
               class ParticleType, class NeighborType>
@@ -111,6 +112,7 @@ class Force<MemorySpace, HertzianModel, NoFracture>
 {
   public:
     using base_type = BaseForce<MemorySpace>;
+    Force() = default;
 
     template <class ModelType, class ForceType, class PosType,
               class ParticleType, class NeighborType>

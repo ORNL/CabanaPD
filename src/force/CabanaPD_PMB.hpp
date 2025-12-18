@@ -77,6 +77,7 @@ class Force<MemorySpace, PMB, NoFracture> : public BaseForce<MemorySpace>
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
     using base_type = BaseForce<MemorySpace>;
+    Force() = default;
 
   protected:
     using base_type::_energy_timer;
@@ -208,6 +209,7 @@ class Force<MemorySpace, PMB, Fracture> : public BaseForce<MemorySpace>
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
     using base_type = BaseForce<MemorySpace>;
+    Force() = default;
 
   protected:
     using base_type::_energy_timer;
@@ -408,6 +410,7 @@ class Force<MemorySpace, LinearPMB, NoFracture> : public BaseForce<MemorySpace>
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
     using base_type = BaseForce<MemorySpace>;
+    Force() = default;
 
   protected:
     using base_type::_energy_timer;

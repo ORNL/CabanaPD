@@ -31,6 +31,7 @@ class HeatTransfer<MemorySpace, NoFracture>
   public:
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
+    HeatTransfer() = default;
 
   protected:
     Timer _timer;
@@ -95,6 +96,7 @@ class HeatTransfer<MemorySpace, Fracture>
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
     using base_type = HeatTransfer<MemorySpace, NoFracture>;
+    HeatTransfer() = default;
 
   protected:
     using base_type::_euler_timer;

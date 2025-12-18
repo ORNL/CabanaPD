@@ -81,6 +81,8 @@ class Force<MemorySpace, LPS, NoFracture> : public BaseForce<MemorySpace>
     using base_type::_total_strain_energy;
 
   public:
+    Force() = default;
+
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
 
@@ -278,6 +280,8 @@ class Force<MemorySpace, LPS, Fracture> : public BaseForce<MemorySpace>
     double _total_damage;
 
   public:
+    Force() = default;
+
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
 
@@ -583,6 +587,8 @@ class Force<MemorySpace, LinearLPS, NoFracture>
     using base_type::_total_strain_energy;
 
   public:
+    Force() = default;
+
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
 
