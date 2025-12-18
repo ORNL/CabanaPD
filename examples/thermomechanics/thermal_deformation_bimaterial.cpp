@@ -78,11 +78,10 @@ void thermalDeformationExample( const std::string filename )
     auto rho = particles.sliceDensity();
     auto x = particles.sliceReferencePosition();
     auto type = particles.sliceType();
-    double half_height = ( high_corner[2] - low_corner[2] ) / 2.0;
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         rho( pid ) = rho0;
-        if ( x( pid, 2 ) <= half_height )
+        if ( x( pid, 2 ) <= 0. )
             type( pid ) = 0;
         else
             type( pid ) = 1;
@@ -112,12 +111,11 @@ void thermalDeformationExample( const std::string filename )
     //                   Imposed field
     // ====================================================
     temp = solver.particles.sliceTemperature();
-    const double low_corner_y = low_corner[1];
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
     auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
-        temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
+        temp( pid ) = temp0 + 100000 * t;
     };
     CabanaPD::BodyTerm body_term( temp_func, solver.particles.size(), false );
 
