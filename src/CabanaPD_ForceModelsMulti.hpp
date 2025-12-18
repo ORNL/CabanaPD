@@ -113,17 +113,15 @@ struct ForceModels
             Kokkos::abort( "Invalid model index." );
     }
 
-    template <typename InputType>
-    void update( const InputType _type )
+    template <typename ParticleType>
+    void update( const ParticleType& particles )
     {
-        if constexpr ( std::is_same_v<InputType, MaterialType> )
-            type = _type;
-        else
-        {
-            model1.update( _type );
-            model2.update( _type );
-            model12.update( _type );
-        }
+        type = particles.sliceType();
+
+        // Update any individual model particle fields.
+        model1.update( particles );
+        model2.update( particles );
+        model12.update( particles );
     }
 
     double force_horizon;

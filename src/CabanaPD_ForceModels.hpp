@@ -62,6 +62,11 @@ struct BaseForceModel
     auto cutoff() const { return force_horizon; }
     auto extend() const { return 0.0; }
 
+    template <typename ParticleType>
+    void update( const ParticleType& )
+    {
+    }
+
     // Only needed for models which store bond properties.
     void updateBonds( const int, const int ) {}
 };
@@ -192,7 +197,11 @@ struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
         temp0 = ( model1.temp0 + model2.temp0 ) / 2.0;
     }
 
-    void update( const TemperatureType _temp ) { temperature = _temp; }
+    template <typename ParticleType>
+    void update( const ParticleType& particles )
+    {
+        temperature = particles.sliceTemperature();
+    }
 
     // Update stretch with temperature effects.
     KOKKOS_INLINE_FUNCTION

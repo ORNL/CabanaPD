@@ -176,12 +176,10 @@ class Solver
 
         // Update optional property ghost sizes if needed.
         if constexpr ( std::is_same<typename ForceModelType::material_type,
-                                    MultiMaterial>::value )
-            force_model.update( particles.sliceType() );
-        // Update temperature ghost size if needed.
-        if constexpr ( is_temperature_dependent<
+                                    MultiMaterial>::value ||
+                       is_temperature_dependent<
                            typename ForceModelType::thermal_type>::value )
-            force_model.update( particles.sliceTemperature() );
+            force_model.update( particles );
 
         neighbor = std::make_shared<neighbor_type>( force_model, particles );
         // Plastic models need correct size for the bond array.
