@@ -70,31 +70,24 @@
 
 namespace CabanaPD
 {
-template <class MemorySpace, class ModelType>
-class Force<MemorySpace, ModelType, LPS, NoFracture>
-    : public BaseForce<MemorySpace>
+template <class MemorySpace>
+class Force<MemorySpace, LPS, NoFracture> : public BaseForce<MemorySpace>
 {
   protected:
     using base_type = BaseForce<MemorySpace>;
-    using model_type = ModelType;
-    model_type _model;
-
     using base_type::_energy_timer;
     using base_type::_stress_timer;
     using base_type::_timer;
     using base_type::_total_strain_energy;
 
   public:
+    Force() = default;
+
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
 
-    Force( const model_type model )
-        : _model( model )
-    {
-    }
-
-    template <class ParticleType, class NeighborType>
-    void computeWeightedVolume( ParticleType& particles,
+    template <class ModelType, class ParticleType, class NeighborType>
+    void computeWeightedVolume( const ModelType& model, ParticleType& particles,
                                 const NeighborType& neighbor )
     {
         _timer.start();
@@ -104,7 +97,6 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
         const auto vol = particles.sliceVolume();
         auto m = particles.sliceWeightedVolume();
         Cabana::deep_copy( m, 0.0 );
-        auto model = _model;
 
         auto weighted_volume = KOKKOS_LAMBDA( const int i, const int j )
         {
@@ -119,8 +111,8 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
         _timer.stop();
     }
 
-    template <class ParticleType, class NeighborType>
-    void computeDilatation( ParticleType& particles,
+    template <class ModelType, class ParticleType, class NeighborType>
+    void computeDilatation( const ModelType& model, ParticleType& particles,
                             const NeighborType neighbor )
     {
         _timer.start();
@@ -130,7 +122,6 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
         const auto vol = particles.sliceVolume();
         auto m = particles.sliceWeightedVolume();
         auto theta = particles.sliceDilatation();
-        auto model = _model;
         Cabana::deep_copy( theta, 0.0 );
 
         auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
@@ -149,15 +140,15 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
         _timer.stop();
     }
 
-    template <class ForceType, class PosType, class ParticleType,
-              class NeighborType>
-    void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
+    template <class ModelType, class ForceType, class PosType,
+              class ParticleType, class NeighborType>
+    void computeForceFull( const ModelType& model, ForceType& f,
+                           const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            NeighborType& neighbor )
     {
         _timer.start();
 
-        auto model = _model;
         const auto vol = particles.sliceVolume();
         auto theta = particles.sliceDilatation();
         auto m = particles.sliceWeightedVolume();
@@ -189,15 +180,13 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
         _timer.stop();
     }
 
-    template <class PosType, class WType, class ParticleType,
+    template <class ModelType, class PosType, class WType, class ParticleType,
               class NeighborType>
-    void computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                            const ParticleType& particles,
+    void computeEnergyFull( const ModelType& model, WType& W, const PosType& x,
+                            const PosType& u, const ParticleType& particles,
                             NeighborType& neighbor )
     {
         _energy_timer.start();
-
-        auto model = _model;
 
         const auto vol = particles.sliceVolume();
         const auto theta = particles.sliceDilatation();
@@ -229,12 +218,12 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
         _energy_timer.stop();
     }
 
-    template <class ParticleType, class NeighborType>
-    void computeStressFull( ParticleType& particles, NeighborType& neighbor )
+    template <class ModelType, class ParticleType, class NeighborType>
+    void computeStressFull( const ModelType& model, ParticleType& particles,
+                            NeighborType& neighbor )
     {
         _stress_timer.start();
 
-        auto model = _model;
         const auto x = particles.sliceReferencePosition();
         const auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();
@@ -279,15 +268,11 @@ class Force<MemorySpace, ModelType, LPS, NoFracture>
     }
 };
 
-template <class MemorySpace, class ModelType>
-class Force<MemorySpace, ModelType, LPS, Fracture>
-    : public BaseForce<MemorySpace>
+template <class MemorySpace>
+class Force<MemorySpace, LPS, Fracture> : public BaseForce<MemorySpace>
 {
   protected:
     using base_type = BaseForce<MemorySpace>;
-    using model_type = ModelType;
-    model_type _model;
-
     using base_type::_energy_timer;
     using base_type::_stress_timer;
     using base_type::_timer;
@@ -295,17 +280,13 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
     double _total_damage;
 
   public:
+    Force() = default;
+
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
 
-    Force( const model_type model )
-        : base_type()
-        , _model( model )
-    {
-    }
-
-    template <class ParticleType, class NeighborType>
-    void computeWeightedVolume( ParticleType& particles,
+    template <class ModelType, class ParticleType, class NeighborType>
+    void computeWeightedVolume( const ModelType& model, ParticleType& particles,
                                 const NeighborType& neighbor )
     {
         _timer.start();
@@ -319,7 +300,6 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
         const auto vol = particles.sliceVolume();
         auto m = particles.sliceWeightedVolume();
         Cabana::deep_copy( m, 0.0 );
-        auto model = _model;
 
         auto weighted_volume = KOKKOS_LAMBDA( const int i )
         {
@@ -349,8 +329,8 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
         _timer.stop();
     }
 
-    template <class ParticleType, class NeighborType>
-    void computeDilatation( ParticleType& particles,
+    template <class ModelType, class ParticleType, class NeighborType>
+    void computeDilatation( const ModelType& model, ParticleType& particles,
                             const NeighborType& neighbor )
     {
         _timer.start();
@@ -363,7 +343,6 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
         const auto vol = particles.sliceVolume();
         auto m = particles.sliceWeightedVolume();
         auto theta = particles.sliceDilatation();
-        auto model = _model;
 
         Cabana::deep_copy( theta, 0.0 );
 
@@ -399,9 +378,10 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
         _timer.stop();
     }
 
-    template <class ForceType, class PosType, class ParticleType,
-              class NeighborType>
-    void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
+    template <class ModelType, class ForceType, class PosType,
+              class ParticleType, class NeighborType>
+    void computeForceFull( const ModelType& model, ForceType& f,
+                           const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            NeighborType& neighbor )
     {
@@ -409,8 +389,6 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
         using neighbor_list_type = typename NeighborType::list_type;
         const auto neigh_list = neighbor.list();
         const auto mu = neighbor.brokenBonds();
-
-        auto model = _model;
 
         const auto vol = particles.sliceVolume();
         auto theta = particles.sliceDilatation();
@@ -469,18 +447,16 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
         _timer.stop();
     }
 
-    template <class PosType, class WType, class ParticleType,
+    template <class ModelType, class PosType, class WType, class ParticleType,
               class NeighborType>
-    void computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                            ParticleType& particles,
+    void computeEnergyFull( const ModelType& model, WType& W, const PosType& x,
+                            const PosType& u, ParticleType& particles,
                             const NeighborType& neighbor )
     {
         _energy_timer.start();
         using neighbor_list_type = typename NeighborType::list_type;
         const auto neigh_list = neighbor.list();
         const auto mu = neighbor.brokenBonds();
-
-        auto model = _model;
 
         const auto vol = particles.sliceVolume();
         const auto theta = particles.sliceDilatation();
@@ -528,15 +504,15 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
         _energy_timer.stop();
     }
 
-    template <class ParticleType, class NeighborType>
-    void computeStressFull( ParticleType& particles, NeighborType& neighbor )
+    template <class ModelType, class ParticleType, class NeighborType>
+    void computeStressFull( const ModelType& model, ParticleType& particles,
+                            NeighborType& neighbor )
     {
         _stress_timer.start();
         using neighbor_list_type = typename NeighborType::list_type;
         const auto neigh_list = neighbor.list();
         const auto mu = neighbor.brokenBonds();
 
-        auto model = _model;
         const auto x = particles.sliceReferencePosition();
         const auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();
@@ -599,39 +575,32 @@ class Force<MemorySpace, ModelType, LPS, Fracture>
     auto totalDamage() { return _total_damage; };
 };
 
-template <class MemorySpace, class ModelType>
-class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
-    : public Force<MemorySpace, ModelType, LPS, NoFracture>
+template <class MemorySpace>
+class Force<MemorySpace, LinearLPS, NoFracture>
+    : public Force<MemorySpace, LPS, NoFracture>
 {
   protected:
-    using base_type = Force<MemorySpace, ModelType, LPS, NoFracture>;
-    using model_type = ModelType;
-    model_type _model;
-
+    using base_type = Force<MemorySpace, LPS, NoFracture>;
     using base_type::_energy_timer;
     using base_type::_stress_timer;
     using base_type::_timer;
     using base_type::_total_strain_energy;
 
   public:
+    Force() = default;
+
     // Using the default exec_space.
     using exec_space = typename MemorySpace::execution_space;
 
-    Force( const model_type model )
-        : base_type( model )
-        , _model( model )
-    {
-    }
-
-    template <class ForceType, class PosType, class ParticleType,
-              class NeighborType>
-    void computeForceFull( ForceType& f, const PosType& x, const PosType& u,
+    template <class ModelType, class ForceType, class PosType,
+              class ParticleType, class NeighborType>
+    void computeForceFull( const ModelType& model, ForceType& f,
+                           const PosType& x, const PosType& u,
                            const ParticleType& particles,
                            NeighborType& neighbor )
     {
         _timer.start();
 
-        auto model = _model;
         const auto vol = particles.sliceVolume();
         auto theta = particles.sliceDilatation();
         // Using weighted volume from base LPS class.
@@ -666,15 +635,14 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
         _timer.stop();
     }
 
-    template <class PosType, class WType, class ParticleType,
+    template <class ModelType, class PosType, class WType, class ParticleType,
               class NeighborType>
-    void computeEnergyFull( WType& W, const PosType& x, const PosType& u,
-                            const ParticleType& particles,
+    void computeEnergyFull( const ModelType& model, WType& W, const PosType& x,
+                            const PosType& u, const ParticleType& particles,
                             NeighborType& neighbor )
     {
         _energy_timer.start();
 
-        auto model = _model;
         using neighbor_list_type = typename NeighborType::list_type;
         const auto neigh_list = neighbor.list();
 
@@ -707,12 +675,12 @@ class Force<MemorySpace, ModelType, LinearLPS, NoFracture>
         _energy_timer.stop();
     }
 
-    template <class ParticleType, class NeighborType>
-    void computeStressFull( ParticleType& particles, NeighborType& neighbor )
+    template <class ModelType, class ParticleType, class NeighborType>
+    void computeStressFull( const ModelType& model, ParticleType& particles,
+                            NeighborType& neighbor )
     {
         _stress_timer.start();
 
-        auto model = _model;
         const auto x = particles.sliceReferencePosition();
         const auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();

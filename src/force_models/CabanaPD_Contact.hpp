@@ -25,7 +25,8 @@ namespace CabanaPD
 ******************************************************************************/
 struct ContactModel
 {
-    using base_model = Contact;
+    // Tag for creating particle fields.
+    using model_tag = Contact;
     using material_type = SingleMaterial;
 
     // Contact neighbor search radius.
@@ -51,10 +52,10 @@ struct ContactModel
 struct NormalRepulsionModel : public ContactModel
 {
     using base_type = ContactModel;
-    using base_model = base_type::base_model;
-    using model_type = NormalRepulsionModel;
     using fracture_type = NoFracture;
     using thermal_type = TemperatureIndependent;
+    // Tag to dispatch to force iteration.
+    using force_tag = NormalRepulsionModel;
 
     double delta;
     using ContactModel::radius;
