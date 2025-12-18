@@ -28,6 +28,8 @@ struct ContactModel
     // Tag for creating particle fields.
     using model_tag = Contact;
     using material_type = SingleMaterial;
+    // Is there a field that needs to be updated later?
+    using needs_update = std::false_type;
 
     // Contact neighbor search radius.
     double radius;

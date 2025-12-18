@@ -175,10 +175,8 @@ class Solver
         }
 
         // Update optional property ghost sizes if needed.
-        if constexpr ( std::is_same<typename ForceModelType::material_type,
-                                    MultiMaterial>::value ||
-                       is_temperature_dependent<
-                           typename ForceModelType::thermal_type>::value )
+        if constexpr ( std::is_same<typename ForceModelType::needs_update,
+                                    std::true_type>::value )
             force_model.update( particles );
 
         neighbor = std::make_shared<neighbor_type>( force_model, particles );

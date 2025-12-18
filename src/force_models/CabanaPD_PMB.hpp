@@ -315,7 +315,7 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
 
     using base_type::operator();
     using base_temperature_type::operator();
-    using base_temperature_type::update;
+    using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, NoFracture fracture, const double _force_horizon,
                 const double _K, const TemperatureType _temp,
@@ -343,7 +343,7 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
 
     using base_type::operator();
     using base_temperature_type::operator();
-    using base_temperature_type::update;
+    using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, const double _horizon, const double _K,
                 const double _G0, const TemperatureType _temp,
@@ -375,7 +375,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, TemperatureDependent,
 
     using base_type::operator();
     using base_temperature_type::operator();
-    using base_temperature_type::update;
+    using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, ElasticPerfectlyPlastic mechanics,
                 const double _horizon, const double _K, const double _G0,
@@ -435,7 +435,7 @@ struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
 
     using base_type::operator();
     using base_temperature_type::operator();
-    using base_temperature_type::update;
+    using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, NoFracture fracture, const double _horizon,
                 const double _K, const TemperatureType& _temp,
@@ -481,7 +481,7 @@ struct ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
 
     using base_type::operator();
     using base_temperature_type::operator();
-    using base_temperature_type::update;
+    using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, const double _horizon, const double _K,
                 const double _G0, const TemperatureType _temp,
@@ -531,7 +531,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, DynamicTemperature,
 
     using base_type::operator();
     using base_temperature_type::operator();
-    using base_temperature_type::update;
+    using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, ElasticPerfectlyPlastic mechanics,
                 const double _horizon, const double _K, const double _G0,

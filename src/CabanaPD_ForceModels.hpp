@@ -41,6 +41,8 @@ struct InfluenceFunctionTag
 
 struct BaseForceModel
 {
+    // Is there a field that needs to be updated later?
+    using needs_update = std::false_type;
     using material_type = SingleMaterial;
     double force_horizon;
     double K;
@@ -61,11 +63,6 @@ struct BaseForceModel
 
     auto cutoff() const { return force_horizon; }
     auto extend() const { return 0.0; }
-
-    template <typename ParticleType>
-    void update( const ParticleType& )
-    {
-    }
 
     // Only needed for models which store bond properties.
     void updateBonds( const int, const int ) {}
@@ -169,6 +166,7 @@ template <typename TemperatureType>
 struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
 {
     using thermal_type = TemperatureDependent;
+    using needs_update = std::true_type;
 
     double alpha;
     double temp0;
@@ -267,6 +265,7 @@ struct ThermalFractureModel
 struct BaseDynamicTemperatureModel
 {
     using thermal_type = DynamicTemperature;
+    using needs_update = std::true_type;
 
     double thermal_horizon;
 
