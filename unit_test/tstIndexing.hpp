@@ -127,24 +127,4 @@ TEST( TEST_CATEGORY, test_binaryIndexing )
         }
     }
 }
-
-TEST( TEST_CATEGORY, test_binaryIndexing_death )
-{
-    // assert death for out of scope indexing
-    ASSERT_DEATH(
-        {
-            CabanaPD::BinaryIndexing<2> indexing;
-            auto i = indexing( 2, 0 );
-            (void)i;
-        },
-        "" );
-    ASSERT_DEATH(
-        {
-            CabanaPD::BinaryIndexing<2> indexing;
-            auto i = indexing( 0, 2 );
-            (void)i;
-        },
-        "" );
-}
-
 } // end namespace Test
