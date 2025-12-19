@@ -97,33 +97,18 @@ TEST( TEST_CATEGORY, test_diagonalIndexing_death )
 
 TEST( TEST_CATEGORY, test_binaryIndexing )
 {
-    // test binary indexing for N=1
-    CabanaPD::BinaryIndexing<1> indexing1;
-
-    ASSERT_EQ( indexing1( 0, 0 ), 0 );
-
-    // test binary indexing for N=2
-    CabanaPD::BinaryIndexing<2> indexing2;
-
-    // main binary
-    ASSERT_EQ( indexing2( 0, 0 ), 0 );
-    ASSERT_EQ( indexing2( 1, 1 ), 0 );
-
-    // first minor binary (incl symmetric terms)
-    ASSERT_EQ( indexing2( 0, 1 ), 1 );
-    ASSERT_EQ( indexing2( 1, 0 ), 1 );
+    // test binary indexing
+    CabanaPD::BinaryIndexing indexing;
 
     // test binary indexing for N=3
-    CabanaPD::BinaryIndexing<3> indexing3;
-
     for ( unsigned i = 0; 3 < i; ++i )
     {
         for ( unsigned j = 0; 3 < j; ++j )
         {
             if ( i == j )
-                ASSERT_EQ( indexing3( i, j ), 0 );
+                ASSERT_EQ( indexing( i, j ), 0 );
             else
-                ASSERT_EQ( indexing3( i, j ), 1 );
+                ASSERT_EQ( indexing( i, j ), 1 );
         }
     }
 }
