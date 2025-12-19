@@ -315,12 +315,21 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
 
     using base_type::operator();
     using base_temperature_type::operator();
+    using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, NoFracture fracture, const double _force_horizon,
                 const double _K, const TemperatureType _temp,
                 const double _alpha, const double _temp0 = 0.0 )
         : base_type( model, fracture, _force_horizon, _K )
         , base_temperature_type( _temp, _alpha, _temp0 )
+    {
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_temperature_type( model1, model2 )
     {
     }
 };
@@ -334,6 +343,7 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
 
     using base_type::operator();
     using base_temperature_type::operator();
+    using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, const double _horizon, const double _K,
                 const double _G0, const TemperatureType _temp,
@@ -365,6 +375,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, TemperatureDependent,
 
     using base_type::operator();
     using base_temperature_type::operator();
+    using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, ElasticPerfectlyPlastic mechanics,
                 const double _horizon, const double _K, const double _G0,
@@ -373,6 +384,14 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, TemperatureDependent,
         : base_type( model, mechanics, typename TemperatureType::memory_space{},
                      _horizon, _K, sigma_y )
         , base_temperature_type( _horizon, _K, _G0, _temp, _alpha, _temp0 )
+    {
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_temperature_type( model1, model2 )
     {
     }
 };
@@ -416,6 +435,7 @@ struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
 
     using base_type::operator();
     using base_temperature_type::operator();
+    using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, NoFracture fracture, const double _horizon,
                 const double _K, const TemperatureType& _temp,
@@ -426,6 +446,14 @@ struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
         , base_temperature_type( _temp, _alpha, _temp0 )
         , base_heat_transfer_type( _horizon, _kappa, _cp,
                                    _constant_microconductivity )
+    {
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_temperature_type( model1, model2 )
     {
     }
 };
@@ -453,6 +481,7 @@ struct ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
 
     using base_type::operator();
     using base_temperature_type::operator();
+    using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, const double _horizon, const double _K,
                 const double _G0, const TemperatureType _temp,
@@ -463,6 +492,15 @@ struct ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
         , base_temperature_type( _horizon, _K, _G0, _temp, _alpha, _temp0 )
         , base_heat_transfer_type( _horizon, _kappa, _cp,
                                    _constant_microconductivity )
+    {
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_temperature_type( model1, model2 )
+        , base_heat_transfer_type( model1, model2 )
     {
     }
 };
@@ -493,6 +531,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, DynamicTemperature,
 
     using base_type::operator();
     using base_temperature_type::operator();
+    using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, ElasticPerfectlyPlastic mechanics,
                 const double _horizon, const double _K, const double _G0,
@@ -505,6 +544,15 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, DynamicTemperature,
         , base_temperature_type( _horizon, _K, _G0, _temp, _alpha, _temp0 )
         , base_heat_transfer_type( _horizon, _kappa, _cp,
                                    _constant_microconductivity )
+    {
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_temperature_type( model1, model2 )
+        , base_heat_transfer_type( model1, model2 )
     {
     }
 };

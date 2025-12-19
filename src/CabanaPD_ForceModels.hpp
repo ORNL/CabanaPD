@@ -41,13 +41,17 @@ struct InfluenceFunctionTag
 
 struct BaseForceModel
 {
+    // Is there a field that needs to be updated later?
+    using needs_update = std::false_type;
     using material_type = SingleMaterial;
     double force_horizon;
     double K;
 
     BaseForceModel( const double _force_horizon, const double _K )
         : force_horizon( _force_horizon )
-        , K( _K ){};
+        , K( _K )
+    {
+    }
 
     // FIXME: use the first model cutoff for now.
     template <typename ModelType1, typename ModelType2>
@@ -162,6 +166,7 @@ template <typename TemperatureType>
 struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
 {
     using thermal_type = TemperatureDependent;
+    using needs_update = std::true_type;
 
     double alpha;
     double temp0;
@@ -173,9 +178,28 @@ struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
                           const double _temp0 )
         : alpha( _alpha )
         , temp0( _temp0 )
-        , temperature( _temp ){};
+        , temperature( _temp )
+    {
+    }
 
-    void update( const TemperatureType _temp ) { temperature = _temp; }
+    // FIXME: use the first model temperature for now.
+    template <typename ModelType1, typename ModelType2>
+    BaseTemperatureModel( const ModelType1& model1, const ModelType2& model2 )
+    {
+        static_assert( std::is_same_v<decltype( model1.temperature ),
+                                      decltype( model2.temperature )>,
+                       "BaseTemperatureModel: Both models must have same "
+                       "TemperatureType" );
+        temperature = model1.temperature;
+        alpha = ( model1.alpha + model2.alpha ) / 2.0;
+        temp0 = ( model1.temp0 + model2.temp0 ) / 2.0;
+    }
+
+    template <typename ParticleType>
+    void update( const ParticleType& particles )
+    {
+        temperature = particles.sliceTemperature();
+    }
 
     // Update stretch with temperature effects.
     KOKKOS_INLINE_FUNCTION
@@ -212,7 +236,17 @@ struct ThermalFractureModel
                           const double _alpha, const double _temp0,
                           const int influence_type = 1 )
         : base_fracture_type( _force_horizon, _K, _G0, influence_type )
-        , base_temperature_type( _temp, _alpha, _temp0 ){};
+        , base_temperature_type( _temp, _alpha, _temp0 )
+    {
+    }
+
+    // FIXME: use the first model horizon and microconductivity for now.
+    template <typename ModelType1, typename ModelType2>
+    ThermalFractureModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_fracture_type( model1, model2 )
+        , base_temperature_type( model1, model2 )
+    {
+    }
 
     KOKKOS_INLINE_FUNCTION
     bool operator()( CriticalStretchTag, const int i, const int j,
@@ -231,6 +265,7 @@ struct ThermalFractureModel
 struct BaseDynamicTemperatureModel
 {
     using thermal_type = DynamicTemperature;
+    using needs_update = std::true_type;
 
     double thermal_horizon;
 
@@ -250,6 +285,18 @@ struct BaseDynamicTemperatureModel
             _thermal_horizon * _thermal_horizon * _thermal_horizon;
         thermal_coeff = 9.0 / 2.0 * _kappa / pi / d3;
         constant_microconductivity = _constant_microconductivity;
+    }
+
+    // FIXME: use the first model horizon and microconductivity for now.
+    template <typename ModelType1, typename ModelType2>
+    BaseDynamicTemperatureModel( const ModelType1& model1,
+                                 const ModelType2& model2 )
+    {
+        constant_microconductivity = model1.constant_microconductivity;
+        thermal_horizon = model1.thermal_horizon;
+        thermal_coeff = ( model1.thermal_coeff + model2.thermal_coeff ) / 2.0;
+        kappa = ( model1.kappa + model2.kappa ) / 2.0;
+        cp = ( model1.cp + model2.cp ) / 2.0;
     }
 
     KOKKOS_INLINE_FUNCTION double microconductivity_function( double r ) const

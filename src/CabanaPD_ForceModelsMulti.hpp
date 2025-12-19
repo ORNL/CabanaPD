@@ -37,14 +37,7 @@ struct ForceModels
     using model_tag = typename first_model::model_tag;
     using thermal_type = typename first_model::thermal_type;
     using fracture_type = typename first_model::fracture_type;
-
-    static_assert( ( std::is_same<typename ModelType1::thermal_type,
-                                  TemperatureIndependent>::value ||
-                     std::is_same<typename ModelType2::thermal_type,
-                                  TemperatureIndependent>::value ||
-                     std::is_same<typename ModelType12::thermal_type,
-                                  TemperatureIndependent>::value ),
-                   "Thermomechanics does not yet support multiple materials!" );
+    using needs_update = std::true_type;
 
     ForceModels( MaterialType t, const ModelType1 m1, ModelType2 m2,
                  ModelType12 m12 )
@@ -121,7 +114,21 @@ struct ForceModels
             Kokkos::abort( "Invalid model index." );
     }
 
-    void update( const MaterialType _type ) { type = _type; }
+    template <typename ParticleType>
+    void update( const ParticleType& particles )
+    {
+        type = particles.sliceType();
+
+        // Update any individual model particle fields. One needing update
+        // currently means all need update.
+        if constexpr ( std::is_same_v<typename ModelType1::needs_update,
+                                      std::true_type> )
+        {
+            model1.update( particles );
+            model2.update( particles );
+            model12.update( particles );
+        }
+    }
 
     double force_horizon;
     MaterialType type;
