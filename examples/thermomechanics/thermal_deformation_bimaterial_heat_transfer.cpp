@@ -36,15 +36,15 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     //            Material and problem parameters
     // ====================================================
     // Material parameters
-    double rho0 = inputs["density"];
+    std::array<double, 2> rho0 = inputs["density"];
     double E = inputs["elastic_modulus"];
     double nu = 0.25;
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double horizon = inputs["horizon"];
     horizon += 1e-10;
-    std::array<double,2> alpha = inputs["thermal_expansion_coeff"];
-    std::array< double,2> kappa = inputs["thermal_conductivity"];
-    std::array< double,2> cp = inputs["specific_heat_capacity"];
+    std::array<double, 2> alpha = inputs["thermal_expansion_coeff"];
+    std::array<double, 2> kappa = inputs["thermal_conductivity"];
+    std::array<double, 2> cp = inputs["specific_heat_capacity"];
 
     // Problem parameters
     double temp0 = inputs["reference_temperature"];
@@ -83,27 +83,31 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     auto type = particles.sliceType();
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
-        // Density
-        rho( pid ) = rho0;
         // Temperature
         temp( pid ) = temp0;
-        // Type
+        // Type and density
         if ( x( pid, 2 ) <= 0. )
+        {
             type( pid ) = 0;
+            rho( pid ) = rho0[0];
+        }
         else
+        {
             type( pid ) = 1;
+            rho( pid ) = rho0[1];
+        }
     };
     particles.update( exec_space{}, init_functor );
 
     // ====================================================
     //                    Force model
     // ====================================================
-    CabanaPD::ForceModel force_model_upper( model_type{}, CabanaPD::NoFracture{},
-                                      horizon, K, temp, kappa[0], cp[0], alpha[0],
-                                      temp0 );
-    CabanaPD::ForceModel force_model_lower( model_type{}, CabanaPD::NoFracture{},
-                                      horizon, K, temp, kappa[1], cp[1], alpha[1],
-                                      temp0 );
+    CabanaPD::ForceModel force_model_upper(
+        model_type{}, CabanaPD::NoFracture{}, horizon, K, temp, kappa[0], cp[0],
+        alpha[0], temp0 );
+    CabanaPD::ForceModel force_model_lower(
+        model_type{}, CabanaPD::NoFracture{}, horizon, K, temp, kappa[1], cp[1],
+        alpha[1], temp0 );
 
     auto models =
         CabanaPD::createMultiForceModel( particles, CabanaPD::AverageTag{},
@@ -116,15 +120,15 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // ====================================================
     //                   Boundary condition
     // ====================================================
-    // Temperature profile imposed on top and bottom surfaces
+    // Temperature profile imposed on sides surfaces
     double dy = solver.particles.dx[1];
     using plane_type = CabanaPD::Region<CabanaPD::RectangularPrism>;
 
-    // Top surface
+    // Left surface
     plane_type plane1( low_corner[0], high_corner[0], high_corner[1] - dy,
                        high_corner[1] + dy, low_corner[2], high_corner[2] );
 
-    // Bottom surface
+    // Right surface
     plane_type plane2( low_corner[0], high_corner[0], low_corner[1] - dy,
                        low_corner[1] + dy, low_corner[2], high_corner[2] );
 
