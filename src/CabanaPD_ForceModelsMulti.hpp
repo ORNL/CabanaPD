@@ -123,12 +123,18 @@ template <typename ParameterPackType, std::size_t... Indices>
 struct CheckTemperatureDependence<ParameterPackType,
                                   std::index_sequence<Indices...>>
 {
-    using type =
+    using temperature_dependence =
         typename IfElseType<TemperatureDependent, TemperatureIndependent,
                             std::disjunction_v<std::is_same<
                                 typename ParameterPackType::template value_type<
                                     Indices>::thermal_type,
                                 TemperatureDependent>...>>::type;
+    using type =
+        typename IfElseType<DynamicTemperature, temperature_dependence,
+                            std::disjunction_v<std::is_same<
+                                typename ParameterPackType::template value_type<
+                                    Indices>::thermal_type,
+                                DynamicTemperature>...>>::type;
 };
 
 template <typename ParameterPackType, typename Sequence>
