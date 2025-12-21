@@ -75,6 +75,24 @@ struct IdentityFunctor
     }
 };
 
+struct MicroconductivityFunctor
+{
+    template <typename Model, typename... ARGS>
+    KOKKOS_FUNCTION auto operator()( Model& model, ARGS... args ) const
+    {
+        return model.microconductivity_function( args... );
+    }
+};
+
+struct SpecificHeatCapacityFunctor
+{
+    template <typename Model>
+    KOKKOS_FUNCTION auto operator()( Model& model ) const
+    {
+        return model.cp;
+    }
+};
+
 template <typename IfType, typename ElseType, bool Condition>
 struct IfElseType
 {
