@@ -294,6 +294,62 @@ struct ForceModelsImpl<MaterialType, Indexing, ParameterPackType,
                 tag, i, j, args... );
     }
 
+    // This is only for LPS force/energy, currently the only cases that require
+    // type information. When running models individually, the SingleMaterial
+    // tag is used in the model directly; here it is replaced with the
+    // MultiMaterial tag instead.
+    template <typename Tag, typename... Args>
+    KOKKOS_INLINE_FUNCTION auto operator()( Tag tag, SingleMaterial,
+                                            const int i, const int j,
+                                            Args... args ) const
+    {
+        MultiMaterial mtag;
+        using commonReturnType = typename std::invoke_result_t<
+            typename ParameterPackType::template value_type<0>, Tag,
+            MultiMaterial, const int, const int, Args...>;
+
+        const int type_i = type( i );
+        const int type_j = type( j );
+
+        auto t = getIndex( i, j );
+        // Call individual model.
+        if ( static_cast<unsigned>( t ) < ParameterPackType::size )
+            return run_functor_for_index_in_pack_with_args(
+                IdentityFunctor{}, t, models, tag, mtag, type_i, type_j,
+                args... );
+        else
+            return outsideRangeFunctor.template operator()<commonReturnType>(
+                tag, i, j, args... );
+    }
+
+    template <typename... Args>
+    KOKKOS_INLINE_FUNCTION auto
+    microconductivity_function( const int i, const int j, Args... args ) const
+    {
+        auto t = getIndex( i, j );
+
+        // Call individual model.
+        if ( static_cast<unsigned>( t ) < ParameterPackType::size )
+            return run_functor_for_index_in_pack_with_args(
+                MicroconductivityFunctor{}, t, models, args... );
+        else // TODO
+            Kokkos::abort( "MultiMaterial with a microconductivity outside of "
+                           "the indexing range is not implemented yet" );
+    }
+
+    KOKKOS_INLINE_FUNCTION auto specific_heat_capacity( const int i ) const
+    {
+        auto t = type( i );
+
+        // Call individual model.
+        if ( static_cast<unsigned>( t ) < ParameterPackType::size )
+            return run_functor_for_index_in_pack_with_args(
+                SpecificHeatCapacityFunctor{}, t, models );
+        else // TODO
+            Kokkos::abort( "MultiMaterial with a microconductivity outside of "
+                           "the indexing range is not implemented yet" );
+    }
+
     template <typename ParticleType>
     void update( const ParticleType& particles )
     {
