@@ -206,6 +206,8 @@ struct ForceModelsImpl<MaterialType, Indexing, ParameterPackType,
     using material_type = MultiMaterial;
     using needs_update = std::true_type;
 
+    static constexpr std::size_t size = sizeof...( Indices );
+
     static_assert(
         (std::conjunction_v<
             std::is_same<typename ParameterPackType::template value_type<
