@@ -319,9 +319,16 @@ class Inputs
             dt_ht *= dt;
 
             // Does not currently support multi-material.
-            double cp = inputs.at( "specific_heat_capacity" )["value"];
-            double rho = inputs.at( "density" )["value"];
-            double dt_ht_crit = rho * cp / sum_ht;
+            auto cp = getVector( "specific_heat_capacity" );
+            auto rho = getVector( "density" );
+            if ( cp.size() != rho.size() )
+                Kokkos::abort( "Thermal simulations with multiple models "
+                               "require density and specific_heat_capacity to "
+                               "be vectors of the same length" );
+
+            double dt_ht_crit = *std::min_element( rho.begin(), rho.end() ) *
+                                *std::min_element( cp.begin(), cp.end() ) /
+                                sum_ht;
             compareCriticalTimeStep( "heat_transfer", dt_ht, dt_ht_crit );
         }
     }
