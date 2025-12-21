@@ -296,8 +296,25 @@ class Inputs
                                                typename ForceModel::
                                                    thermal_type>::value )
                             {
-                                double coeff =
-                                    model.microconductivity_function( xi );
+                                double coeff;
+                                if constexpr ( is_multi_material<
+                                                   ForceModel>::value )
+                                {
+                                    std::vector<double> coeff_vec;
+                                    for ( std::size_t idx = 0;
+                                          idx < ForceModel::size; idx++ )
+                                        for ( std::size_t jdx = 0;
+                                              jdx < ForceModel::size; jdx++ )
+                                            coeff_vec.emplace_back(
+                                                model
+                                                    .microconductivity_function(
+                                                        idx, jdx, xi ) );
+                                    coeff = *std::max_element(
+                                        coeff_vec.begin(), coeff_vec.end() );
+                                }
+                                else
+                                    coeff =
+                                        model.microconductivity_function( xi );
                                 sum_ht += v_p * coeff / r2;
                             }
                         }
