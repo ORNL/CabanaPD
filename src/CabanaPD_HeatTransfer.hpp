@@ -146,7 +146,11 @@ class HeatTransfer<MemorySpace, Fracture>
                 // Only include unbroken bonds.
                 if ( mu( i, n ) > 0 )
                 {
-                    const double coeff = model.microconductivity_function( xi );
+                    double coeff;
+                    if constexpr ( is_multi_material<ModelType>::value )
+                        coeff = model.microconductivity_function( i, j, xi );
+                    else
+                        coeff = model.microconductivity_function( xi );
                     conduction( i ) +=
                         coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
                 }
