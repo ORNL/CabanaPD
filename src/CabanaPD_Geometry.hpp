@@ -115,7 +115,7 @@ struct Region<Cylinder>
         , x_center( _x_center )
         , y_center( _y_center )
     {
-        assert( radius_in < _radius_out );
+        assert( radius_in < radius_out );
         assert( low_z < high_z );
     }
 
