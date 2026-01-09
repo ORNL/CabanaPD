@@ -236,6 +236,47 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
     }
 };
 
+template <>
+struct OnlyForceModel<PMB, Elastic, NoFracture>
+    : public BaseForceModelPMB<Elastic>, BaseNoFractureModel
+{
+    using base_type = BaseForceModelPMB<Elastic>;
+    using base_fracture_type = BaseNoFractureModel;
+
+    using base_type::base_type;
+    using base_type::force_horizon;
+    using base_type::operator();
+    using base_fracture_type::operator();
+};
+
+template <typename ModelType>
+OnlyForceModel( ModelType, NoFracture, const double force_horizon,
+                const double K )
+    -> OnlyForceModel<ModelType, Elastic, NoFracture>;
+
+template <>
+struct OnlyForceModel<PMB, Elastic, Fracture>
+    : public BaseForceModelPMB<Elastic>, BaseFractureModel
+{
+    using base_type = BaseForceModelPMB<Elastic>;
+    using base_fracture_type = BaseFractureModel;
+
+    using base_type::operator();
+    using base_fracture_type::operator();
+
+    OnlyForceModel( PMB model, const double force_horizon, const double K,
+                    const double G0, const int influence_type = 1 )
+        : base_type( model, NoFracture{}, force_horizon, K )
+        , base_fracture_type( force_horizon, K, G0, influence_type )
+    {
+    }
+};
+
+// Default to elastic.
+template <typename ModelType>
+OnlyForceModel( ModelType, const double force_horizon, const double K,
+                const double G0 ) -> OnlyForceModel<ModelType>;
+
 template <typename MemorySpace>
 struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
                   TemperatureIndependent, MemorySpace>
@@ -307,11 +348,13 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
                   TemperatureType>
     : public BaseForceModelPMB<Elastic>,
       BaseNoFractureModel,
-      BaseTemperatureModel<TemperatureDependent, TemperatureType>
+      BaseTemperatureModel<TemperatureDependent, ConstantProperty,
+                           TemperatureType>
 {
     using base_type = BaseForceModelPMB<Elastic>;
     using base_temperature_type =
-        BaseTemperatureModel<TemperatureDependent, TemperatureType>;
+        BaseTemperatureModel<TemperatureDependent, ConstantProperty,
+                             TemperatureType>;
 
     using base_type::operator();
     using base_temperature_type::operator();
@@ -422,12 +465,14 @@ template <typename TemperatureType>
 struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
     : public BaseForceModelPMB<Elastic>,
       BaseNoFractureModel,
-      BaseTemperatureModel<TemperatureDependent, TemperatureType>,
+      BaseTemperatureModel<TemperatureDependent, ConstantProperty,
+                           TemperatureType>,
       BaseDynamicTemperatureModel
 {
     using base_type = BaseForceModelPMB<Elastic>;
     using base_temperature_type =
-        BaseTemperatureModel<TemperatureDependent, TemperatureType>;
+        BaseTemperatureModel<TemperatureDependent, ConstantProperty,
+                             TemperatureType>;
     using base_heat_transfer_type = BaseDynamicTemperatureModel;
 
     // Necessary to distinguish between TemperatureDependent

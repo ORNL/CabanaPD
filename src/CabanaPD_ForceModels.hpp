@@ -162,19 +162,43 @@ class BasePlasticity
     }
 };
 
-template <typename TemperatureType>
-struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
+struct ConstantProperty
+{
+    ConstantProperty( const double v )
+        : value( v )
+    {
+    }
+
+    ConstantProperty( const double v1, const double v2 )
+        : value( ( v1 + v2 ) / 2.0 )
+    {
+    }
+
+    auto operator()( const double ) const { return value; }
+
+    double value;
+};
+
+template <typename TemperatureType, typename FunctorType>
+struct BaseTemperatureModel<TemperatureDependent, FunctorType, TemperatureType>
 {
     using thermal_type = TemperatureDependent;
+    using fracture_type = NoFracture;
     using needs_update = std::true_type;
 
-    double alpha;
+    FunctorType alpha;
     double temp0;
 
     // Temperature field
     TemperatureType temperature;
 
-    BaseTemperatureModel( const TemperatureType _temp, const double _alpha,
+    explicit BaseTemperatureModel( const TemperatureType _temp,
+                                   const double _alpha, const double _temp0 )
+        : BaseTemperatureModel( _temp, ConstantProperty( _alpha ), _temp0 )
+    {
+    }
+
+    BaseTemperatureModel( const TemperatureType _temp, const FunctorType _alpha,
                           const double _temp0 )
         : alpha( _alpha )
         , temp0( _temp0 )
@@ -185,13 +209,13 @@ struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
     // FIXME: use the first model temperature for now.
     template <typename ModelType1, typename ModelType2>
     BaseTemperatureModel( const ModelType1& model1, const ModelType2& model2 )
+        : alpha( model1.alpha( 0 ), model2.alpha( 0 ) )
     {
         static_assert( std::is_same_v<decltype( model1.temperature ),
                                       decltype( model2.temperature )>,
                        "BaseTemperatureModel: Both models must have same "
                        "TemperatureType" );
         temperature = model1.temperature;
-        alpha = ( model1.alpha + model2.alpha ) / 2.0;
         temp0 = ( model1.temp0 + model2.temp0 ) / 2.0;
     }
 
@@ -207,18 +231,29 @@ struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
                        const double s ) const
     {
         double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
-        return s - ( alpha * temp_avg );
+        return s - ( alpha( temp_avg ) * temp_avg );
     }
 };
 
 template <typename TemperatureType>
+BaseTemperatureModel( const TemperatureType, const double, const double )
+    -> BaseTemperatureModel<TemperatureDependent, ConstantProperty,
+                            TemperatureType>;
+
+template <typename TemperatureType, typename FunctorType>
+BaseTemperatureModel( const TemperatureType, const FunctorType, const double )
+    -> BaseTemperatureModel<TemperatureDependent, FunctorType, TemperatureType>;
+
+template <typename TemperatureType>
 struct ThermalFractureModel
     : public BaseFractureModel,
-      BaseTemperatureModel<TemperatureDependent, TemperatureType>
+      BaseTemperatureModel<TemperatureDependent, ConstantProperty,
+                           TemperatureType>
 {
     using base_fracture_type = BaseFractureModel;
     using base_temperature_type =
-        BaseTemperatureModel<TemperatureDependent, TemperatureType>;
+        BaseTemperatureModel<TemperatureDependent, ConstantProperty,
+                             TemperatureType>;
     using typename base_fracture_type::fracture_type;
     using typename base_temperature_type::thermal_type;
 
@@ -253,8 +288,8 @@ struct ThermalFractureModel
                      const double r, const double xi ) const
     {
         double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
-        double bond_break_coeff =
-            ( 1.0 + s0 + alpha * temp_avg ) * ( 1.0 + s0 + alpha * temp_avg );
+        double bond_break_coeff = ( 1.0 + s0 + alpha( temp_avg ) * temp_avg ) *
+                                  ( 1.0 + s0 + alpha( temp_avg ) * temp_avg );
         return r * r >= bond_break_coeff * xi * xi;
     }
 };
@@ -312,6 +347,45 @@ template <typename PeridynamicsModelType, typename MechanicsModelType = Elastic,
           typename DamageType = Fracture,
           typename ThermalType = TemperatureIndependent, typename... DataTypes>
 struct ForceModel;
+
+template <typename PeridynamicsModelType, typename MechanicsModelType = Elastic,
+          typename DamageType = Fracture>
+struct OnlyForceModel;
+
+template <typename ThermalType = TemperatureIndependent, typename... DataTypes>
+struct ThermalModel;
+
+template <typename ForceType, typename ThermalType>
+struct ThermalForceModel : public ForceType, ThermalType
+{
+    using base_type = ForceType;
+    using base_temperature_type = ThermalType;
+
+    using base_type::operator();
+    using base_temperature_type::operator();
+    using typename base_temperature_type::needs_update;
+    using typename base_temperature_type::thermal_type;
+    using typename base_type::fracture_type;
+    /*
+    static_assert( std::is_same_v<typename ForceType::fracture_type,
+                                  typename ThermalType::fracture_type>,
+                   "ThermalForceModel: Both models must have same "
+                   "fracture_type" );
+    */
+    ThermalForceModel( ForceType force, ThermalType thermal )
+        : base_type( force )
+        , base_temperature_type( thermal )
+    {
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ThermalForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_temperature_type( model1, model2 )
+    {
+    }
+};
 
 } // namespace CabanaPD
 

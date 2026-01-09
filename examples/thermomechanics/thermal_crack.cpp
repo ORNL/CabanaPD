@@ -44,7 +44,13 @@ void thermalCrackExample( const std::string filename )
     double G0 = inputs["fracture_energy"];
     double horizon = inputs["horizon"];
     horizon += 1e-10;
-    double alpha = inputs["thermal_expansion_coeff"];
+    std::vector<double> coeff_vec = inputs["thermal_expansion_coeff"];
+    Kokkos::View<double*, memory_space> coeff( coeff_vec.data(),
+                                               coeff_vec.size() );
+    auto alpha = KOKKOS_LAMBDA( const int t )
+    {
+        return coeff[0] + coeff[1] * t + coeff[2] * Kokkos::pow( t, 2.0 );
+    };
 
     // Problem parameters
     double temp0 = inputs["reference_temperature"];
@@ -86,15 +92,17 @@ void thermalCrackExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
+    CabanaPD::OnlyForceModel force_model( model_type{}, horizon, K, G0 );
+
     auto temp = particles.sliceTemperature();
-    CabanaPD::ForceModel force_model( model_type{}, horizon, K, G0, temp, alpha,
-                                      temp0 );
+    CabanaPD::BaseTemperatureModel thermal_model( temp, alpha, temp0 );
+    CabanaPD::ThermalForceModel thermal_force_model( force_model,
+                                                     thermal_model );
 
     // ====================================================
     //                   Create solver
     // ====================================================
-
-    CabanaPD::Solver solver( inputs, particles, force_model );
+    CabanaPD::Solver solver( inputs, particles, thermal_force_model );
 
     // --------------------------------------------
     //                Thermal shock
