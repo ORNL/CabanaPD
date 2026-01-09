@@ -102,7 +102,6 @@ void thermalCrackExample( const std::string filename )
     // ====================================================
     //                   Create solver
     // ====================================================
-
     CabanaPD::Solver solver( inputs, particles, thermal_force_model );
 
     // --------------------------------------------
