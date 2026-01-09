@@ -38,21 +38,8 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
     using base_type::K;
     double c;
 
-    BaseForceModelPMB( PMB, NoFracture, const double force_horizon,
-                       const double _K )
+    BaseForceModelPMB( const double force_horizon, const double _K )
         : base_type( force_horizon, _K )
-    {
-        init();
-    }
-
-    BaseForceModelPMB( PMB, Elastic, NoFracture, const double force_horizon,
-                       const double _K )
-        : base_type( force_horizon, _K )
-    {
-        init();
-    }
-
-    void init()
     {
         c = 18.0 * K /
             ( pi * force_horizon * force_horizon * force_horizon *
@@ -99,10 +86,9 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
 
     using base_plasticity_type::updateBonds;
 
-    BaseForceModelPMB( PMB model, mechanics_type, MemorySpace,
-                       const double force_horizon, const double K,
+    BaseForceModelPMB( MemorySpace, const double force_horizon, const double K,
                        const double sigma_y )
-        : base_type( model, NoFracture{}, force_horizon, K )
+        : base_type( force_horizon, K )
         , base_plasticity_type()
         , s_Y( sigma_y / 3.0 / K )
     {
@@ -175,6 +161,17 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
     using base_type::operator();
     using base_fracture_type::operator();
     using base_temperature_type::operator();
+
+    ForceModel( PMB, NoFracture, const double force_horizon, const double K )
+        : base_type( force_horizon, K )
+    {
+    }
+
+    ForceModel( PMB, Elastic, NoFracture, const double force_horizon,
+                const double K )
+        : base_type( force_horizon, K )
+    {
+    }
 };
 
 template <>
@@ -191,38 +188,35 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
     using base_fracture_type::operator();
     using base_temperature_type::operator();
 
-    ForceModel( PMB model, const double force_horizon, const double K,
+    ForceModel( PMB, const double force_horizon, const double K,
                 const double G0, const int influence_type = 1 )
-        : base_type( model, NoFracture{}, force_horizon, K )
+        : base_type( force_horizon, K )
         , base_fracture_type( force_horizon, K, G0, influence_type )
     {
     }
 
-    ForceModel( PMB model, Elastic elastic, const double force_horizon,
-                const double K, const double G0, const int influence_type = 1 )
-        : base_type( model, elastic, NoFracture{}, force_horizon, K )
-        , base_fracture_type( force_horizon, K, G0, influence_type )
+    ForceModel( PMB model, Elastic, const double force_horizon, const double K,
+                const double G0, const int influence_type = 1 )
+        : ForceModel( model, force_horizon, K, G0, influence_type )
     {
     }
 
     ForceModel( PMB model, Fracture, const double force_horizon, const double K,
                 const double G0, const int influence_type = 1 )
-        : base_type( model, Elastic{}, NoFracture{}, force_horizon, K )
-        , base_fracture_type( force_horizon, K, G0, influence_type )
+        : ForceModel( model, force_horizon, K, G0, influence_type )
     {
     }
 
     ForceModel( PMB model, Elastic, Fracture, const double force_horizon,
                 const double K, const double G0, const int influence_type = 1 )
-        : base_type( model, NoFracture{}, force_horizon, K )
-        , base_fracture_type( force_horizon, K, G0, influence_type )
+        : ForceModel( model, force_horizon, K, G0, influence_type )
     {
     }
 
     // Constructor to work with plasticity.
-    ForceModel( PMB model, Elastic elastic, const double force_horizon,
-                const double K, const double G0, const double s0 )
-        : base_type( model, elastic, NoFracture{}, force_horizon, K )
+    ForceModel( PMB, Elastic, const double force_horizon, const double K,
+                const double G0, const double s0 )
+        : base_type( force_horizon, K )
         , base_fracture_type( G0, s0 )
     {
     }
@@ -252,15 +246,22 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
     using base_temperature_type::operator();
     using base_type::updateBonds;
 
-    ForceModel( PMB model, ElasticPerfectlyPlastic mechanics, MemorySpace space,
+    ForceModel( PMB, ElasticPerfectlyPlastic, MemorySpace space,
                 const double force_horizon, const double K, const double G0,
                 const double sigma_y )
-        : base_type( model, mechanics, space, force_horizon, K, sigma_y )
+        : base_type( space, force_horizon, K, sigma_y )
         , base_fracture_type(
               G0,
               // s0
               ( 5.0 * G0 / sigma_y / force_horizon + sigma_y / K ) / 6.0 )
         , base_temperature_type()
+    {
+    }
+
+    ForceModel( PMB model, ElasticPerfectlyPlastic mechanics, Fracture,
+                MemorySpace space, const double force_horizon, const double K,
+                const double G0, const double sigma_y )
+        : ForceModel( model, mechanics, space, force_horizon, K, G0, sigma_y )
     {
     }
 
@@ -317,10 +318,10 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
     using base_temperature_type::operator();
     using typename base_temperature_type::needs_update;
 
-    ForceModel( PMB model, NoFracture fracture, const double _force_horizon,
-                const double _K, const TemperatureType _temp,
-                const double _alpha, const double _temp0 = 0.0 )
-        : base_type( model, fracture, _force_horizon, _K )
+    ForceModel( PMB, NoFracture, const double _force_horizon, const double _K,
+                const TemperatureType _temp, const double _alpha,
+                const double _temp0 = 0.0 )
+        : base_type( _force_horizon, _K )
         , base_temperature_type( _temp, _alpha, _temp0 )
     {
     }
@@ -345,10 +346,10 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
     using base_temperature_type::operator();
     using typename base_temperature_type::needs_update;
 
-    ForceModel( PMB model, const double _horizon, const double _K,
-                const double _G0, const TemperatureType _temp,
-                const double _alpha, const double _temp0 = 0.0 )
-        : base_type( model, NoFracture{}, _horizon, _K )
+    ForceModel( PMB, const double _horizon, const double _K, const double _G0,
+                const TemperatureType _temp, const double _alpha,
+                const double _temp0 = 0.0 )
+        : base_type( _horizon, _K )
         , base_temperature_type( _horizon, _K, _G0, _temp, _alpha, _temp0 )
     {
     }
@@ -377,12 +378,12 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, TemperatureDependent,
     using base_temperature_type::operator();
     using typename base_temperature_type::needs_update;
 
-    ForceModel( PMB model, ElasticPerfectlyPlastic mechanics,
-                const double _horizon, const double _K, const double _G0,
-                const double sigma_y, const TemperatureType _temp,
-                const double _alpha, const double _temp0 = 0.0 )
-        : base_type( model, mechanics, typename TemperatureType::memory_space{},
-                     _horizon, _K, sigma_y )
+    ForceModel( PMB, ElasticPerfectlyPlastic, const double _horizon,
+                const double _K, const double _G0, const double sigma_y,
+                const TemperatureType _temp, const double _alpha,
+                const double _temp0 = 0.0 )
+        : base_type( typename TemperatureType::memory_space{}, _horizon, _K,
+                     sigma_y )
         , base_temperature_type( _horizon, _K, _G0, _temp, _alpha, _temp0 )
     {
     }
@@ -437,12 +438,12 @@ struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
     using base_temperature_type::operator();
     using typename base_temperature_type::needs_update;
 
-    ForceModel( PMB model, NoFracture fracture, const double _horizon,
-                const double _K, const TemperatureType& _temp,
-                const double _kappa, const double _cp, const double _alpha,
+    ForceModel( PMB, NoFracture, const double _horizon, const double _K,
+                const TemperatureType& _temp, const double _kappa,
+                const double _cp, const double _alpha,
                 const double _temp0 = 0.0,
                 const bool _constant_microconductivity = true )
-        : base_type( model, fracture, _horizon, _K )
+        : base_type( _horizon, _K )
         , base_temperature_type( _temp, _alpha, _temp0 )
         , base_heat_transfer_type( _horizon, _kappa, _cp,
                                    _constant_microconductivity )
@@ -483,12 +484,12 @@ struct ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
     using base_temperature_type::operator();
     using typename base_temperature_type::needs_update;
 
-    ForceModel( PMB model, const double _horizon, const double _K,
-                const double _G0, const TemperatureType _temp,
-                const double _kappa, const double _cp, const double _alpha,
+    ForceModel( PMB, const double _horizon, const double _K, const double _G0,
+                const TemperatureType _temp, const double _kappa,
+                const double _cp, const double _alpha,
                 const double _temp0 = 0.0,
                 const bool _constant_microconductivity = true )
-        : base_type( model, NoFracture{}, _horizon, _K )
+        : base_type( _horizon, _K )
         , base_temperature_type( _horizon, _K, _G0, _temp, _alpha, _temp0 )
         , base_heat_transfer_type( _horizon, _kappa, _cp,
                                    _constant_microconductivity )
@@ -533,14 +534,14 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, DynamicTemperature,
     using base_temperature_type::operator();
     using typename base_temperature_type::needs_update;
 
-    ForceModel( PMB model, ElasticPerfectlyPlastic mechanics,
-                const double _horizon, const double _K, const double _G0,
-                const double sigma_y, const TemperatureType _temp,
-                const double _kappa, const double _cp, const double _alpha,
+    ForceModel( PMB, ElasticPerfectlyPlastic, const double _horizon,
+                const double _K, const double _G0, const double sigma_y,
+                const TemperatureType _temp, const double _kappa,
+                const double _cp, const double _alpha,
                 const double _temp0 = 0.0,
                 const bool _constant_microconductivity = true )
-        : base_type( model, mechanics, typename TemperatureType::memory_space{},
-                     _horizon, _K, sigma_y )
+        : base_type( typename TemperatureType::memory_space{}, _horizon, _K,
+                     sigma_y )
         , base_temperature_type( _horizon, _K, _G0, _temp, _alpha, _temp0 )
         , base_heat_transfer_type( _horizon, _kappa, _cp,
                                    _constant_microconductivity )
@@ -569,31 +570,15 @@ ForceModel( ModelType, ElasticPerfectlyPlastic, const double horizon,
 /******************************************************************************
  Linear PMB.
 ******************************************************************************/
-template <>
-struct ForceModel<LinearPMB, Elastic, NoFracture, TemperatureIndependent>
-    : public ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
+template <typename MechanicsType, typename FractureType, typename ThermalType,
+          typename... FieldTypes>
+struct ForceModel<LinearPMB, MechanicsType, FractureType, ThermalType,
+                  FieldTypes...>
+    : public ForceModel<PMB, MechanicsType, FractureType, ThermalType,
+                        FieldTypes...>
 {
-    using base_type =
-        ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>;
-    // Tag to dispatch to force iteration.
-    using force_tag = LinearPMB;
-
-    using base_type::base_type;
-    using base_type::operator();
-
-    template <typename... Args>
-    ForceModel( LinearPMB, Args... args )
-        : base_type( typename base_type::model_tag{}, args... )
-    {
-    }
-};
-
-template <>
-struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
-    : public ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
-{
-    using base_type =
-        ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>;
+    using base_type = ForceModel<PMB, MechanicsType, FractureType, ThermalType,
+                                 FieldTypes...>;
 
     // Tag to dispatch to force iteration.
     using force_tag = LinearPMB;
@@ -603,50 +588,6 @@ struct ForceModel<LinearPMB, Elastic, Fracture, TemperatureIndependent>
     template <typename... Args>
     ForceModel( LinearPMB, Args... args )
         : base_type( typename base_type::model_tag{},
-                     std::forward<Args>( args )... )
-    {
-    }
-};
-
-template <typename MemorySpace>
-struct ForceModel<LinearPMB, ElasticPerfectlyPlastic, Fracture,
-                  TemperatureIndependent, MemorySpace>
-    : public ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
-                        TemperatureIndependent, MemorySpace>
-{
-    using base_type = ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
-                                 TemperatureIndependent, MemorySpace>;
-
-    // Tag to dispatch to force iteration.
-    using force_tag = LinearPMB;
-
-    using base_type::operator();
-
-    template <typename... Args>
-    ForceModel( LinearPMB, Args... args )
-        : base_type( typename base_type::base_model{},
-                     std::forward<Args>( args )... )
-    {
-    }
-};
-
-template <typename MechanicsType, typename ThermalType, typename... FieldTypes>
-struct ForceModel<LinearPMB, MechanicsType, Fracture, ThermalType,
-                  FieldTypes...>
-    : public ForceModel<PMB, MechanicsType, Fracture, ThermalType,
-                        FieldTypes...>
-{
-    using base_type =
-        ForceModel<PMB, MechanicsType, Fracture, ThermalType, FieldTypes...>;
-
-    // Tag to dispatch to force iteration.
-    using force_tag = LinearPMB;
-
-    using base_type::operator();
-
-    template <typename... Args>
-    ForceModel( LinearPMB, Args... args )
-        : base_type( typename base_type::base_model{},
                      std::forward<Args>( args )... )
     {
     }
