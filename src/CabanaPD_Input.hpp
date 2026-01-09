@@ -363,8 +363,8 @@ class Inputs
     // Get input units. Not currently enforced to be consistent.
     std::string units( std::string label )
     {
-        if ( inputs.at( label ).contains( "units" ) )
-            return inputs[label]["units"];
+        if ( inputs.at( label ).contains( "unit" ) )
+            return inputs[label]["unit"];
         else
             return "";
     }
