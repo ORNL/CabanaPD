@@ -211,6 +211,42 @@ struct BaseTemperatureModel<TemperatureDependent, TemperatureType>
     }
 };
 
+template <typename TemperatureType, typename FunctorType>
+struct BaseTemperatureModel<TemperatureDependent, FunctorType, TemperatureType>
+    : public BaseTemperatureModel<TemperatureDependent, TemperatureType>
+{
+    using thermal_type = TemperatureDependent;
+    using base_type =
+        BaseTemperatureModel<TemperatureDependent, TemperatureType>;
+    using typename base_type::needs_update;
+
+    FunctorType alpha;
+    using base_type::temp0;
+
+    // Temperature field
+    using base_type::temperature;
+
+    BaseTemperatureModel( const TemperatureType _temp, const FunctorType _alpha,
+                          const double _temp0 )
+        : base_type( _temp, 0.0, _temp0 )
+        , alpha( _alpha )
+    {
+    }
+
+    // Update stretch with temperature effects.
+    KOKKOS_INLINE_FUNCTION
+    double operator()( ThermalStretchTag, const int i, const int j,
+                       const double s ) const
+    {
+        double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
+        return s - ( alpha( temp_avg ) * temp_avg );
+    }
+};
+
+template <typename TemperatureType, typename FunctorType>
+BaseTemperatureModel( const TemperatureType, const FunctorType, const double )
+    -> BaseTemperatureModel<TemperatureDependent, FunctorType, TemperatureType>;
+
 template <typename TemperatureType>
 struct ThermalFractureModel
     : public BaseFractureModel,
@@ -312,6 +348,40 @@ template <typename PeridynamicsModelType, typename MechanicsModelType = Elastic,
           typename DamageType = Fracture,
           typename ThermalType = TemperatureIndependent, typename... DataTypes>
 struct ForceModel;
+
+template <typename PeridynamicsModelType, typename MechanicsModelType = Elastic,
+          typename DamageType = Fracture>
+struct OnlyForceModel;
+
+template <typename ThermalType = TemperatureIndependent, typename... DataTypes>
+struct ThermalModel;
+
+template <typename ForceType, typename ThermalType>
+struct ThermalForceModel : public ForceType, ThermalType
+{
+    using base_type = ForceType;
+    using base_temperature_type = ThermalType;
+
+    using base_type::operator();
+    using base_temperature_type::operator();
+    using typename base_temperature_type::needs_update;
+    using typename base_temperature_type::thermal_type;
+    using typename base_type::fracture_type;
+
+    ThermalForceModel( ForceType force, ThermalType thermal )
+        : base_type( force )
+        , base_temperature_type( thermal )
+    {
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ThermalForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , base_temperature_type( model1, model2 )
+    {
+    }
+};
 
 } // namespace CabanaPD
 

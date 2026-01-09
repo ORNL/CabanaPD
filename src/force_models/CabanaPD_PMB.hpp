@@ -236,6 +236,29 @@ struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
     }
 };
 
+template <>
+struct OnlyForceModel<PMB, Elastic, Fracture>
+    : public BaseForceModelPMB<Elastic>, BaseFractureModel
+{
+    using base_type = BaseForceModelPMB<Elastic>;
+    using base_fracture_type = BaseFractureModel;
+
+    using base_type::operator();
+    using base_fracture_type::operator();
+
+    OnlyForceModel( PMB model, const double force_horizon, const double K,
+                    const double G0, const int influence_type = 1 )
+        : base_type( model, NoFracture{}, force_horizon, K )
+        , base_fracture_type( force_horizon, K, G0, influence_type )
+    {
+    }
+};
+
+// Default to elastic.
+template <typename ModelType>
+OnlyForceModel( ModelType, const double force_horizon, const double K,
+                const double G0 ) -> OnlyForceModel<ModelType>;
+
 template <typename MemorySpace>
 struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
                   TemperatureIndependent, MemorySpace>
