@@ -1039,22 +1039,25 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
     particles.domain( box_min, box_max, num_cells, 0 );
     particles.create( TEST_EXECSPACE{} );
     auto temp = particles.sliceTemperature();
+    CabanaPD::ThermalModel thermal_model( temp, alpha, temp0 );
     {
         //  With elastic, without fracture.
-        CabanaPD::ForceModel force_model( CabanaPD::PMB{},
-                                          CabanaPD::NoFracture{}, force_horizon,
-                                          K, temp, alpha, temp0 );
+        CabanaPD::ForceModel force_model(
+            CabanaPD::PMB{}, CabanaPD::NoFracture{}, force_horizon, K );
+        CabanaPD::ThermalForceModel model( force_model, thermal_model );
     }
     {
         //  With elastic.
-        CabanaPD::ForceModel force_model( CabanaPD::PMB{}, force_horizon, K, G0,
-                                          temp, alpha, temp0 );
+        CabanaPD::ForceModel force_model( CabanaPD::PMB{}, force_horizon, K,
+                                          G0 );
+        CabanaPD::ThermalForceModel model( force_model, thermal_model );
     }
     {
         //  With EPP.
         CabanaPD::ForceModel force_model(
-            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{}, force_horizon,
-            K, G0, sigma_y, temp, alpha, temp0 );
+            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{},
+            TEST_MEMSPACE{}, force_horizon, K, G0, sigma_y );
+        CabanaPD::ThermalForceModel model( force_model, thermal_model );
     }
 
     // With heat transfer.

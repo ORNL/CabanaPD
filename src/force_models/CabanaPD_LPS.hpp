@@ -27,6 +27,7 @@ template <>
 struct BaseForceModelLPS<Elastic> : public BaseForceModel
 {
     using base_type = BaseForceModel;
+    using thermal_type = TemperatureIndependent;
     // Tags for creating particle fields and dispatch to force iteration.
     using model_tag = LPS;
     using force_tag = LPS;
@@ -203,38 +204,29 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
 };
 
 template <>
-struct ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
-    : public BaseForceModelLPS<Elastic>,
-      BaseNoFractureModel,
-      BaseTemperatureModel<TemperatureIndependent>
-
+struct ForceModel<LPS, Elastic, NoFracture> : public BaseForceModelLPS<Elastic>,
+                                              BaseNoFractureModel
 {
     using base_type = BaseForceModelLPS<Elastic>;
     using base_fracture_type = BaseNoFractureModel;
-    using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
     using fracture_type = NoFracture;
-    using thermal_type = typename base_temperature_type::thermal_type;
+    using thermal_type = typename base_type::thermal_type;
 
     using base_type::base_type;
     using base_type::operator();
     using base_fracture_type::operator();
-    using base_temperature_type::operator();
 
     using base_type::influence_type;
 };
 
 template <>
-struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
-    : public BaseForceModelLPS<Elastic>,
-      BaseFractureModel,
-      BaseTemperatureModel<TemperatureIndependent>
+struct ForceModel<LPS, Elastic, Fracture> : public BaseForceModelLPS<Elastic>,
+                                            BaseFractureModel
 {
     using base_type = BaseForceModelLPS<Elastic>;
     using base_fracture_type = BaseFractureModel;
-    using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
 
     using fracture_type = Fracture;
-    using thermal_type = base_temperature_type::thermal_type;
 
     using base_fracture_type::bond_break_coeff;
     using base_fracture_type::G0;
@@ -246,7 +238,6 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
 
     using base_type::operator();
     using base_fracture_type::operator();
-    using base_temperature_type::operator();
 
     ForceModel( LPS model, const double _force_horizon, const double _K,
                 const double _G, const double _G0, const int _influence = 0 )
@@ -307,11 +298,10 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
 };
 
 template <>
-struct ForceModel<LinearLPS, Elastic, NoFracture, TemperatureIndependent>
-    : public ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
+struct ForceModel<LinearLPS, Elastic, NoFracture>
+    : public ForceModel<LPS, Elastic, NoFracture>
 {
-    using base_type =
-        ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>;
+    using base_type = ForceModel<LPS, Elastic, NoFracture>;
     // Tag to dispatch to force iteration.
     using force_tag = LinearLPS;
 
@@ -327,11 +317,10 @@ struct ForceModel<LinearLPS, Elastic, NoFracture, TemperatureIndependent>
 };
 
 template <>
-struct ForceModel<LinearLPS, Elastic, Fracture, TemperatureIndependent>
-    : public ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
+struct ForceModel<LinearLPS, Elastic, Fracture>
+    : public ForceModel<LPS, Elastic, Fracture>
 {
-    using base_type =
-        ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>;
+    using base_type = ForceModel<LPS, Elastic, Fracture>;
 
     // Tag to dispatch to force iteration.
     using force_tag = LinearLPS;

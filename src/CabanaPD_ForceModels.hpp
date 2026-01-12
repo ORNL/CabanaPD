@@ -128,23 +128,6 @@ struct BaseFractureModel
     }
 };
 
-template <typename ThermalType, typename... TemperatureType>
-struct BaseTemperatureModel;
-
-template <>
-struct BaseTemperatureModel<TemperatureIndependent>
-{
-    using thermal_type = TemperatureIndependent;
-
-    // No-op for temperature.
-    KOKKOS_INLINE_FUNCTION
-    double operator()( ThermalStretchTag, const int, const int,
-                       const double s ) const
-    {
-        return s;
-    }
-};
-
 template <class MemorySpace>
 class BasePlasticity
 {
@@ -179,8 +162,11 @@ struct ConstantProperty
     double value;
 };
 
+template <typename ThermalType, typename... TemperatureType>
+struct ThermalModel;
+
 template <typename TemperatureType, typename FunctorType>
-struct BaseTemperatureModel<TemperatureDependent, FunctorType, TemperatureType>
+struct ThermalModel<TemperatureDependent, FunctorType, TemperatureType>
 {
     using thermal_type = TemperatureDependent;
     using needs_update = std::true_type;
@@ -191,14 +177,14 @@ struct BaseTemperatureModel<TemperatureDependent, FunctorType, TemperatureType>
     // Temperature field
     TemperatureType temperature;
 
-    explicit BaseTemperatureModel( const TemperatureType _temp,
-                                   const double _alpha, const double _temp0 )
-        : BaseTemperatureModel( _temp, ConstantProperty( _alpha ), _temp0 )
+    explicit ThermalModel( const TemperatureType _temp, const double _alpha,
+                           const double _temp0 )
+        : ThermalModel( _temp, ConstantProperty( _alpha ), _temp0 )
     {
     }
 
-    BaseTemperatureModel( const TemperatureType _temp, const FunctorType _alpha,
-                          const double _temp0 )
+    ThermalModel( const TemperatureType _temp, const FunctorType _alpha,
+                  const double _temp0 )
         : alpha( _alpha )
         , temp0( _temp0 )
         , temperature( _temp )
@@ -207,12 +193,12 @@ struct BaseTemperatureModel<TemperatureDependent, FunctorType, TemperatureType>
 
     // FIXME: use the first model temperature for now.
     template <typename ModelType1, typename ModelType2>
-    BaseTemperatureModel( const ModelType1& model1, const ModelType2& model2 )
+    ThermalModel( const ModelType1& model1, const ModelType2& model2 )
         : alpha( model1.alpha( 0 ), model2.alpha( 0 ) )
     {
         static_assert( std::is_same_v<decltype( model1.temperature ),
                                       decltype( model2.temperature )>,
-                       "BaseTemperatureModel: Both models must have same "
+                       "ThermalModel: Both models must have same "
                        "TemperatureType" );
         temperature = model1.temperature;
         temp0 = ( model1.temp0 + model2.temp0 ) / 2.0;
@@ -235,24 +221,21 @@ struct BaseTemperatureModel<TemperatureDependent, FunctorType, TemperatureType>
 };
 
 template <typename TemperatureType>
-BaseTemperatureModel( const TemperatureType, const double, const double )
-    -> BaseTemperatureModel<TemperatureDependent, ConstantProperty,
-                            TemperatureType>;
+ThermalModel( const TemperatureType, const double, const double )
+    -> ThermalModel<TemperatureDependent, ConstantProperty, TemperatureType>;
 
 template <typename TemperatureType, typename FunctorType>
-BaseTemperatureModel( const TemperatureType, const FunctorType, const double )
-    -> BaseTemperatureModel<TemperatureDependent, FunctorType, TemperatureType>;
+ThermalModel( const TemperatureType, const FunctorType, const double )
+    -> ThermalModel<TemperatureDependent, FunctorType, TemperatureType>;
 
 template <typename TemperatureType>
 struct ThermalFractureModel
     : public BaseFractureModel,
-      BaseTemperatureModel<TemperatureDependent, ConstantProperty,
-                           TemperatureType>
+      ThermalModel<TemperatureDependent, ConstantProperty, TemperatureType>
 {
     using base_fracture_type = BaseFractureModel;
     using base_temperature_type =
-        BaseTemperatureModel<TemperatureDependent, ConstantProperty,
-                             TemperatureType>;
+        ThermalModel<TemperatureDependent, ConstantProperty, TemperatureType>;
     using typename base_fracture_type::fracture_type;
     using typename base_temperature_type::thermal_type;
 
@@ -343,16 +326,8 @@ struct BaseDynamicTemperatureModel
 };
 
 template <typename PeridynamicsModelType, typename MechanicsModelType = Elastic,
-          typename DamageType = Fracture,
-          typename ThermalType = TemperatureIndependent, typename... DataTypes>
+          typename DamageType = Fracture, typename... DataTypes>
 struct ForceModel;
-
-template <typename PeridynamicsModelType, typename MechanicsModelType = Elastic,
-          typename DamageType = Fracture>
-struct OnlyForceModel;
-
-template <typename ThermalType = TemperatureIndependent, typename... DataTypes>
-struct ThermalModel;
 
 template <typename ForceType, typename ThermalType>
 struct ThermalForceModel : public ForceType, ThermalType
