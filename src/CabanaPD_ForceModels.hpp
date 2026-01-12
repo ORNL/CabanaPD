@@ -183,7 +183,6 @@ template <typename TemperatureType, typename FunctorType>
 struct BaseTemperatureModel<TemperatureDependent, FunctorType, TemperatureType>
 {
     using thermal_type = TemperatureDependent;
-    using fracture_type = NoFracture;
     using needs_update = std::true_type;
 
     FunctorType alpha;
@@ -366,12 +365,7 @@ struct ThermalForceModel : public ForceType, ThermalType
     using typename base_temperature_type::needs_update;
     using typename base_temperature_type::thermal_type;
     using typename base_type::fracture_type;
-    /*
-    static_assert( std::is_same_v<typename ForceType::fracture_type,
-                                  typename ThermalType::fracture_type>,
-                   "ThermalForceModel: Both models must have same "
-                   "fracture_type" );
-    */
+
     ThermalForceModel( ForceType force, ThermalType thermal )
         : base_type( force )
         , base_temperature_type( thermal )
