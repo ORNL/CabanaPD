@@ -47,9 +47,9 @@ void thermalCrackExample( const std::string filename )
     std::vector<double> coeff_vec = inputs["thermal_expansion_coeff"];
     Kokkos::View<double*, memory_space> coeff( coeff_vec.data(),
                                                coeff_vec.size() );
-    auto alpha = KOKKOS_LAMBDA( const int t )
+    auto alpha = KOKKOS_LAMBDA( const int temp )
     {
-        return coeff[0] + coeff[1] * t + coeff[2] * Kokkos::pow( t, 2.0 );
+        return coeff[0] + coeff[1] * temp + coeff[2] * Kokkos::pow( temp, 2.0 );
     };
 
     // Problem parameters
