@@ -325,6 +325,55 @@ struct BaseDynamicTemperatureModel
     }
 };
 
+template <typename TemperatureType, typename FunctorType>
+struct ThermalModel<DynamicTemperature, FunctorType, TemperatureType>
+    : public BaseDynamicTemperatureModel,
+      ThermalModel<TemperatureDependent, FunctorType, TemperatureType>
+{
+    using thermal_type = TemperatureDependent;
+    using base_heattransfer_type = BaseDynamicTemperatureModel;
+    using base_temperature_type =
+        ThermalModel<TemperatureDependent, FunctorType, TemperatureType>;
+
+    ThermalModel( const TemperatureType _temp, const double _thermal_horizon,
+                  const FunctorType _alpha, const double _kappa,
+                  const double _cp, const double _temp0,
+                  const bool _constant_microconductivity = true )
+        : base_heattransfer_type( _thermal_horizon, _kappa, _cp,
+                                  _constant_microconductivity )
+        , base_temperature_type( _temp, _alpha, _temp0 )
+    {
+    }
+
+    ThermalModel( const TemperatureType _temp, const double _thermal_horizon,
+                  const double _alpha, const double _kappa, const double _cp,
+                  const double _temp0,
+                  const bool _constant_microconductivity = true )
+        : base_heattransfer_type( _thermal_horizon, _kappa, _cp,
+                                  _constant_microconductivity )
+        , base_temperature_type( _temp, _alpha, _temp0 )
+    {
+    }
+
+    template <typename ModelType1, typename ModelType2>
+    ThermalModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_heattransfer_type( model1, model2 )
+        , base_temperature_type( model1, model2 )
+    {
+    }
+};
+
+template <typename TemperatureType>
+ThermalModel( const TemperatureType, const double, const double, const double,
+              const double, const double = 0.0, const bool = true )
+    -> ThermalModel<DynamicTemperature, ConstantProperty, TemperatureType>;
+
+template <typename TemperatureType, typename FunctorType>
+ThermalModel( const TemperatureType, const double, const FunctorType,
+              const double, const double, const double = 0.0,
+              const bool = true )
+    -> ThermalModel<DynamicTemperature, FunctorType, TemperatureType>;
+
 template <typename PeridynamicsModelType, typename MechanicsModelType = Elastic,
           typename DamageType = Fracture, typename... DataTypes>
 struct ForceModel;

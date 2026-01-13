@@ -1064,19 +1064,27 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
     double kappa = 1.0;
     double cp = 1.0;
     {
-        CabanaPD::ForceModel force_model( CabanaPD::PMB{},
-                                          CabanaPD::NoFracture{}, force_horizon,
-                                          K, temp, kappa, cp, alpha, temp0 );
+        CabanaPD::ForceModel force_model(
+            CabanaPD::PMB{}, CabanaPD::NoFracture{}, force_horizon, K );
+        CabanaPD::ThermalModel thermal_model( temp, force_horizon, kappa, cp,
+                                              alpha, temp0 );
+        CabanaPD::ThermalForceModel( force_model, thermal_model );
     }
     {
-        CabanaPD::ForceModel force_model( CabanaPD::PMB{}, force_horizon, K, G0,
-                                          temp, kappa, cp, alpha, temp0 );
+        CabanaPD::ForceModel force_model( CabanaPD::PMB{}, force_horizon, K,
+                                          G0 );
+        CabanaPD::ThermalModel thermal_model( temp, force_horizon, kappa, cp,
+                                              alpha, temp0 );
+        CabanaPD::ThermalForceModel( force_model, thermal_model );
     }
     {
         //  With EPP.
         CabanaPD::ForceModel force_model(
-            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{}, force_horizon,
-            K, G0, sigma_y, temp, kappa, cp, alpha, temp0 );
+            CabanaPD::PMB{}, CabanaPD::ElasticPerfectlyPlastic{},
+            TEST_MEMSPACE{}, force_horizon, K, G0, sigma_y );
+        CabanaPD::ThermalModel thermal_model( temp, force_horizon, kappa, cp,
+                                              alpha, temp0 );
+        CabanaPD::ThermalForceModel( force_model, thermal_model );
     }
 }
 
@@ -1271,9 +1279,12 @@ TEST( TEST_CATEGORY, test_force_thermal_pmb_multi )
                                       thermal_type{}, temp0 );
     auto temp = particles.sliceTemperature();
 
-    CabanaPD::ForceModel model1( CabanaPD::PMB{}, horizon, K, G0, temp, kappa,
-                                 cp, alpha, temp0 );
-    CabanaPD::ForceModel model2( model1 );
+    CabanaPD::ForceModel force_model( CabanaPD::PMB{}, horizon, K, G0 );
+    CabanaPD::ThermalModel thermal_model( temp, horizon, kappa, cp, alpha,
+                                          temp0 );
+    CabanaPD::ThermalForceModel model1( force_model, thermal_model );
+
+    auto model2( model1 );
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, model1, model2 );
 
