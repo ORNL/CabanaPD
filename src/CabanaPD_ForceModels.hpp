@@ -282,10 +282,8 @@ struct ThermalFractureModel
 struct BaseDynamicTemperatureModel
 {
     using thermal_type = DynamicTemperature;
-    using needs_update = std::true_type;
 
     double thermal_horizon;
-
     double thermal_coeff;
     double kappa;
     double cp;
