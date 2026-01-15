@@ -1357,14 +1357,19 @@ class Particles<MemorySpace, ModelType, ThermalType, OutputType, DynamicDensity,
 
     using aosoa_density_type =
         Cabana::AoSoA<Cabana::MemberTypes<double>, memory_space, 1>;
+    using typename base_type::aosoa_u_type;
 
     template <typename... Args>
     Particles( MemorySpace space, ModelType, TemperatureDependent temp,
                DynamicDensity, Args&&... args )
         : base_type( space, LPS{}, temp, std::forward<Args>( args )... )
     {
-        _aosoa_density = aosoa_density_type( "Particle Output Fields",
-                                             base_type::localOffset() );
+        _aosoa_density =
+            aosoa_density_type( "Particle Density", base_type::localOffset() );
+        // FIXME: this is nothing to do with density updates per se, but is for
+        // the creep dependence that we only currently do for density changes.
+        _aosoa_displacement_prev = aosoa_u_type( "Particle Displacement Prev",
+                                                 base_type::localOffset() );
         init();
     }
 
@@ -1374,6 +1379,7 @@ class Particles<MemorySpace, ModelType, ThermalType, OutputType, DynamicDensity,
         // Forward arguments to standard or custom particle creation.
         base_type::createParticles( std::forward<Args>( args )... );
         _aosoa_density.resize( base_type::localOffset() );
+        _aosoa_displacement_prev.resize( base_type::localOffset() );
     }
 
     auto sliceCurrentDensity()
@@ -1383,6 +1389,17 @@ class Particles<MemorySpace, ModelType, ThermalType, OutputType, DynamicDensity,
     auto sliceCurrentDensity() const
     {
         return Cabana::slice<0>( _aosoa_density, "current_density" );
+    }
+
+    auto slicePreviousDisplacement()
+    {
+        return Cabana::slice<0>( _aosoa_displacement_prev,
+                                 "previous_displacement" );
+    }
+    auto slicePreviousDisplacement() const
+    {
+        return Cabana::slice<0>( _aosoa_displacement_prev,
+                                 "previous_displacement" );
     }
 
     template <typename... Args>
@@ -1412,9 +1429,13 @@ class Particles<MemorySpace, ModelType, ThermalType, OutputType, DynamicDensity,
         auto reference = base_type::sliceDensity();
         auto current = sliceCurrentDensity();
         Cabana::deep_copy( current, reference );
+
+        auto prev_u = slicePreviousDisplacement();
+        Cabana::deep_copy( prev_u, 0.0 );
     }
 
     aosoa_density_type _aosoa_density;
+    aosoa_u_type _aosoa_displacement_prev;
 };
 
 /******************************************************************************

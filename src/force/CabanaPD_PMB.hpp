@@ -454,6 +454,7 @@ class Force<MemorySpace, ModelType, PMB, Fracture, DynamicDensity>
         const auto vol = particles.sliceVolume();
         const auto nofail = particles.sliceNoFail();
         auto theta = particles.sliceDilatation();
+        auto u_prev = particles.slicePreviousDisplacement();
 
         auto force_full = KOKKOS_LAMBDA( const int i )
         {
@@ -488,12 +489,16 @@ class Force<MemorySpace, ModelType, PMB, Fracture, DynamicDensity>
                 // Else if statement is only for performance.
                 else if ( mu( i, n ) > 0 )
                 {
-                    const double coeff = model.forceCoeff( i, n, s, vol( j ) );
+                    double coeff = model.forceCoeff( i, n, s, vol( j ) );
 
-                    double muij = mu( i, n );
-                    fx_i = muij * coeff * rx / r;
-                    fy_i = muij * coeff * ry / r;
-                    fz_i = muij * coeff * rz / r;
+                    double r_prev, s_prev;
+                    getDistance( x, u_prev, i, j, xi, r_prev, s_prev );
+                    coeff += model.creepCoeff( s, s_prev, xi, vol( j ) );
+
+                    coeff *= mu( i, n );
+                    fx_i = coeff * rx / r;
+                    fy_i = coeff * ry / r;
+                    fz_i = coeff * rz / r;
 
                     f( i, 0 ) += fx_i;
                     f( i, 1 ) += fy_i;

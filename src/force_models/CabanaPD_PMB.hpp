@@ -578,6 +578,9 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     using base_type::s0;
     using base_type::s_Y;
     double coeff;
+    double visco_coeff;
+    double eta;
+    double dt;
 
     double rho0;
     DensityType rho;
@@ -598,16 +601,21 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
                        const DensityType& _rho,
                        const CurrentDensityType& _rho_c, const double delta,
                        const double K, const double G0, const double sigma_y,
-                       const double _rho0, const TemperatureType _temp,
-                       const double alpha, const double temp0 = 0.0 )
+                       const double _rho0, const double _eta, const double _dt,
+                       const TemperatureType _temp, const double alpha,
+                       const double temp0 = 0.0 )
         : base_type( model, mechanics, delta, K, G0, sigma_y, _temp, alpha,
                      temp0 )
         , lps_base_type( LPS{}, Fracture{}, delta, K, ( 3.0 / 5.0 * K ), G0 )
+        , eta( _eta )
+        , dt( _dt )
         , rho0( _rho0 )
         , rho( _rho )
         , rho_current( _rho_c )
     {
-        coeff = 18.0 / pi / delta / delta / delta / delta;
+        auto delta4 = delta / delta / delta / delta;
+        coeff = 18.0 / pi / delta4;
+        visco_coeff = 30.0 / pi / delta4 / delta;
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -644,6 +652,13 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
         // FIXME: this is just reimplementing the plastic force from the base.
         auto s_p = base_type::plasticStretch( i, s, n );
         return c_current * ( s - s_p ) * vol;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto creepCoeff( const double s, const double s_prev, const double xi,
+                     const double vol ) const
+    {
+        return visco_coeff * eta * xi * ( s - s_prev ) / dt * vol;
     }
 
     // Update plastic dilatation.
@@ -715,14 +730,15 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
                        const DensityType& _rho,
                        const CurrentDensityType& _rho_c, const double _delta,
                        const double _K, const double _G0, const double _sigma_y,
-                       const double _rho0, const TemperatureType _temp,
-                       const double _kappa, const double _cp,
-                       const double _alpha, const double _temp0 = 0.0,
+                       const double _rho0, const double _eta, const double _dt,
+                       const TemperatureType _temp, const double _kappa,
+                       const double _cp, const double _alpha,
+                       const double _temp0 = 0.0,
                        const bool _constant_microconductivity = true )
         : base_temperature_type( _delta, _kappa, _cp,
                                  _constant_microconductivity )
         , base_type( model, mechanics, _rho, _rho_c, _delta, _K, _G0, _sigma_y,
-                     _rho0, _temp, _alpha, _temp0 )
+                     _rho0, _eta, _dt, _temp, _alpha, _temp0 )
     {
     }
 };
@@ -732,8 +748,9 @@ template <typename DensityType, typename CurrentDensityType,
 ForceDensityModel( PMB, ElasticPerfectlyPlastic, DensityType rho,
                    const CurrentDensityType& rho_c, const double delta,
                    const double K, const double G0, const double sigma_y,
-                   const double rho0, TemperatureType temp, const double _kappa,
-                   const double _cp, const double _alpha, const double _temp0 )
+                   const double rho0, const double _eta, const double _dt,
+                   TemperatureType temp, const double _kappa, const double _cp,
+                   const double _alpha, const double _temp0 )
     -> ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
                          DynamicTemperature, TemperatureType, DensityType,
                          CurrentDensityType>;
