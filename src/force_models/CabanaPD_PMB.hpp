@@ -637,11 +637,13 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto forceCoeff( const int i, const int, const double s,
+    auto forceCoeff( const int i, const int n, const double s,
                      const double vol ) const
     {
         auto c_current = currentC( i );
-        return c_current * s * vol;
+        // FIXME: this is just reimplementing the plastic force from the base.
+        auto s_p = base_type::plasticStretch( i, s, n );
+        return c_current * ( s - s_p ) * vol;
     }
 
     // Update plastic dilatation.
