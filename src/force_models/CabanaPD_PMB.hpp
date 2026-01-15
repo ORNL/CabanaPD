@@ -647,10 +647,9 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     }
 
     // Update plastic dilatation.
-    KOKKOS_INLINE_FUNCTION auto dilatation( const int i, const int n,
-                                            const double s, const double xi,
-                                            const double vol,
-                                            const double ) const
+    KOKKOS_INLINE_FUNCTION
+    auto dilatation( const int i, const int n, const double s, const double xi,
+                     const double vol, const double ) const
     {
         auto s_p = base_type::plasticStretch( i, s, n );
         return coeff / 6.0 * s_p * xi * vol;
