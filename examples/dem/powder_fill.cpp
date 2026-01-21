@@ -63,23 +63,27 @@ void powderSettlingExample( const std::string filename )
     double diameter = inputs["cylinder_diameter"];
     double cylinder_radius = 0.5 * diameter;
     double wall_thickness = inputs["wall_thickness"];
-    double bottom = low_corner[2];
+    double H = inputs["system_size"][2];
+    CabanaPD::Region<CabanaPD::Cylinder> cylinder( 0.0, cylinder_radius,
+                                                   -0.5 * H, 0.5 * H );
+    double powder_radius = cylinder_radius - wall_thickness;
+    CabanaPD::Region<CabanaPD::Cylinder> powder_cylinder(
+        0.0, powder_radius, -0.5 * H + wall_thickness,
+        0.5 * H - wall_thickness );
+    CabanaPD::Region<CabanaPD::Cylinder> open_cylinder(
+        0.0, powder_radius, -0.5 * H + wall_thickness, 0.5 * H );
 
     CabanaPD::Particles particles( memory_space{}, model_type{},
                                    CabanaPD::BaseOutput{} );
     // Create container.
     auto create_container = KOKKOS_LAMBDA( const int, const double x[3] )
     {
-        double rsq = x[0] * x[0] + x[1] * x[1];
-
-        // Convert domain block into cylinder
-        if ( rsq > cylinder_radius * cylinder_radius )
+        // Overall cylindrical region.
+        if ( !cylinder.inside( x ) )
             return false;
-        // Leave remaining bottom wall particles and remove particles inside
-        // cylinder
-        if ( x[2] > bottom + wall_thickness &&
-             rsq < ( cylinder_radius - wall_thickness ) *
-                       ( cylinder_radius - wall_thickness ) )
+
+        // Powder region.
+        if ( open_cylinder.inside( x ) )
             return false;
 
         return true;
@@ -89,15 +93,10 @@ void powderSettlingExample( const std::string filename )
     particles.create( exec_space{}, create_container, 0, true );
 
     // Create powder.
-    double min_height = inputs["min_height"];
     auto create_powder = KOKKOS_LAMBDA( const int, const double x[3] )
     {
-        double rsq = x[0] * x[0] + x[1] * x[1];
-
         // Only create particles inside cylinder.
-        if ( x[2] > min_height &&
-             rsq < ( cylinder_radius - wall_thickness ) *
-                       ( cylinder_radius - wall_thickness ) )
+        if ( powder_cylinder.inside( x ) )
             return true;
 
         return false;
@@ -128,16 +127,22 @@ void powderSettlingExample( const std::string filename )
     // Use a force magnitude threshold to remove particles that are too close.
     // TODO: The force magnitude should be based on the maximum desired overlap
     // according to the properties of the contact model
-    solver.remove( 1e6 );
+    solver.remove( 1e8 );
 
     // ====================================================
     //                   Boundary condition
     // ====================================================
     auto f = solver.particles.sliceForce();
     rho = solver.particles.sliceDensity();
+    using pool_type = Kokkos::Random_XorShift64_Pool<exec_space>;
+    using random_type = Kokkos::Random_XorShift64<exec_space>;
+    int seed = 456854;
+    pool_type pool( seed, particles.numLocal() );
     auto body_functor = KOKKOS_LAMBDA( const int pid, const double )
     {
-        f( pid, 2 ) -= 9.8 * rho( pid );
+        auto gen = pool.get_state();
+        auto rand = Kokkos::rand<random_type, double>::draw( gen, 0.0, 1.0 );
+        f( pid, 2 ) -= 9.8 * rho( pid ) + rand;
     };
     CabanaPD::BodyTerm gravity( body_functor, solver.particles.size(), true );
 
