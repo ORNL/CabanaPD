@@ -195,6 +195,15 @@ struct ForceModelsImpl<MaterialType, Indexing, ParameterPackType,
                          typename ParameterPackType::template value_type<
                              0>::model_tag>...>),
         "All models need the same base model" );
+
+    // TODO this might be softened in the future
+    static_assert(
+        (std::conjunction_v<
+            std::is_same<typename ParameterPackType::template value_type<
+                             Indices>::force_tag,
+                         typename ParameterPackType::template value_type<
+                             0>::force_tag>...>),
+        "All forces need the same base type" );
     using model_tag =
         typename ParameterPackType::template value_type<0>::model_tag;
 
