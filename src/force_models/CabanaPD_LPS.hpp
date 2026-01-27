@@ -39,9 +39,9 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
     using base_type::K;
     double G;
     // Store coefficients for multi-material systems.
-    // TODO: this currently only supports bi-material systems.
     Kokkos::Array<double, 2> theta_coeff;
     Kokkos::Array<double, 2> s_coeff;
+    BinaryOrderIndexing index;
 
     BaseForceModelLPS( LPS, NoFracture, const double _force_horizon,
                        const double _K, const double _G,
@@ -68,6 +68,7 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
     BaseForceModelLPS( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
     {
+        // FIXME: guaranteed model order - need the Indexing used.
         G = ( model1.G + model2.G ) / 2.0;
         theta_coeff[0] = 3.0 * model1.K - 5.0 * model1.G;
         s_coeff[0] = 15.0 * model1.G;
@@ -85,7 +86,7 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
     {
         theta_coeff[0] = 3.0 * K - 5.0 * G;
         s_coeff[0] = 15.0 * G;
-        // Set extra coefficients for multi-material.
+        // Set extra coefficients (unused for single material).
         theta_coeff[1] = theta_coeff[0];
         s_coeff[1] = s_coeff[0];
 
@@ -142,10 +143,6 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
                influence * xi * vol;
     }
 
-    // CI failures for gcc-13 in release show an apparent false-positive warning
-    // for array bounds of the coefficients.
-#pragma GCC diagnostic warning "-Warray-bounds"
-#pragma GCC diagnostic push
     // In this case we may have any combination of material types. These
     // coefficients may still be the same for some interaction pairs.
     KOKKOS_INLINE_FUNCTION auto
@@ -154,13 +151,15 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
                 const double vol, const double m_i, const double m_j,
                 const double theta_i, const double theta_j ) const
     {
-        KOKKOS_ASSERT( type_i < 2 );
-        KOKKOS_ASSERT( type_j < 2 );
+        // FIXME: all the model averaging we do follows this, but there's no
+        // guarantee.
+        int index_i = index( type_i, type_j );
+        int index_j = Kokkos::abs( index_i - 1 );
         auto influence = ( *this )( influence_tag, xi );
-        double theta_coeff_i = theta_coeff[type_i];
-        double theta_coeff_j = theta_coeff[type_j];
-        double s_coeff_i = s_coeff[type_i];
-        double s_coeff_j = s_coeff[type_j];
+        double theta_coeff_i = theta_coeff[index_i];
+        double theta_coeff_j = theta_coeff[index_j];
+        double s_coeff_i = s_coeff[index_i];
+        double s_coeff_j = s_coeff[index_j];
 
         return ( theta_coeff_i * theta_i / m_i + theta_coeff_j * theta_j / m_j +
                  s * ( s_coeff_i / m_i + s_coeff_j / m_j ) ) *
@@ -185,21 +184,22 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
     // In this case we may have any combination of material types. These
     // coefficients may still be the same for some interaction pairs.
     KOKKOS_INLINE_FUNCTION
-    auto operator()( EnergyTag, MultiMaterial, const int type_i, const int,
-                     const double s, const double xi, const double vol,
-                     const double m_i, const double theta_i,
+    auto operator()( EnergyTag, MultiMaterial, const int type_i,
+                     const int type_j, const double s, const double xi,
+                     const double vol, const double m_i, const double theta_i,
                      const double num_bonds ) const
     {
-        auto influence = ( *this )( influence_tag, xi );
+        // FIXME: all the model averaging we do follows this, but there's no
+        // guarantee.
+        int index_i = index( type_i, type_j );
 
-        KOKKOS_ASSERT( type_i < 2 );
-        double theta_coeff_i = theta_coeff[type_i];
-        double s_coeff_i = s_coeff[type_i];
+        auto influence = ( *this )( influence_tag, xi );
+        double theta_coeff_i = theta_coeff[index_i];
+        double s_coeff_i = s_coeff[index_i];
         return 1.0 / num_bonds * 0.5 * theta_coeff_i / 3.0 *
                    ( theta_i * theta_i ) +
                0.5 * ( s_coeff_i / m_i ) * influence * s * s * xi * xi * vol;
     }
-#pragma GCC diagnostic pop
 };
 
 template <>

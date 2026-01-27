@@ -50,6 +50,16 @@ struct BinaryIndexing
         return firstType != secondType;
     }
 };
+
+// Index lower type as 0 and higher type as 1.
+struct BinaryOrderIndexing
+{
+    KOKKOS_FUNCTION unsigned operator()( unsigned firstType,
+                                         unsigned secondType ) const
+    {
+        return firstType < secondType ? 0 : 1;
+    }
+};
 } // namespace CabanaPD
 
 #endif
