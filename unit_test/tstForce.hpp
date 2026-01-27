@@ -573,9 +573,31 @@ struct TempInitFunctor
     KOKKOS_FUNCTION void operator()( const int pid ) const { t( pid ) = temp0; }
 };
 
+template <class T>
+struct MaterialInitFunctor
+{
+    T t;
+    int N;
+
+    MaterialInitFunctor( T _t, int _N )
+        : t( _t )
+        , N( _N )
+    {
+    }
+
+    KOKKOS_FUNCTION void operator()( const int pid ) const
+    {
+        t( pid ) = pid % N;
+    }
+};
+
 } // namespace
-template <class ModelTag, class ThermalTag = CabanaPD::TemperatureIndependent>
+
+template <class ModelTag, class ThermalTag = CabanaPD::TemperatureIndependent,
+          class MaterialTag = CabanaPD::SingleMaterial>
 auto createParticles( ModelTag tag, LinearTag, const double dx, const double s0,
+                      MaterialTag = MaterialTag{},
+                      [[maybe_unused]] int num_materials = 1,
                       ThermalTag thermal_tag = ThermalTag{},
                       [[maybe_unused]] double temp0 = 0. )
 {
@@ -599,6 +621,12 @@ auto createParticles( ModelTag tag, LinearTag, const double dx, const double s0,
     {
         auto t = particles.sliceTemperature();
         particles.update( TEST_EXECSPACE{}, TempInitFunctor( t, temp0 ) );
+    }
+    if constexpr ( std::is_same_v<MaterialTag, CabanaPD::MultiMaterial> )
+    {
+        auto t = particles.sliceType();
+        particles.update( TEST_EXECSPACE{},
+                          MaterialInitFunctor( t, num_materials ) );
     }
     return particles;
 }
@@ -1217,7 +1245,8 @@ TEST( TEST_CATEGORY, test_force_pmb_binary )
                                  CabanaPD::NoFracture{}, force_horizon, K );
     CabanaPD::ForceModel model2( model1 );
 
-    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1 );
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      CabanaPD::MultiMaterial{}, 2 );
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, model1, model2 );
 
@@ -1250,7 +1279,8 @@ TEST( TEST_CATEGORY, test_force_lps_binary )
                                  1 );
     CabanaPD::ForceModel model2( model_type{}, force_horizon, K, G, G0, 1 );
 
-    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1 );
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      CabanaPD::MultiMaterial{}, 2 );
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, model1, model2 );
 
@@ -1281,7 +1311,8 @@ TEST( TEST_CATEGORY, test_force_pmb_ternary )
     CabanaPD::ForceModel model2( model1 );
     CabanaPD::ForceModel model3( model1 );
 
-    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1 );
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      CabanaPD::MultiMaterial{}, 3 );
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, model1, model2, model3 );
 
@@ -1315,7 +1346,8 @@ TEST( TEST_CATEGORY, test_force_lps_ternary )
     CabanaPD::ForceModel model2( model_type{}, force_horizon, K, G, G0, 1 );
     CabanaPD::ForceModel model3( model_type{}, force_horizon, K, G, G0, 1 );
 
-    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1 );
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      CabanaPD::MultiMaterial{}, 3 );
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, model1, model2, model3 );
 
@@ -1347,8 +1379,9 @@ TEST( TEST_CATEGORY, test_force_thermal_pmb_multi )
     using model_type = CabanaPD::PMB;
     using thermal_type = CabanaPD::DynamicTemperature;
 
-    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
-                                      thermal_type{}, temp0 );
+    auto particles =
+        createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                         CabanaPD::MultiMaterial{}, 2, thermal_type{}, temp0 );
     auto temp = particles.sliceTemperature();
 
     CabanaPD::ForceModel model1( CabanaPD::PMB{}, horizon, K, G0, temp, kappa,
@@ -1377,7 +1410,8 @@ TEST( TEST_CATEGORY, test_force_pmb_quaternary )
     CabanaPD::ForceModel model3( model1 );
     CabanaPD::ForceModel model4( model1 );
 
-    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1 );
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      CabanaPD::MultiMaterial{}, 4 );
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, model1, model2, model3, model4 );
 
@@ -1412,7 +1446,8 @@ TEST( TEST_CATEGORY, test_force_lps_quaternary )
     CabanaPD::ForceModel model3( model_type{}, force_horizon, K, G, G0, 1 );
     CabanaPD::ForceModel model4( model_type{}, force_horizon, K, G, G0, 1 );
 
-    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1 );
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      CabanaPD::MultiMaterial{}, 4 );
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, model1, model2, model3, model4 );
 
