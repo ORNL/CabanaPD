@@ -198,6 +198,170 @@ class VelocityVerlet<Contact> : public VelocityVerlet<NoContact>
     using base_type::_timer;
 };
 
+// template <typename ExecutionSpace, typename ParticleType, typename
+// FictitiousMassType,typename InitialVelocityType, typename ContactType =
+// NoContact> class ADRIntegrator;
+//  Single Responsibility Principle: Integrate d^2u/dt^2 = Force in time with
+//  Adaptive Dynamic Relaxation Open-Closed Principle: Can be extended by
+//  wrapping Liskov-Substitution: no inheritance Interface Segregation: uses "I
+//  need interfaces" and uses all passed values Dependency-Inversion: We do not
+//  depend on how the entities we are integrating are stored, only depend on "I
+//  need interface" for iteration via parallel_for. Doing one integrator per
+//  entity is suspected to lead to performance penalties
+
+template <typename ExecutionSpace, typename FictitiousMassType,
+          typename InitialVelocityType, int SpatialDimension = 3>
+struct ADRIntegrator
+{
+    static constexpr int dim = SpatialDimension;
+    using force_storage_base_type = double[dim];
+    using velocity_storage_base_type = double[dim];
+
+    Kokkos::View<force_storage_base_type*, ExecutionSpace> _forces_last_step;
+    Kokkos::View<velocity_storage_base_type*, ExecutionSpace>
+        _velocities_last_step;
+    FictitiousMassType _fictitious_mass;
+    InitialVelocityType _initial_velocity_type;
+    double _delta_t;
+
+  public:
+    ADRIntegrator( ExecutionSpace const& exec_space,
+                   FictitiousMassType const& fictitious_mass,
+                   InitialVelocityType const& initial_velocity,
+                   size_t num_masses, double dt )
+        : _forces_last_step(
+              Kokkos::View<force_storage_base_type*, ExecutionSpace>(
+                  Kokkos::view_alloc( exec_space, Kokkos::WithoutInitializing,
+                                      "Forces_Last_Step" ),
+                  num_masses ) )
+        , _velocities_last_step(
+              Kokkos::View<velocity_storage_base_type*, ExecutionSpace>(
+                  Kokkos::view_alloc( exec_space, Kokkos::WithoutInitializing,
+                                      "Velocities_Last_Step" ),
+                  num_masses ) )
+        , _fictitious_mass( fictitious_mass )
+        , _initial_velocity_type( initial_velocity )
+        , _delta_t( dt )
+    {
+    }
+
+    void reset( ExecutionSpace const& exec_space ) const
+    {
+        Kokkos::parallel_for(
+            "ADRIntegrator::reset",
+            Kokkos::RangePolicy( 0, _velocities_last_step.extent( 0 ) ),
+            KOKKOS_CLASS_LAMBDA( int64_t index ) {
+                for ( int i = 0; i < dim; ++i )
+                    _velocities_last_step( index, i ) =
+                        _initial_velocity_type( index, i );
+            } );
+        Kokkos::fence( "ADRIntegrator::Fence::reset" );
+    }
+
+    template <typename ForceType>
+    void initialStep( ExecutionSpace const& exec_space,
+                      ForceType const& forces ) const
+    {
+        Kokkos::parallel_for(
+            "ADRIntegrator::initialStep",
+            Kokkos::RangePolicy( 0, _forces_last_step.extent( 0 ) ),
+            KOKKOS_CLASS_LAMBDA( int64_t index ) {
+                for ( int i = 0; i < dim; ++i )
+                    _forces_last_step( index, i ) = forces( index, i );
+            } );
+        Kokkos::fence( "ADRIntegrator::Fence::intialStep" );
+    }
+    template <typename ForceType, typename VelocityType,
+              typename DisplacementType>
+    void finalStep( ExecutionSpace, ForceType const& forces,
+                    VelocityType const& velocities,
+                    DisplacementType const& displacements ) const
+    {
+        Kokkos::parallel_for(
+            "ADRIntegrator::finalStep",
+            Kokkos::RangePolicy( 0, _forces_last_step.extent( 0 ) ),
+            KOKKOS_CLASS_LAMBDA( int64_t index ) {
+                double mass[dim];
+                double stiffness[dim];
+                double damping_numerator = 0.;
+                double damping_denominator = 0.;
+                // compute damping coefficient
+                for ( int i = 0; i < dim; ++i )
+                {
+                    mass[i] = _fictitious_mass( index, i );
+                    stiffness[i] = ( -forces( index, i ) +
+                                     _forces_last_step( index, i ) ) /
+                                   mass[i] / _delta_t /
+                                   _velocities_last_step( index, i );
+                    damping_numerator += displacements( index, i ) *
+                                         stiffness[i] *
+                                         displacements( index, i );
+                    damping_denominator +=
+                        displacements( index, i ) * displacements( index, i );
+                }
+                double c_damping = 2.0 * Kokkos::sqrt( damping_numerator /
+                                                       damping_denominator );
+
+                // update velocity with old velocity and damping coefficient
+                double velocity_denomiator = 2.0 + c_damping * _delta_t;
+                for ( int i = 0; i < dim; ++i )
+                {
+                    // update velocity
+                    velocities( index, i ) =
+                        ( ( 2.0 - c_damping * _delta_t ) *
+                              _velocities_last_step( index, i ) +
+                          2.0 * _delta_t * forces( index, i ) / mass[i] ) /
+                        velocity_denomiator;
+
+                    // update displacement with velocity
+                    displacements( index, i ) +=
+                        _delta_t * velocities( index, i );
+
+                    // store current velocity as old velocity for next step
+                    _velocities_last_step( index, i ) = velocities( index, i );
+                }
+            } );
+        Kokkos::fence( "ADRIntegrator::Fence::finalStep" );
+    }
+};
+
+struct ADRFictitiousMass
+{
+    double _delta_t;
+    double _horizon;
+    double _delta_x;
+    double _c;
+    double _safety_factor;
+
+    template <typename IndexType>
+    double KOKKOS_FUNCTION operator()( IndexType index, int dim ) const
+    {
+        return _safety_factor *
+               ( _delta_t * _delta_t * Kokkos::numbers::pi * _horizon *
+                 _horizon * _horizon * _c ) /
+               ( 3.0 * _delta_x );
+    }
+};
+
+template <typename ForcesType, typename FictitiousMassType>
+struct ADRInitialVelocity
+{
+    ForcesType _forces;
+    FictitiousMassType _fictitious_mass;
+    double _delta_t;
+
+    template <typename IndexType>
+    auto KOKKOS_FUNCTION operator()( IndexType index, int dim ) const
+    {
+        return ( _forces( index, dim ) * _delta_t ) / 2.0 /
+               _fictitious_mass( index, dim );
+    }
+};
+
+template <typename ForcesType, typename FictitiousMassType>
+ADRInitialVelocity( ForcesType, FictitiousMassType, double )
+    -> ADRInitialVelocity<ForcesType, FictitiousMassType>;
+
 } // namespace CabanaPD
 
 #endif
