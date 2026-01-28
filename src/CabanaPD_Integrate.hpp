@@ -245,11 +245,12 @@ struct ADRIntegrator
     {
     }
 
-    void reset( ExecutionSpace const& exec_space ) const
+    void reset( ExecutionSpace ) const
     {
         Kokkos::parallel_for(
             "ADRIntegrator::reset",
-            Kokkos::RangePolicy( 0, _velocities_last_step.extent( 0 ) ),
+            Kokkos::RangePolicy<ExecutionSpace>( 0,
+                                 _velocities_last_step.extent( 0 ) ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 for ( int i = 0; i < dim; ++i )
                     _velocities_last_step( index, i ) =
@@ -259,12 +260,12 @@ struct ADRIntegrator
     }
 
     template <typename ForceType>
-    void initialStep( ExecutionSpace const& exec_space,
+    void initialStep( ExecutionSpace,
                       ForceType const& forces ) const
     {
         Kokkos::parallel_for(
             "ADRIntegrator::initialStep",
-            Kokkos::RangePolicy( 0, _forces_last_step.extent( 0 ) ),
+            Kokkos::RangePolicy<ExecutionSpace>( 0, _forces_last_step.extent( 0 ) ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 for ( int i = 0; i < dim; ++i )
                     _forces_last_step( index, i ) = forces( index, i );
@@ -279,7 +280,7 @@ struct ADRIntegrator
     {
         Kokkos::parallel_for(
             "ADRIntegrator::finalStep",
-            Kokkos::RangePolicy( 0, _forces_last_step.extent( 0 ) ),
+            Kokkos::RangePolicy<ExecutionSpace>( 0, _forces_last_step.extent( 0 ) ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 double mass[dim];
                 double stiffness[dim];
@@ -334,7 +335,7 @@ struct ADRFictitiousMass
     double _safety_factor;
 
     template <typename IndexType>
-    double KOKKOS_FUNCTION operator()( IndexType index, int dim ) const
+    double KOKKOS_FUNCTION operator()( IndexType, int ) const
     {
         return _safety_factor *
                ( _delta_t * _delta_t * Kokkos::numbers::pi * _horizon *
