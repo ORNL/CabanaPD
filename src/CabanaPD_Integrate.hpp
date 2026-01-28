@@ -198,9 +198,6 @@ class VelocityVerlet<Contact> : public VelocityVerlet<NoContact>
     using base_type::_timer;
 };
 
-// template <typename ExecutionSpace, typename ParticleType, typename
-// FictitiousMassType,typename InitialVelocityType, typename ContactType =
-// NoContact> class ADRIntegrator;
 //  Single Responsibility Principle: Integrate d^2u/dt^2 = Force in time with
 //  Adaptive Dynamic Relaxation Open-Closed Principle: Can be extended by
 //  wrapping Liskov-Substitution: no inheritance Interface Segregation: uses "I
@@ -249,8 +246,8 @@ struct ADRIntegrator
     {
         Kokkos::parallel_for(
             "ADRIntegrator::reset",
-            Kokkos::RangePolicy<ExecutionSpace>( 0,
-                                 _velocities_last_step.extent( 0 ) ),
+            Kokkos::RangePolicy<ExecutionSpace>(
+                0, _velocities_last_step.extent( 0 ) ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 for ( int i = 0; i < dim; ++i )
                     _velocities_last_step( index, i ) =
@@ -260,12 +257,12 @@ struct ADRIntegrator
     }
 
     template <typename ForceType>
-    void initialStep( ExecutionSpace,
-                      ForceType const& forces ) const
+    void initialStep( ExecutionSpace, ForceType const& forces ) const
     {
         Kokkos::parallel_for(
             "ADRIntegrator::initialStep",
-            Kokkos::RangePolicy<ExecutionSpace>( 0, _forces_last_step.extent( 0 ) ),
+            Kokkos::RangePolicy<ExecutionSpace>(
+                0, _forces_last_step.extent( 0 ) ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 for ( int i = 0; i < dim; ++i )
                     _forces_last_step( index, i ) = forces( index, i );
@@ -280,7 +277,8 @@ struct ADRIntegrator
     {
         Kokkos::parallel_for(
             "ADRIntegrator::finalStep",
-            Kokkos::RangePolicy<ExecutionSpace>( 0, _forces_last_step.extent( 0 ) ),
+            Kokkos::RangePolicy<ExecutionSpace>(
+                0, _forces_last_step.extent( 0 ) ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 double mass[dim];
                 double stiffness[dim];
