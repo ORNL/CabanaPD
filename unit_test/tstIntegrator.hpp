@@ -94,6 +94,70 @@ void testIntegratorReversibility( int steps )
             EXPECT_DOUBLE_EQ( x_final( p, d ), x_init( p, d ) );
 }
 
+void testIntegratorADR( int steps )
+{
+    using exec_space = TEST_EXECSPACE;
+    constexpr int num_masses = 1;
+    double stiffness = 1000;
+
+    Kokkos::View<double[num_masses][3], TEST_EXECSPACE> velocities(
+        "testIntegrateADR::velocities" );
+    Kokkos::View<double[num_masses][3], TEST_EXECSPACE> displacements(
+        "testIntegrateADR::displacements" );
+    Kokkos::View<double[num_masses][3], TEST_EXECSPACE> forces(
+        "testIntegrateADR::forces" );
+
+    // calculate forces
+    auto force_lambda = KOKKOS_LAMBDA( int i )
+    {
+        forces( i, 0 ) = -stiffness * displacements( i, 0 );
+        forces( i, 1 ) = -stiffness * displacements( i, 1 );
+        forces( i, 2 ) = -stiffness * displacements( i, 2 );
+    };
+
+    // initialize displacements
+    Kokkos::parallel_for(
+        "testIntegrateADR::initialize_displacements", num_masses,
+        KOKKOS_LAMBDA( int i ) {
+            displacements( i, 0 ) = -0.3;
+            displacements( i, 1 ) = -0.4;
+            displacements( i, 2 ) = -0.5;
+        } );
+
+    // initialize forces
+    Kokkos::parallel_for( "testIntegrateADR::initialize_forces", num_masses,
+                          force_lambda );
+
+    double adrDeltaT = 1.0;
+    CabanaPD::ADRFictitiousMass adrMass{ adrDeltaT, 1.0, 1.0, stiffness, 5 };
+    CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass,
+                                                     adrDeltaT };
+    CabanaPD::ADRIntegrator integrator(
+        exec_space{}, adrMass, adrInitialVelocity, num_masses, adrDeltaT );
+
+    integrator.reset( exec_space{} );
+    // Integrate one step
+    for ( int s = 0; s < steps; ++s )
+    {
+        integrator.initialStep( exec_space{}, forces );
+        Kokkos::parallel_for( "testIntegrateADR::update_forces", num_masses,
+                              force_lambda );
+        integrator.finalStep( exec_space{}, forces, velocities, displacements );
+    }
+
+    // Make a copy of final results on the host
+    auto displacements_host = Kokkos::create_mirror_view_and_copy(
+        Kokkos::HostSpace{}, displacements );
+
+    // Check the results
+    for ( std::size_t p = 0; p < num_masses; ++p )
+    {
+        EXPECT_NEAR( displacements_host( p, 0 ), 0.0, 0.01 );
+        EXPECT_NEAR( displacements_host( p, 1 ), 0.0, 0.01 );
+        EXPECT_NEAR( displacements_host( p, 2 ), 0.0, 0.01 );
+    }
+}
+
 //---------------------------------------------------------------------------//
 // TESTS
 //---------------------------------------------------------------------------//
@@ -101,6 +165,8 @@ TEST( TEST_CATEGORY, test_integrate_reversibility )
 {
     testIntegratorReversibility( 100 );
 }
+
+TEST( TEST_CATEGORY, test_integrate_ADR ) { testIntegratorADR( 20 ); }
 
 //---------------------------------------------------------------------------//
 
