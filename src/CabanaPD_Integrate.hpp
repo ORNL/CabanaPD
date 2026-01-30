@@ -403,6 +403,21 @@ struct ParticleIntegratorWrapper
     }
 };
 
+template <typename ExecutionSpace, typename ForceType>
+auto createADRParticleIntegrator( ExecutionSpace const& exec_space,
+                                  ForceType const& forces, double delta_t,
+                                  double horizon, double delta_x, double c,
+                                  double safety_factor = 5.0 )
+{
+    CabanaPD::ADRFictitiousMass adrMass{ delta_t, horizon, delta_x, c,
+                                         safety_factor };
+    CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass, delta_t };
+    CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrInitialVelocity,
+                                        forces.size(), delta_t );
+    CabanaPD::ParticleIntegratorWrapper particleIntegrator( integrator );
+    return particleIntegrator;
+}
+
 } // namespace CabanaPD
 
 #endif
