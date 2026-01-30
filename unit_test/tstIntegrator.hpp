@@ -205,7 +205,7 @@ void testIntegratorADRparticles( int steps )
     Kokkos::parallel_for( "testIntegrateADRSingleMass::initialize_forces",
                           num_particle, force_lambda );
 
-    integrator.reset( exec_space{} );
+    particleIntegrator.reset( exec_space{} );
     // Integrate one step
     for ( int s = 0; s < steps; ++s )
     {
