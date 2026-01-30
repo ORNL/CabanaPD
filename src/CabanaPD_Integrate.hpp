@@ -377,6 +377,12 @@ struct ParticleIntegratorWrapper
     {
     }
 
+    template <typename ExecutionSpace>
+    void reset( ExecutionSpace const& exec_space )
+    {
+        _integrator.reset( exec_space );
+    }
+
     template <typename ExecutionSpace, typename ParticleType>
     void initialSubStep( ExecutionSpace const& exec_space,
                          ParticleType const& particles )
