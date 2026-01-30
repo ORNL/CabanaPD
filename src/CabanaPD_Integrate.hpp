@@ -198,13 +198,13 @@ class VelocityVerlet<Contact> : public VelocityVerlet<NoContact>
     using base_type::_timer;
 };
 
-//  Single Responsibility Principle: Integrate d^2u/dt^2 = Force in time with
-//  Adaptive Dynamic Relaxation Open-Closed Principle: Can be extended by
-//  wrapping Liskov-Substitution: no inheritance Interface Segregation: uses "I
-//  need interfaces" and uses all passed values Dependency-Inversion: We do not
-//  depend on how the entities we are integrating are stored, only depend on "I
-//  need interface" for iteration via parallel_for. Doing one integrator per
-//  entity is suspected to lead to performance penalties
+//  S: Integrate d^2u/dt^2 = Force in time with Adaptive Dynamic Relaxation
+//  O: Can be extended by wrapping
+//  L: no inheritance
+//  I: uses "I need interfaces" and uses all passed values
+//  D: We do not depend on how the entities we are integrating are stored, only
+//  depend on "I need interface" for iteration via parallel_for. Doing one
+//  integrator per entity is suspected to lead to performance penalties
 
 template <typename ExecutionSpace, typename FictitiousMassType,
           typename InitialVelocityType, int SpatialDimension = 3>
