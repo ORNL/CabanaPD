@@ -361,6 +361,42 @@ template <typename ForcesType, typename FictitiousMassType>
 ADRInitialVelocity( ForcesType, FictitiousMassType, double )
     -> ADRInitialVelocity<ForcesType, FictitiousMassType>;
 
+//  S: Adapt interface of particles to interface of Integrator
+//  O: can be extended by inheritance/composition
+//  L: no inheritance
+//  I: uses "I need interfaces" and uses all passed values
+//  D: No dependence on the impl of particles, just on the interface
+
+template <typename Integrator>
+struct ParticleIntegratorWrapper
+{
+    Integrator _integrator;
+
+    explicit ParticleIntegratorWrapper( Integrator const& integrator )
+        : _integrator( integrator )
+    {
+    }
+
+    template <typename ExecutionSpace, typename ParticleType>
+    void initialSubStep( ExecutionSpace const& exec_space,
+                         ParticleType const& particles )
+    {
+        auto forces = particles.sliceForce();
+        _integrator.initialSubStep( exec_space, forces );
+    }
+
+    template <typename ExecutionSpace, typename ParticleType>
+    void finalSubStep( ExecutionSpace const& exec_space,
+                       ParticleType const& particles )
+    {
+        auto forces = particles.sliceForce();
+        auto velocities = particles.sliceVelocity();
+        auto displacements = particles.sliceDisplacement();
+        _integrator.finalSubStep( exec_space, forces, velocities,
+                                  displacements );
+    }
+};
+
 } // namespace CabanaPD
 
 #endif
