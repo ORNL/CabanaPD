@@ -177,12 +177,8 @@ void testIntegratorADRparticles( int steps )
 
     double adrDeltaT = 1.0;
     double stiffness = 1000;
-    CabanaPD::ADRFictitiousMass adrMass{ adrDeltaT, 1.0, 1.0, stiffness, 5 };
-    CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass,
-                                                     adrDeltaT };
-    CabanaPD::ADRIntegrator integrator(
-        exec_space{}, adrMass, adrInitialVelocity, num_particle, adrDeltaT );
-    CabanaPD::ParticleIntegratorWrapper particleIntegrator( integrator );
+    auto particleIntegrator = CabanaPD::createADRParticleIntegrator(
+        exec_space{}, forces, adrDeltaT, 1.0, 1.0, stiffness );
 
     // how to calculate forces
     auto force_lambda = KOKKOS_LAMBDA( int i )
