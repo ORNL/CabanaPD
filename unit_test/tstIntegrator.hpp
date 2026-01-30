@@ -94,18 +94,18 @@ void testIntegratorReversibility( int steps )
             EXPECT_DOUBLE_EQ( x_final( p, d ), x_init( p, d ) );
 }
 
-void testIntegratorADR( int steps )
+void testIntegratorADRSingleMass( int steps )
 {
     using exec_space = TEST_EXECSPACE;
     constexpr int num_masses = 1;
     double stiffness = 1000;
 
     Kokkos::View<double[num_masses][3], TEST_EXECSPACE> velocities(
-        "testIntegrateADR::velocities" );
+        "testIntegrateADRSingleMass::velocities" );
     Kokkos::View<double[num_masses][3], TEST_EXECSPACE> displacements(
-        "testIntegrateADR::displacements" );
+        "testIntegrateADRSingleMass::displacements" );
     Kokkos::View<double[num_masses][3], TEST_EXECSPACE> forces(
-        "testIntegrateADR::forces" );
+        "testIntegrateADRSingleMass::forces" );
 
     // calculate forces
     auto force_lambda = KOKKOS_LAMBDA( int i )
@@ -117,7 +117,7 @@ void testIntegratorADR( int steps )
 
     // initialize displacements
     Kokkos::parallel_for(
-        "testIntegrateADR::initialize_displacements", num_masses,
+        "testIntegrateADRSingleMass::initialize_displacements", num_masses,
         KOKKOS_LAMBDA( int i ) {
             displacements( i, 0 ) = -0.3;
             displacements( i, 1 ) = -0.4;
@@ -125,8 +125,8 @@ void testIntegratorADR( int steps )
         } );
 
     // initialize forces
-    Kokkos::parallel_for( "testIntegrateADR::initialize_forces", num_masses,
-                          force_lambda );
+    Kokkos::parallel_for( "testIntegrateADRSingleMass::initialize_forces",
+                          num_masses, force_lambda );
 
     double adrDeltaT = 1.0;
     CabanaPD::ADRFictitiousMass adrMass{ adrDeltaT, 1.0, 1.0, stiffness, 5 };
@@ -139,10 +139,11 @@ void testIntegratorADR( int steps )
     // Integrate one step
     for ( int s = 0; s < steps; ++s )
     {
-        integrator.initialStep( exec_space{}, forces );
-        Kokkos::parallel_for( "testIntegrateADR::update_forces", num_masses,
-                              force_lambda );
-        integrator.finalStep( exec_space{}, forces, velocities, displacements );
+        integrator.initialSubStep( exec_space{}, forces );
+        Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
+                              num_masses, force_lambda );
+        integrator.finalSubStep( exec_space{}, forces, velocities,
+                                 displacements );
     }
 
     // Make a copy of final results on the host
@@ -166,7 +167,10 @@ TEST( TEST_CATEGORY, test_integrate_reversibility )
     testIntegratorReversibility( 100 );
 }
 
-TEST( TEST_CATEGORY, test_integrate_ADR ) { testIntegratorADR( 20 ); }
+TEST( TEST_CATEGORY, test_integrate_ADR_single_mass )
+{
+    testIntegratorADRSingleMass( 20 );
+}
 
 //---------------------------------------------------------------------------//
 

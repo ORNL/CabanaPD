@@ -257,7 +257,7 @@ struct ADRIntegrator
     }
 
     template <typename ForceType>
-    void initialStep( ExecutionSpace, ForceType const& forces ) const
+    void initialSubStep( ExecutionSpace, ForceType const& forces ) const
     {
         Kokkos::parallel_for(
             "ADRIntegrator::initialStep",
@@ -271,9 +271,9 @@ struct ADRIntegrator
     }
     template <typename ForceType, typename VelocityType,
               typename DisplacementType>
-    void finalStep( ExecutionSpace, ForceType const& forces,
-                    VelocityType const& velocities,
-                    DisplacementType const& displacements ) const
+    void finalSubStep( ExecutionSpace, ForceType const& forces,
+                       VelocityType const& velocities,
+                       DisplacementType const& displacements ) const
     {
         Kokkos::parallel_for(
             "ADRIntegrator::finalStep",
