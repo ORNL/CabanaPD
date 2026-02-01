@@ -292,7 +292,7 @@ struct ADRIntegrator
                                      _forces_last_step( index, i ) ) /
                                    mass[i] / _delta_t /
                                    _velocities_last_step( index, i );
-                    if ( Kokkos::isnan(stiffness[i]))
+                    if ( Kokkos::isnan( stiffness[i] ) )
                         stiffness[i] = 0.;
 
                     damping_numerator += displacements( index, i ) *
@@ -304,8 +304,10 @@ struct ADRIntegrator
                 double c_damping = 2.0 * Kokkos::sqrt( damping_numerator /
                                                        damping_denominator );
 
-                // nan check since we divide by the displacement and the velocity. Thus we can have a lot of 0s which are singularities in the formula for c_damping
-                if (Kokkos::isnan(c_damping))
+                // nan check since we divide by the displacement and the
+                // velocity. Thus we can have a lot of 0s which are
+                // singularities in the formula for c_damping
+                if ( Kokkos::isnan( c_damping ) )
                     c_damping = 0.;
 
                 // update velocity with old velocity and damping coefficient
@@ -425,45 +427,56 @@ auto createADRParticleIntegrator( ExecutionSpace const& exec_space,
     return particleIntegrator;
 }
 
-
-template <typename ExecutionSpace, typename SolverType,typename IntegratorType, typename ParticleType, typename BoundaryType, typename ... ARGS>
-void runStepWithExternalIntegrator( ExecutionSpace const & exec_space, SolverType& solver, IntegratorType& integrator_in, ParticleType const & particles, BoundaryType boundary_condition, double time, ARGS ... args )
+template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
+          typename ParticleType, typename BoundaryType, typename... ARGS>
+void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
+                                    SolverType& solver,
+                                    IntegratorType& integrator_in,
+                                    ParticleType const& particles,
+                                    BoundaryType boundary_condition,
+                                    double time, ARGS... args )
 {
-        integrator_in.initialSubStep( exec_space, particles, args...);
+    integrator_in.initialSubStep( exec_space, particles, args... );
 
-        // Update ghost particles.
-        //TODO not public
-        //solver.comm->gatherDisplacement();
+    // Update ghost particles.
+    // TODO not public
+    // solver.comm->gatherDisplacement();
 
-        // Add non-force boundary condition.
-        if ( !boundary_condition.forceUpdate() )
-            boundary_condition.apply( exec_space, particles, time );
+    // Add non-force boundary condition.
+    if ( !boundary_condition.forceUpdate() )
+        boundary_condition.apply( exec_space, particles, time );
 
-        // Compute internal forces.
-        solver.updateForce();
+    // Compute internal forces.
+    solver.updateForce();
 
-        //TODO typedef not public
-        //if constexpr ( is_contact<typename SolverType::ContactModelType>::value )
-        //    computeForce( solver.contact_model, solver.contact, particles,
-        //                  solver.contact_neighbor, false );
+    // TODO typedef not public
+    // if constexpr ( is_contact<typename SolverType::ContactModelType>::value )
+    //     computeForce( solver.contact_model, solver.contact, particles,
+    //                   solver.contact_neighbor, false );
 
-        // TODO comm not public
-        //if constexpr ( is_temperature_dependent<
-        //                   typename SolverType::ForceModelType::thermal_type>::value )
-        //    solver.comm->gatherTemperature();
+    // TODO comm not public
+    // if constexpr ( is_temperature_dependent<
+    //                   typename
+    //                   SolverType::ForceModelType::thermal_type>::value )
+    //    solver.comm->gatherTemperature();
 
-        // Add force boundary condition.
-        if ( boundary_condition.forceUpdate() )
-            boundary_condition.apply( exec_space, particles, time );
+    // Add force boundary condition.
+    if ( boundary_condition.forceUpdate() )
+        boundary_condition.apply( exec_space, particles, time );
 
-        integrator_in.finalSubStep( exec_space, particles, args ...);
+    integrator_in.finalSubStep( exec_space, particles, args... );
 }
 
-template <typename ExecutionSpace, typename SolverType,typename IntegratorType, typename ParticleType, typename BoundaryType, typename ... ARGS>
-void runStepWithExternalIntegratorAndOutput( ExecutionSpace const & exec_space, SolverType& solver, IntegratorType& integrator, ParticleType& particles, BoundaryType boundary_condition, double time, unsigned step, ARGS ... args )
+template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
+          typename ParticleType, typename BoundaryType, typename... ARGS>
+void runStepWithExternalIntegratorAndOutput(
+    ExecutionSpace const& exec_space, SolverType& solver,
+    IntegratorType& integrator, ParticleType& particles,
+    BoundaryType boundary_condition, double time, unsigned step, ARGS... args )
 {
-    runStepWithExternalIntegrator( exec_space,solver, integrator,particles, boundary_condition, time, args... );
-    particles.output(step,time,solver.output_reference);
+    runStepWithExternalIntegrator( exec_space, solver, integrator, particles,
+                                   boundary_condition, time, args... );
+    particles.output( step, time, solver.output_reference );
 }
 
 } // namespace CabanaPD
