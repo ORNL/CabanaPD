@@ -292,6 +292,9 @@ struct ADRIntegrator
                                      _forces_last_step( index, i ) ) /
                                    mass[i] / _delta_t /
                                    _velocities_last_step( index, i );
+                    if ( Kokkos::isnan(stiffness[i]))
+                        stiffness[i] = 0.;
+
                     damping_numerator += displacements( index, i ) *
                                          stiffness[i] *
                                          displacements( index, i );
@@ -300,6 +303,10 @@ struct ADRIntegrator
                 }
                 double c_damping = 2.0 * Kokkos::sqrt( damping_numerator /
                                                        damping_denominator );
+
+                // nan check since we divide by the displacement and the velocity. Thus we can have a lot of 0s which are singularities in the formula for c_damping
+                if (Kokkos::isnan(c_damping))
+                    c_damping = 0.;
 
                 // update velocity with old velocity and damping coefficient
                 double velocity_denomiator = 2.0 + c_damping * _delta_t;
