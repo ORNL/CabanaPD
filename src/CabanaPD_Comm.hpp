@@ -230,12 +230,13 @@ struct HaloIds
     }
 };
 
-template <class ParticleType, class ModelType, class ThermalType>
+template <class ParticleType, class ModelType, class MaterialType,
+          class ThermalType>
 class Comm;
 
 // FIXME: extract model from ParticleType instead.
 template <class ParticleType>
-class Comm<ParticleType, PMB, TemperatureIndependent>
+class Comm<ParticleType, Pair, SingleMaterial, TemperatureIndependent>
 {
   public:
     int mpi_size = -1;
@@ -254,8 +255,8 @@ class Comm<ParticleType, PMB, TemperatureIndependent>
     {
         _init_timer.start();
         auto local_grid = particles.local_grid;
-        MPI_Comm_size( local_grid->globalGrid().comm(), &mpi_size );
-        MPI_Comm_rank( local_grid->globalGrid().comm(), &mpi_rank );
+        mpi_size = local_grid->globalGrid().totalNumBlock();
+        mpi_rank = local_grid->globalGrid().blockId();
 
         auto positions = particles.sliceReferencePosition();
         // Get all 26 neighbor ranks.
@@ -270,9 +271,9 @@ class Comm<ParticleType, PMB, TemperatureIndependent>
         halo_ids.rebuild( positions );
 
         // Create the Cabana Halo.
-        halo = std::make_shared<halo_type>( local_grid->globalGrid().comm(),
-                                            particles.n_local, halo_ids._ids,
-                                            halo_ids._destinations, topology );
+        halo = std::make_shared<halo_type>(
+            local_grid->globalGrid().comm(), particles.localOffset(),
+            halo_ids._ids, halo_ids._destinations, topology );
 
         particles.resize( halo->numLocal(), halo->numGhost() );
 
@@ -286,7 +287,9 @@ class Comm<ParticleType, PMB, TemperatureIndependent>
 
         _init_timer.stop();
     }
-    ~Comm() {}
+
+    auto size() { return mpi_size; }
+    auto rank() { return mpi_rank; }
 
     // Determine which particles should be ghosted, reallocating and recounting
     // if needed.
@@ -320,11 +323,12 @@ class Comm<ParticleType, PMB, TemperatureIndependent>
 };
 
 template <class ParticleType>
-class Comm<ParticleType, LPS, TemperatureIndependent>
-    : public Comm<ParticleType, PMB, TemperatureIndependent>
+class Comm<ParticleType, State, SingleMaterial, TemperatureIndependent>
+    : public Comm<ParticleType, Pair, SingleMaterial, TemperatureIndependent>
 {
   public:
-    using base_type = Comm<ParticleType, PMB, TemperatureIndependent>;
+    using base_type =
+        Comm<ParticleType, Pair, SingleMaterial, TemperatureIndependent>;
     using memory_space = typename base_type::memory_space;
     using halo_type = typename base_type::halo_type;
     using base_type::gather_u;
@@ -368,12 +372,13 @@ class Comm<ParticleType, LPS, TemperatureIndependent>
     }
 };
 
-template <class ParticleType>
-class Comm<ParticleType, PMB, TemperatureDependent>
-    : public Comm<ParticleType, PMB, TemperatureIndependent>
+template <class ParticleType, class MaterialType>
+class Comm<ParticleType, Pair, MaterialType, TemperatureDependent>
+    : public Comm<ParticleType, Pair, MaterialType, TemperatureIndependent>
 {
   public:
-    using base_type = Comm<ParticleType, PMB, TemperatureIndependent>;
+    using base_type =
+        Comm<ParticleType, Pair, MaterialType, TemperatureIndependent>;
     using memory_space = typename base_type::memory_space;
     using halo_type = typename base_type::halo_type;
     using base_type::halo;
@@ -391,6 +396,45 @@ class Comm<ParticleType, PMB, TemperatureDependent>
     }
 
     void gatherTemperature() { gather_temp->apply(); }
+};
+
+template <class ParticleType, class ModelType>
+class Comm<ParticleType, ModelType, MultiMaterial, TemperatureIndependent>
+    : public Comm<ParticleType, ModelType, SingleMaterial,
+                  TemperatureIndependent>
+{
+  public:
+    using base_type =
+        Comm<ParticleType, ModelType, SingleMaterial, TemperatureIndependent>;
+    using memory_space = typename base_type::memory_space;
+    using halo_type = typename base_type::halo_type;
+    using base_type::halo;
+
+    using base_type::_init_timer;
+    using base_type::_timer;
+
+    using gather_material_type =
+        Cabana::Gather<halo_type, typename ParticleType::aosoa_material_type>;
+    std::shared_ptr<gather_material_type> gather_material;
+
+    Comm( ParticleType& particles, int max_export_guess = 100 )
+        : base_type( particles, max_export_guess )
+    {
+        _init_timer.start();
+
+        gather_material = std::make_shared<gather_material_type>(
+            *halo, particles._aosoa_material );
+
+        particles.resize( halo->numLocal(), halo->numGhost() );
+        _init_timer.stop();
+    }
+
+    void gatherMaterial()
+    {
+        _timer.start();
+        gather_material->apply();
+        _timer.stop();
+    }
 };
 
 } // namespace CabanaPD

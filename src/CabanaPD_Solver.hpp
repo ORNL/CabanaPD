@@ -63,7 +63,6 @@
 #include <chrono>
 #include <ctime>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 
 #include <CabanaPD_config.hpp>
@@ -74,49 +73,93 @@
 #include <CabanaPD_Boundary.hpp>
 #include <CabanaPD_Comm.hpp>
 #include <CabanaPD_Force.hpp>
+#include <CabanaPD_HeatTransfer.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Integrate.hpp>
 #include <CabanaPD_Output.hpp>
 #include <CabanaPD_Particles.hpp>
 #include <CabanaPD_Prenotch.hpp>
 #include <CabanaPD_Timer.hpp>
+#include <CabanaPD_Types.hpp>
 
 namespace CabanaPD
 {
-class SolverBase
+template <class ParticleType, class ForceModelType,
+          class ContactModelType = NoContact>
+class Solver
 {
   public:
-    virtual ~SolverBase() = default;
-    virtual void run() = 0;
-};
-
-template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel>
-class SolverElastic
-{
-  public:
-    using memory_space = MemorySpace;
+    using memory_space = typename ParticleType::memory_space;
     using exec_space = typename memory_space::execution_space;
 
-    using particle_type = ParticleType;
-    using integrator_type = Integrator<exec_space>;
-    using force_model_type = ForceModel;
-    using force_type = Force<exec_space, force_model_type>;
-    using comm_type = Comm<particle_type, typename force_model_type::base_model,
-                           typename force_model_type::thermal_type>;
-    using neighbor_type =
-        Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
-                           Cabana::VerletLayout2D, Cabana::TeamOpTag>;
-    using neigh_iter_tag = Cabana::SerialOpTag;
-    using input_type = InputType;
+    // Core module types - required for all problems.
+    using force_model_tag = typename ForceModelType::force_tag;
+    using force_fracture_type = typename ForceModelType::fracture_type;
+    using force_type =
+        Force<memory_space, force_model_tag, force_fracture_type>;
+    using force_thermal_type = typename ForceModelType::thermal_type::base_type;
+    using comm_type =
+        Comm<ParticleType, typename ForceModelType::model_tag::base_type,
+             typename ForceModelType::material_type, force_thermal_type>;
+    using neighbor_type = Neighbor<memory_space, force_fracture_type>;
 
-    SolverElastic( input_type _inputs,
-                   std::shared_ptr<particle_type> _particles,
-                   force_model_type force_model )
-        : inputs( _inputs )
-        , particles( _particles )
-        , _init_time( 0.0 )
+    // Optional module types.
+    using heat_transfer_type = HeatTransfer<memory_space, force_fracture_type>;
+    using contact_model_tag = typename ContactModelType::force_tag;
+    using contact_fracture_type = typename ContactModelType::fracture_type;
+    using contact_type =
+        Force<memory_space, contact_model_tag, contact_fracture_type>;
+    using contact_neighbor_type = Neighbor<memory_space, contact_fracture_type>;
+
+    // Flexible module types.
+    // Integration should include max displacement tracking if either model
+    // involves contact.
+    using integrator_type = VelocityVerlet<
+        typename either_contact<ForceModelType, ContactModelType>::base_type>;
+    // Different timings are output based on models.
+    using output_type = TimingOutput<ForceModelType, ContactModelType>;
+
+    // Force model accessors
+    ForceModelType& forceModel() { return force_model; }
+    const ForceModelType& forceModel() const { return force_model; }
+
+    Solver( Inputs _inputs, ParticleType _particles,
+            ForceModelType _force_model )
+        : particles( _particles )
+        , inputs( _inputs )
+        , force_model( _force_model )
+        , _other_time( 0.0 )
+        , _total_time( 0.0 )
     {
+        _total_timer.start();
+        setup();
+        _total_timer.stop();
+    }
+
+    Solver( Inputs _inputs, ParticleType _particles,
+            ForceModelType _force_model, ContactModelType _contact_model )
+        : particles( _particles )
+        , inputs( _inputs )
+        , force_model( _force_model )
+        , _other_time( 0.0 )
+        , _total_time( 0.0 )
+    {
+        _total_timer.start();
+        setup();
+
+        contact_model = std::make_unique<ContactModelType>( _contact_model );
+        contact = std::make_shared<contact_type>();
+        contact_neighbor = std::make_shared<contact_neighbor_type>(
+            *contact_model, particles );
+        _total_timer.stop();
+    }
+
+    void setup()
+    {
+        // This timestep is not valid for DEM-only.
+        if constexpr ( !is_contact<ForceModelType>::value )
+            inputs.computeCriticalTimeStep( force_model );
+
         num_steps = inputs["num_steps"];
         output_frequency = inputs["output_frequency"];
         output_reference = inputs["output_reference"];
@@ -126,39 +169,45 @@ class SolverElastic
         integrator = std::make_shared<integrator_type>( dt );
 
         // Add ghosts from other MPI ranks.
-        comm = std::make_shared<comm_type>( *particles );
+        comm = std::make_shared<comm_type>( particles );
 
-        // Update temperature ghost size if needed.
-        if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                    TemperatureDependent>::value )
-            force_model.update( particles->sliceTemperature() );
+        if constexpr ( is_contact<ContactModelType>::value )
+        {
+            if ( comm->size() > 1 )
+                throw std::runtime_error(
+                    "Contact with MPI is currently disabled." );
+        }
 
-        force =
-            std::make_shared<force_type>( inputs["half_neigh"], force_model );
+        // Update optional property ghost sizes if needed.
+        if constexpr ( std::is_same<typename ForceModelType::needs_update,
+                                    std::true_type>::value )
+            force_model.update( particles );
 
-        // Create the neighbor list.
-        _neighbor_timer.start();
-        double mesh_min[3] = { particles->ghost_mesh_lo[0],
-                               particles->ghost_mesh_lo[1],
-                               particles->ghost_mesh_lo[2] };
-        double mesh_max[3] = { particles->ghost_mesh_hi[0],
-                               particles->ghost_mesh_hi[1],
-                               particles->ghost_mesh_hi[2] };
-        auto x = particles->sliceReferencePosition();
-        neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
-                                                     force_model.delta, 1.0,
-                                                     mesh_min, mesh_max );
-        _neighbor_timer.stop();
+        neighbor = std::make_shared<neighbor_type>( force_model, particles );
+        // Plastic models need correct size for the bond array.
+        force_model.updateBonds( particles.localOffset(),
+                                 neighbor->getMaxLocal() );
 
-        _init_timer.start();
+        // This will either be PD or DEM forces.
+        force = std::make_shared<force_type>();
+
         unsigned max_neighbors;
         unsigned long long total_neighbors;
-        getNeighborStatistics( max_neighbors, total_neighbors );
+        neighbor->getStatistics( max_neighbors, total_neighbors );
+
+        // Create heat transfer if needed, using the same neighbor list as
+        // the mechanics.
+        if constexpr ( is_heat_transfer<
+                           typename ForceModelType::thermal_type>::value )
+        {
+            thermal_subcycle_steps = inputs["thermal_subcycle_steps"];
+            heat_transfer = std::make_shared<heat_transfer_type>();
+        }
 
         print = print_rank();
         if ( print )
         {
-            log( std::cout, "Local particles: ", particles->n_local,
+            log( std::cout, "Local particles: ", particles.numLocal(),
                  ", Maximum neighbors: ", max_neighbors );
             log( std::cout, "#Timestep/Total-steps Simulation-time" );
 
@@ -173,161 +222,266 @@ class SolverElastic
             exec_space().print_configuration( out );
 
             log( out, "Local particles, Ghosted particles, Global particles\n",
-                 particles->n_local, ", ", particles->n_ghost, ", ",
-                 particles->n_global );
+                 particles.numLocal(), ", ", particles.numGhost(), ", ",
+                 particles.numGlobal() );
             log( out, "Maximum neighbors: ", max_neighbors,
                  ", Total neighbors: ", total_neighbors, "\n" );
             out.close();
         }
-        _init_timer.stop();
-    }
-
-    void getNeighborStatistics( unsigned& max_neighbors,
-                                unsigned long long& total_neighbors )
-    {
-        auto neigh = *neighbors;
-        unsigned local_max_neighbors;
-        unsigned long long local_total_neighbors;
-        auto neigh_stats = KOKKOS_LAMBDA( const int, unsigned& max_n,
-                                          unsigned long long& total_n )
-        {
-            max_n = Cabana::NeighborList<neighbor_type>::maxNeighbor( neigh );
-            total_n =
-                Cabana::NeighborList<neighbor_type>::totalNeighbor( neigh );
-        };
-        Kokkos::RangePolicy<exec_space> policy( 0, 1 );
-        Kokkos::parallel_reduce( policy, neigh_stats, local_max_neighbors,
-                                 local_total_neighbors );
-        Kokkos::fence();
-        MPI_Reduce( &local_max_neighbors, &max_neighbors, 1, MPI_UNSIGNED,
-                    MPI_MAX, 0, MPI_COMM_WORLD );
-        MPI_Reduce( &local_total_neighbors, &total_neighbors, 1,
-                    MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD );
     }
 
     void init( const bool initial_output = true )
     {
+        _total_timer.start();
         // Compute and communicate weighted volume for LPS (does nothing for
-        // PMB). Only computed once.
-        force->computeWeightedVolume( *particles, *neighbors,
-                                      neigh_iter_tag{} );
-        comm->gatherWeightedVolume();
-
+        // PMB). Only computed once without fracture (and inside updateForce for
+        // fracture).
+        if constexpr ( !is_fracture<ForceModelType>::value )
+        {
+            force->computeWeightedVolume( force_model, particles, *neighbor );
+            comm->gatherWeightedVolume();
+        }
         // Compute initial internal forces and energy.
         updateForce();
-        computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
+        computeEnergy( force_model, *force, particles, *neighbor );
+        computeStress( force_model, *force, particles, *neighbor );
 
         if ( initial_output )
-            particles->output( 0, 0.0, output_reference );
+            particles.output( 0, 0.0, output_reference );
+        _total_timer.stop();
     }
 
     template <typename BoundaryType>
     void init( BoundaryType boundary_condition,
                const bool initial_output = true )
     {
+        _total_timer.start();
         // Add non-force boundary condition.
         if ( !boundary_condition.forceUpdate() )
-            boundary_condition.apply( exec_space(), *particles, 0.0 );
+            boundary_condition.apply( exec_space(), particles, 0.0 );
 
-        // Communicate temperature.
-        if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                    TemperatureDependent>::value )
+        // Communicate optional properties.
+        if constexpr ( std::is_same<typename ForceModelType::material_type,
+                                    MultiMaterial>::value )
+            comm->gatherMaterial();
+        if constexpr ( is_temperature_dependent<
+                           typename ForceModelType::thermal_type>::value )
             comm->gatherTemperature();
+        _total_timer.stop();
 
         // Force init without particle output.
         init( false );
 
+        _total_timer.start();
         // Add force boundary condition.
         if ( boundary_condition.forceUpdate() )
-            boundary_condition.apply( exec_space(), *particles, 0.0 );
+            boundary_condition.apply( exec_space(), particles, 0.0 );
 
         if ( initial_output )
-            particles->output( 0, 0.0, output_reference );
+            particles.output( 0, 0.0, output_reference );
+        _total_timer.stop();
+    }
+
+    // Initialize with prenotch, but no BC.
+    template <std::size_t NumPrenotch>
+    void init( Prenotch<NumPrenotch> prenotch,
+               const bool initial_output = true )
+    {
+        init_prenotch( prenotch );
+        init( initial_output );
+    }
+
+    // Initialize with prenotch and BC.
+    template <typename BoundaryType, std::size_t NumPrenotch>
+    void init( BoundaryType boundary_condition, Prenotch<NumPrenotch> prenotch,
+               const bool initial_output = true )
+    {
+        init_prenotch( prenotch );
+        init( boundary_condition, initial_output );
+    }
+
+    // Given a user functor, remove certain particles.
+    void remove( const double threshold, const bool use_frozen = false )
+    {
+        _total_timer.start();
+        // Remove any points that are too close.
+        Kokkos::View<int*, memory_space> keep( "keep_points",
+                                               particles.numLocal() );
+        Kokkos::deep_copy( keep, 1 );
+        auto f = particles.sliceForce();
+        std::size_t min_particle = particles.numFrozen();
+        if ( use_frozen )
+            min_particle = 0;
+        auto remove_functor = KOKKOS_LAMBDA( const int pid, int& k )
+        {
+            auto f_mag = Kokkos::hypot( f( pid, 0 ), f( pid, 1 ), f( pid, 2 ) );
+            if ( f_mag > threshold )
+                keep( pid - min_particle ) = 0;
+            else
+                k++;
+        };
+
+        int num_keep;
+        Kokkos::RangePolicy<exec_space> policy( min_particle,
+                                                particles.localOffset() );
+        Kokkos::parallel_reduce( "remove", policy, remove_functor,
+                                 Kokkos::Sum<int>( num_keep ) );
+        Kokkos::fence();
+        particles.remove( num_keep, keep );
+        // FIXME: Will need to rebuild ghosts.
+        _total_timer.stop();
+        _other_time += _total_timer.lastTime();
     }
 
     template <typename BoundaryType>
-    void run( BoundaryType boundary_condition )
+    void runStep( const int step, BoundaryType boundary_condition )
     {
-        init_output( boundary_condition.timeInit() );
+        _step_timer.start();
+        // Integrate - velocity Verlet first half.
+        integrator->initialHalfStep( exec_space{}, particles );
 
-        // Main timestep loop.
-        for ( int step = 1; step <= num_steps; step++ )
+        // Update ghost particles.
+        comm->gatherDisplacement();
+
+        if constexpr ( is_heat_transfer<
+                           typename ForceModelType::thermal_type>::value )
         {
-            _step_timer.start();
-
-            // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( *particles );
-
-            // Add non-force boundary condition.
-            if ( !boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space(), *particles, step * dt );
-
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        TemperatureDependent>::value )
-                comm->gatherTemperature();
-
-            // Update ghost particles.
-            comm->gatherDisplacement();
-
-            // Compute internal forces.
-            updateForce();
-
-            // Add force boundary condition.
-            if ( boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space(), *particles, step * dt );
-
-            // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( *particles );
-
-            output( step );
+            if ( step % thermal_subcycle_steps == 0 )
+                computeHeatTransfer( force_model, *heat_transfer, particles,
+                                     *neighbor, thermal_subcycle_steps * dt );
         }
 
-        // Final output and timings.
-        final_output();
+        // Add non-force boundary condition.
+        if ( !boundary_condition.forceUpdate() )
+        {
+            boundary_condition.apply( exec_space(), particles, step * dt );
+            // IMPORTANT: BC modifies owned displacement; ghosts must be updated
+            // before any force evaluation.
+            comm->gatherDisplacement();
+        }
+
+        if constexpr ( is_temperature_dependent<
+                           typename ForceModelType::thermal_type>::value )
+            comm->gatherTemperature();
+
+        // Compute internal forces.
+        updateForce();
+
+        if constexpr ( is_contact<ContactModelType>::value )
+            computeForce( *contact_model, *contact, particles,
+                          *contact_neighbor, false );
+
+        // Add force boundary condition.
+        if ( boundary_condition.forceUpdate() )
+            boundary_condition.apply( exec_space(), particles, step * dt );
+
+        // Integrate - velocity Verlet second half.
+        integrator->finalHalfStep( exec_space{}, particles );
+
+        // Separate output time.
+        _step_timer.stop();
+        output( step );
     }
 
-    void run()
+    void runStep( const int step )
+    {
+        _step_timer.start();
+
+        // Integrate - velocity Verlet first half.
+        integrator->initialHalfStep( exec_space{}, particles );
+
+        // Update ghost particles.
+        comm->gatherDisplacement();
+
+        // Compute internal forces.
+        updateForce();
+
+        if constexpr ( is_contact<ContactModelType>::value )
+            computeForce( *contact_model, *contact, particles,
+                          *contact_neighbor, false );
+
+        if constexpr ( is_temperature_dependent<
+                           typename ForceModelType::thermal_type>::value )
+            comm->gatherTemperature();
+
+        // Integrate - velocity Verlet second half.
+        integrator->finalHalfStep( exec_space{}, particles );
+
+        // Separate output time.
+        _step_timer.stop();
+        output( step );
+    }
+
+    template <typename... OutputType>
+    void run( OutputType&... region_output )
     {
         init_output();
+        _total_timer.start();
 
         // Main timestep loop.
         for ( int step = 1; step <= num_steps; step++ )
         {
-            _step_timer.start();
-
-            // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( *particles );
-
-            // Update ghost particles.
-            comm->gatherDisplacement();
-
-            // Compute internal forces.
-            updateForce();
-
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        TemperatureDependent>::value )
-                comm->gatherTemperature();
-
-            // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( *particles );
-
-            output( step );
+            runStep( step );
+            // FIXME: not included in timing
+            if ( step % output_frequency == 0 )
+                updateRegion( region_output... );
         }
 
         // Final output and timings.
-        final_output();
+        _total_timer.stop();
+        final_output( region_output... );
+    }
+
+    template <typename BoundaryType, typename... OutputType>
+    void run( BoundaryType& boundary_condition, OutputType&... region_output )
+    {
+        init_output();
+        _total_timer.start();
+        _other_time += boundary_condition.timeInit();
+
+        // Main timestep loop.
+        for ( int step = 1; step <= num_steps; step++ )
+        {
+            runStep( step, boundary_condition );
+            // FIXME: not included in timing
+            if ( step % output_frequency == 0 )
+                updateRegion( region_output... );
+        }
+
+        // Final output and timings.
+        _total_timer.stop();
+        final_output( region_output... );
+    }
+
+    // Iterate over all regions.
+    template <typename... RegionType>
+    void updateRegion( RegionType&... region )
+    {
+        ( updateRegion( region ), ... );
+    }
+    template <typename RegionType>
+    void updateRegion( RegionType& region )
+    {
+        region.update();
     }
 
     // Compute and communicate fields needed for force computation and update
     // forces.
     void updateForce()
     {
+        // Compute and communicate weighted volume for LPS (does nothing for
+        // PMB). Only computed once without fracture.
+        if constexpr ( is_fracture<ForceModelType>::value )
+        {
+            force->computeWeightedVolume( force_model, particles, *neighbor );
+            comm->gatherWeightedVolume();
+        }
         // Compute and communicate dilatation for LPS (does nothing for PMB).
-        force->computeDilatation( *particles, *neighbors, neigh_iter_tag{} );
+        force->computeDilatation( force_model, particles, *neighbor );
         comm->gatherDilatation();
 
         // Compute internal forces.
-        computeForce( *force, *particles, *neighbors, neigh_iter_tag{} );
+        computeForce( force_model, *force, particles, *neighbor );
     }
 
     void output( const int step )
@@ -335,58 +489,65 @@ class SolverElastic
         // Print output.
         if ( step % output_frequency == 0 )
         {
-            auto W = computeEnergy( *force, *particles, *neighbors,
-                                    neigh_iter_tag() );
+            _step_timer.start();
+            computeEnergy( force_model, *force, particles, *neighbor );
+            computeStress( force_model, *force, particles, *neighbor );
 
-            particles->output( step / output_frequency, step * dt,
-                               output_reference );
+            particles.output( step / output_frequency, step * dt,
+                              output_reference );
+
+            // Timer has to be stopped before printing output.
             _step_timer.stop();
-            step_output( step, W );
+            step_output( step );
         }
-        else
+    }
+
+    void init_output()
+    {
+        // Add timings that aren't included elsewhere (particles are created
+        // prior to the solver and therefore not included in any other timers).
+        double particle_time = particles.timeInit() + particles.time();
+        // All time up to now is init.
+        double total_init_time = _total_timer.time() + particle_time;
+        _step_timer.set( total_init_time );
+
+        // Use total init time here.
+        timing_output.header( output_file, total_init_time );
+    }
+
+    void step_output( const int step )
+    {
+        // All ranks must reduce - do this outside the if block since only rank
+        // 0 will print below.
+        double global_damage = 0.0;
+        if constexpr ( is_fracture<ForceModelType>::value )
         {
-            _step_timer.stop();
+            global_damage = updateGlobal( force->totalDamage() );
         }
-    }
+        double relative_damage = global_damage / particles.numGlobal();
+        double total_strain_energy = updateGlobal( force->totalStrainEnergy() );
 
-    void init_output( double boundary_init_time = 0.0 )
-    {
-        // Output after construction and initial forces.
-        std::ofstream out( output_file, std::ofstream::app );
-        _init_time += _init_timer.time() + _neighbor_timer.time() +
-                      particles->timeInit() + comm->timeInit() +
-                      integrator->timeInit() + boundary_init_time;
-        log( out, "Init-Time(s): ", _init_time );
-        log( out, "Init-Neighbor-Time(s): ", _neighbor_timer.time(), "\n" );
-        log( out, "#Timestep/Total-steps Simulation-time Total-strain-energy "
-                  "Step-Time(s) Force-Time(s) Comm-Time(s) Integrate-Time(s) "
-                  "Energy-Time(s) Output-Time(s) Particle*steps/s" );
-    }
-
-    void step_output( const int step, const double W )
-    {
         if ( print )
         {
-            std::ofstream out( output_file, std::ofstream::app );
-            log( std::cout, step, "/", num_steps, " ", std::scientific,
-                 std::setprecision( 2 ), step * dt );
-
             double step_time = _step_timer.time();
-            double comm_time = comm->time();
-            double integrate_time = integrator->time();
-            double force_time = force->time();
-            double energy_time = force->timeEnergy();
-            double output_time = particles->timeOutput();
-            _total_time += step_time;
-            auto rate = static_cast<double>( particles->n_global *
-                                             output_frequency / ( step_time ) );
-            _step_timer.reset();
-            log( out, std::fixed, std::setprecision( 6 ), step, "/", num_steps,
-                 " ", std::scientific, std::setprecision( 2 ), step * dt, " ",
-                 W, " ", std::fixed, _total_time, " ", force_time, " ",
-                 comm_time, " ", integrate_time, " ", energy_time, " ",
-                 output_time, " ", std::scientific, rate );
-            out.close();
+            // Instantaneous rate.
+            double p_steps_per_sec =
+                static_cast<double>( particles.numGlobal() ) *
+                output_frequency / step_time;
+
+            double contact_time = 0.0;
+            double neigh_time = neighbor->time();
+            if constexpr ( is_contact<ContactModelType>::value )
+            {
+                contact_time = contact->time();
+                neigh_time += contact_neighbor->time();
+            }
+
+            timing_output.step(
+                output_file, step, num_steps, dt, total_strain_energy,
+                relative_damage, step_time, force->time(), contact_time,
+                neigh_time, comm->time(), integrator->time(),
+                force->timeEnergy(), particles.timeOutput(), p_steps_per_sec );
         }
     }
 
@@ -394,313 +555,114 @@ class SolverElastic
     {
         if ( print )
         {
-            std::ofstream out( output_file, std::ofstream::app );
-            double comm_time = comm->time();
-            double integrate_time = integrator->time();
-            double force_time = force->time();
-            double energy_time = force->timeEnergy();
-            double output_time = particles->timeOutput();
-            double neighbor_time = _neighbor_timer.time();
-            _total_time = _init_time + comm_time + integrate_time + force_time +
-                          energy_time + output_time + particles->time();
+            // Add timings that aren't included elsewhere (particles are created
+            // prior to the solver and therefore not included in any other
+            // timers).
+            double particle_time = particles.timeInit() + particles.time();
+            double total_time = _total_timer.time() + particle_time;
+            // Already included in total, but not in other.
+            _other_time +=
+                comm->timeInit() + integrator->timeInit() + particle_time;
 
-            double steps_per_sec = 1.0 * num_steps / _total_time;
-            double p_steps_per_sec = particles->n_global * steps_per_sec;
-            log( out, std::fixed, std::setprecision( 2 ),
-                 "\n#Procs Particles | Total Force Comm Integrate Energy "
-                 "Output Init Init_Neighbor |\n",
-                 comm->mpi_size, " ", particles->n_global, " | \t", _total_time,
-                 " ", force_time, " ", comm_time, " ", integrate_time, " ",
-                 energy_time, " ", output_time, " ", _init_time, " ",
-                 neighbor_time, " | PERFORMANCE\n", std::fixed, comm->mpi_size,
-                 " ", particles->n_global, " | \t", 1.0, " ",
-                 force_time / _total_time, " ", comm_time / _total_time, " ",
-                 integrate_time / _total_time, " ", energy_time / _total_time,
-                 " ", output_time / _total_time, " ", _init_time / _total_time,
-                 " ", neighbor_time / _total_time, " | FRACTION\n\n",
-                 "#Steps/s Particle-steps/s Particle-steps/proc/s\n",
-                 std::scientific, steps_per_sec, " ", p_steps_per_sec, " ",
-                 p_steps_per_sec / comm->mpi_size );
-            out.close();
+            // Rates over the whole simulation.
+            double steps_per_sec =
+                static_cast<double>( num_steps ) / total_time;
+            double p_steps_per_sec =
+                static_cast<double>( particles.numGlobal() ) * steps_per_sec;
+
+            double neigh_time = neighbor->time();
+            double contact_time = 0.0;
+            double contact_neigh_time = 0.0;
+            if constexpr ( is_contact<ContactModelType>::value )
+            {
+                contact_time = contact->time();
+                contact_neigh_time += contact_neighbor->time();
+            }
+
+            timing_output.final(
+                output_file, comm->mpi_size, particles.numGlobal(), total_time,
+                force->time(), contact_time, neigh_time, contact_neigh_time,
+                comm->time(), integrator->time(), force->timeEnergy(),
+                particles.timeOutput(), _other_time, steps_per_sec,
+                p_steps_per_sec );
         }
+    }
+
+    template <typename... RegionType>
+    void final_output( RegionType... region )
+    {
+        final_output();
+        printRegion( region... );
+    }
+
+    // Iterate over all regions.
+    template <typename... RegionType>
+    void printRegion( RegionType... region )
+    {
+        ( printRegion( region ), ... );
+    }
+    template <typename RegionType>
+    void printRegion( RegionType region )
+    {
+        region.print( particles.comm() );
+    }
+
+    auto updateGlobal( double local )
+    {
+        double global = 0.0;
+        // Not using Allreduce because global values are only used for printing.
+        MPI_Reduce( &local, &global, 1, MPI_DOUBLE, MPI_SUM, 0,
+                    MPI_COMM_WORLD );
+        return global;
     }
 
     int num_steps;
     int output_frequency;
     bool output_reference;
     double dt;
+    int thermal_subcycle_steps;
+    // Sometimes necessary to update particles after solver creation.
+    ParticleType particles;
 
   protected:
-    input_type inputs;
-    std::shared_ptr<particle_type> particles;
+    template <std::size_t NumPrenotch>
+    void init_prenotch( Prenotch<NumPrenotch> prenotch )
+    {
+        _total_timer.start();
+        static_assert( is_fracture<ForceModelType>::value,
+                       "Cannot create prenotch in system without fracture." );
+
+        // Create prenotch.
+        neighbor->prenotch( exec_space{}, particles, prenotch );
+        _other_time += prenotch.time();
+        _total_timer.stop();
+    }
+
+    // Core modules.
+    Inputs inputs;
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
+    std::shared_ptr<neighbor_type> neighbor;
     std::shared_ptr<force_type> force;
-    std::shared_ptr<neighbor_type> neighbors;
+    ForceModelType force_model;
+    // Optional modules.
+    std::shared_ptr<heat_transfer_type> heat_transfer;
+    std::shared_ptr<contact_type> contact;
+    std::unique_ptr<ContactModelType> contact_model;
+    std::shared_ptr<contact_neighbor_type> contact_neighbor;
 
+    // Output files.
     std::string output_file;
     std::string error_file;
 
-    // Combined from many class timers.
-    double _init_time;
-    Timer _init_timer;
-    Timer _neighbor_timer;
-    Timer _step_timer;
+    // Note: _other_time is combined from many class timers.
+    double _other_time;
     double _total_time;
+    Timer _step_timer;
+    Timer _total_timer;
     bool print;
+    output_type timing_output;
 };
-
-template <class MemorySpace, class InputType, class ParticleType,
-          class ForceModel>
-class SolverFracture
-    : public SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>
-{
-  public:
-    using base_type =
-        SolverElastic<MemorySpace, InputType, ParticleType, ForceModel>;
-    using exec_space = typename base_type::exec_space;
-    using memory_space = typename base_type::memory_space;
-
-    using particle_type = typename base_type::particle_type;
-    using integrator_type = typename base_type::integrator_type;
-    using comm_type = typename base_type::comm_type;
-    using neighbor_type = typename base_type::neighbor_type;
-    using force_model_type = ForceModel;
-    using force_type = typename base_type::force_type;
-    using neigh_iter_tag = Cabana::SerialOpTag;
-    using input_type = typename base_type::input_type;
-
-    template <typename PrenotchType>
-    SolverFracture( input_type _inputs,
-                    std::shared_ptr<particle_type> _particles,
-                    force_model_type force_model, PrenotchType prenotch )
-        : base_type( _inputs, _particles, force_model )
-    {
-        init_mu();
-
-        // Create prenotch.
-        prenotch.create( exec_space{}, mu, *particles, *neighbors );
-        _init_time += prenotch.time();
-    }
-
-    SolverFracture( input_type _inputs,
-                    std::shared_ptr<particle_type> _particles,
-                    force_model_type force_model )
-        : base_type( _inputs, _particles, force_model )
-    {
-        init_mu();
-    }
-
-    void init_mu()
-    {
-        _init_timer.start();
-        // Create View to track broken bonds.
-        int max_neighbors =
-            Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
-        mu = NeighborView(
-            Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
-            particles->n_local, max_neighbors );
-        Kokkos::deep_copy( mu, 1 );
-        _init_timer.stop();
-    }
-
-    void init( const bool initial_output = true )
-    {
-        // Compute initial internal forces and energy.
-        updateForce();
-        computeEnergy( *force, *particles, *neighbors, mu, neigh_iter_tag() );
-
-        if ( initial_output )
-            particles->output( 0, 0.0, output_reference );
-    }
-
-    template <typename BoundaryType>
-    void init( BoundaryType boundary_condition,
-               const bool initial_output = true )
-    {
-        // Add non-force boundary condition.
-        if ( !boundary_condition.forceUpdate() )
-            boundary_condition.apply( exec_space(), *particles, 0.0 );
-
-        // Communicate temperature.
-        if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                    TemperatureDependent>::value )
-            comm->gatherTemperature();
-
-        // Force init without particle output.
-        init( false );
-
-        // Add force boundary condition.
-        if ( boundary_condition.forceUpdate() )
-            boundary_condition.apply( exec_space(), *particles, 0.0 );
-
-        if ( initial_output )
-            particles->output( 0, 0.0, output_reference );
-    }
-
-    template <typename BoundaryType>
-    void run( BoundaryType boundary_condition )
-    {
-        this->init_output( boundary_condition.timeInit() );
-
-        // Main timestep loop.
-        for ( int step = 1; step <= num_steps; step++ )
-        {
-            _step_timer.start();
-
-            // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( *particles );
-
-            // Add non-force boundary condition.
-            if ( !boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space(), *particles, step * dt );
-
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        TemperatureDependent>::value )
-                comm->gatherTemperature();
-
-            // Update ghost particles.
-            comm->gatherDisplacement();
-
-            // Compute internal forces.
-            updateForce();
-
-            // Add force boundary condition.
-            if ( boundary_condition.forceUpdate() )
-                boundary_condition.apply( exec_space{}, *particles, step * dt );
-
-            // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( *particles );
-
-            output( step );
-        }
-
-        // Final output and timings.
-        this->final_output();
-    }
-
-    void run()
-    {
-        this->init_output( 0.0 );
-
-        // Main timestep loop.
-        for ( int step = 1; step <= num_steps; step++ )
-        {
-            _step_timer.start();
-
-            // Integrate - velocity Verlet first half.
-            integrator->initialHalfStep( *particles );
-
-            if constexpr ( std::is_same<typename force_model_type::thermal_type,
-                                        TemperatureDependent>::value )
-                comm->gatherTemperature();
-
-            // Update ghost particles.
-            comm->gatherDisplacement();
-
-            // Compute internal forces.
-            updateForce();
-
-            // Integrate - velocity Verlet second half.
-            integrator->finalHalfStep( *particles );
-
-            output( step );
-        }
-
-        // Final output and timings.
-        this->final_output();
-    }
-
-    // Compute and communicate fields needed for force computation and update
-    // forces.
-    void updateForce()
-    {
-        // Compute and communicate weighted volume for LPS (does nothing for
-        // PMB).
-        force->computeWeightedVolume( *particles, *neighbors, mu );
-        comm->gatherWeightedVolume();
-
-        // Compute and communicate dilatation for LPS (does nothing for PMB).
-        force->computeDilatation( *particles, *neighbors, mu );
-        comm->gatherDilatation();
-
-        // Compute internal forces.
-        computeForce( *force, *particles, *neighbors, mu, neigh_iter_tag{} );
-    }
-
-    void output( const int step )
-    {
-        // Print output.
-        if ( step % output_frequency == 0 )
-        {
-            auto W = computeEnergy( *force, *particles, *neighbors, mu,
-                                    neigh_iter_tag() );
-
-            particles->output( step / output_frequency, step * dt,
-                               output_reference );
-            _step_timer.stop();
-            this->step_output( step, W );
-        }
-        else
-        {
-            _step_timer.stop();
-        }
-    }
-
-    using base_type::dt;
-    using base_type::num_steps;
-    using base_type::output_frequency;
-    using base_type::output_reference;
-
-  protected:
-    using base_type::comm;
-    using base_type::force;
-    using base_type::inputs;
-    using base_type::integrator;
-    using base_type::neighbors;
-    using base_type::particles;
-
-    using NeighborView = typename Kokkos::View<int**, memory_space>;
-    NeighborView mu;
-
-    using base_type::_init_time;
-    using base_type::_init_timer;
-    using base_type::_step_timer;
-    using base_type::print;
-};
-
-template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel>
-auto createSolverElastic( InputsType inputs,
-                          std::shared_ptr<ParticleType> particles,
-                          ForceModel model )
-{
-    return std::make_shared<
-        SolverElastic<MemorySpace, InputsType, ParticleType, ForceModel>>(
-        inputs, particles, model );
-}
-
-template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel>
-auto createSolverFracture( InputsType inputs,
-                           std::shared_ptr<ParticleType> particles,
-                           ForceModel model )
-{
-    return std::make_shared<
-        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModel>>(
-        inputs, particles, model );
-}
-
-template <class MemorySpace, class InputsType, class ParticleType,
-          class ForceModel, class PrenotchType>
-auto createSolverFracture( InputsType inputs,
-                           std::shared_ptr<ParticleType> particles,
-                           ForceModel model, PrenotchType prenotch )
-{
-    return std::make_shared<
-        SolverFracture<MemorySpace, InputsType, ParticleType, ForceModel>>(
-        inputs, particles, model, prenotch );
-}
 
 } // namespace CabanaPD
 

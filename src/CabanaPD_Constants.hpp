@@ -12,13 +12,12 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-#include "mpi.h"
+#include "Kokkos_Core.hpp"
 
 namespace CabanaPD
 {
 
-// FIXME: Kokkos::numbers::pi_v<double> when minimum 4.0 is required.
-constexpr double pi = M_PI;
+constexpr double pi = Kokkos::numbers::pi_v<double>;
 
 } // namespace CabanaPD
 #endif

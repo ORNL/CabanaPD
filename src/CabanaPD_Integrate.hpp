@@ -67,25 +67,26 @@
 
 namespace CabanaPD
 {
-template <class ExecutionSpace>
-class Integrator
-{
-    using exec_space = ExecutionSpace;
 
+template <typename ContactType = NoContact>
+class VelocityVerlet;
+
+template <>
+class VelocityVerlet<NoContact>
+{
+  protected:
     double _dt, _half_dt;
     Timer _timer;
 
   public:
-    Integrator( double dt )
+    VelocityVerlet( double dt )
         : _dt( dt )
     {
         _half_dt = 0.5 * dt;
     }
 
-    ~Integrator() {}
-
-    template <class ParticlesType>
-    void initialHalfStep( ParticlesType& p )
+    template <class ExecutionSpace, class ParticlesType>
+    void initialHalfStep( ExecutionSpace, ParticlesType& p )
     {
         _timer.start();
 
@@ -106,15 +107,16 @@ class Integrator
             u( i, 1 ) += dt * v( i, 1 );
             u( i, 2 ) += dt * v( i, 2 );
         };
-        Kokkos::RangePolicy<exec_space> policy( 0, v.size() );
-        Kokkos::parallel_for( "CabanaPD::Integrator::Initial", policy,
+        Kokkos::RangePolicy<ExecutionSpace> policy( p.frozenOffset(),
+                                                    p.localOffset() );
+        Kokkos::parallel_for( "CabanaPD::VelocityVerlet::Initial", policy,
                               init_func );
-
+        Kokkos::fence();
         _timer.stop();
     }
 
-    template <class ParticlesType>
-    void finalHalfStep( ParticlesType& p )
+    template <class ExecutionSpace, class ParticlesType>
+    void finalHalfStep( ExecutionSpace, ParticlesType& p )
     {
         _timer.start();
 
@@ -130,15 +132,70 @@ class Integrator
             v( i, 1 ) += half_dt_m * f( i, 1 );
             v( i, 2 ) += half_dt_m * f( i, 2 );
         };
-        Kokkos::RangePolicy<exec_space> policy( 0, v.size() );
-        Kokkos::parallel_for( "CabanaPD::Integrator::Final", policy,
+        Kokkos::RangePolicy<ExecutionSpace> policy( p.frozenOffset(),
+                                                    p.localOffset() );
+        Kokkos::parallel_for( "CabanaPD::VelocityVerlet::Final", policy,
                               final_func );
-
+        Kokkos::fence();
         _timer.stop();
     }
 
     double timeInit() { return 0.0; };
     auto time() { return _timer.time(); };
+};
+
+template <>
+class VelocityVerlet<Contact> : public VelocityVerlet<NoContact>
+{
+    using base_type = VelocityVerlet<NoContact>;
+    using base_type::base_type;
+
+  public:
+    template <class ExecutionSpace, class ParticlesType>
+    void initialHalfStep( ExecutionSpace, ParticlesType& p )
+    {
+        _timer.start();
+
+        auto u = p.sliceDisplacement();
+        auto v = p.sliceVelocity();
+        auto f = p.sliceForce();
+        auto rho = p.sliceDensity();
+        auto u_neigh = p.sliceDisplacementNeighborBuild();
+
+        auto dt = _dt;
+        auto half_dt = _half_dt;
+        auto init_func = KOKKOS_LAMBDA( const int i, double& max_u )
+        {
+            const double half_dt_m = half_dt / rho( i );
+            v( i, 0 ) += half_dt_m * f( i, 0 );
+            v( i, 1 ) += half_dt_m * f( i, 1 );
+            v( i, 2 ) += half_dt_m * f( i, 2 );
+            u( i, 0 ) += dt * v( i, 0 );
+            u( i, 1 ) += dt * v( i, 1 );
+            u( i, 2 ) += dt * v( i, 2 );
+
+            auto u_mag = Kokkos::hypot( u( i, 0 ) - u_neigh( i, 0 ),
+                                        u( i, 1 ) - u_neigh( i, 1 ),
+                                        u( i, 2 ) - u_neigh( i, 2 ) );
+            if ( u_mag > max_u )
+                max_u = u_mag;
+        };
+        Kokkos::RangePolicy<ExecutionSpace> policy( p.frozenOffset(),
+                                                    p.localOffset() );
+        double max_displacement;
+        Kokkos::parallel_reduce( "CabanaPD::VelocityVerlet::Initial", policy,
+                                 init_func,
+                                 Kokkos::Max<double>( max_displacement ) );
+
+        Kokkos::fence();
+        p.setMaxDisplacement( max_displacement );
+        _timer.stop();
+    }
+
+  protected:
+    using base_type::_dt;
+    using base_type::_half_dt;
+    using base_type::_timer;
 };
 
 } // namespace CabanaPD

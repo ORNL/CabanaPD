@@ -60,9 +60,10 @@
 #ifndef FORCE_H
 #define FORCE_H
 
-#include <cmath>
+#include <Kokkos_Core.hpp>
 
 #include <CabanaPD_ForceModels.hpp>
+#include <CabanaPD_Neighbor.hpp>
 #include <CabanaPD_Particles.hpp>
 
 namespace CabanaPD
@@ -72,38 +73,9 @@ namespace CabanaPD
 ******************************************************************************/
 template <class PosType>
 KOKKOS_INLINE_FUNCTION void
-getDistanceComponents( const PosType& x, const PosType& u, const int i,
-                       const int j, double& xi, double& r, double& s,
-                       double& rx, double& ry, double& rz )
-{
-    // Get the reference positions and displacements.
-    const double xi_x = x( j, 0 ) - x( i, 0 );
-    const double eta_u = u( j, 0 ) - u( i, 0 );
-    const double xi_y = x( j, 1 ) - x( i, 1 );
-    const double eta_v = u( j, 1 ) - u( i, 1 );
-    const double xi_z = x( j, 2 ) - x( i, 2 );
-    const double eta_w = u( j, 2 ) - u( i, 2 );
-    rx = xi_x + eta_u;
-    ry = xi_y + eta_v;
-    rz = xi_z + eta_w;
-    r = sqrt( rx * rx + ry * ry + rz * rz );
-    xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
-    s = ( r - xi ) / xi;
-}
-
-template <class PosType>
-KOKKOS_INLINE_FUNCTION void getDistance( const PosType& x, const PosType& u,
-                                         const int i, const int j, double& xi,
-                                         double& r, double& s )
-{
-    double rx, ry, rz;
-    getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-}
-
-template <class PosType>
-KOKKOS_INLINE_FUNCTION void getLinearizedDistanceComponents(
-    const PosType& x, const PosType& u, const int i, const int j, double& xi,
-    double& s, double& xi_x, double& xi_y, double& xi_z )
+getDistance( const PosType& x, const PosType& u, const int i, const int j,
+             double& xi, double& r, double& s, double& rx, double& ry,
+             double& rz, double& xi_x, double& xi_y, double& xi_z )
 {
     // Get the reference positions and displacements.
     xi_x = x( j, 0 ) - x( i, 0 );
@@ -112,7 +84,47 @@ KOKKOS_INLINE_FUNCTION void getLinearizedDistanceComponents(
     const double eta_v = u( j, 1 ) - u( i, 1 );
     xi_z = x( j, 2 ) - x( i, 2 );
     const double eta_w = u( j, 2 ) - u( i, 2 );
-    xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+    rx = xi_x + eta_u;
+    ry = xi_y + eta_v;
+    rz = xi_z + eta_w;
+    r = Kokkos::sqrt( rx * rx + ry * ry + rz * rz );
+    xi = Kokkos::sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
+    s = ( r - xi ) / xi;
+}
+
+template <class PosType>
+KOKKOS_INLINE_FUNCTION void getDistance( const PosType& x, const PosType& u,
+                                         const int i, const int j, double& xi,
+                                         double& r, double& s, double& rx,
+                                         double& ry, double& rz )
+{
+    double xi_x, xi_y, xi_z;
+    getDistance( x, u, i, j, xi, r, s, rx, ry, rz, xi_x, xi_y, xi_z );
+}
+
+template <class PosType>
+KOKKOS_INLINE_FUNCTION void getDistance( const PosType& x, const PosType& u,
+                                         const int i, const int j, double& xi,
+                                         double& r, double& s )
+{
+    double rx, ry, rz;
+    getDistance( x, u, i, j, xi, r, s, rx, ry, rz );
+}
+
+template <class PosType>
+KOKKOS_INLINE_FUNCTION void
+getLinearizedDistance( const PosType& x, const PosType& u, const int i,
+                       const int j, double& xi, double& s, double& xi_x,
+                       double& xi_y, double& xi_z )
+{
+    // Get the reference positions and displacements.
+    xi_x = x( j, 0 ) - x( i, 0 );
+    const double eta_u = u( j, 0 ) - u( i, 0 );
+    xi_y = x( j, 1 ) - x( i, 1 );
+    const double eta_v = u( j, 1 ) - u( i, 1 );
+    xi_z = x( j, 2 ) - x( i, 2 );
+    const double eta_w = u( j, 2 ) - u( i, 2 );
+    xi = Kokkos::sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
     s = ( xi_x * eta_u + xi_y * eta_v + xi_z * eta_w ) / ( xi * xi );
 }
 
@@ -122,162 +134,105 @@ getLinearizedDistance( const PosType& x, const PosType& u, const int i,
                        const int j, double& xi, double& s )
 {
     double xi_x, xi_y, xi_z;
-    getLinearizedDistanceComponents( x, u, i, j, xi, s, xi_x, xi_y, xi_z );
+    getLinearizedDistance( x, u, i, j, xi, s, xi_x, xi_y, xi_z );
 }
 
 // Forward declaration.
-template <class ExecutionSpace, class ForceType>
+template <class MemorySpace, class ModelTag, class FractureType>
 class Force;
 
-template <class ExecutionSpace>
-class Force<ExecutionSpace, BaseForceModel>
+template <class MemorySpace>
+class BaseForce
 {
   protected:
-    bool _half_neigh;
-
     Timer _timer;
     Timer _energy_timer;
+    Timer _stress_timer;
+    double _total_strain_energy;
 
   public:
-    Force( const bool half_neigh )
-        : _half_neigh( half_neigh )
-    {
-    }
+    BaseForce() = default;
 
-    template <class ParticleType, class NeighListType, class ParallelType>
-    void computeWeightedVolume( ParticleType&, const NeighListType&,
-                                const ParallelType ) const
+    // Default to no-op.
+    template <class ModelType, class ParticleType, class NeighborType>
+    void computeWeightedVolume( const ModelType&, ParticleType&,
+                                const NeighborType ) const
     {
     }
-    template <class ParticleType, class NeighListType, class ParallelType>
-    void computeDilatation( ParticleType&, const NeighListType&,
-                            const ParallelType ) const
+    template <class ModelType, class ParticleType, class NeighborType>
+    void computeDilatation( const ModelType&, ParticleType&,
+                            const NeighborType ) const
     {
     }
 
     auto time() { return _timer.time(); };
     auto timeEnergy() { return _energy_timer.time(); };
+    auto totalStrainEnergy() { return _total_strain_energy; };
 };
 
 /******************************************************************************
   Force free functions.
 ******************************************************************************/
-template <class ForceType, class ParticleType, class NeighListType,
-          class ParallelType>
-void computeForce( ForceType& force, ParticleType& particles,
-                   const NeighListType& neigh_list,
-                   const ParallelType& neigh_op_tag )
+template <class ModelType, class ForceType, class ParticleType,
+          class NeighborType>
+void computeForce( const ModelType& model, ForceType& force,
+                   ParticleType& particles, NeighborType& neighbor,
+                   const bool reset = true )
 {
-    auto n_local = particles.n_local;
     auto x = particles.sliceReferencePosition();
     auto u = particles.sliceDisplacement();
     auto f = particles.sliceForce();
     auto f_a = particles.sliceForceAtomic();
 
     // Reset force.
-    Cabana::deep_copy( f, 0.0 );
-
-    // if ( half_neigh )
-    // Forces must be atomic for half list
-    // computeForce_half( f_a, x, u, neigh_list, n_local,
-    //                    neigh_op_tag );
+    if ( reset )
+        Cabana::deep_copy( f, 0.0 );
 
     // Forces only atomic if using team threading.
-    if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
-        force.computeForceFull( f_a, x, u, particles, neigh_list, n_local,
-                                neigh_op_tag );
+    if constexpr ( std::is_same<typename NeighborType::Tag,
+                                Cabana::TeamOpTag>::value )
+        force.computeForceFull( model, f_a, x, u, particles, neighbor );
     else
-        force.computeForceFull( f, x, u, particles, neigh_list, n_local,
-                                neigh_op_tag );
+        force.computeForceFull( model, f, x, u, particles, neighbor );
     Kokkos::fence();
 }
 
-template <class ForceType, class ParticleType, class NeighListType,
+template <class ModelType, class ForceType, class ParticleType,
+          class NeighborType>
+void computeEnergy( const ModelType& model, ForceType& force,
+                    ParticleType& particles, const NeighborType& neighbor )
+{
+    if constexpr ( is_energy_output<typename ParticleType::output_type>::value )
+    {
+        auto x = particles.sliceReferencePosition();
+        auto u = particles.sliceDisplacement();
+        auto f = particles.sliceForce();
+        auto W = particles.sliceStrainEnergy();
+        auto vol = particles.sliceVolume();
+
+        // Reset energy.
+        Cabana::deep_copy( W, 0.0 );
+
+        force.computeEnergyFull( model, W, x, u, particles, neighbor );
+        Kokkos::fence();
+    }
+}
+
+template <class ModelType, class ForceType, class ParticleType,
           class ParallelType>
-double computeEnergy( ForceType& force, ParticleType& particles,
-                      const NeighListType& neigh_list,
-                      const ParallelType& neigh_op_tag )
+void computeStress( const ModelType& model, ForceType& force,
+                    ParticleType& particles, const ParallelType& neigh_op_tag )
 {
-    auto n_local = particles.n_local;
-    auto x = particles.sliceReferencePosition();
-    auto u = particles.sliceDisplacement();
-    auto f = particles.sliceForce();
-    auto W = particles.sliceStrainEnergy();
-    auto vol = particles.sliceVolume();
+    if constexpr ( is_stress_output<typename ParticleType::output_type>::value )
+    {
+        auto stress = particles.sliceStress();
 
-    // Reset energy.
-    Cabana::deep_copy( W, 0.0 );
+        // Reset stress.
+        Cabana::deep_copy( stress, 0.0 );
 
-    double energy;
-    // if ( _half_neigh )
-    //    energy = computeEnergy_half( force, x, u, neigh_list,
-    //                                  n_local, neigh_op_tag );
-    // else
-    energy = force.computeEnergyFull( W, x, u, particles, neigh_list, n_local,
-                                      neigh_op_tag );
-    Kokkos::fence();
-
-    return energy;
-}
-
-// Forces with bond breaking.
-template <class ForceType, class ParticleType, class NeighListType,
-          class NeighborView, class ParallelType>
-void computeForce( ForceType& force, ParticleType& particles,
-                   const NeighListType& neigh_list, NeighborView& mu,
-                   const ParallelType& neigh_op_tag )
-{
-    auto n_local = particles.n_local;
-    auto x = particles.sliceReferencePosition();
-    auto u = particles.sliceDisplacement();
-    auto f = particles.sliceForce();
-    auto f_a = particles.sliceForceAtomic();
-
-    // Reset force.
-    Cabana::deep_copy( f, 0.0 );
-
-    // if ( half_neigh )
-    // Forces must be atomic for half list
-    // computeForce_half( f_a, x, u, neigh_list, n_local,
-    //                    neigh_op_tag );
-
-    // Forces only atomic if using team threading.
-    if ( std::is_same<decltype( neigh_op_tag ), Cabana::TeamOpTag>::value )
-        force.computeForceFull( f_a, x, u, particles, neigh_list, mu, n_local,
-                                neigh_op_tag );
-    else
-        force.computeForceFull( f, x, u, particles, neigh_list, mu, n_local,
-                                neigh_op_tag );
-    Kokkos::fence();
-}
-
-// Energy and damage.
-template <class ForceType, class ParticleType, class NeighListType,
-          class NeighborView, class ParallelType>
-double computeEnergy( ForceType& force, ParticleType& particles,
-                      const NeighListType& neigh_list, NeighborView& mu,
-                      const ParallelType& neigh_op_tag )
-{
-    auto n_local = particles.n_local;
-    auto x = particles.sliceReferencePosition();
-    auto u = particles.sliceDisplacement();
-    auto f = particles.sliceForce();
-    auto W = particles.sliceStrainEnergy();
-    auto phi = particles.sliceDamage();
-
-    // Reset energy.
-    Cabana::deep_copy( W, 0.0 );
-
-    double energy;
-    // if ( _half_neigh )
-    //    energy = computeEnergy_half( force, x, u, neigh_list,
-    //                                  n_local, neigh_op_tag );
-    // else
-    energy = force.computeEnergyFull( W, x, u, phi, particles, neigh_list, mu,
-                                      n_local, neigh_op_tag );
-    Kokkos::fence();
-
-    return energy;
+        force.computeStressFull( model, particles, neigh_op_tag );
+        Kokkos::fence();
+    }
 }
 
 } // namespace CabanaPD
