@@ -269,14 +269,15 @@ struct ADRIntegrator
             } );
         Kokkos::fence( "ADRIntegrator::Fence::intialStep" );
     }
+
     template <typename ForceType, typename VelocityType,
               typename DisplacementType>
-    void finalSubStep( ExecutionSpace, ForceType const& forces,
-                       VelocityType const& velocities,
-                       DisplacementType const& displacements ) const
+    void middleSubStep( ExecutionSpace, ForceType const& forces,
+                        VelocityType const& velocities,
+                        DisplacementType const& displacements ) const
     {
         Kokkos::parallel_for(
-            "ADRIntegrator::finalStep",
+            "ADRIntegrator::middleStep",
             Kokkos::RangePolicy<ExecutionSpace>(
                 0, _forces_last_step.extent( 0 ) ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
@@ -320,12 +321,26 @@ struct ADRIntegrator
                               _velocities_last_step( index, i ) +
                           2.0 * _delta_t * forces( index, i ) / mass[i] ) /
                         velocity_denomiator;
+                }
+            } );
+        Kokkos::fence( "ADRIntegrator::Fence::middleStep" );
+    }
 
+    template <typename VelocityType, typename DisplacementType>
+    void finalSubStep( ExecutionSpace, VelocityType const& velocities,
+                       DisplacementType const& displacements ) const
+    {
+        Kokkos::parallel_for(
+            "ADRIntegrator::finalStep",
+            Kokkos::RangePolicy<ExecutionSpace>(
+                0, _forces_last_step.extent( 0 ) ),
+            KOKKOS_CLASS_LAMBDA( int64_t index ) {
+                for ( int i = 0; i < dim; ++i )
+                {
                     // update displacement with velocity
                     displacements( index, i ) +=
                         _delta_t * velocities( index, i );
 
-                    // store current velocity as old velocity for next step
                     _velocities_last_step( index, i ) = velocities( index, i );
                 }
             } );
@@ -401,14 +416,23 @@ struct ParticleIntegratorWrapper
     }
 
     template <typename ExecutionSpace, typename ParticleType>
-    void finalSubStep( ExecutionSpace const& exec_space,
-                       ParticleType const& particles )
+    void middleSubStep( ExecutionSpace const& exec_space,
+                        ParticleType const& particles )
     {
         auto forces = particles.sliceForce();
         auto velocities = particles.sliceVelocity();
         auto displacements = particles.sliceDisplacement();
-        _integrator.finalSubStep( exec_space, forces, velocities,
-                                  displacements );
+        _integrator.middleSubStep( exec_space, forces, velocities,
+                                   displacements );
+    }
+
+    template <typename ExecutionSpace, typename ParticleType>
+    void finalSubStep( ExecutionSpace const& exec_space,
+                       ParticleType const& particles )
+    {
+        auto velocities = particles.sliceVelocity();
+        auto displacements = particles.sliceDisplacement();
+        _integrator.finalSubStep( exec_space, velocities, displacements );
     }
 };
 
@@ -431,21 +455,16 @@ template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
           typename ParticleType, typename BoundaryType, typename... ARGS>
 void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
                                     SolverType& solver,
-                                    IntegratorType& integrator_in,
+                                    IntegratorType& integrator,
                                     ParticleType const& particles,
                                     BoundaryType boundary_condition,
                                     double time, ARGS... args )
 {
-    integrator_in.initialSubStep( exec_space, particles, args... );
+    integrator.initialSubStep( exec_space, particles, args... );
 
     // Update ghost particles.
     // TODO not public
     // solver.comm->gatherDisplacement();
-
-    // Add non-force boundary condition.
-    if ( !boundary_condition.forceUpdate() )
-        boundary_condition.apply( exec_space, particles, time );
-
     // Compute internal forces.
     solver.updateForce();
 
@@ -464,7 +483,13 @@ void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
     if ( boundary_condition.forceUpdate() )
         boundary_condition.apply( exec_space, particles, time );
 
-    integrator_in.finalSubStep( exec_space, particles, args... );
+    integrator.middleSubStep( exec_space, particles, args... );
+
+    // Add non-force boundary condition.
+    if ( !boundary_condition.forceUpdate() )
+        boundary_condition.apply( exec_space, particles, time );
+
+    integrator.finalSubStep( exec_space, particles, args... );
 }
 
 template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
