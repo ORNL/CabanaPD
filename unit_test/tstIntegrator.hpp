@@ -142,8 +142,9 @@ void testIntegratorADRSingleMass( int steps )
         integrator.initialSubStep( exec_space{}, forces );
         Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
                               num_masses, force_lambda );
-        integrator.finalSubStep( exec_space{}, forces, velocities,
-                                 displacements );
+        integrator.middleSubStep( exec_space{}, forces, velocities,
+                                  displacements );
+        integrator.finalSubStep( exec_space{}, velocities, displacements );
     }
 
     // Make a copy of final results on the host
@@ -208,6 +209,7 @@ void testIntegratorADRparticles( int steps )
         particleIntegrator.initialSubStep( exec_space{}, particles );
         Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
                               num_particle, force_lambda );
+        particleIntegrator.middleSubStep( exec_space{}, particles );
         particleIntegrator.finalSubStep( exec_space{}, particles );
     }
 
