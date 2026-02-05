@@ -265,11 +265,11 @@ void dogboneTensileTestExample( const std::string filename )
     // ====================================================
     //                   ADR Integrator
     // ====================================================
-    double adrDeltaT = 1.0;
+    double adrSubDeltaT = 1.0;
     // TODO the constants in this should be easier to get from some model and
     // not recalculating
     auto particleADRIntegator = CabanaPD::createADRParticleIntegrator(
-        exec_space{}, f, adrDeltaT, horizon,
+        exec_space{}, f, adrSubDeltaT, horizon,
         ( high_corner[0] - low_corner[0] ) / num_cells[0],
         18.0 * static_cast<double>( K ) /
             ( Kokkos::numbers::pi * horizon * horizon * horizon * horizon ),
@@ -284,25 +284,30 @@ void dogboneTensileTestExample( const std::string filename )
 
     // TODO think about this can be integrated in a non ugly manner
     double time = 0.0;
-    double adrTime = 0.8 * static_cast<double>( inputs["final_time"] );
+    double adrFinalTime = 0.8 * static_cast<double>( inputs["final_time"] );
+    double adrDeltaT = 0.1 * static_cast<double>( inputs["final_time"] );
+    int numADRSteps = adrFinalTime / adrDeltaT;
 
-    time = adrTime;
-    unsigned num_subIterations = 3000;
-    for ( unsigned subIterations = 0; subIterations < num_subIterations;
-          subIterations++ )
+    for ( int adrTimeStep = 1; adrTimeStep < numADRSteps; ++adrTimeStep )
     {
-        CabanaPD::runStepWithExternalIntegrator(
+        time = adrDeltaT * adrTimeStep;
+        unsigned num_subIterations = 3000;
+        for ( unsigned subIterations = 0; subIterations < num_subIterations;
+              subIterations++ )
+        {
+            CabanaPD::runStepWithExternalIntegrator(
+                exec_space{}, stationary_solver, particleADRIntegator,
+                particles, bc, time );
+        }
+        CabanaPD::runStepWithExternalIntegratorAndOutput(
             exec_space{}, stationary_solver, particleADRIntegator, particles,
-            bc, time );
+            bc, time, adrTimeStep );
     }
-    CabanaPD::runStepWithExternalIntegratorAndOutput(
-        exec_space{}, stationary_solver, particleADRIntegator, particles, bc,
-        time, 1 );
 
     // TODO same here ... this is probably not what we want for our users
-    unsigned num_steps_verlet =
+    unsigned numVerletSteps =
         ( static_cast<double>( inputs["final_time"] ) - time ) / solver.dt;
-    for ( unsigned i = 1; i < num_steps_verlet; i++ )
+    for ( unsigned i = 1; i < numVerletSteps; i++ )
     {
         int step = ( time / solver.dt ) + i;
         solver.runStep( step, bc );
