@@ -22,4 +22,7 @@ target_link_libraries(PlateWithHole LINK_PUBLIC CabanaPD)
 add_executable(CrackInclusion crack_inclusion.cpp)
 target_link_libraries(CrackInclusion LINK_PUBLIC CabanaPD)
 
-install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DogboneTensileTest PlateWithHole CrackInclusion DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(IndentationTest indentation_test.cpp)
+target_link_libraries(IndentationTest LINK_PUBLIC CabanaPD)
+
+install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DogboneTensileTest PlateWithHole CrackInclusion IndentationTest DESTINATION ${CMAKE_INSTALL_BINDIR})
