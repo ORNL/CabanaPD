@@ -91,17 +91,16 @@ void thermalDeformationExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
+    CabanaPD::ForceModel force_model( model_type{}, CabanaPD::NoFracture{},
+                                      horizon, K );
     auto temp = particles.sliceTemperature();
-    CabanaPD::ForceModel force_model_upper( model_type{},
-                                            CabanaPD::NoFracture{}, horizon, K,
-                                            temp, alpha[0], temp0 );
-    CabanaPD::ForceModel force_model_lower( model_type{},
-                                            CabanaPD::NoFracture{}, horizon, K,
-                                            temp, alpha[1], temp0 );
+    CabanaPD::ThermalModel thermal_model_upper( temp, alpha[0], temp0 );
+    CabanaPD::ThermalModel thermal_model_lower( temp, alpha[1], temp0 );
+    CabanaPD::ThermalForceModel model_upper( force_model, thermal_model_upper );
+    CabanaPD::ThermalForceModel model_lower( force_model, thermal_model_lower );
 
-    auto models =
-        CabanaPD::createMultiForceModel( particles, CabanaPD::AverageTag{},
-                                         force_model_upper, force_model_lower );
+    auto models = CabanaPD::createMultiForceModel(
+        particles, CabanaPD::AverageTag{}, model_upper, model_lower );
     // ====================================================
     //                   Create solver
     // ====================================================
