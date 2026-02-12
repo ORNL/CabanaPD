@@ -400,7 +400,8 @@ auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
     // multiforce model, as the return index of indexing is used to select the
     // model from the model list.
     DiagonalIndexing<3> indexing;
-    return createMultiForceModel( particles, indexing, m1, m2, m12, m23, m13 );
+    return createMultiForceModel( particles, indexing, m1, m2, m3, m12, m23,
+                                  m13 );
 }
 
 template <typename ParticleType, typename ModelType1, typename ModelType2,
