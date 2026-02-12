@@ -96,6 +96,7 @@ if(CabanaPD_ENABLE_TESTING)
   endif()
   enable_testing()
   add_subdirectory(unit_test)
+  add_subdirectory(regression_test)
 endif()
 
 ##---------------------------------------------------------------------------##
