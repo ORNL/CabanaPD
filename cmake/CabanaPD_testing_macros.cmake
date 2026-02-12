@@ -2,7 +2,7 @@
 ## On-node tests
 ##--------------------------------------------------------------------------##
 macro(CabanaPD_add_tests)
-  cmake_parse_arguments(CABANAPD_UNIT_TEST "MPI" "" "NAMES" ${ARGN})
+  cmake_parse_arguments(CABANAPD_UNIT_TEST "MPI" "PREFIX" "NAMES" ${ARGN})
   set(CABANAPD_UNIT_TEST_MPIEXEC_NUMPROCS 1)
   if(CABANAPD_UNIT_TEST_MPI)
     list(APPEND CABANAPD_UNIT_TEST_MPIEXEC_NUMPROCS 2)
@@ -20,12 +20,12 @@ macro(CabanaPD_add_tests)
       set(_dir ${CMAKE_CURRENT_BINARY_DIR}/${_uppercase_device})
       file(MAKE_DIRECTORY ${_dir})
       foreach(_test ${CABANAPD_UNIT_TEST_NAMES})
-        set(_file ${_dir}/tst${_test}_${_uppercase_device}.cpp)
+        set(_file ${_dir}/tst_${CABANAPD_UNIT_TEST_PREFIX}_${_test}_${_uppercase_device}.cpp)
         file(WRITE ${_file}
           "#include <Test${_uppercase_device}_Category.hpp>\n"
           "#include <tst${_test}.hpp>\n"
           )
-        set(_target ${_test}_test_${_uppercase_device})
+        set(_target ${CABANAPD_UNIT_TEST_PREFIX}_${_test}_test_${_uppercase_device})
         add_executable(${_target} ${_file} ${CABANAPD_UNIT_TEST_MAIN})
         target_include_directories(${_target} PRIVATE ${_dir} ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/unit_test)
         target_link_libraries(${_target} PRIVATE CabanaPD ${gtest_target})

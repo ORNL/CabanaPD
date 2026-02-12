@@ -11,4 +11,4 @@ configure_file(
 
 include(${PROJECT_SOURCE_DIR}/cmake/CabanaPD_testing_macros.cmake)
 
-CabanaPD_add_tests(NAMES Hertz HertzJKR)
+CabanaPD_add_tests(PREFIX RegressionTest NAMES Hertz HertzJKR)
