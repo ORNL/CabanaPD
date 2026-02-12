@@ -12,7 +12,7 @@ macro(CabanaPD_add_tests)
   endif()
   set(CABANAPD_UNIT_TEST_NUMTHREADS 1 2)
 
-  set(CABANAPD_UNIT_TEST_MAIN ${PROJECT_SOURCE_DIR}/unit_test/mpi_unit_test_main.cpp)
+  set(CABANAPD_UNIT_TEST_MAIN ${PROJECT_SOURCE_DIR}/test_harness/mpi_unit_test_main.cpp)
 
   foreach(_device SERIAL PTHREAD OPENMP CUDA HIP)
     if(Kokkos_ENABLE_${_device})
@@ -27,7 +27,7 @@ macro(CabanaPD_add_tests)
           )
         set(_target ${CABANAPD_UNIT_TEST_PREFIX}_${_test}_test_${_uppercase_device})
         add_executable(${_target} ${_file} ${CABANAPD_UNIT_TEST_MAIN})
-        target_include_directories(${_target} PRIVATE ${_dir} ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/unit_test)
+        target_include_directories(${_target} PRIVATE ${_dir} ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/test_harness)
         target_link_libraries(${_target} PRIVATE CabanaPD ${gtest_target})
 
         foreach(_np ${CABANAPD_UNIT_TEST_MPIEXEC_NUMPROCS})
