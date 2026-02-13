@@ -1,13 +1,20 @@
-configure_file(inputs/hertzian_contact.json hertzian_contact.json COPYONLY)
-configure_file(inputs/hertzian_jkr_contact.json hertzian_jkr_contact.json COPYONLY)
-
 include(${PROJECT_SOURCE_DIR}/test_harness/CabanaPD_testing_macros.cmake)
 
-CabanaPD_add_tests(PREFIX RegressionTest NAMES Hertz HertzJKR)
+#Regression tests without MPI
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/inputs/hertzian_contact.json ${CMAKE_CURRENT_BINARY_DIR}/hertzian_contact.json COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/inputs/hertzian_jkr_contact.json ${CMAKE_CURRENT_BINARY_DIR}/hertzian_jkr_contact.json COPYONLY)
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/inputs/cube_single_material_pmb.json
+  ${CMAKE_CURRENT_BINARY_DIR}/cube_single_material_pmb.json
+  COPYONLY
+)
 
-configure_file(inputs/elastic_wave.json elastic_wave.json COPYONLY )
-configure_file(inputs/kalthoff_winkler.json kalthoff_winkler.json COPYONLY )
-configure_file(inputs/crack_inclusion.json crack_inclusion.json COPYONLY )
+CabanaPD_add_tests(PREFIX RegressionTest NAMES Hertz HertzJKR CubeSingleMaterial)
+
+#Regression tests with MPI
+configure_file(${CMAKE_CURRENT_BINARY_DIR}/inputs/elastic_wave.json ${CMAKE_CURRENT_BINARY_DIR}/elastic_wave.json COPYONLY )
+configure_file(${CMAKE_CURRENT_BINARY_DIR}/inputs/kalthoff_winkler.json ${CMAKE_CURRENT_BINARY_DIR}/kalthoff_winkler.json COPYONLY )
+configure_file(${CMAKE_CURRENT_BINARY_DIR}/inputs/crack_inclusion.json ${CMAKE_CURRENT_BINARY_DIR}/crack_inclusion.json COPYONLY )
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/inputs/cube_linear_temperature.json
   ${CMAKE_CURRENT_BINARY_DIR}/cube_linear_temperature.json
