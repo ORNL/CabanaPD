@@ -100,6 +100,7 @@ void HIPREVExample( const std::string filename )
     auto temp = particles.sliceTemperature();
     auto x = particles.sliceReferencePosition();
     auto nofail = particles.sliceNoFail();
+    auto type = particles.sliceType();
 
     using pool_type = Kokkos::Random_XorShift64_Pool<exec_space>;
     using random_type = Kokkos::Random_XorShift64<exec_space>;
@@ -136,11 +137,14 @@ void HIPREVExample( const std::string filename )
 
             // Free the state after drawing
             pool.free_state( gen );
+
+            type( pid ) = 0;
         }
         else
         {
             // Container density
             rho( pid ) = rho0;
+            type( pid ) = 1;
         };
 
         // Initial temperature
@@ -297,7 +301,7 @@ void HIPREVExample( const std::string filename )
     //                      Outputs
     // ====================================================
     // Output average total density.
-    auto rho_c = particles.sliceCurrentDensity();
+    auto rho_c = solver.particles.sliceCurrentDensity();
     auto density_func = KOKKOS_LAMBDA( const int p ) { return rho_c( p ); };
     auto output_rho = CabanaPD::createOutputTimeSeries(
         "output_density.txt", inputs, exec_space{}, solver.particles,
