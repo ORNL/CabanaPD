@@ -17,6 +17,7 @@
 #include <CabanaPD_Constants.hpp>
 #include <CabanaPD_ForceModels.hpp>
 #include <CabanaPD_Types.hpp>
+#include <force_models/CabanaPD_Contact.hpp>
 
 namespace CabanaPD
 {
@@ -82,6 +83,15 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
         // the integrand (pairwise potential).
         return 0.25 * c * s * s * xi * vol;
     }
+
+    // For multi material.
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( DilatationTag, const int, const int, const double,
+                     const double, const double, const double ) const
+    {
+        return 0.0;
+    }
+    auto getPlasticStretch( const int, const int ) const { return 0.0; }
 };
 
 template <typename MemorySpace>
@@ -117,9 +127,7 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
         s_Y = ( model1.s_Y + model2.s_Y ) / 2.0;
     }
 
-    KOKKOS_INLINE_FUNCTION
-    auto operator()( ForceCoeffTag, const int i, const int, const double s,
-                     const double vol, const int n ) const
+    auto updatePlasticStretch( const int i, const double s, const int n ) const
     {
         // Update bond plastic stretch.
         auto s_p = _s_p( i, n );
@@ -131,8 +139,19 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
             _s_p( i, n ) = s + s_Y;
         // else: Elastic (in between), do not modify.
 
-        // Must extract again if in the plastic regime.
-        s_p = _s_p( i, n );
+        return _s_p( i, n );
+    }
+
+    auto getPlasticStretch( const int i, const int n ) const
+    {
+        return _s_p( i, n );
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( ForceCoeffTag, const int i, const int, const double s,
+                     const double vol, const int n ) const
+    {
+        const double s_p = updatePlasticStretch( i, s, n );
         return c * ( s - s_p ) * vol;
     }
 
@@ -651,6 +670,208 @@ struct ForceModel<LinearPMB, MechanicsType, Fracture, ThermalType,
     {
     }
 };
+
+template <typename PDType, typename MechanicsType, typename ThermalType,
+          typename FractureType, typename TemperatureType, typename DensityType,
+          typename CurrentDensityType>
+struct ForceDensityModel;
+
+// Force models with evolving density.
+template <typename TemperatureType, typename DensityType,
+          typename CurrentDensityType>
+struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                         TemperatureDependent, TemperatureType, DensityType,
+                         CurrentDensityType>
+    : public ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                        TemperatureDependent, TemperatureType>
+{
+    using base_type = ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                                 TemperatureDependent, TemperatureType>;
+    using fracture_type = typename base_type::fracture_type;
+    using mechanics_type = typename base_type::mechanics_type;
+    using thermal_type = typename base_type::thermal_type;
+    using density_type = DynamicDensity;
+
+    using base_type::operator();
+
+    // Does not use base_type::c because it is density dependent.
+    using base_type::_s_p;
+    using base_type::K;
+    double coeff;
+
+    double rho0;
+    DensityType rho;
+    CurrentDensityType rho_current;
+
+    NormalRepulsionModel contact;
+
+    ForceDensityModel( PMB model, ElasticPerfectlyPlastic mechanics,
+                       const DensityType& _rho,
+                       const CurrentDensityType& _rho_c, const double delta,
+                       const double K, const double G0, const double sigma_y,
+                       const double _rho0, const double contact_radius,
+                       const TemperatureType _temp, const double alpha,
+                       const double temp0 = 0.0 )
+        : base_type( model, mechanics, delta, K, G0, sigma_y, _temp, alpha,
+                     temp0 )
+        , rho0( _rho0 )
+        , rho( _rho )
+        , rho_current( _rho_c )
+        , contact( delta, contact_radius, 0.0, K )
+    {
+        coeff = 18.0 / pi / delta / delta / delta / delta;
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceDensityModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
+        , rho0( model1.rho0 )
+        , rho( model1.rho )
+        , rho_current( model1.rho_current )
+        , contact( model1.contact )
+    {
+        coeff = model1.coeff;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto currentC( const int i ) const
+    {
+        // Initial relative density for relative density factor (HARDCODED)
+        double D0 = 0.69;
+        // Relative density:
+        double D = rho_current( i ) / rho0;
+        // Relative density factor from C. Van Nguyen et al., Journal of
+        // Materials Processing Technology 226 (2015): 134-145.
+        double RD = Kokkos::pow( ( D - D0 ) / ( 1.0 - D0 ), 1.46 * ( 1 - D0 ) );
+
+        // Young's modulus from C. Van Nguyen et al., Journal of Materials
+        // Processing Technology 226 (2015): 134-145.
+        // double T = temperature( i );
+        // double E = ( 199510 - 65.63 * T - 0.0276 * T * T - 1.754E-6 * T * T *
+        // T ) * RD;
+        //
+        // Bulk modulus
+        // double nu = 0.25; // Use bond-based model
+        // double K = E / ( 3 * ( 1 - 2 * nu ) );
+        //
+        // return coeff * K;
+
+        return coeff * K * RD;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( ForceCoeffTag, const int i, const int, const double s,
+                     const double vol, const int n ) const
+    {
+        // Update c given updated density.
+        auto c_current = currentC( i );
+        // Plastic stretch is already updated.
+        auto s_p = base_type::getPlasticStretch( i, n );
+        return c_current * ( s - s_p ) * vol;
+    }
+
+    // Update plastic dilatation.
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( DilatationTag, const int i, const int, const double s,
+                     const double xi, const double vol, const double,
+                     const int n ) const
+    {
+        // Update plastic stretch and then plastic dilatation.
+        const auto s_p = base_type::updatePlasticStretch( i, s, n );
+        return coeff / 6.0 * s_p * xi * vol;
+    }
+
+    // Density update using plastic dilatation.
+    KOKKOS_INLINE_FUNCTION auto operator()( DensityTag, const int i,
+                                            const double theta_i ) const
+    {
+        // Update density using plastic dilatation.
+        // Note that this assumes zero initial plastic dilatation.
+        rho_current( i ) = Kokkos::min( rho( i ) * Kokkos::exp( -theta_i ),
+                                        rho0 ); // exp(theta_i - theta_i_0)
+    }
+
+    template <typename ParticleType>
+    void update( const ParticleType& particles )
+    {
+        base_type::update( particles );
+        rho = particles.sliceDensity();
+        rho_current = particles.sliceCurrentDensity();
+    }
+};
+
+template <typename DensityType, typename CurrentDensityType,
+          typename TemperatureType>
+ForceDensityModel( PMB, ElasticPerfectlyPlastic, DensityType rho,
+                   const CurrentDensityType& rho_c, const double delta,
+                   const double K, const double G0, const double sigma_y,
+                   const double rho0, const double contact_radius,
+                   TemperatureType temp, const double _alpha,
+                   const double _temp0 )
+    -> ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                         TemperatureDependent, TemperatureType, DensityType,
+                         CurrentDensityType>;
+
+// Force models with evolving density with heat transfer.
+template <typename TemperatureType, typename DensityType,
+          typename CurrentDensityType>
+struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                         DynamicTemperature, TemperatureType, DensityType,
+                         CurrentDensityType>
+    : public BaseDynamicTemperatureModel,
+      public ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                               TemperatureDependent, TemperatureType,
+                               DensityType, CurrentDensityType>
+{
+    using base_type = ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                                        TemperatureDependent, TemperatureType,
+                                        DensityType, CurrentDensityType>;
+    using base_temperature_type = BaseDynamicTemperatureModel;
+
+    using fracture_type = typename base_type::fracture_type;
+    using mechanics_type = typename base_type::mechanics_type;
+    using density_type = typename base_type::density_type;
+    using thermal_type = DynamicTemperature;
+
+    using base_type::operator();
+
+    ForceDensityModel( PMB model, ElasticPerfectlyPlastic mechanics,
+                       const DensityType& _rho,
+                       const CurrentDensityType& _rho_c, const double _delta,
+                       const double _K, const double _G0, const double _sigma_y,
+                       const double _rho0, const double contact_radius,
+                       const TemperatureType _temp, const double _kappa,
+                       const double _cp, const double _alpha,
+                       const double _temp0 = 0.0,
+                       const bool _constant_microconductivity = true )
+        : base_temperature_type( _delta, _kappa, _cp,
+                                 _constant_microconductivity )
+        , base_type( model, mechanics, _rho, _rho_c, _delta, _K, _G0, _sigma_y,
+                     _rho0, contact_radius, _temp, _alpha, _temp0 )
+    {
+    }
+
+    // Constructor to average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    ForceDensityModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_temperature_type( model1, model2 )
+        , base_type( model1, model2 )
+    {
+    }
+};
+
+template <typename DensityType, typename CurrentDensityType,
+          typename TemperatureType>
+ForceDensityModel( PMB, ElasticPerfectlyPlastic, DensityType rho,
+                   const CurrentDensityType& rho_c, const double delta,
+                   const double K, const double G0, const double sigma_y,
+                   const double rho0, const double contact_radius,
+                   TemperatureType temp, const double _kappa, const double _cp,
+                   const double _alpha, const double _temp0 )
+    -> ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
+                         DynamicTemperature, TemperatureType, DensityType,
+                         CurrentDensityType>;
 
 } // namespace CabanaPD
 

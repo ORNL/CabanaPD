@@ -38,6 +38,9 @@ struct DilatationTag
 struct InfluenceFunctionTag
 {
 };
+struct DensityTag
+{
+};
 
 struct BaseForceModel
 {
