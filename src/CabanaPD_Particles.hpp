@@ -1389,46 +1389,56 @@ class Particles<MemorySpace, ModelType, ThermalType, OutputType, DynamicDensity,
                OutputType output, DynamicDensity )
         : base_type( space, model, temp, output )
     {
-        _aosoa_density = aosoa_scalar_type( "Particle Output Fields",
-                                            base_type::localOffset() );
-        _aosoa_dilatation =
+        _aosoa_current_density =
+            aosoa_scalar_type( "Current Density", base_type::localOffset() );
+        _aosoa_theta_p =
             aosoa_scalar_type( "Plastic Dilatation", base_type::localOffset() );
 
         init();
     }
 
     template <typename... Args>
-    void createParticles( Args&&... args )
+    void create( Args&&... args )
     {
         // Forward arguments to standard or custom particle creation.
-        base_type::createParticles( std::forward<Args>( args )... );
-        _aosoa_density.resize( base_type::localOffset() );
-        _aosoa_dilatation.resize( base_type::localOffset() );
+        base_type::create( std::forward<Args>( args )... );
+        _aosoa_current_density.resize( base_type::localOffset() );
+        _aosoa_theta_p.resize( base_type::localOffset() );
+        // Need to re-init on creation.
+        init();
     }
 
     auto sliceCurrentDensity()
     {
-        return Cabana::slice<0>( _aosoa_density, "current_density" );
+        return Cabana::slice<0>( _aosoa_current_density, "current_density" );
     }
     auto sliceCurrentDensity() const
     {
-        return Cabana::slice<0>( _aosoa_density, "current_density" );
+        return Cabana::slice<0>( _aosoa_current_density, "current_density" );
     }
     auto slicePlasticDilatation()
     {
-        return Cabana::slice<0>( _aosoa_dilatation, "plastic_dilatation" );
+        return Cabana::slice<0>( _aosoa_theta_p, "plastic_dilatation" );
     }
     auto slicePlasticDilatation() const
     {
-        return Cabana::slice<0>( _aosoa_dilatation, "plastic_dilatation" );
+        return Cabana::slice<0>( _aosoa_theta_p, "plastic_dilatation" );
     }
 
     template <typename... Args>
     void resize( Args&&... args )
     {
         base_type::resize( std::forward<Args>( args )... );
-        _aosoa_density.resize( base_type::localOffset() );
-        _aosoa_dilatation.resize( base_type::localOffset() );
+        _aosoa_current_density.resize( base_type::localOffset() );
+        _aosoa_theta_p.resize( base_type::localOffset() );
+    }
+
+    // Need to re-copy after update.
+    template <typename... Args>
+    void update( Args&&... args )
+    {
+        base_type::update( std::forward<Args>( args )... );
+        init();
     }
 
     template <typename... OtherFields>
@@ -1460,8 +1470,8 @@ class Particles<MemorySpace, ModelType, ThermalType, OutputType, DynamicDensity,
         Cabana::deep_copy( plastic_dilatation, 0.0 );
     }
 
-    aosoa_scalar_type _aosoa_density;
-    aosoa_scalar_type _aosoa_dilatation;
+    aosoa_scalar_type _aosoa_current_density;
+    aosoa_scalar_type _aosoa_theta_p;
 };
 
 /******************************************************************************
