@@ -38,6 +38,15 @@ struct DilatationTag
 struct InfluenceFunctionTag
 {
 };
+struct HeatCapacityTag
+{
+};
+struct MicroconductivityTag
+{
+};
+struct DensityTag
+{
+};
 
 struct BaseForceModel
 {
@@ -299,12 +308,19 @@ struct BaseDynamicTemperatureModel
         cp = ( model1.cp + model2.cp ) / 2.0;
     }
 
-    KOKKOS_INLINE_FUNCTION double microconductivity_function( double r ) const
+    KOKKOS_INLINE_FUNCTION auto operator()( MicroconductivityTag, const int,
+                                            const int, double r ) const
     {
         if ( constant_microconductivity )
             return thermal_coeff;
         else
             return 4.0 * thermal_coeff * ( 1.0 - r / thermal_horizon );
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    auto operator()( HeatCapacityTag, const int, const int ) const
+    {
+        return cp;
     }
 };
 

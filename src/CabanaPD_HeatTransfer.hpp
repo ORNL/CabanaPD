@@ -56,7 +56,7 @@ class HeatTransfer<MemorySpace, NoFracture>
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
-            const double coeff = model.microconductivity_function( xi );
+            const double coeff = model( MicroconductivityTag{}, i, j, xi );
             conduction( i ) +=
                 coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
         };
@@ -77,7 +77,8 @@ class HeatTransfer<MemorySpace, NoFracture>
         auto temp = particles.sliceTemperature();
         auto euler_func = KOKKOS_LAMBDA( const int i )
         {
-            temp( i ) += dt / rho( i ) / model.cp * conduction( i );
+            temp( i ) += dt / rho( i ) / model( HeatCapacityTag{}, i, i ) *
+                         conduction( i );
         };
         Kokkos::RangePolicy<exec_space> policy( particles.frozenOffset(),
                                                 particles.localOffset() );
@@ -137,7 +138,8 @@ class HeatTransfer<MemorySpace, Fracture>
                 // Only include unbroken bonds.
                 if ( mu( i, n ) > 0 )
                 {
-                    const double coeff = model.microconductivity_function( xi );
+                    const double coeff =
+                        model( MicroconductivityTag{}, i, j, xi );
                     conduction( i ) +=
                         coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
                 }

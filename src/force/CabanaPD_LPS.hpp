@@ -130,7 +130,7 @@ class Force<MemorySpace, LPS, NoFracture> : public BaseForce<MemorySpace>
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
             theta( i ) +=
-                model( DilatationTag{}, i, j, s, xi, vol( j ), m( i ) );
+                model( DilatationTag{}, i, j, s, xi, vol( j ), m( i ), -1 );
         };
 
         neighbor.iterate( exec_space{}, dilatation, particles,
@@ -366,8 +366,9 @@ class Force<MemorySpace, LPS, Fracture> : public BaseForce<MemorySpace>
                 // broken, because m=0 only occurs when all bonds are broken.
                 // mu is still included to account for individual bond breaking.
                 if ( m( i ) > 0 )
-                    theta( i ) += mu( i, n ) * model( DilatationTag{}, i, j, s,
-                                                      xi, vol( j ), m( i ) );
+                    theta( i ) +=
+                        mu( i, n ) * model( DilatationTag{}, i, j, s, xi,
+                                            vol( j ), m( i ), -1 );
             }
         };
 

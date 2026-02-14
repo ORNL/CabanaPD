@@ -14,3 +14,7 @@ add_executable(ThermalDeformationBiMaterial thermal_deformation_bimaterial.cpp)
 target_link_libraries(ThermalDeformationBiMaterial LINK_PUBLIC CabanaPD)
 
 install(TARGETS ThermalDeformation ThermalCrack ThermalDeformationHeatTransfer ThermalDeformationHeatTransferPrenotched ThermalDeformationBiMaterial DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+add_executable(HipRveSphere hip_rve_sphere.cpp)
+target_link_libraries(HipRveSphere LINK_PUBLIC CabanaPD)
+install(TARGETS HipRveSphere)

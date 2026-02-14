@@ -138,7 +138,8 @@ getLinearizedDistance( const PosType& x, const PosType& u, const int i,
 }
 
 // Forward declaration.
-template <class MemorySpace, class ModelTag, class FractureType>
+template <class MemorySpace, class ModelTag, class FractureType,
+          class DensityType = StaticDensity>
 class Force;
 
 template <class MemorySpace>

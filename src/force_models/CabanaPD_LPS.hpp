@@ -118,8 +118,8 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
 
     KOKKOS_INLINE_FUNCTION auto operator()( DilatationTag, const int, const int,
                                             const double s, const double xi,
-                                            const double vol,
-                                            const double m_i ) const
+                                            const double vol, const double m_i,
+                                            const int ) const
     {
         auto influence = ( *this )( influence_tag, xi );
         double theta_i = influence * s * xi * xi * vol;

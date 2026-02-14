@@ -199,6 +199,13 @@ struct either_contact<
     using base_type = Contact;
 };
 
+struct StaticDensity
+{
+};
+struct DynamicDensity
+{
+};
+
 // Output tags.
 struct BaseOutput
 {
