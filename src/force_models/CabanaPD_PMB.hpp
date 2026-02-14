@@ -91,6 +91,7 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
     {
         return 0.0;
     }
+    auto getYieldStretch() const { return DBL_MAX; }
     auto getPlasticStretch( const int, const int ) const { return 0.0; }
 };
 
@@ -124,8 +125,10 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
         : base_type( model1, model2 )
         , base_plasticity_type()
     {
-        s_Y = ( model1.s_Y + model2.s_Y ) / 2.0;
+        s_Y = ( model1.getYieldStretch() + model2.getYieldStretch() ) / 2.0;
     }
+
+    auto getYieldStretch() const { return s_Y; }
 
     auto updatePlasticStretch( const int i, const double s, const int n ) const
     {
@@ -454,6 +457,7 @@ struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
 
     using base_type::operator();
     using base_temperature_type::operator();
+    using base_heat_transfer_type::operator();
     using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, NoFracture fracture, const double _horizon,
@@ -500,6 +504,7 @@ struct ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
 
     using base_type::operator();
     using base_temperature_type::operator();
+    using base_heat_transfer_type::operator();
     using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, const double _horizon, const double _K,
@@ -550,6 +555,7 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, DynamicTemperature,
 
     using base_type::operator();
     using base_temperature_type::operator();
+    using base_heat_transfer_type::operator();
     using typename base_temperature_type::needs_update;
 
     ForceModel( PMB model, ElasticPerfectlyPlastic mechanics,
@@ -835,6 +841,7 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     using thermal_type = DynamicTemperature;
 
     using base_type::operator();
+    using base_temperature_type::operator();
 
     ForceDensityModel( PMB model, ElasticPerfectlyPlastic mechanics,
                        const DensityType& _rho,
