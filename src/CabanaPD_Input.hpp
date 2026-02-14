@@ -298,7 +298,7 @@ class Inputs
                                                    thermal_type>::value )
                             {
                                 double coeff =
-                                    model( MicroconductivityTag{}, i, j, xi );
+                                    model( MicroconductivityTag{}, 0, 0, xi );
                                 sum_ht += v_p * coeff / r2;
                             }
                         }
