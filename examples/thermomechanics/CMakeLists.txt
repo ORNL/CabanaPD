@@ -17,4 +17,6 @@ install(TARGETS ThermalDeformation ThermalCrack ThermalDeformationHeatTransfer T
 
 add_executable(HipRveSphere hip_rve_sphere.cpp)
 target_link_libraries(HipRveSphere LINK_PUBLIC CabanaPD)
-install(TARGETS HipRveSphere)
+add_executable(HipRveElasticSphere hip_rve_elastic_sphere.cpp)
+target_link_libraries(HipRveElasticSphere LINK_PUBLIC CabanaPD)
+install(TARGETS HipRveSphere HipRveElasticSphere)
