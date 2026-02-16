@@ -160,6 +160,36 @@ struct LinearLPS
     using model_tag = LPS;
 };
 
+template <typename T>
+struct is_symmetric : public std::false_type
+{
+};
+// Force models
+template <>
+struct is_symmetric<PMB> : public std::true_type
+{
+};
+
+template <>
+struct is_symmetric<LinearPMB> : public std::true_type
+{
+};
+// Indexing
+template <unsigned NumBaseModels>
+struct DiagonalIndexing;
+
+struct BinaryIndexing;
+
+template <unsigned NumBaseModels>
+struct is_symmetric<DiagonalIndexing<NumBaseModels>> : public std::true_type
+{
+};
+
+template <>
+struct is_symmetric<BinaryIndexing> : public std::true_type
+{
+};
+
 // Contact and DEM (contact without PD) tags.
 struct Contact
 {
