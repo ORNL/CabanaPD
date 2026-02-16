@@ -50,6 +50,22 @@ struct BinaryIndexing
         return firstType != secondType;
     }
 };
+
+template <unsigned NumBaseModels>
+struct FullIndexing
+{
+    static_assert( NumBaseModels > 0, "NumBaseModels must be larger than 0" );
+
+    KOKKOS_FUNCTION unsigned operator()( unsigned firstType,
+                                         unsigned secondType ) const
+    {
+        if ( firstType >= NumBaseModels || secondType >= NumBaseModels )
+            Kokkos::abort( "Index out of range of FullIndexing" );
+
+        return firstType * NumBaseModels + secondType;
+    }
+};
+
 } // namespace CabanaPD
 
 #endif
