@@ -68,8 +68,8 @@ void fragmentingCylinderExample( const std::string filename )
     double x_center = 0.5 * ( low_corner[0] + high_corner[0] );
     double y_center = 0.5 * ( low_corner[1] + high_corner[1] );
     double z_center = 0.5 * ( low_corner[2] + high_corner[2] );
-    double Rout = inputs["cylinder_outer_radius"];
-    double Rin = inputs["cylinder_inner_radius"];
+    double R_out = inputs["cylinder_outer_radius"];
+    double R_in = inputs["cylinder_inner_radius"];
     double H = inputs["cylinder_height"];
 
     // Do not create particles outside given cylindrical region
@@ -77,7 +77,7 @@ void fragmentingCylinderExample( const std::string filename )
     {
         double rsq = ( x[0] - x_center ) * ( x[0] - x_center ) +
                      ( x[1] - y_center ) * ( x[1] - y_center );
-        if ( rsq < Rin * Rin || rsq > Rout * Rout ||
+        if ( rsq < R_in * R_in || rsq > R_out * R_out ||
              x[2] > z_center + 0.5 * H || x[2] < z_center - 0.5 * H )
             return false;
         return true;

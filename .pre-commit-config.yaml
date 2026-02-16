@@ -1,19 +1,22 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.4.0
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # v6.0.0
     hooks:
-      - id: check-merge-conflict
-      - id: end-of-file-fixer
+    - id: check-case-conflict
+    - id: check-merge-conflict
+    - id: check-yaml
+    - id: end-of-file-fixer
+    - id: trailing-whitespace
 
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v14.0.0
+    rev: 4c1506e7e6f7712eee075b58391eabe1192d3adb # v14.0.0
     hooks:
-      - id: clang-format
-        types_or: [c++]
-        args: ["-style=file", "-i"]
+    - id: clang-format
+      types_or: [c++]
+      args: ["-style=file"]
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.6
+    rev: 63c8f8312b7559622c0d82815639671ae42132ac # v2.4.1
     hooks:
-      - id: codespell
-        args: ["-L", "gage"]
+    - id: codespell
+      args: ["-L", "gage"]

@@ -8,7 +8,7 @@
     "thermal_conductivity"    : {"value": 387, "unit": "W/(m.K)"},
     "specific_heat_capacity"  : {"value": 385, "unit": "J/(kg.K)"},
     "reference_temperature"   : {"value": 100.0, "unit": "oC"},
-    "horizon"                 : {"value": 0.00615, "unit": "m"},  
+    "horizon"                 : {"value": 0.00615, "unit": "m"},
     "final_time"              : {"value": 8, "unit": "s"},
     "timestep"                : {"value": 0.02, "unit": "s", "note": "This timestep is too large for mechanics to be stable. Use thermal_deformation_heat_transfer.json instead if coupled thermomechanics is desired."},
     "thermal_subcycle_steps"  : {"value": 1},
