@@ -32,6 +32,7 @@
 #include <CabanaPD_ForceModelsMulti.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Particles.hpp>
+#include <CabanaPD_Types.hpp>
 #include <force/CabanaPD_LPS.hpp>
 #include <force/CabanaPD_PMB.hpp>
 #include <force_models/CabanaPD_LPS.hpp>
@@ -1274,9 +1275,7 @@ TEST( TEST_CATEGORY, test_force_lps_binary )
     double G = 0.5;
     double G0 = 1000.0;
     using model_type = CabanaPD::LPS;
-    CabanaPD::ForceModel model1( model_type{}, CabanaPD::Elastic{},
-                                 CabanaPD::NoFracture{}, force_horizon, K, G,
-                                 1 );
+    CabanaPD::ForceModel model1( model_type{}, force_horizon, K, G, G0, 1 );
     CabanaPD::ForceModel model2( model_type{}, force_horizon, K, G, G0, 1 );
 
     auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
@@ -1340,9 +1339,7 @@ TEST( TEST_CATEGORY, test_force_lps_ternary )
     double G = 0.5;
     double G0 = 1000.0;
     using model_type = CabanaPD::LPS;
-    CabanaPD::ForceModel model1( model_type{}, CabanaPD::Elastic{},
-                                 CabanaPD::NoFracture{}, force_horizon, K, G,
-                                 1 );
+    CabanaPD::ForceModel model1( model_type{}, force_horizon, K, G, G0, 1 );
     CabanaPD::ForceModel model2( model_type{}, force_horizon, K, G, G0, 1 );
     CabanaPD::ForceModel model3( model_type{}, force_horizon, K, G, G0, 1 );
 
@@ -1439,9 +1436,7 @@ TEST( TEST_CATEGORY, test_force_lps_quaternary )
     double G = 0.5;
     double G0 = 1000.0;
     using model_type = CabanaPD::LPS;
-    CabanaPD::ForceModel model1( model_type{}, CabanaPD::Elastic{},
-                                 CabanaPD::NoFracture{}, force_horizon, K, G,
-                                 1 );
+    CabanaPD::ForceModel model1( model_type{}, force_horizon, K, G, G0, 1 );
     CabanaPD::ForceModel model2( model_type{}, force_horizon, K, G, G0, 1 );
     CabanaPD::ForceModel model3( model_type{}, force_horizon, K, G, G0, 1 );
     CabanaPD::ForceModel model4( model_type{}, force_horizon, K, G, G0, 1 );
@@ -1471,9 +1466,11 @@ namespace
 struct FirstTestTag
 {
 };
+
 struct BaseModelDummy
 {
 };
+
 struct BaseForceDummy
 {
 };
@@ -1526,7 +1523,7 @@ struct TestModel
 
 TEST( TEST_CATEGORY, test_forceModelsMulti_binary )
 {
-    int parameter[3] = { 1, 2, 3 };
+    int parameter[4] = { 1, 2, 3, 4 };
     TestModel<TestModelType<BaseModelDummy>, BaseForceDummy,
               CabanaPD::NoFracture, CabanaPD::TemperatureIndependent>
         model1{ 0, 0, parameter[0] };
@@ -1536,10 +1533,13 @@ TEST( TEST_CATEGORY, test_forceModelsMulti_binary )
     TestModel<TestModelType<BaseModelDummy>, BaseForceDummy, CabanaPD::Fracture,
               CabanaPD::TemperatureIndependent>
         model12{ 0, 1, parameter[2] };
+    TestModel<TestModelType<BaseModelDummy>, BaseForceDummy, CabanaPD::Fracture,
+              CabanaPD::TemperatureIndependent>
+        model21{ 1, 0, parameter[3] };
 
     CabanaPD::ForceModels models(
-        TestModelType<BaseModelDummy>{}, CabanaPD::DiagonalIndexing<2>{},
-        Cabana::makeParameterPack( model1, model2, model12 ) );
+        TestModelType<BaseModelDummy>{}, CabanaPD::FullIndexing<2>{},
+        Cabana::makeParameterPack( model1, model12, model21, model2 ) );
 
     static_assert( std::is_same_v<CabanaPD::Fracture,
                                   typename decltype( models )::fracture_type> );
@@ -1549,6 +1549,7 @@ TEST( TEST_CATEGORY, test_forceModelsMulti_binary )
     models( FirstTestTag{}, CabanaPD::SingleMaterial{}, 0, 0, parameter[0] );
     models( FirstTestTag{}, CabanaPD::SingleMaterial{}, 1, 1, parameter[1] );
     models( FirstTestTag{}, CabanaPD::SingleMaterial{}, 0, 1, parameter[2] );
+    models( FirstTestTag{}, CabanaPD::SingleMaterial{}, 1, 0, parameter[3] );
 }
 
 } // end namespace Test
