@@ -12,7 +12,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/CabanaPD_config.hpp DESTINATION ${CMAK
 add_library(CabanaPD INTERFACE)
 add_library(CabanaPD::CabanaPD ALIAS CabanaPD)
 
-target_include_directories(CabanaPD INTERFACE 
+target_include_directories(CabanaPD INTERFACE
                            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
                            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
                            $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)

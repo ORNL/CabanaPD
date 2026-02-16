@@ -5,7 +5,7 @@
     "volume"                 : {"value": 5.236e-13,  "unit": "m^3"},
     "elastic_modulus"        : {"value": 195.6e9, "unit": "Pa"},
     "poisson_ratio"          : {"value": 0.25, "unit": ""},
-    "restitution"            : {"value": 0.5},  
+    "restitution"            : {"value": 0.5},
     "radius"                 : {"value": 5e-5 },
     "radius_extend"          : {"value": 1e-8 },
     "final_time"             : {"value": 1e-5, "unit": "s"},

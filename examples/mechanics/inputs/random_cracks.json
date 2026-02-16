@@ -4,7 +4,7 @@
     "density"                 : {"value": 2440,  "unit": "kg/m^3"},
     "elastic_modulus"         : {"value": 72e+9, "unit": "Pa"},
     "fracture_energy"         : {"value": 3.8,   "unit": "J/m^2"},
-    "horizon"                 : {"value": 0.001, "unit": "m"},   
+    "horizon"                 : {"value": 0.001, "unit": "m"},
     "traction"                : {"value": 2e6,   "unit": "Pa"},
     "minimum_prenotch_length" : {"value": 0.001, "unit": "m"},
     "maximum_prenotch_length" : {"value": 0.0025, "unit": "m"},

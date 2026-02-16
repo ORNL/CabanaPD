@@ -5,7 +5,7 @@
     "volume"                 : {"value": 6.544985e-8,  "unit": "m^3"},
     "elastic_modulus"        : {"value": 1.0e5, "unit": "Pa"},
     "poisson_ratio"          : {"value": 0.25, "unit": ""},
-    "restitution"            : {"value": 0.5},  
+    "restitution"            : {"value": 0.5},
     "radius"                 : {"value": 2.5e-3 },
     "radius_extend"             : {"value": 2.5e-3 },
     "cylinder_diameter"        : {"value": 0.25, "unit": "m"},

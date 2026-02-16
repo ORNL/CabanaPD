@@ -27,7 +27,7 @@ CabanaPD currently includes the following:
     - PD state-based (many-body): LPS (linear peridynamic solid)
     - DEM (contact): normal repulsion, Hertzian, HertzianJKR (Johnson–Kendall–Roberts)
     - Hybrid PD-DEM
-    - Multi-material systems can be constructed for any models of the **same category** 
+    - Multi-material systems can be constructed for any models of the **same category**
       (bond-based, state-based, contact) above (*Currently 2-material systems only*)
       - Cross-term interactions can be averaged, requiring **identical model** types
  - Mechanical response:
@@ -120,7 +120,7 @@ After building Kokkos and Cabana for Cuda:
 https://github.com/ECP-CoPA/Cabana/wiki/Build-CUDA
 
 The CUDA build script is identical to that above, but again note that Kokkos
-must be compiled with the CUDA backend. 
+must be compiled with the CUDA backend.
 
 Note that the same compiler should be used for Kokkos, Cabana, and CabanaPD.
 
@@ -177,7 +177,7 @@ Examples which only include mechanics and fracture are within `examples/mechanic
     ./CabanaPD/build/install/bin/RandomCracks CabanaPD/examples/mechanics/inputs/random_cracks.json
     ```
 
- -  The next example is a fragmenting cylinder due to internal pressure [4]. 
+ -  The next example is a fragmenting cylinder due to internal pressure [4].
     This problem can either run with PD only or with hybrid PD-DEM contact.
     ```
     ./CabanaPD/build/install/bin/FragmentingCylinder CabanaPD/examples/mechanics/inputs/fragmenting_cylinder.json
@@ -254,7 +254,7 @@ ctest
 
 ## Visualizing with Paraview
 
-As mentioned above, the simulation results can be visualized with Paraview or similar applications.  
+As mentioned above, the simulation results can be visualized with Paraview or similar applications.
 
 ### How to Install
 
@@ -262,9 +262,9 @@ The installation instructions can be found [here](https://www.paraview.org/downl
 
 ### Importing Files
 
-Once Paraview is installed, the following simulation output file group should be imported to view the results: `particles_..xmf` for HDF5 or `particles_..silo` for SILO. 
+Once Paraview is installed, the following simulation output file group should be imported to view the results: `particles_..xmf` for HDF5 or `particles_..silo` for SILO.
 
-If shown the option to select a reader type, select `XDMF Reader` in the "Open Data With ..." window for HDF5. 
+If shown the option to select a reader type, select `XDMF Reader` in the "Open Data With ..." window for HDF5.
 
 ### Viewing Results
 
@@ -272,9 +272,9 @@ Below are some basic guidelines for how to perform the initial steps in order to
 
 1. Select `Apply` in the lower left-hand Properties window. This will load your simulation data.
 
-2. In the Properties window, under Representation, `Surface` will be selected by default as the geometry representation. Change this to `Point Gaussian`. 
+2. In the Properties window, under Representation, `Surface` will be selected by default as the geometry representation. Change this to `Point Gaussian`.
 
-3. Different output fields can be selected within the Coloring menu below Representation. 
+3. Different output fields can be selected within the Coloring menu below Representation.
 
 4. To control the size of the visualized points, scroll down within the Properties window until the Point Gaussian menu and choose a value for Gaussian Radius.
 
@@ -293,9 +293,9 @@ Kunze, and L.W. Meyer, eds., Vol 1, DGM Informationsgesellschaft Verlag (1988)
 
 [3] F. Bobaru and G. Zhang, Why do cracks branch? A peridynamic investigation of dynamic brittle fracture, International Journal of Fracture 196 (2015): 59–98.
 
-[4] D.J. Littlewood, M.L. Parks, J.T. Foster, J.A. Mitchell, and P. Diehl, The peridigm meshfree peridynamics code, Journal of Peridynamics and Nonlocal Modeling 6 (2024): 118–148.  
+[4] D.J. Littlewood, M.L. Parks, J.T. Foster, J.A. Mitchell, and P. Diehl, The peridigm meshfree peridynamics code, Journal of Peridynamics and Nonlocal Modeling 6 (2024): 118–148.
 
-[5] A.S. Fallah, I.N. Giannakeas, R. Mella, M.R. Wenman, Y. Safa, and H. Bahai, On the computational derivation of bond-based peridynamic stress tensor, Journal of Peridynamics and Nonlocal Modeling 2 (2020): 352–378. 
+[5] A.S. Fallah, I.N. Giannakeas, R. Mella, M.R. Wenman, Y. Safa, and H. Bahai, On the computational derivation of bond-based peridynamic stress tensor, Journal of Peridynamics and Nonlocal Modeling 2 (2020): 352–378.
 
 [6] D. He, D. Huang, and D. Jiang, Modeling and studies of fracture in functionally graded materials under thermal shock loading using peridynamics, Theoretical and Applied Fracture Mechanics 111 (2021): 102852.
 

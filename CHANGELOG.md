@@ -31,7 +31,7 @@
 
 ## New Features
  - Added thermomechanics and associated example problems
- - Custom particle generation with user-functors 
+ - Custom particle generation with user-functors
  - Added body terms as a special case of boundary conditions applied to the entire system
  - New fragmenting cylinder example
 
@@ -75,7 +75,7 @@
 # Version 0.1.0
 
 ## New Features
-- Cabana particle data on regular grids 
+- Cabana particle data on regular grids
 - Multi-node Cabana particle migration
 - Cabana Verlet neighbor list
 - Prototype microelastic brittle (PMB) and linear peridynamic solid (LPS) force models
