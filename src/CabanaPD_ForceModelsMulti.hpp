@@ -204,8 +204,13 @@ struct ForceModelsImpl<MaterialType, Indexing, ParameterPackType,
                          typename ParameterPackType::template value_type<
                              0>::force_tag>...>),
         "All forces need the same base type" );
+
     using model_tag =
         typename ParameterPackType::template value_type<0>::model_tag;
+
+    static_assert( is_symmetric<model_tag>::value ==
+                       is_symmetric<Indexing>::value,
+                   "Symmetry of model and indexing must match" );
 
     using fracture_type = typename CheckFractureModel<
         ParameterPackType,
