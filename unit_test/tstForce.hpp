@@ -1512,7 +1512,7 @@ struct TestModel
     }
 
     KOKKOS_INLINE_FUNCTION bool operator()( FirstTestTag,
-                                            CabanaPD::MultiMaterial,
+                                            CabanaPD::SingleMaterial,
                                             const int typeI, const int typeJ,
                                             const int inputValue ) const
     {
