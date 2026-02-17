@@ -18,9 +18,9 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate a spherical representative volume element (RVE) under isostatic
-// pressing with an elastic model.
-void IPrveElasticExample( const std::string filename )
+// Simulate a spherical representative volume element (RVE) under hot isostatic
+// pressing with a thermo-elastic model.
+void HIPrveThermoElasticExample( const std::string filename )
 {
     // ====================================================
     //               Choose Kokkos spaces
@@ -45,6 +45,13 @@ void IPrveElasticExample( const std::string filename )
     double delta = inputs["horizon"];
     delta += 1e-10;
 
+    double alpha = inputs["thermal_expansion_coeff"];
+    double kappa = inputs["thermal_conductivity"];
+    double cp = inputs["specific_heat_capacity"];
+
+    // Problem parameters
+    double temp0 = inputs["reference_temperature"];
+
     // ====================================================
     //                  Discretization
     // ====================================================
@@ -56,10 +63,10 @@ void IPrveElasticExample( const std::string filename )
     int halo_width = m + 1; // Just to be safe.
 
     // ====================================================
-    //                   Force model
+    //                Force model type
     // ====================================================
     using model_type = CabanaPD::PMB;
-    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0 );
+    using thermal_type = CabanaPD::DynamicTemperature;
 
     // ====================================================
     //    Custom particle generation and initialization
@@ -77,18 +84,30 @@ void IPrveElasticExample( const std::string filename )
         return true;
     };
 
-    CabanaPD::Particles particles( memory_space{}, model_type{} );
+    CabanaPD::Particles particles( memory_space{}, model_type{},
+                                   thermal_type{} );
     particles.domain( low_corner, high_corner, num_cells, halo_width );
     particles.create( exec_space{}, init_op );
 
     auto rho = particles.sliceDensity();
+    auto temp = particles.sliceTemperature();
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Initial density
         rho( pid ) = rho0;
+
+        // Initial temperature
+        temp( pid ) = temp0;
     };
     particles.update( exec_space{}, init_functor );
+
+    // ====================================================
+    //                    Force model
+    // ====================================================
+    temp = particles.sliceTemperature();
+    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0, temp, kappa,
+                                      cp, alpha, temp0 );
 
     // ====================================================
     //                   Create solver
@@ -103,6 +122,7 @@ void IPrveElasticExample( const std::string filename )
     double RW = ( R - W );
     double RW2 = RW * RW;
     double Pmax = inputs["maximum_pressure"];
+    double tempmax = inputs["maximum_temperature"];
     double trampup = inputs["ramp_up_bc_time"];
     double trampdown = inputs["ramp_down_bc_time"];
     double tf = inputs["final_time"];
@@ -125,20 +145,25 @@ void IPrveElasticExample( const std::string filename )
     auto bc_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
         double b0;
-        // Pressure ramping
+        double temp_bc;
+        // Pressure and temperature ramping
         // Linear profile: f(x) = f(a) + (x-a) * (f(b)-f(a))/(b-a) for x in
         // [a,b]
         if ( t < trampup )
         {
             b0 = t * b0max / trampup;
+            temp_bc = temp0 + t * ( tempmax - temp0 ) / trampup;
         }
         else if ( t > tf - trampdown )
         {
             b0 = b0max - ( t - ( tf - trampdown ) ) * b0max / trampdown;
+            temp_bc = tempmax - ( t - ( tf - trampdown ) ) *
+                                    ( tempmax - temp0 ) / trampdown;
         }
         else
         {
             b0 = b0max;
+            temp_bc = tempmax;
         }
 
         const double r2 = x( pid, 0 ) * x( pid, 0 ) +
@@ -149,6 +174,8 @@ void IPrveElasticExample( const std::string filename )
         {
             for ( int d = 0; d < 3; d++ )
                 f( pid, d ) += -b0 * x( pid, d ) / Kokkos::sqrt( r2 );
+
+            temp( pid ) = temp_bc;
         }
 
         // Constraint 1: fix x-displacement on YZ-plane within BC region
@@ -172,7 +199,8 @@ void IPrveElasticExample( const std::string filename )
             u( pid, 2 ) = 0.0;
         }
     };
-    CabanaPD::BodyTerm bc( bc_func, solver.particles.size(), true );
+    CabanaPD::BodyTerm bc( bc_func, solver.particles.size(), false );
+    // CabanaPD::BodyTerm bc( bc_func, solver.particles.size(), true );
 
     // ====================================================
     //                      Outputs
@@ -204,7 +232,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    IPrveElasticExample( argv[1] );
+    HIPrveThermoElasticExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();

@@ -19,8 +19,8 @@
 #include <CabanaPD.hpp>
 
 // Simulate a spherical representative volume element (RVE) under isostatic
-// pressing with an elastic model.
-void IPrveElasticExample( const std::string filename )
+// pressing with an elastic-perfectly plastic model.
+void IPrveElasticPerfectlyPlasticExample( const std::string filename )
 {
     // ====================================================
     //               Choose Kokkos spaces
@@ -40,6 +40,7 @@ void IPrveElasticExample( const std::string filename )
     double E = inputs["elastic_modulus"];
     double nu = 0.25; // Use bond-based model
     double K = E / ( 3 * ( 1 - 2 * nu ) );
+    double sigma_y = inputs["yield_stress"];
     double G0 = inputs["fracture_energy"];
 
     double delta = inputs["horizon"];
@@ -56,10 +57,10 @@ void IPrveElasticExample( const std::string filename )
     int halo_width = m + 1; // Just to be safe.
 
     // ====================================================
-    //                   Force model
+    //                 Force model type
     // ====================================================
     using model_type = CabanaPD::PMB;
-    CabanaPD::ForceModel force_model( model_type{}, delta, K, G0 );
+    using mechanics_type = CabanaPD::ElasticPerfectlyPlastic;
 
     // ====================================================
     //    Custom particle generation and initialization
@@ -89,6 +90,12 @@ void IPrveElasticExample( const std::string filename )
         rho( pid ) = rho0;
     };
     particles.update( exec_space{}, init_functor );
+
+    // ====================================================
+    //                    Force model
+    // ====================================================
+    CabanaPD::ForceModel force_model( model_type{}, mechanics_type{},
+                                      memory_space{}, delta, K, G0, sigma_y );
 
     // ====================================================
     //                   Create solver
@@ -204,7 +211,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    IPrveElasticExample( argv[1] );
+    IPrveElasticPerfectlyPlasticExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();
