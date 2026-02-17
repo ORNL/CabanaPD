@@ -783,6 +783,8 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
         auto s_de = s - s_p - s_c + theta_p_ij; // theta_ij -
         if ( Kokkos::abs( s_de ) > s_C )
             _s_c( i, n ) += dt / lambda * s_de;
+
+        return _s_c( i, n );
     }
 
     auto getCreepStretch( const int i, const int n ) const
