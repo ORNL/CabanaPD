@@ -154,10 +154,11 @@ void HIPREVExample( const std::string filename )
     const double contact_horizon_factor = inputs["contact_horizon_factor"];
     const double contact_r = contact_horizon_factor * particles.dx[0];
     const double dt = inputs["timestep"];
+    const double s_c = 0.0;
     CabanaPD::ForceDensityModel powder_model(
         model_type{}, CabanaPD::ElasticPerfectlyPlastic{}, rho, rho_current,
-        theta_p, delta, K, G0, sigma_y, rho0, contact_r, dt, temp, kappa, cp,
-        alpha, temp0 );
+        theta_p, delta, K, G0, sigma_y, rho0, contact_r, dt, s_c, temp, kappa,
+        cp, alpha, temp0 );
 
     // ====================================================
     //                   Create solver

@@ -702,7 +702,7 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     using typename base_type::neighbor_view;
     neighbor_view _s_c;
     double dt;
-    const double s_C = 0.0;
+    const double s_C;
     const double lambda = 1.0;
 
     double rho0;
@@ -718,11 +718,13 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
                        DilatationType& _theta_p, const double delta,
                        const double K, const double G0, const double sigma_y,
                        const double _rho0, const double contact_radius,
-                       const double _dt, const TemperatureType _temp,
-                       const double alpha, const double temp0 = 0.0 )
+                       const double _dt, const double creep_stretch,
+                       const TemperatureType _temp, const double alpha,
+                       const double temp0 = 0.0 )
         : base_type( model, mechanics, delta, K, G0, sigma_y, _temp, alpha,
                      temp0 )
         , dt( _dt )
+        , s_C( creep_stretch )
         , rho0( _rho0 )
         , rho( _rho )
         , rho_current( _rho_c )
@@ -737,6 +739,7 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     ForceDensityModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
         , dt( model1.dt )
+        , s_C( model1.s_C )
         , rho0( model1.rho0 )
         , rho( model1.rho )
         , rho_current( model1.rho_current )
@@ -852,8 +855,8 @@ ForceDensityModel( PMB, ElasticPerfectlyPlastic, DensityType rho,
                    const double K, const double G0, const double sigma_y,
                    const double rho0, DilatationType& _theta_p,
                    const double contact_radius, const double _dt,
-                   TemperatureType temp, const double _alpha,
-                   const double _temp0 )
+                   const double creep_stretch, TemperatureType temp,
+                   const double _alpha, const double _temp0 )
     -> ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
                          TemperatureDependent, TemperatureType, DensityType,
                          CurrentDensityType, DilatationType>;
@@ -889,15 +892,16 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
                        DilatationType& _theta_p, const double _delta,
                        const double _K, const double _G0, const double _sigma_y,
                        const double _rho0, const double contact_radius,
-                       const double _dt, const TemperatureType _temp,
-                       const double _kappa, const double _cp,
-                       const double _alpha, const double _temp0 = 0.0,
+                       const double _dt, const double creep_stretch,
+                       const TemperatureType _temp, const double _kappa,
+                       const double _cp, const double _alpha,
+                       const double _temp0 = 0.0,
                        const bool _constant_microconductivity = true )
         : base_temperature_type( _delta, _kappa, _cp,
                                  _constant_microconductivity )
         , base_type( model, mechanics, _rho, _rho_c, _theta_p, _delta, _K, _G0,
-                     _sigma_y, _rho0, contact_radius, _dt, _temp, _alpha,
-                     _temp0 )
+                     _sigma_y, _rho0, contact_radius, _dt, creep_stretch, _temp,
+                     _alpha, _temp0 )
     {
     }
 
@@ -917,8 +921,9 @@ ForceDensityModel( PMB, ElasticPerfectlyPlastic, DensityType rho,
                    const double delta, const double K, const double G0,
                    const double sigma_y, const double rho0,
                    const double contact_radius, const double _dt,
-                   TemperatureType temp, const double _kappa, const double _cp,
-                   const double _alpha, const double _temp0 )
+                   const double creep_stretch, TemperatureType temp,
+                   const double _kappa, const double _cp, const double _alpha,
+                   const double _temp0 )
     -> ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
                          DynamicTemperature, TemperatureType, DensityType,
                          CurrentDensityType, DilatationType>;

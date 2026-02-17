@@ -111,11 +111,11 @@ void IPrveElasticPerfectlyPlasticExample( const std::string filename )
     auto temp = particles.sliceTemperature();
     double contact_r = 0.0;
     const double dt = inputs["timestep"];
+    const double s_c = inputs["creep_stretch"];
     auto theta_p = particles.slicePlasticDilatation();
     CabanaPD::ForceDensityModel force_model(
-        model_type{}, CabanaPD::ElasticPerfectlyPlastic{}, rho, rho_current,
-        theta_p, delta, K, G0, sigma_y, rho0, contact_r, dt, temp, kappa, cp,
-        alpha, temp0 );
+        model_type{}, mechanics_type{}, rho, rho_current, theta_p, delta, K, G0,
+        sigma_y, rho0, contact_r, dt, s_c, temp, kappa, cp, alpha, temp0 );
 
     // ====================================================
     //                   Create solver
