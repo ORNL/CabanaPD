@@ -48,6 +48,13 @@ void IPrveElasticPerfectlyPlasticExample( const std::string filename )
     double delta = inputs["horizon"];
     delta += 1e-10;
 
+    double alpha = inputs["thermal_expansion_coeff"];
+    double kappa = inputs["thermal_conductivity"];
+    double cp = inputs["specific_heat_capacity"];
+
+    // Problem parameters
+    double temp0 = inputs["reference_temperature"];
+
     // ====================================================
     //                  Discretization
     // ====================================================
@@ -63,6 +70,7 @@ void IPrveElasticPerfectlyPlasticExample( const std::string filename )
     // ====================================================
     using model_type = CabanaPD::PMB;
     using mechanics_type = CabanaPD::ElasticPerfectlyPlastic;
+    using thermal_type = CabanaPD::TemperatureDependent;
 
     // ====================================================
     //    Custom particle generation and initialization
@@ -80,7 +88,9 @@ void IPrveElasticPerfectlyPlasticExample( const std::string filename )
         return true;
     };
 
-    CabanaPD::Particles particles( memory_space{}, model_type{} );
+    CabanaPD::Particles particles( memory_space{}, model_type{}, thermal_type{},
+                                   CabanaPD::EnergyOutput{},
+                                   CabanaPD::DynamicDensity{} );
     particles.domain( low_corner, high_corner, num_cells, halo_width );
     particles.create( exec_space{}, init_op );
 
@@ -96,8 +106,13 @@ void IPrveElasticPerfectlyPlasticExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    CabanaPD::ForceModel force_model( model_type{}, mechanics_type{},
-                                      memory_space{}, delta, K, G0, sigma_y );
+    rho = particles.sliceDensity();
+    auto rho_current = particles.sliceCurrentDensity();
+    auto temp = particles.sliceTemperature();
+    double contact_r = 0.0;
+    CabanaPD::ForceDensityModel force_model(
+        model_type{}, CabanaPD::ElasticPerfectlyPlastic{}, rho, rho_current,
+        delta, K, G0, sigma_y, rho0, contact_r, temp, kappa, cp, alpha, temp0 );
 
     // ====================================================
     //                   Create solver
@@ -201,11 +216,28 @@ void IPrveElasticPerfectlyPlasticExample( const std::string filename )
         "output_distance.txt", inputs, exec_space{}, solver.particles,
         distance_func, inner_sphere );
 
+    // Output average total density.
+    auto rho_c = solver.particles.sliceCurrentDensity();
+    auto density_func = KOKKOS_LAMBDA( const int p ) { return rho_c( p ); };
+    auto output_rho = CabanaPD::createOutputTimeSeries(
+        "output_density.txt", inputs, exec_space{}, solver.particles,
+        density_func, inner_sphere );
+
+    // Output average total density.
+    auto theta_p = solver.particles.slicePlasticDilatation();
+    auto plastic_dilatation_func = KOKKOS_LAMBDA( const int p )
+    {
+        return theta_p( p );
+    };
+    auto output_theta_p = CabanaPD::createOutputTimeSeries(
+        "output_plastic_dilatation.txt", inputs, exec_space{}, solver.particles,
+        plastic_dilatation_func, inner_sphere );
+
     // ====================================================
     //                   Simulation run
     // ====================================================
     solver.init( bc );
-    solver.run( bc, output_r );
+    solver.run( bc, output_r, output_rho, output_theta_p );
 }
 
 // Initialize MPI+Kokkos.

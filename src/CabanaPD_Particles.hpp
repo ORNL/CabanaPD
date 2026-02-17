@@ -1385,7 +1385,7 @@ class Particles<MemorySpace, ModelType, ThermalType, OutputType, DynamicDensity,
     using aosoa_scalar_type =
         Cabana::AoSoA<Cabana::MemberTypes<double>, memory_space, 1>;
 
-    Particles( MemorySpace space, ModelType model, TemperatureDependent temp,
+    Particles( MemorySpace space, ModelType model, ThermalType temp,
                OutputType output, DynamicDensity )
         : base_type( space, model, temp, output )
     {
