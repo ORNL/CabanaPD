@@ -96,15 +96,17 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
     using base_plasticity_type::_s_p;
     using base_type::c;
     double s_Y;
+    double H;
 
     using base_plasticity_type::updateBonds;
 
     BaseForceModelPMB( PMB model, mechanics_type, MemorySpace,
                        const double force_horizon, const double K,
-                       const double sigma_y )
+                       const double sigma_y, const double hardening = 0.0 )
         : base_type( model, NoFracture{}, force_horizon, K )
         , base_plasticity_type()
         , s_Y( sigma_y / 3.0 / K )
+        , H( hardening )
     {
     }
 
@@ -121,14 +123,17 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
     auto operator()( ForceCoeffTag, const int i, const int, const double s,
                      const double vol, const int n ) const
     {
-        // Update bond plastic stretch.
         auto s_p = _s_p( i, n );
+
+        // Include simple hardening.
+        double s_Y_eff = s_Y + H * Kokkos::abs( s_p );
+
         // Yield in tension.
-        if ( s >= s_p + s_Y )
-            _s_p( i, n ) = s - s_Y;
+        if ( s >= s_p + s_Y_eff )
+            _s_p( i, n ) = s - s_Y_eff;
         // Yield in compression.
-        else if ( s <= s_p - s_Y )
-            _s_p( i, n ) = s + s_Y;
+        else if ( s <= s_p - s_Y_eff )
+            _s_p( i, n ) = s + s_Y_eff;
         // else: Elastic (in between), do not modify.
 
         // Must extract again if in the plastic regime.
@@ -143,13 +148,17 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
                      const double xi, const double vol, const int n ) const
     {
         auto s_p = _s_p( i, n );
+
+        // Include simple hardening.
+        double s_Y_eff = s_Y + H * Kokkos::abs( s_p );
+
         double stretch_term;
         // Yield in tension.
-        if ( s >= s_p + s_Y )
-            stretch_term = s_Y * ( 2.0 * s - s_Y );
+        if ( s >= s_p + s_Y_eff )
+            stretch_term = s_Y_eff * ( 2.0 * s - s_Y_eff );
         // Yield in compression.
-        else if ( s <= s_p - s_Y )
-            stretch_term = s_Y * ( -2.0 * s - s_Y );
+        else if ( s <= s_p - s_Y_eff )
+            stretch_term = s_Y_eff * ( -2.0 * s - s_Y_eff );
         else
             // Elastic (in between).
             stretch_term = s * s;
@@ -254,8 +263,8 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
 
     ForceModel( PMB model, ElasticPerfectlyPlastic mechanics, MemorySpace space,
                 const double force_horizon, const double K, const double G0,
-                const double sigma_y )
-        : base_type( model, mechanics, space, force_horizon, K, sigma_y )
+                const double sigma_y, const double H = 0.0 )
+        : base_type( model, mechanics, space, force_horizon, K, sigma_y, H )
         , base_fracture_type(
               G0,
               // s0
