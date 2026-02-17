@@ -221,53 +221,59 @@ void HIPREVExample( const std::string filename )
 
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
-    auto bc_func = KOKKOS_LAMBDA( const int pid, const double t )
+    auto bc_func =
+        KOKKOS_LAMBDA( const int pid, const double t, const bool force_update,
+                       const bool nonforce_update )
     {
-        double b0;
-        // Pressure and temperature ramping
-        // Linear profile: f(x) = f(a) + (x-a) * (f(b)-f(a))/(b-a) for x in
-        // [a,b]
-        if ( t < trampup )
-        {
-            b0 = t * b0max / trampup;
-        }
-        else if ( t > tf - trampdown )
-        {
-            b0 = b0max - ( t - ( tf - trampdown ) ) * b0max / trampdown;
-        }
-        else
-        {
-            b0 = b0max;
-        }
-
         const double r2 = x( pid, 0 ) * x( pid, 0 ) +
                           x( pid, 1 ) * x( pid, 1 ) + x( pid, 2 ) * x( pid, 2 );
-        for ( int d = 0; d < 3; d++ )
-            f( pid, d ) += -b0 * x( pid, d ) / Kokkos::sqrt( r2 );
+        if ( force_update )
+        {
+            double b0;
+            // Pressure and temperature ramping
+            // Linear profile: f(x) = f(a) + (x-a) * (f(b)-f(a))/(b-a) for x in
+            // [a,b]
+            if ( t < trampup )
+            {
+                b0 = t * b0max / trampup;
+            }
+            else if ( t > tf - trampdown )
+            {
+                b0 = b0max - ( t - ( tf - trampdown ) ) * b0max / trampdown;
+            }
+            else
+            {
+                b0 = b0max;
+            }
+            for ( int d = 0; d < 3; d++ )
+                f( pid, d ) += -b0 * x( pid, d ) / Kokkos::sqrt( r2 );
+        }
+        else if ( nonforce_update )
+        {
+            double temp_bc;
+            // Pressure and temperature ramping
+            // Linear profile: f(x) = f(a) + (x-a) * (f(b)-f(a))/(b-a) for x in
+            // [a,b]
+            if ( t < trampup )
+            {
+                temp_bc = temp0 + t * ( tempmax - temp0 ) / trampup;
+            }
+            else if ( t > tf - trampdown )
+            {
+                temp_bc = tempmax - ( t - ( tf - trampdown ) ) *
+                                        ( tempmax - temp0 ) / trampdown;
+            }
+            else
+            {
+                temp_bc = tempmax;
+            }
 
-        double temp_bc;
-        // Pressure and temperature ramping
-        // Linear profile: f(x) = f(a) + (x-a) * (f(b)-f(a))/(b-a) for x in
-        // [a,b]
-        if ( t < trampup )
-        {
-            temp_bc = temp0 + t * ( tempmax - temp0 ) / trampup;
-        }
-        else if ( t > tf - trampdown )
-        {
-            temp_bc = tempmax - ( t - ( tf - trampdown ) ) *
-                                    ( tempmax - temp0 ) / trampdown;
-        }
-        else
-        {
-            temp_bc = tempmax;
-        }
-
-        // const double r2 = x( pid, 0 ) * x( pid, 0 ) +
-        //      x( pid, 1 ) * x( pid, 1 ) + x( pid, 2 ) * x( pid, 2 );
-        if ( r2 > RW2 )
-        {
-            temp( pid ) = temp_bc;
+            // const double r2 = x( pid, 0 ) * x( pid, 0 ) +
+            //      x( pid, 1 ) * x( pid, 1 ) + x( pid, 2 ) * x( pid, 2 );
+            if ( r2 > RW2 )
+            {
+                temp( pid ) = temp_bc;
+            }
         }
 
         // Constraint 1: fix x-displacement on YZ-plane of the surface
@@ -295,7 +301,7 @@ void HIPREVExample( const std::string filename )
     //     temp_func, exec_space{}, solver.particles, false, volume );
     //  auto force_bc = CabanaPD::createBoundaryCondition(
     //     force_func, exec_space{}, solver.particles, true, volume );
-    CabanaPD::BodyTerm bc( bc_func, solver.particles.size(), true );
+    CabanaPD::BodyTerm bc( bc_func, solver.particles.size(), true, true );
 
     // ====================================================
     //                      Outputs

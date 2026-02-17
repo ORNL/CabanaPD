@@ -99,11 +99,14 @@ void thermalDeformationExample( const std::string filename )
     const double low_corner_y = low_corner[1];
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
-    auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
+    auto temp_func =
+        KOKKOS_LAMBDA( const int pid, const double t, const bool, const bool )
     {
         temp( pid ) = temp0 + 5000.0 * ( x( pid, 1 ) - low_corner_y ) * t;
     };
-    CabanaPD::BodyTerm body_term( temp_func, solver.particles.size(), false );
+    // Apply force boundary? Non-force boundary?
+    CabanaPD::BodyTerm body_term( temp_func, solver.particles.size(), false,
+                                  true );
 
     // ====================================================
     //                   Simulation run

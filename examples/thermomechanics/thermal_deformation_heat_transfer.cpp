@@ -118,13 +118,14 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
     temp = solver.particles.sliceTemperature();
-    auto temp_bc = KOKKOS_LAMBDA( const int pid, const double )
+    auto temp_bc =
+        KOKKOS_LAMBDA( const int pid, const double, const bool, const bool )
     {
         temp( pid ) = 0.0;
     };
 
     auto bc = CabanaPD::createBoundaryCondition(
-        temp_bc, exec_space{}, solver.particles, false, plane1, plane2 );
+        temp_bc, exec_space{}, solver.particles, false, true, plane1, plane2 );
 
     // ====================================================
     //                   Simulation run

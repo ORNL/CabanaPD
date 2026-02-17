@@ -179,7 +179,8 @@ void dogboneTensileTestExample( const std::string filename )
     // Create BC last to ensure ghost particles are included.
     auto x = solver.particles.sliceReferencePosition();
     auto u = solver.particles.sliceDisplacement();
-    auto disp_func = KOKKOS_LAMBDA( const int pid, const double t )
+    auto disp_func =
+        KOKKOS_LAMBDA( const int pid, const double t, const bool, const bool )
     {
         if ( right_grip.inside( x, pid ) )
         {
@@ -195,7 +196,7 @@ void dogboneTensileTestExample( const std::string filename )
         }
     };
     auto bc = CabanaPD::createBoundaryCondition( disp_func, exec_space{},
-                                                 solver.particles, false,
+                                                 solver.particles, false, true,
                                                  left_grip, right_grip );
 
     // ====================================================

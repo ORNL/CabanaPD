@@ -122,7 +122,8 @@ void IPrveElasticExample( const std::string filename )
 
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
-    auto bc_func = KOKKOS_LAMBDA( const int pid, const double t )
+    auto bc_func =
+        KOKKOS_LAMBDA( const int pid, const double t, const bool, const bool )
     {
         double b0;
         // Pressure ramping
@@ -172,7 +173,8 @@ void IPrveElasticExample( const std::string filename )
             u( pid, 2 ) = 0.0;
         }
     };
-    CabanaPD::BodyTerm bc( bc_func, solver.particles.size(), true );
+    // Force boundary? Non-force boundary?
+    CabanaPD::BodyTerm bc( bc_func, solver.particles.size(), true, false );
 
     // ====================================================
     //                      Outputs

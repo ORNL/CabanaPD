@@ -126,14 +126,15 @@ void plateWithHoleExample( const std::string filename )
     f = solver.particles.sliceForce();
     x = solver.particles.sliceReferencePosition();
     // Create a symmetric force BC in the x-direction.
-    auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
+    auto bc_op =
+        KOKKOS_LAMBDA( const int pid, const double, const bool, const bool )
     {
         auto xpos = x( pid, 0 );
         auto sign = std::abs( xpos ) / xpos;
         f( pid, 0 ) += b0 * sign;
     };
     auto bc = createBoundaryCondition( bc_op, exec_space{}, solver.particles,
-                                       true, plane1, plane2 );
+                                       true, false, plane1, plane2 );
 
     // ====================================================
     //                   Simulation run
