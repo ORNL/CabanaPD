@@ -801,6 +801,9 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     auto operator()( ForceCoeffTag, const int i, const int j, const double s,
                      const double vol, const int n ) const
     {
+        // Update density first.
+        densityUpdate( i );
+
         // Update c given updated density.
         const auto c_current = currentC( i );
         // Plastic/creep stretch is already updated.
@@ -823,12 +826,11 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     }
 
     // Density update using plastic dilatation.
-    KOKKOS_INLINE_FUNCTION auto operator()( DensityTag, const int i,
-                                            const double theta_i ) const
+    KOKKOS_INLINE_FUNCTION auto densityUpdate( const int i ) const
     {
         // Update density using plastic dilatation.
         // Note that this assumes zero initial plastic dilatation.
-        rho_current( i ) = Kokkos::min( rho( i ) * Kokkos::exp( -theta_i ),
+        rho_current( i ) = Kokkos::min( rho( i ) * Kokkos::exp( -theta_p( i ) ),
                                         rho0 ); // exp(theta_i - theta_i_0)
     }
 
