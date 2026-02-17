@@ -538,7 +538,7 @@ class Force<MemorySpace, LinearPMB, NoFracture> : public BaseForce<MemorySpace>
 };
 
 template <class MemorySpace>
-class Force<MemorySpace, PMB, Fracture, DynamicDensity>
+class Force<MemorySpace, PMBDensity, Fracture>
     : public Force<MemorySpace, PMB, Fracture>
 {
   public:
@@ -561,22 +561,36 @@ class Force<MemorySpace, PMB, Fracture, DynamicDensity>
     {
         _timer.start();
 
+        using neighbor_list_type = typename NeighborType::list_type;
+        const auto neigh_list = neighbor.list();
+        const auto mu = neighbor.brokenBonds();
+
         const auto x = particles.sliceReferencePosition();
         auto u = particles.sliceDisplacement();
         const auto vol = particles.sliceVolume();
         auto theta = particles.slicePlasticDilatation();
         Cabana::deep_copy( theta, 0.0 );
 
-        auto dilatation = KOKKOS_LAMBDA( const int i, const int j )
+        auto dilatation = KOKKOS_LAMBDA( const int i )
         {
-            // Get the bond distance, displacement, and stretch.
-            double xi, r, s;
-            getDistance( x, u, i, j, xi, r, s );
-            theta( i ) += model( DilatationTag{}, i, j, s, xi, vol( j ) );
-        };
+            std::size_t num_neighbors =
+                Cabana::NeighborList<neighbor_list_type>::numNeighbor(
+                    neigh_list, i );
+            for ( std::size_t n = 0; n < num_neighbors; n++ )
+            {
+                std::size_t j =
+                    Cabana::NeighborList<neighbor_list_type>::getNeighbor(
+                        neigh_list, i, n );
 
-        neighbor.iterate( exec_space{}, dilatation, particles,
-                          "CabanaPD::Dilatation::compute" );
+                // Get the bond distance, displacement, and stretch.
+                double xi, r, s;
+                getDistance( x, u, i, j, xi, r, s );
+                theta( i ) += mu( i, n ) * model( DilatationTag{}, i, j, s, xi,
+                                                  vol( j ), -1, n );
+            }
+        };
+        neighbor.iterateLinear( exec_space{}, dilatation, particles,
+                                "CabanaPD::PlasticDilatation::compute" );
         Kokkos::fence();
 
         _timer.stop();
