@@ -83,21 +83,6 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
         // the integrand (pairwise potential).
         return 0.25 * c * s * s * xi * vol;
     }
-
-    // For multi material.
-    KOKKOS_INLINE_FUNCTION
-    auto operator()( DilatationTag, const int, const int, const double,
-                     const double, const double, const double, const int ) const
-    {
-        return 0.0;
-    }
-    KOKKOS_INLINE_FUNCTION auto operator()( DensityTag, const int,
-                                            const double ) const
-    {
-    }
-    auto getYieldStretch() const { return DBL_MAX; }
-    auto getPlasticStretch( const int, const int ) const { return 0.0; }
-    auto getCreepStretch( const int, const int ) const { return 0.0; }
 };
 
 template <typename MemorySpace>

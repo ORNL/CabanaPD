@@ -115,37 +115,26 @@ void HIPREVExample( const std::string filename )
     {
         const double r2 = x( pid, 0 ) * x( pid, 0 ) +
                           x( pid, 1 ) * x( pid, 1 ) + x( pid, 2 ) * x( pid, 2 );
-        if ( r2 < RW2 )
+
+        // Powder density
+        rho( pid ) = D0 * rho0;
+        // Perturb powder density
+        auto gen = pool.get_state();
+        auto rand = Kokkos::rand<random_type, double>::draw( gen, 0.0, 1.0 );
+        double factor = ( 1 + ( 2.0 * rand - 1.0 ) * rho_perturb_factor );
+
+        // Check perturbed density does not exceed maximum density
+        if ( D0 * factor < 1 )
         {
-            // Powder density
-            rho( pid ) = D0 * rho0;
-            // Perturb powder density
-            auto gen = pool.get_state();
-            auto rand =
-                Kokkos::rand<random_type, double>::draw( gen, 0.0, 1.0 );
-            double factor = ( 1 + ( 2.0 * rand - 1.0 ) * rho_perturb_factor );
-
-            // Check perturbed density does not exceed maximum density
-            if ( D0 * factor < 1 )
-            {
-                rho( pid ) *= factor;
-            }
-            else
-            {
-                rho( pid ) = rho0;
-            }
-
-            // Free the state after drawing
-            pool.free_state( gen );
-
-            type( pid ) = 0;
+            rho( pid ) *= factor;
         }
         else
         {
-            // Container density
             rho( pid ) = rho0;
-            type( pid ) = 1;
-        };
+        }
+
+        // Free the state after drawing
+        pool.free_state( gen );
 
         // Initial temperature
         temp( pid ) = temp0;
@@ -170,15 +159,10 @@ void HIPREVExample( const std::string filename )
         theta_p, delta, K, G0, sigma_y, rho0, contact_r, dt, temp, kappa, cp,
         alpha, temp0 );
 
-    CabanaPD::ForceModel can_model( model_type{}, delta, K, G0, temp, kappa, cp,
-                                    alpha, temp0 );
-    auto force_models = CabanaPD::createMultiForceModel(
-        particles, CabanaPD::AverageTag{}, powder_model, can_model );
-
     // ====================================================
     //                   Create solver
     // ====================================================
-    CabanaPD::Solver solver( inputs, particles, force_models );
+    CabanaPD::Solver solver( inputs, particles, powder_model );
     /*
     using contact_type = CabanaPD::NormalRepulsionModel;
 
