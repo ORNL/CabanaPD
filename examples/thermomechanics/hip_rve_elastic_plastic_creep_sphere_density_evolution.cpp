@@ -19,8 +19,8 @@
 #include <CabanaPD.hpp>
 
 // Simulate a spherical representative volume element (RVE) under isostatic
-// pressing with an elastic-perfectly plastic model.
-void IPrveElasticPerfectlyPlasticExample( const std::string filename )
+// pressing with an elastic-perfectly plastic and creep model.
+void IPrveElasticPerfectlyPlasticCreepExample( const std::string filename )
 {
     // ====================================================
     //               Choose Kokkos spaces
@@ -38,7 +38,8 @@ void IPrveElasticPerfectlyPlasticExample( const std::string filename )
     // ====================================================
     double rho0 = inputs["density"];
     double reduced_rho_factor = inputs["reduced_density_factor"];
-    rho0 *= reduced_rho_factor; // Using an initial reduced density
+    double rho_reduced =
+        rho0 * reduced_rho_factor; // Using an initial reduced density
     double E = inputs["elastic_modulus"];
     double nu = 0.25; // Use bond-based model
     double K = E / ( 3 * ( 1 - 2 * nu ) );
@@ -99,7 +100,7 @@ void IPrveElasticPerfectlyPlasticExample( const std::string filename )
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Initial density
-        rho( pid ) = rho0;
+        rho( pid ) = rho_reduced;
     };
     particles.update( exec_space{}, init_functor );
 
@@ -112,7 +113,7 @@ void IPrveElasticPerfectlyPlasticExample( const std::string filename )
     double contact_r = 0.0;
     const double dt = inputs["timestep"];
     const double s_c = inputs["creep_stretch"];
-    const double lambda = inputs["creep_lambda"];
+    const double lambda = inputs["creep_rate"];
     auto theta_p = particles.slicePlasticDilatation();
     CabanaPD::ForceDensityModel force_model(
         model_type{}, mechanics_type{}, rho, rho_current, theta_p, delta, K, G0,
@@ -228,7 +229,7 @@ void IPrveElasticPerfectlyPlasticExample( const std::string filename )
         "output_density.txt", inputs, exec_space{}, solver.particles,
         density_func, inner_sphere );
 
-    // Output average total density.
+    // Output average plastic dilatation.
     theta_p = solver.particles.slicePlasticDilatation();
     auto plastic_dilatation_func = KOKKOS_LAMBDA( const int p )
     {
@@ -251,7 +252,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    IPrveElasticPerfectlyPlasticExample( argv[1] );
+    IPrveElasticPerfectlyPlasticCreepExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();

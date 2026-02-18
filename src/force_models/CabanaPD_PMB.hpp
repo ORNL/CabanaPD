@@ -774,7 +774,8 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
         //
         // return coeff * K;
 
-        return coeff * K * RD;
+        // return coeff * K * RD;
+        return coeff * K;
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -810,7 +811,8 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
         const auto s_c = getCreepStretch( i, n );
         const auto s_p = base_type::getPlasticStretch( i, n );
         const auto theta_p_ij = theta_p( i ) + theta_p( j ) / 6.0;
-        return c_current * ( theta_p_ij + s - s_c - s_p ) * vol;
+        // return c_current * ( theta_p_ij + s - s_c - s_p ) * vol;
+        return c_current * ( s - s_c - s_p ) * vol;
     }
 
     // Update plastic dilatation.
@@ -821,6 +823,7 @@ struct ForceDensityModel<PMB, ElasticPerfectlyPlastic, Fracture,
     {
         // Update creep & plastic stretch and then creep+plastic dilatation.
         const auto s_c = updateCreepStretch( i, j, s, n );
+        // double s_c = 0.0;
         const auto s_p = base_type::updatePlasticStretch( i, s, n );
         return coeff / 6.0 * ( s_c + s_p ) * xi * vol;
     }
