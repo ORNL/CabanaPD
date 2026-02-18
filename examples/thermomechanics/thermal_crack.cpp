@@ -109,7 +109,8 @@ void thermalCrackExample( const std::string filename )
     double Yn = high_corner[1];
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
-    auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
+    auto temp_func =
+        KOKKOS_LAMBDA( const int pid, const double t, const bool, const bool )
     {
         // Define a time-dependent surface temperature:
         // An inverted triangular pulse over a 2*t_ramp period starting at temp0
@@ -148,7 +149,9 @@ void thermalCrackExample( const std::string filename )
         // Compute particle temperature
         temp( pid ) = temp_infinity + ( temp0 - temp_infinity ) * fx * fy;
     };
-    CabanaPD::BodyTerm body_term( temp_func, solver.particles.size(), false );
+    // Apply force boundary? Non-force boundary?
+    CabanaPD::BodyTerm body_term( temp_func, solver.particles.size(), false,
+                                  true );
 
     // ====================================================
     //                   Simulation run

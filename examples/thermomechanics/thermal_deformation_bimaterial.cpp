@@ -113,11 +113,14 @@ void thermalDeformationExample( const std::string filename )
     temp = solver.particles.sliceTemperature();
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
-    auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
+    auto temp_func =
+        KOKKOS_LAMBDA( const int pid, const double t, const bool, const bool )
     {
         temp( pid ) = temp0 + 100000 * t;
     };
-    CabanaPD::BodyTerm body_term( temp_func, solver.particles.size(), false );
+    // Apply force boundary? Non-force boundary?
+    CabanaPD::BodyTerm body_term( temp_func, solver.particles.size(), false,
+                                  true );
 
     // ====================================================
     //                   Simulation run

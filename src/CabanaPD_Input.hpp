@@ -20,6 +20,7 @@
 #include <nlohmann/json.hpp>
 
 #include <CabanaPD_Constants.hpp>
+#include <CabanaPD_ForceModels.hpp>
 #include <CabanaPD_Output.hpp>
 
 namespace CabanaPD
@@ -297,7 +298,7 @@ class Inputs
                                                    thermal_type>::value )
                             {
                                 double coeff =
-                                    model.microconductivity_function( xi );
+                                    model( MicroconductivityTag{}, 0, 0, xi );
                                 sum_ht += v_p * coeff / r2;
                             }
                         }

@@ -135,11 +135,13 @@ void powderSettlingExample( const std::string filename )
     // ====================================================
     auto f = solver.particles.sliceForce();
     rho = solver.particles.sliceDensity();
-    auto body_functor = KOKKOS_LAMBDA( const int pid, const double )
+    auto body_functor =
+        KOKKOS_LAMBDA( const int pid, const double, const bool, const bool )
     {
         f( pid, 2 ) -= 9.8 * rho( pid );
     };
-    CabanaPD::BodyTerm gravity( body_functor, solver.particles.size(), true );
+    CabanaPD::BodyTerm gravity( body_functor, solver.particles.size(), true,
+                                false );
 
     // ====================================================
     //                   Simulation run

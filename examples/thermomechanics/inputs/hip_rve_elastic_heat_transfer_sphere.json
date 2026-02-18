@@ -1,0 +1,23 @@
+{
+    "num_cells"                       : {"value": [80, 80, 80]},
+    "system_size"                     : {"value": [0.1, 0.1, 0.1], "unit": "m"},
+    "wall_thickness"                  : {"value": 0.0045, "unit": "m"},
+    "density"                         : {"value": 1, "unit": "kg/m^3"},
+    "elastic_modulus"                 : {"value": 195.6e+8, "unit": "Pa"},
+    "fracture_energy"                 : {"value": 4786, "unit": "J/m^2"},
+    "thermal_expansion_coeff"         : {"value": 0.0, "unit": "oC^{-1}"},
+    "thermal_conductivity"            : {"value": 14.12e+3, "unit": "W/(m.K)"},
+    "specific_heat_capacity"          : {"value": 492, "unit": "J/(kg.K)"},
+    "horizon"                         : {"value": 0.00375, "unit": "m"},  
+    "reference_temperature"           : {"value": 20.0, "unit": "oC"},
+    "maximum_temperature"             : {"value": 100.0, "unit": "oC"},
+    "maximum_pressure"                : {"value": 110e1, "unit": "Pa"},
+    "ramp_up_bc_time"                 : {"value": 0.8e-6, "unit": "s"},
+    "ramp_down_bc_time"               : {"value": 0.4e-6, "unit": "s"},
+    "final_time"                      : {"value": 2.0e-6, "unit": "s"},
+    "timestep"                        : {"value": 1.0e-8, "unit": "s"},
+    "timestep_safety_factor"          : {"value": 0.85},
+    "thermal_subcycle_steps"          : {"value": 1},
+    "output_frequency"                : {"value": 1},
+    "output_reference"                : {"value": false}
+}

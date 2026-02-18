@@ -28,15 +28,18 @@ struct BodyTerm
     UserFunctor _user_functor;
     std::size_t _particle_count;
     bool _force_update;
+    bool _nonforce_update;
     bool _update_frozen;
 
     Timer _timer;
 
     BodyTerm( UserFunctor user, const std::size_t particle_count,
-              const bool force, const bool update_frozen = false )
+              const bool force, const bool nonforce,
+              const bool update_frozen = false )
         : _user_functor( user )
         , _particle_count( particle_count )
         , _force_update( force )
+        , _nonforce_update( nonforce )
         , _update_frozen( update_frozen )
     {
     }
@@ -44,7 +47,8 @@ struct BodyTerm
     // This function interface purposely matches the boundary conditions in
     // order to use the two interchangeably in Solvers.
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles, const double time )
+    void apply( ExecSpace, ParticleType& particles, const double time,
+                const bool force_update, const bool nonforce_update )
     {
         checkParticleCount( _particle_count, particles.referenceOffset(),
                             "BodyTerm" );
@@ -56,13 +60,15 @@ struct BodyTerm
         Kokkos::RangePolicy<ExecSpace> policy( start, particles.localOffset() );
         auto user = _user_functor;
         Kokkos::parallel_for(
-            "CabanaPD::BodyTerm::apply", policy,
-            KOKKOS_LAMBDA( const int p ) { user( p, time ); } );
+            "CabanaPD::BodyTerm::apply", policy, KOKKOS_LAMBDA( const int p ) {
+                user( p, time, force_update, nonforce_update );
+            } );
         Kokkos::fence();
         _timer.stop();
     }
 
     auto forceUpdate() { return _force_update; }
+    auto nonforceUpdate() { return _nonforce_update; }
 
     auto time() { return _timer.time(); };
     auto timeInit() { return 0.0; };

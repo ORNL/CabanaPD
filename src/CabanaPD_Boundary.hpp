@@ -38,19 +38,22 @@ struct BoundaryCondition
     steering_vector_type _indices;
     UserFunctor _user_functor;
     bool _force_update;
+    bool _nonforce_update;
 
     Timer _timer;
 
     BoundaryCondition( steering_vector_type bc_indices, UserFunctor user,
-                       const bool force )
+                       const bool force, const bool nonforce )
         : _indices( bc_indices )
         , _user_functor( user )
         , _force_update( force )
+        , _nonforce_update( nonforce )
     {
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles, double time )
+    void apply( ExecSpace, ParticleType& particles, double time,
+                const bool force_update, const bool nonforce_update )
     {
         checkParticleCount( _indices.particle_count,
                             particles.referenceOffset(), "BoundaryCondition" );
@@ -62,13 +65,14 @@ struct BoundaryCondition
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
-                user( pid, time );
+                user( pid, time, force_update, nonforce_update );
             } );
         Kokkos::fence();
         _timer.stop();
     }
 
     auto forceUpdate() { return _force_update; }
+    auto nonforceUpdate() { return _nonforce_update; }
 
     auto time() { return _timer.time(); };
     auto timeInit() { return _indices.time(); };
@@ -80,7 +84,6 @@ struct BoundaryCondition<MemorySpace, ForceValueBCTag>
     double _value;
     using steering_vector_type = ParticleSteeringVector<MemorySpace>;
     steering_vector_type _indices;
-    const bool _force_update = true;
 
     Timer _timer;
 
@@ -92,7 +95,8 @@ struct BoundaryCondition<MemorySpace, ForceValueBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles, double )
+    void apply( ExecSpace, ParticleType& particles, double, const bool,
+                const bool )
     {
         checkParticleCount( _indices.particle_count,
                             particles.referenceOffset(), "BoundaryCondition" );
@@ -112,7 +116,8 @@ struct BoundaryCondition<MemorySpace, ForceValueBCTag>
         _timer.stop();
     }
 
-    auto forceUpdate() { return _force_update; }
+    auto forceUpdate() { return true; }
+    auto nonforceUpdate() { return false; }
 
     auto time() { return _timer.time(); };
     auto timeInit() { return _indices.time(); };
@@ -124,7 +129,6 @@ struct BoundaryCondition<MemorySpace, ForceUpdateBCTag>
     double _value;
     using steering_vector_type = ParticleSteeringVector<MemorySpace>;
     steering_vector_type _indices;
-    const bool _force_update = true;
 
     Timer _timer;
 
@@ -136,7 +140,8 @@ struct BoundaryCondition<MemorySpace, ForceUpdateBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles, double )
+    void apply( ExecSpace, ParticleType& particles, double, const bool,
+                const bool )
     {
         checkParticleCount( _indices.particle_count,
                             particles.referenceOffset(), "BoundaryCondition" );
@@ -156,7 +161,8 @@ struct BoundaryCondition<MemorySpace, ForceUpdateBCTag>
         _timer.stop();
     }
 
-    auto forceUpdate() { return _force_update; }
+    auto forceUpdate() { return true; }
+    auto nonforceUpdate() { return false; }
 
     auto time() { return _timer.time(); };
     auto timeInit() { return _indices.time(); };
@@ -179,10 +185,12 @@ template <class UserFunctor, class ExecSpace, class Particles,
           class... RegionType>
 auto createBoundaryCondition( UserFunctor user_functor, ExecSpace exec_space,
                               Particles particles, const bool force_update,
+                              const bool nonforce_update,
                               RegionType... regions )
 {
     ParticleSteeringVector bc_indices( exec_space, particles, regions... );
-    return BoundaryCondition( bc_indices, user_functor, force_update );
+    return BoundaryCondition( bc_indices, user_functor, force_update,
+                              nonforce_update );
 }
 
 // Custom boundary particle cases.

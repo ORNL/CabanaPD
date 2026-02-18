@@ -24,6 +24,9 @@ namespace CabanaPD
 struct RectangularPrism
 {
 };
+struct SphericalShell
+{
+};
 struct Cylinder
 {
 };
@@ -91,6 +94,40 @@ struct Region<RectangularPrism>
                                         const int d ) const
     {
         return ( x( pid, d ) >= low[d] && x( pid, d ) <= high[d] );
+    }
+};
+
+// Define a subset of the system with a spherical shell.
+template <>
+struct Region<SphericalShell>
+{
+    double radius_in;
+    double radius_out;
+    double x_center;
+    double y_center;
+    double z_center;
+
+    Region( const double _radius_in, const double _radius_out,
+            double _x_center = 0.0, double _y_center = 0.0,
+            double _z_center = 0.0 )
+        : radius_in( _radius_in )
+        , radius_out( _radius_out )
+        , x_center( _x_center )
+        , y_center( _y_center )
+        , z_center( _z_center )
+    {
+        assert( radius_in < radius_out );
+    }
+
+    template <class PositionType>
+    KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
+                                        const int pid ) const
+    {
+        double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center ) +
+                     ( x( pid, 1 ) - y_center ) * ( x( pid, 1 ) - y_center ) +
+                     ( x( pid, 2 ) - z_center ) * ( x( pid, 2 ) - z_center );
+        return ( rsq >= radius_in * radius_in &&
+                 rsq <= radius_out * radius_out );
     }
 };
 
