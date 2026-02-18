@@ -1,0 +1,164 @@
+/****************************************************************************
+ * Copyright (c) 2022 by Oak Ridge National Laboratory                      *
+ * All rights reserved.                                                     *
+ *                                                                          *
+ * This file is part of CabanaPD. CabanaPD is distributed under a           *
+ * BSD 3-clause license. For the licensing terms see the LICENSE file in    *
+ * the top-level directory.                                                 *
+ *                                                                          *
+ * SPDX-License-Identifier: BSD-3-Clause                                    *
+ ****************************************************************************/
+
+#include <fstream>
+#include <iostream>
+
+#include "mpi.h"
+
+#include <Kokkos_Core.hpp>
+
+#include <CabanaPD.hpp>
+
+// Simulate crack branching from an pre-crack.
+void crackBranchingExample( const std::string filename )
+{
+    // ====================================================
+    //               Choose Kokkos spaces
+    // ====================================================
+    using exec_space = Kokkos::DefaultExecutionSpace;
+    using memory_space = typename exec_space::memory_space;
+
+    // ====================================================
+    //                   Read inputs
+    // ====================================================
+    CabanaPD::Inputs inputs( filename );
+
+    // ====================================================
+    //                Material parameters
+    // ====================================================
+    double rho0 = inputs["density"];
+    double E = inputs["elastic_modulus"];
+    double nu = 0.25; // Use bond-based model
+    double K = E / ( 3 * ( 1 - 2 * nu ) );
+    double G0 = inputs["fracture_energy"];
+    double horizon = inputs["horizon"];
+    horizon += 1e-10;
+
+    // ====================================================
+    //                  Discretization
+    // ====================================================
+    std::array<double, 3> low_corner = inputs["low_corner"];
+    std::array<double, 3> high_corner = inputs["high_corner"];
+
+    // ====================================================
+    //                    Pre-notch
+    // ====================================================
+/*	
+    double height = inputs["system_size"][0];
+    double thickness = inputs["system_size"][2];
+    double L_prenotch = height / 2.0;
+    double y_prenotch = 0.0;
+    Kokkos::Array<double, 3> p01 = { low_corner[0], y_prenotch, low_corner[2] };
+    Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
+    Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
+    Kokkos::Array<Kokkos::Array<double, 3>, 1> notch_positions = { p01 };
+    CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
+*/
+    // ====================================================
+    //                    Force model
+    // ====================================================
+    using model_type = CabanaPD::PMB;
+    CabanaPD::ForceModel force_model( model_type{}, horizon, K, G0 );
+
+    // ====================================================
+    //                 Particle generation
+    // ====================================================
+    CabanaPD::Particles particles( memory_space{}, model_type{} );
+
+    // Note that individual inputs can be passed instead (see other examples).
+    particles.domain( inputs );
+    particles.create( exec_space{} );
+
+    // ====================================================
+    //                Boundary conditions planes
+    // ====================================================
+
+    double dz = particles.dx[2];
+    CabanaPD::Region<CabanaPD::RectangularPrism> square_pressure(
+        0.5 * low_corner[0], 0.5 * high_corner[0], 0.5 * low_corner[1],
+        0.5 * high_corner[1], high_corner[2] - dz, high_corner[2] + dz );
+
+    // ====================================================
+    //            Custom particle initialization
+    // ====================================================
+    auto rho = particles.sliceDensity();
+    auto x = particles.sliceReferencePosition();
+    auto v = particles.sliceVelocity();
+    auto f = particles.sliceForce();
+    auto nofail = particles.sliceNoFail();
+
+
+    auto init_functor = KOKKOS_LAMBDA( const int pid )
+    {
+		
+        // Density
+        rho( pid ) = rho0;
+/*		
+        // No-fail zone
+        if ( x( pid, 1 ) <= plane1.low[1] + horizon + 1e-10 ||
+             x( pid, 1 ) >= plane2.high[1] - horizon - 1e-10 )
+            nofail( pid ) = 1;
+*/
+    };
+    particles.update( exec_space{}, init_functor );
+
+    // ====================================================
+    //                   Create solver
+    // ====================================================
+    CabanaPD::Solver solver( inputs, particles, force_model );
+
+    // ====================================================
+    //                Boundary conditions
+    // ====================================================
+    // Create BC last to ensure ghost particles are included.
+    double sigma0 = inputs["traction"];
+    double b0 = -sigma0 / dz;
+	auto indent_force = 0;
+    f = solver.particles.sliceForce();
+    x = solver.particles.sliceReferencePosition();
+    // Create a symmetric force BC in the z-direction.
+	
+    auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
+    {		
+	  double xsq = x(pid,0) * x(pid,0);
+	  double ysq = x(pid,1) * x(pid,1);
+	  double rsq = xsq + ysq;
+	    
+	        if ( xsq + ysq < 9e-6 )
+	        {
+	          f( pid, 2 ) += b0;
+	        }  	
+
+		
+    };
+    auto bc = createBoundaryCondition( bc_op, exec_space{}, solver.particles,
+                                       true, square_pressure );
+
+    // ====================================================
+    //                   Simulation run
+    // ====================================================
+    //solver.init( bc, prenotch );
+	solver.init( bc );
+    solver.run( bc );
+}
+
+// Initialize MPI+Kokkos.
+int main( int argc, char* argv[] )
+{
+    MPI_Init( &argc, &argv );
+    Kokkos::initialize( argc, argv );
+
+    crackBranchingExample( argv[1] );
+
+    Kokkos::finalize();
+    MPI_Finalize();
+}
