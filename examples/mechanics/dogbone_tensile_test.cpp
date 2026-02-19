@@ -43,6 +43,7 @@ void dogboneTensileTestExample( const std::string filename )
     double C13 = inputs["C13"];
     double C33 = inputs["C33"];
 
+    // Require two values for both yield and failure.
     std::array<double, 2> sigma_y_input = inputs["yield_stress"];
     auto sigma_y = CabanaPD::copy( sigma_y_input );
     std::array<double, 2> sc_input = inputs["critical_stretch"];
