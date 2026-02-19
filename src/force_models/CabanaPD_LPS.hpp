@@ -20,13 +20,11 @@
 
 namespace CabanaPD
 {
-template <typename MechanicsModelType>
-struct BaseForceModelLPS;
-
 template <>
-struct BaseForceModelLPS<Elastic> : public BaseForceModel
+struct MechanicsModel<LPS, Elastic> : public BaseForceModel
 {
     using base_type = BaseForceModel;
+    using thermal_type = TemperatureIndependent;
     // Tags for creating particle fields and dispatch to force iteration.
     using model_tag = LPS;
     using force_tag = LPS;
@@ -43,8 +41,8 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
     Kokkos::Array<double, 2> theta_coeff;
     Kokkos::Array<double, 2> s_coeff;
 
-    BaseForceModelLPS( const double _force_horizon, const double _K,
-                       const double _G, const int _influence = 0 )
+    MechanicsModel( LPS, const double _force_horizon, const double _K,
+                    const double _G, const int _influence = 0 )
         : base_type( _force_horizon, _K )
         , influence_type( _influence )
         , G( _G )
@@ -54,7 +52,10 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
 
     // Constructor to average from existing models.
     template <typename ModelType1, typename ModelType2>
-    BaseForceModelLPS( const ModelType1& model1, const ModelType2& model2 )
+    MechanicsModel(
+        const ModelType1& model1, const ModelType2& model2,
+        typename std::enable_if_t<is_mechanics_model<ModelType1>::value &&
+                                  is_mechanics_model<ModelType2>::value> = 0 )
         : base_type( model1, model2 )
     {
         G = ( model1.G + model2.G ) / 2.0;
@@ -149,77 +150,73 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
 };
 
 template <>
-struct ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
-    : public BaseForceModelLPS<Elastic>,
-      BaseNoFractureModel,
-      BaseTemperatureModel<TemperatureIndependent>
-
+struct MechanicsModel<LinearLPS, Elastic> : public MechanicsModel<LPS, Elastic>
 {
-    using base_type = BaseForceModelLPS<Elastic>;
-    using base_fracture_type = BaseNoFractureModel;
-    using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
-    using fracture_type = NoFracture;
-    using thermal_type = typename base_temperature_type::thermal_type;
+    using base_type = MechanicsModel<LPS, Elastic>;
+    // Tag to dispatch to force iteration.
+    using force_tag = LinearLPS;
 
     using base_type::base_type;
     using base_type::operator();
-    using base_fracture_type::operator();
-    using base_temperature_type::operator();
 
-    using base_type::influence_type;
+    template <typename... Args>
+    MechanicsModel( LinearLPS, Args&&... args )
+        : base_type( typename base_type::model_tag{},
+                     std::forward<Args>( args )... )
+    {
+    }
+};
 
-    ForceModel( LPS, NoFracture, const double _force_horizon, const double _K,
+// Backwards compatibility wrapper.
+template <>
+struct ForceModel<LPS, Elastic, NoFracture>
+    : public Experimental::ForceModel<MechanicsModel<LPS, Elastic>,
+                                      FractureModel<NoFracture>>
+{
+    using base_type = Experimental::ForceModel<MechanicsModel<LPS, Elastic>,
+                                               FractureModel<NoFracture>>;
+    using base_type::operator();
+
+    ForceModel( LPS tag, const double _force_horizon, const double _K,
                 const double _G, const int _influence = 0 )
-        : base_type( _force_horizon, _K, _G, _influence )
+        : base_type( MechanicsModel( tag, _force_horizon, _K, _G, _influence ),
+                     FractureModel() )
     {
     }
 
-    ForceModel( LPS, Elastic, NoFracture, const double _force_horizon,
+    ForceModel( LPS tag, NoFracture, const double _force_horizon,
                 const double _K, const double _G, const int _influence = 0 )
-        : base_type( _force_horizon, _K, _G, _influence )
+        : ForceModel( tag, _force_horizon, _K, _G, _influence )
+    {
+    }
+
+    ForceModel( LPS tag, Elastic, NoFracture, const double _force_horizon,
+                const double _K, const double _G, const int _influence = 0 )
+        : ForceModel( tag, _force_horizon, _K, _G, _influence )
+    {
+    }
+
+    template <typename ModelType1, typename ModelType2>
+    ForceModel( const ModelType1& model1, const ModelType2& model2 )
+        : base_type( model1, model2 )
     {
     }
 };
 
 template <>
-struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
-    : public BaseForceModelLPS<Elastic>,
-      BaseFractureModel,
-      BaseTemperatureModel<TemperatureIndependent>
+struct ForceModel<LPS, Elastic, Fracture>
+    : public Experimental::ForceModel<MechanicsModel<LPS, Elastic>,
+                                      FractureModel<CriticalStretch>>
+
 {
-    using base_type = BaseForceModelLPS<Elastic>;
-    using base_fracture_type = BaseFractureModel;
-    using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
-
-    using fracture_type = Fracture;
-    using thermal_type = base_temperature_type::thermal_type;
-
-    using base_fracture_type::bond_break_coeff;
-    using base_fracture_type::G0;
-    using base_fracture_type::s0;
-    using base_type::base_type;
-    using base_type::force_horizon;
-    using base_type::influence_type;
-    using base_type::K;
-
+    using base_type = Experimental::ForceModel<MechanicsModel<LPS, Elastic>,
+                                               FractureModel<CriticalStretch>>;
     using base_type::operator();
-    using base_fracture_type::operator();
-    using base_temperature_type::operator();
-
-    ForceModel( LPS, const double _force_horizon, const double _K,
+    ForceModel( LPS tag, const double _force_horizon, const double _K,
                 const double _G, const double _G0, const int _influence = 0 )
-        : base_type( _force_horizon, _K, _G, _influence )
-        , base_fracture_type( _force_horizon, _K, _G0, _influence )
+        : base_type( MechanicsModel( tag, _force_horizon, _K, _G, _influence ),
+                     FractureModel( _force_horizon, _K, _G0, _influence ) )
     {
-        if ( influence_type == 1 )
-        {
-            s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / K / force_horizon ); // 1/xi
-        }
-        else
-        {
-            s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / K / force_horizon ); // 1
-        }
-        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 
     ForceModel( LPS model, Fracture, const double _force_horizon,
@@ -243,22 +240,24 @@ struct ForceModel<LPS, Elastic, Fracture, TemperatureIndependent>
     {
     }
 
-    // Constructor to average from existing models.
     template <typename ModelType1, typename ModelType2>
     ForceModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
-        , base_fracture_type( model1, model2 )
     {
     }
 };
 
-template <typename FractureType>
-struct ForceModel<LinearLPS, Elastic, FractureType, TemperatureIndependent>
-    : public ForceModel<LPS, Elastic, FractureType, TemperatureIndependent>
+template <typename MechanicsType, typename FractureType, typename ThermalType,
+          typename... FieldTypes>
+struct ForceModel<LinearLPS, MechanicsType, FractureType, ThermalType,
+                  FieldTypes...>
+    : public ForceModel<LPS, MechanicsType, FractureType, ThermalType,
+                        FieldTypes...>
 {
-    using base_type =
-        ForceModel<LPS, Elastic, FractureType, TemperatureIndependent>;
-    using model_type = LinearLPS;
+    using base_type = ForceModel<LPS, MechanicsType, FractureType, ThermalType,
+                                 FieldTypes...>;
+    // Tag to dispatch to force iteration.
+    using force_tag = LinearLPS;
 
     using base_type::base_type;
     using base_type::operator();
@@ -270,6 +269,11 @@ struct ForceModel<LinearLPS, Elastic, FractureType, TemperatureIndependent>
     {
     }
 };
+
+template <typename ModelType>
+MechanicsModel( ModelType, const double force_horizon, const double K,
+                const double G, const int influence = 0 )
+    -> MechanicsModel<ModelType, Elastic>;
 
 template <typename ModelType>
 ForceModel( ModelType, Elastic, NoFracture, const double force_horizon,

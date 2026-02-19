@@ -106,7 +106,10 @@ class Force<MemorySpace, PMB, NoFracture> : public BaseForce<MemorySpace>
             double rx, ry, rz;
             getDistance( x, u, i, j, xi, r, s, rx, ry, rz );
 
-            s = model( ThermalStretchTag{}, i, j, s );
+            if constexpr ( std::is_same_v<
+                               typename ModelType::thermal_tag::base_type,
+                               TemperatureDependent> )
+                s = model( ThermalStretchTag{}, i, j, s );
 
             const double coeff = model( ForceCoeffTag{}, i, j, s, vol( j ) );
             fx_i = coeff * rx / r;
@@ -140,7 +143,10 @@ class Force<MemorySpace, PMB, NoFracture> : public BaseForce<MemorySpace>
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
-            s = model( ThermalStretchTag{}, i, j, s );
+            if constexpr ( std::is_same_v<
+                               typename ModelType::thermal_tag::base_type,
+                               TemperatureDependent> )
+                s = model( ThermalStretchTag{}, i, j, s );
 
             double w = model( EnergyTag{}, i, j, s, xi, vol( j ) );
             W( i ) += w;
@@ -173,7 +179,10 @@ class Force<MemorySpace, PMB, NoFracture> : public BaseForce<MemorySpace>
             double xi_x, xi_y, xi_z;
             getDistance( x, u, i, j, xi, r, s, rx, ry, rz, xi_x, xi_y, xi_z );
 
-            s = model( ThermalStretchTag{}, i, j, s );
+            if constexpr ( std::is_same_v<
+                               typename ModelType::thermal_tag::base_type,
+                               TemperatureDependent> )
+                s = model( ThermalStretchTag{}, i, j, s );
 
             const double coeff =
                 0.5 * model( ForceCoeffTag{}, i, j, s, vol( j ) );
@@ -254,7 +263,10 @@ class Force<MemorySpace, PMB, Fracture> : public BaseForce<MemorySpace>
                 double rx, ry, rz;
                 getDistance( x, u, i, j, xi, r, s, rx, ry, rz );
 
-                s = model( ThermalStretchTag{}, i, j, s );
+                if constexpr ( std::is_same_v<
+                                   typename ModelType::thermal_tag::base_type,
+                                   TemperatureDependent> )
+                    s = model( ThermalStretchTag{}, i, j, s );
 
                 // Break if beyond critical stretch unless in no-fail zone.
                 if ( model( CriticalStretchTag{}, i, j, r, xi ) &&
@@ -316,7 +328,10 @@ class Force<MemorySpace, PMB, Fracture> : public BaseForce<MemorySpace>
                 double xi, r, s;
                 getDistance( x, u, i, j, xi, r, s );
 
-                s = model( ThermalStretchTag{}, i, j, s );
+                if constexpr ( std::is_same_v<
+                                   typename ModelType::thermal_tag::base_type,
+                                   TemperatureDependent> )
+                    s = model( ThermalStretchTag{}, i, j, s );
 
                 double w =
                     mu( i, n ) * model( EnergyTag{}, i, j, s, xi, vol( j ), n );
@@ -370,7 +385,10 @@ class Force<MemorySpace, PMB, Fracture> : public BaseForce<MemorySpace>
                 getDistance( x, u, i, j, xi, r, s, rx, ry, rz, xi_x, xi_y,
                              xi_z );
 
-                s = model( ThermalStretchTag{}, i, j, s );
+                if constexpr ( std::is_same_v<
+                                   typename ModelType::thermal_tag::base_type,
+                                   TemperatureDependent> )
+                    s = model( ThermalStretchTag{}, i, j, s );
 
                 const double coeff =
                     0.5 * model( ForceCoeffTag{}, i, j, s, vol( j ), n );
@@ -439,7 +457,10 @@ class Force<MemorySpace, LinearPMB, NoFracture> : public BaseForce<MemorySpace>
             double xi_x, xi_y, xi_z;
             getLinearizedDistance( x, u, i, j, xi, linear_s, xi_x, xi_y, xi_z );
 
-            linear_s = model( ThermalStretchTag{}, i, j, linear_s );
+            if constexpr ( std::is_same_v<
+                               typename ModelType::thermal_tag::base_type,
+                               TemperatureDependent> )
+                linear_s = model( ThermalStretchTag{}, i, j, linear_s );
 
             const double coeff =
                 model( ForceCoeffTag{}, i, j, linear_s, vol( j ) );
@@ -475,7 +496,10 @@ class Force<MemorySpace, LinearPMB, NoFracture> : public BaseForce<MemorySpace>
             double xi, linear_s;
             getLinearizedDistance( x, u, i, j, xi, linear_s );
 
-            linear_s = model( ThermalStretchTag{}, i, j, linear_s );
+            if constexpr ( std::is_same_v<
+                               typename ModelType::thermal_tag::base_type,
+                               TemperatureDependent> )
+                linear_s = model( ThermalStretchTag{}, i, j, linear_s );
 
             double w = model( EnergyTag{}, i, j, linear_s, xi, vol( j ) );
             W( i ) += w;
@@ -507,7 +531,10 @@ class Force<MemorySpace, LinearPMB, NoFracture> : public BaseForce<MemorySpace>
             double xi_x, xi_y, xi_z;
             getLinearizedDistance( x, u, i, j, xi, linear_s, xi_x, xi_y, xi_z );
 
-            linear_s = model( ThermalStretchTag{}, i, j, linear_s );
+            if constexpr ( std::is_same_v<
+                               typename ModelType::thermal_tag::base_type,
+                               TemperatureDependent> )
+                linear_s = model( ThermalStretchTag{}, i, j, linear_s );
 
             const double coeff =
                 0.5 * model( ForceCoeffTag{}, i, j, linear_s, vol( j ) );
