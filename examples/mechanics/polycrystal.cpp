@@ -110,12 +110,17 @@ void polycrystalExample( const std::string filename )
     //                   Force models
     // ====================================================
     using model_type = CabanaPD::PMB;
+    CabanaPD::MechanicsModel mechanics_model_intra( model_type{}, horizon,
+                                                    K_intra );
+    CabanaPD::FractureModel fracture_model_intra( horizon, K_intra, G0_intra );
+    CabanaPD::ForceModel force_model_intra( mechanics_model_intra,
+                                            fracture_model_intra );
 
-    // Grain force models
-    CabanaPD::ForceModel force_model_intra( model_type{}, horizon, K_intra,
-                                            G0_intra );
-    CabanaPD::ForceModel force_model_inter( model_type{}, horizon, K_inter,
-                                            G0_inter );
+    CabanaPD::MechanicsModel mechanics_model_inter( model_type{}, horizon,
+                                                    K_inter );
+    CabanaPD::FractureModel fracture_model_inter( horizon, K_inter, G0_inter );
+    CabanaPD::ForceModel force_model_inter( mechanics_model_inter,
+                                            fracture_model_inter );
 
     // ====================================================
     //                 Particle generation
