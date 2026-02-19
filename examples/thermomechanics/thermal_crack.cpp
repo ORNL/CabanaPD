@@ -18,6 +18,25 @@
 
 #include <CabanaPD.hpp>
 
+template <typename TemperatureType>
+struct CustomAlpha : public CabanaPD::PolynomialProperty<TemperatureType>
+{
+    using base_type = CabanaPD::PolynomialProperty<TemperatureType>;
+    using base_type::base_type;
+    using base_type::coeff;
+    using base_type::temp;
+
+    // Return temperature-dependent value.
+    KOKKOS_FUNCTION
+    auto operator()( const int p ) const
+    {
+        return coeff( 0 ) + coeff( 1 ) / temp( p );
+    }
+};
+template <typename ArrayType, typename TemperatureType>
+CustomAlpha( const ArrayType, const TemperatureType )
+    -> CustomAlpha<TemperatureType>;
+
 // Simulate crack initiation and propagation in a ceramic plate under thermal
 // shock caused by water quenching.
 void thermalCrackExample( const std::string filename )
@@ -44,7 +63,6 @@ void thermalCrackExample( const std::string filename )
     double G0 = inputs["fracture_energy"];
     double horizon = inputs["horizon"];
     horizon += 1e-10;
-    double alpha = inputs["thermal_expansion_coeff"];
 
     // Problem parameters
     double temp0 = inputs["reference_temperature"];
@@ -90,6 +108,9 @@ void thermalCrackExample( const std::string filename )
     CabanaPD::FractureModel fracture_model( horizon, K, G0 );
 
     auto temp = particles.sliceTemperature();
+    std::vector<double> coeff = inputs["thermal_expansion_coeff"];
+
+    CustomAlpha alpha( coeff, temp );
     const double s0 = fracture_model.criticalStretch();
     CabanaPD::ThermalModel thermal_model( s0, temp, alpha, temp0 );
     CabanaPD::ThermalForceModel force_model( mechanics_model, thermal_model );
