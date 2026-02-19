@@ -326,10 +326,11 @@ struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
                   TemperatureType>
     : public Experimental::ThermalForceModel<
           MechanicsModel<PMB, Elastic>,
-          ThermalModel<TemperatureDependent, TemperatureType>>
+          ThermalModel<TemperatureDependent, TemperatureType, ConstantProperty>>
 {
     using mechanics_type = MechanicsModel<PMB, Elastic>;
-    using thermal_type = ThermalModel<TemperatureDependent, TemperatureType>;
+    using thermal_type =
+        ThermalModel<TemperatureDependent, TemperatureType, ConstantProperty>;
     using base_type =
         Experimental::ThermalForceModel<mechanics_type, thermal_type>;
     using typename thermal_type::thermal_tag;
@@ -353,11 +354,12 @@ template <typename TemperatureType>
 struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
     : public Experimental::ThermalForceModel<
           MechanicsModel<PMB, Elastic>,
-          ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch>>
+          ThermalModel<TemperatureDependent, TemperatureType, ConstantProperty,
+                       CriticalStretch>>
 {
     using mechanics_type = MechanicsModel<PMB, Elastic>;
-    using thermal_type =
-        ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch>;
+    using thermal_type = ThermalModel<TemperatureDependent, TemperatureType,
+                                      ConstantProperty, CriticalStretch>;
     using fracture_type = FractureModel<CriticalStretch>;
     using base_type =
         Experimental::ThermalForceModel<mechanics_type, thermal_type>;
@@ -384,13 +386,14 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, TemperatureDependent,
     : public Experimental::ThermalForceModel<
           MechanicsModel<PMB, ElasticPerfectlyPlastic,
                          typename TemperatureType::memory_space>,
-          ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch>>
+          ThermalModel<TemperatureDependent, TemperatureType, ConstantProperty,
+                       CriticalStretch>>
 {
     using mechanics_type =
         MechanicsModel<PMB, ElasticPerfectlyPlastic,
                        typename TemperatureType::memory_space>;
-    using thermal_type =
-        ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch>;
+    using thermal_type = ThermalModel<TemperatureDependent, TemperatureType,
+                                      ConstantProperty, CriticalStretch>;
     using base_type =
         Experimental::ThermalForceModel<mechanics_type, thermal_type>;
 
@@ -439,11 +442,12 @@ template <typename TemperatureType>
 struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
     : public Experimental::ThermalForceModel<
           MechanicsModel<PMB, Elastic>,
-          ThermalModel<DynamicTemperature, TemperatureType, NoFracture>>
+          ThermalModel<DynamicTemperature, TemperatureType, ConstantProperty,
+                       NoFracture>>
 {
     using mechanics_type = MechanicsModel<PMB, Elastic>;
-    using thermal_type =
-        ThermalModel<DynamicTemperature, TemperatureType, NoFracture>;
+    using thermal_type = ThermalModel<DynamicTemperature, TemperatureType,
+                                      ConstantProperty, NoFracture>;
     using base_type =
         Experimental::ThermalForceModel<mechanics_type, thermal_type>;
 
@@ -470,11 +474,12 @@ struct ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
                   TemperatureType>
     : public Experimental::ThermalForceModel<
           MechanicsModel<PMB, Elastic>,
-          ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch>>
+          ThermalModel<DynamicTemperature, TemperatureType, ConstantProperty,
+                       CriticalStretch>>
 {
     using mechanics_type = MechanicsModel<PMB, Elastic>;
-    using thermal_type =
-        ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch>;
+    using thermal_type = ThermalModel<DynamicTemperature, TemperatureType,
+                                      ConstantProperty, CriticalStretch>;
     using base_type =
         Experimental::ThermalForceModel<mechanics_type, thermal_type>;
 
@@ -503,14 +508,15 @@ struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, DynamicTemperature,
     : public Experimental::ThermalForceModel<
           MechanicsModel<PMB, ElasticPerfectlyPlastic,
                          typename TemperatureType::memory_space>,
-          ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch>>
+          ThermalModel<DynamicTemperature, TemperatureType, ConstantProperty,
+                       CriticalStretch>>
 
 {
     using mechanics_type =
         MechanicsModel<PMB, ElasticPerfectlyPlastic,
                        typename TemperatureType::memory_space>;
-    using thermal_type =
-        ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch>;
+    using thermal_type = ThermalModel<DynamicTemperature, TemperatureType,
+                                      ConstantProperty, CriticalStretch>;
     using base_type =
         Experimental::ThermalForceModel<mechanics_type, thermal_type>;
 
