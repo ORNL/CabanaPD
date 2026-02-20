@@ -32,6 +32,7 @@
 #include <CabanaPD_ForceModelsMulti.hpp>
 #include <CabanaPD_Input.hpp>
 #include <CabanaPD_Particles.hpp>
+#include <CabanaPD_Types.hpp>
 #include <force/CabanaPD_LPS.hpp>
 #include <force/CabanaPD_PMB.hpp>
 #include <force_models/CabanaPD_LPS.hpp>
@@ -375,8 +376,7 @@ auto computeReferenceStress(
                 {
                     // We assume the dilatation and weighted volume are constant
                     f_mag =
-                        model( CabanaPD::ForceCoeffTag{},
-                               CabanaPD::SingleMaterial{}, 0, 0, s0, xi, vol,
+                        model( CabanaPD::ForceCoeffTag{}, 0, 0, s0, xi, vol,
                                weighted_volume, weighted_volume, theta, theta );
                     f_x = f_mag * xi_x / xi;
                     f_y = f_mag * xi_y / xi;
@@ -427,8 +427,7 @@ double computeReferenceStrainEnergyDensity(
 
                 if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
-                    W += model( CabanaPD::EnergyTag{},
-                                CabanaPD::SingleMaterial{}, 0, 0, s0, xi, vol,
+                    W += model( CabanaPD::EnergyTag{}, 0, 0, s0, xi, vol,
                                 weighted_volume, theta, num_neighbors );
                 }
             }
@@ -471,8 +470,7 @@ double computeReferenceStrainEnergyDensity(
 
                 if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
-                    W += model( CabanaPD::EnergyTag{},
-                                CabanaPD::SingleMaterial{}, 0, 0, s, xi, vol,
+                    W += model( CabanaPD::EnergyTag{}, 0, 0, s, xi, vol,
                                 weighted_volume, theta_i, num_neighbors );
                 }
             }
@@ -516,8 +514,7 @@ double computeReferenceForceX(
                     model, m, u11, vol, weighted_volume, x_j );
                 if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
-                    fx += model( CabanaPD::ForceCoeffTag{},
-                                 CabanaPD::SingleMaterial{}, 0, 0, s, xi, vol,
+                    fx += model( CabanaPD::ForceCoeffTag{}, 0, 0, s, xi, vol,
                                  weighted_volume, weighted_volume, theta_i,
                                  theta_j ) *
                           rx / r;
@@ -573,9 +570,31 @@ struct TempInitFunctor
     KOKKOS_FUNCTION void operator()( const int pid ) const { t( pid ) = temp0; }
 };
 
+template <class T>
+struct MaterialInitFunctor
+{
+    T t;
+    int N;
+
+    MaterialInitFunctor( T _t, int _N )
+        : t( _t )
+        , N( _N )
+    {
+    }
+
+    KOKKOS_FUNCTION void operator()( const int pid ) const
+    {
+        t( pid ) = pid % N;
+    }
+};
+
 } // namespace
-template <class ModelTag, class ThermalTag = CabanaPD::TemperatureIndependent>
+
+template <class ModelTag, class ThermalTag = CabanaPD::TemperatureIndependent,
+          class MaterialTag = CabanaPD::SingleMaterial>
 auto createParticles( ModelTag tag, LinearTag, const double dx, const double s0,
+                      MaterialTag = MaterialTag{},
+                      [[maybe_unused]] int num_materials = 1,
                       ThermalTag thermal_tag = ThermalTag{},
                       [[maybe_unused]] double temp0 = 0. )
 {
@@ -599,6 +618,12 @@ auto createParticles( ModelTag tag, LinearTag, const double dx, const double s0,
     {
         auto t = particles.sliceTemperature();
         particles.update( TEST_EXECSPACE{}, TempInitFunctor( t, temp0 ) );
+    }
+    if constexpr ( std::is_same_v<MaterialTag, CabanaPD::MultiMaterial> )
+    {
+        auto t = particles.sliceType();
+        particles.update( TEST_EXECSPACE{},
+                          MaterialInitFunctor( t, num_materials ) );
     }
     return particles;
 }
@@ -1205,7 +1230,7 @@ TEST( TEST_CATEGORY, test_force_lps_damage )
     inputs.update( 0.01 );
     testForce( model, dx, m, QuadraticTag{}, inputs );
 }
-TEST( TEST_CATEGORY, test_force_pmb_multi )
+TEST( TEST_CATEGORY, test_force_pmb_binary )
 {
     // dx needs to be decreased for increased m: boundary particles are ignored.
     double m = 3;
@@ -1217,16 +1242,26 @@ TEST( TEST_CATEGORY, test_force_pmb_multi )
                                  CabanaPD::NoFracture{}, force_horizon, K );
     CabanaPD::ForceModel model2( model1 );
 
-    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1 );
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      CabanaPD::MultiMaterial{}, 2 );
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, model1, model2 );
+
+    static_assert( std::is_same_v<decltype( model1 )::force_tag,
+                                  typename decltype( models )::force_tag> );
+    static_assert( std::is_same_v<typename model_type::model_tag,
+                                  typename decltype( models )::model_tag> );
+    static_assert( std::is_same_v<CabanaPD::NoFracture,
+                                  typename decltype( models )::fracture_type> );
+    static_assert( std::is_same_v<CabanaPD::TemperatureIndependent,
+                                  typename decltype( models )::thermal_type> );
 
     Inputs<model_type> inputs{ force_horizon, K, 0.1, 1.1 };
     testForce( models, dx, m, LinearTag{}, inputs );
     inputs.update( 0.01 );
     testForce( models, dx, m, QuadraticTag{}, inputs );
 }
-TEST( TEST_CATEGORY, test_force_lps_multi )
+TEST( TEST_CATEGORY, test_force_lps_binary )
 {
     double m = 3;
     // Need a larger system than PMB because the boundary region is larger.
@@ -1236,14 +1271,87 @@ TEST( TEST_CATEGORY, test_force_lps_multi )
     double G = 0.5;
     double G0 = 1000.0;
     using model_type = CabanaPD::LPS;
-    CabanaPD::ForceModel model1( model_type{}, CabanaPD::Elastic{},
-                                 CabanaPD::NoFracture{}, force_horizon, K, G,
-                                 1 );
+    CabanaPD::ForceModel model1( model_type{}, force_horizon, K, G, G0, 1 );
     CabanaPD::ForceModel model2( model_type{}, force_horizon, K, G, G0, 1 );
 
-    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1 );
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      CabanaPD::MultiMaterial{}, 2 );
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, model1, model2 );
+
+    static_assert( std::is_same_v<decltype( model1 )::force_tag,
+                                  typename decltype( models )::force_tag> );
+    static_assert( std::is_same_v<typename model_type::model_tag,
+                                  typename decltype( models )::model_tag> );
+    static_assert( std::is_same_v<CabanaPD::Fracture,
+                                  typename decltype( models )::fracture_type> );
+    static_assert( std::is_same_v<CabanaPD::TemperatureIndependent,
+                                  typename decltype( models )::thermal_type> );
+
+    Inputs<model_type> inputs{ force_horizon, K, G, 0.1, 2.1 };
+    testForce( models, dx, m, LinearTag{}, inputs );
+    inputs.update( 0.01 );
+    testForce( models, dx, m, QuadraticTag{}, inputs );
+}
+TEST( TEST_CATEGORY, test_force_pmb_ternary )
+{
+    // dx needs to be decreased for increased m: boundary particles are ignored.
+    double m = 3;
+    double dx = 2.0 / 11.0;
+    double force_horizon = dx * m;
+    double K = 1.0;
+    using model_type = CabanaPD::PMB;
+    CabanaPD::ForceModel model1( model_type{}, CabanaPD::Elastic{},
+                                 CabanaPD::NoFracture{}, force_horizon, K );
+    CabanaPD::ForceModel model2( model1 );
+    CabanaPD::ForceModel model3( model1 );
+
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      CabanaPD::MultiMaterial{}, 3 );
+    auto models = CabanaPD::createMultiForceModel(
+        particles, CabanaPD::AverageTag{}, model1, model2, model3 );
+
+    static_assert( std::is_same_v<decltype( model1 )::force_tag,
+                                  typename decltype( models )::force_tag> );
+    static_assert( std::is_same_v<typename model_type::model_tag,
+                                  typename decltype( models )::model_tag> );
+    static_assert( std::is_same_v<CabanaPD::NoFracture,
+                                  typename decltype( models )::fracture_type> );
+    static_assert( std::is_same_v<CabanaPD::TemperatureIndependent,
+                                  typename decltype( models )::thermal_type> );
+
+    Inputs<model_type> inputs{ force_horizon, K, 0.1, 1.1 };
+    testForce( models, dx, m, LinearTag{}, inputs );
+    inputs.update( 0.01 );
+    testForce( models, dx, m, QuadraticTag{}, inputs );
+}
+TEST( TEST_CATEGORY, test_force_lps_ternary )
+{
+    double m = 3;
+    // Need a larger system than PMB because the boundary region is larger.
+    double dx = 2.0 / 15.0;
+    double force_horizon = dx * m;
+    double K = 1.0;
+    double G = 0.5;
+    double G0 = 1000.0;
+    using model_type = CabanaPD::LPS;
+    CabanaPD::ForceModel model1( model_type{}, force_horizon, K, G, G0, 1 );
+    CabanaPD::ForceModel model2( model_type{}, force_horizon, K, G, G0, 1 );
+    CabanaPD::ForceModel model3( model_type{}, force_horizon, K, G, G0, 1 );
+
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      CabanaPD::MultiMaterial{}, 3 );
+    auto models = CabanaPD::createMultiForceModel(
+        particles, CabanaPD::AverageTag{}, model1, model2, model3 );
+
+    static_assert( std::is_same_v<decltype( model1 )::force_tag,
+                                  typename decltype( models )::force_tag> );
+    static_assert( std::is_same_v<typename model_type::model_tag,
+                                  typename decltype( models )::model_tag> );
+    static_assert( std::is_same_v<CabanaPD::Fracture,
+                                  typename decltype( models )::fracture_type> );
+    static_assert( std::is_same_v<CabanaPD::TemperatureIndependent,
+                                  typename decltype( models )::thermal_type> );
 
     Inputs<model_type> inputs{ force_horizon, K, G, 0.1, 2.1 };
     testForce( models, dx, m, LinearTag{}, inputs );
@@ -1264,8 +1372,9 @@ TEST( TEST_CATEGORY, test_force_thermal_pmb_multi )
     using model_type = CabanaPD::PMB;
     using thermal_type = CabanaPD::DynamicTemperature;
 
-    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
-                                      thermal_type{}, temp0 );
+    auto particles =
+        createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                         CabanaPD::MultiMaterial{}, 2, thermal_type{}, temp0 );
     auto temp = particles.sliceTemperature();
 
     CabanaPD::ForceModel model1( CabanaPD::PMB{}, horizon, K, G0, temp, kappa,
@@ -1278,6 +1387,165 @@ TEST( TEST_CATEGORY, test_force_thermal_pmb_multi )
     testForce( models, horizon / m, m, LinearTag{}, inputs );
     inputs.update( 0.01 );
     testForce( models, horizon / m, m, QuadraticTag{}, inputs );
+}
+
+TEST( TEST_CATEGORY, test_force_pmb_quaternary )
+{
+    // dx needs to be decreased for increased m: boundary particles are ignored.
+    double m = 3;
+    double dx = 2.0 / 11.0;
+    double force_horizon = dx * m;
+    double K = 1.0;
+    using model_type = CabanaPD::PMB;
+    CabanaPD::ForceModel model1( model_type{}, CabanaPD::Elastic{},
+                                 CabanaPD::NoFracture{}, force_horizon, K );
+    CabanaPD::ForceModel model2( model1 );
+    CabanaPD::ForceModel model3( model1 );
+    CabanaPD::ForceModel model4( model1 );
+
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      CabanaPD::MultiMaterial{}, 4 );
+    auto models = CabanaPD::createMultiForceModel(
+        particles, CabanaPD::AverageTag{}, model1, model2, model3, model4 );
+
+    static_assert( std::is_same_v<decltype( model1 )::force_tag,
+                                  typename decltype( models )::force_tag> );
+    static_assert( std::is_same_v<typename model_type::model_tag,
+                                  typename decltype( models )::model_tag> );
+    static_assert( std::is_same_v<CabanaPD::NoFracture,
+                                  typename decltype( models )::fracture_type> );
+    static_assert( std::is_same_v<CabanaPD::TemperatureIndependent,
+                                  typename decltype( models )::thermal_type> );
+
+    Inputs<model_type> inputs{ force_horizon, K, 0.1, 1.1 };
+    testForce( models, dx, m, LinearTag{}, inputs );
+    inputs.update( 0.01 );
+    testForce( models, dx, m, QuadraticTag{}, inputs );
+}
+TEST( TEST_CATEGORY, test_force_lps_quaternary )
+{
+    double m = 3;
+    // Need a larger system than PMB because the boundary region is larger.
+    double dx = 2.0 / 15.0;
+    double force_horizon = dx * m;
+    double K = 1.0;
+    double G = 0.5;
+    double G0 = 1000.0;
+    using model_type = CabanaPD::LPS;
+    CabanaPD::ForceModel model1( model_type{}, force_horizon, K, G, G0, 1 );
+    CabanaPD::ForceModel model2( model_type{}, force_horizon, K, G, G0, 1 );
+    CabanaPD::ForceModel model3( model_type{}, force_horizon, K, G, G0, 1 );
+    CabanaPD::ForceModel model4( model_type{}, force_horizon, K, G, G0, 1 );
+
+    auto particles = createParticles( model_type{}, LinearTag{}, dx, 0.1,
+                                      CabanaPD::MultiMaterial{}, 4 );
+    auto models = CabanaPD::createMultiForceModel(
+        particles, CabanaPD::AverageTag{}, model1, model2, model3, model4 );
+
+    static_assert( std::is_same_v<decltype( model1 )::force_tag,
+                                  typename decltype( models )::force_tag> );
+    static_assert( std::is_same_v<typename model_type::model_tag,
+                                  typename decltype( models )::model_tag> );
+    static_assert( std::is_same_v<CabanaPD::Fracture,
+                                  typename decltype( models )::fracture_type> );
+    static_assert( std::is_same_v<CabanaPD::TemperatureIndependent,
+                                  typename decltype( models )::thermal_type> );
+
+    Inputs<model_type> inputs{ force_horizon, K, G, 0.1, 2.1 };
+    testForce( models, dx, m, LinearTag{}, inputs );
+    inputs.update( 0.01 );
+    testForce( models, dx, m, QuadraticTag{}, inputs );
+}
+
+namespace
+{
+struct FirstTestTag
+{
+};
+
+struct BaseModelDummy
+{
+};
+
+struct BaseForceDummy
+{
+};
+
+template <typename BaseModel>
+struct TestModelType
+{
+    using base_model = BaseModel;
+    KOKKOS_INLINE_FUNCTION auto operator()( int index ) const { return index; }
+};
+
+template <typename ModelType, typename ForceType, typename FractureType,
+          typename ThermalType>
+struct TestModel
+{
+    using force_tag = ForceType;
+    using model_tag = ModelType;
+    using fracture_type = FractureType;
+    using thermal_type = ThermalType;
+
+    int expectedTypeI;
+    int expectedTypeJ;
+    int expectedParameter;
+
+    double force_horizon = 0.1;
+
+    KOKKOS_INLINE_FUNCTION bool operator()( FirstTestTag, const int typeI,
+                                            const int typeJ,
+                                            const int inputValue ) const
+    {
+        if ( inputValue != expectedParameter )
+            Kokkos::abort( "Wrong inputValue in operator with FirstTestTag" );
+        if ( typeI != expectedTypeI )
+            Kokkos::abort( "Wrong typeI in operator with FirstTestTag" );
+        if ( typeJ != expectedTypeJ )
+            Kokkos::abort( "Wrong typeJ in operator with FirstTestTag" );
+
+        return true;
+    }
+
+    KOKKOS_INLINE_FUNCTION bool operator()( FirstTestTag,
+                                            CabanaPD::SingleMaterial,
+                                            const int typeI, const int typeJ,
+                                            const int inputValue ) const
+    {
+        return this->operator()( FirstTestTag(), typeI, typeJ, inputValue );
+    }
+};
+} // namespace
+
+TEST( TEST_CATEGORY, test_forceModelsMulti_binary )
+{
+    int parameter[4] = { 1, 2, 3, 4 };
+    TestModel<TestModelType<BaseModelDummy>, BaseForceDummy,
+              CabanaPD::NoFracture, CabanaPD::TemperatureIndependent>
+        model1{ 0, 0, parameter[0] };
+    TestModel<TestModelType<BaseModelDummy>, BaseForceDummy,
+              CabanaPD::NoFracture, CabanaPD::TemperatureDependent>
+        model2{ 1, 1, parameter[1] };
+    TestModel<TestModelType<BaseModelDummy>, BaseForceDummy, CabanaPD::Fracture,
+              CabanaPD::TemperatureIndependent>
+        model12{ 0, 1, parameter[2] };
+    TestModel<TestModelType<BaseModelDummy>, BaseForceDummy, CabanaPD::Fracture,
+              CabanaPD::TemperatureIndependent>
+        model21{ 1, 0, parameter[3] };
+
+    CabanaPD::ForceModels models(
+        TestModelType<BaseModelDummy>{}, CabanaPD::FullIndexing<2>{},
+        Cabana::makeParameterPack( model1, model12, model21, model2 ) );
+
+    static_assert( std::is_same_v<CabanaPD::Fracture,
+                                  typename decltype( models )::fracture_type> );
+    static_assert( std::is_same_v<CabanaPD::TemperatureDependent,
+                                  typename decltype( models )::thermal_type> );
+
+    models( FirstTestTag{}, 0, 0, parameter[0] );
+    models( FirstTestTag{}, 1, 1, parameter[1] );
+    models( FirstTestTag{}, 0, 1, parameter[2] );
+    models( FirstTestTag{}, 1, 0, parameter[3] );
 }
 
 } // end namespace Test
