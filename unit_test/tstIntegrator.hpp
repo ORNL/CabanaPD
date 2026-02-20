@@ -94,12 +94,154 @@ void testIntegratorReversibility( int steps )
             EXPECT_DOUBLE_EQ( x_final( p, d ), x_init( p, d ) );
 }
 
+void testIntegratorADRSingleMass( int steps )
+{
+    using exec_space = TEST_EXECSPACE;
+    constexpr int num_masses = 1;
+    double stiffness = 1000;
+
+    Kokkos::View<double[num_masses][3], TEST_EXECSPACE> velocities(
+        "testIntegrateADRSingleMass::velocities" );
+    Kokkos::View<double[num_masses][3], TEST_EXECSPACE> displacements(
+        "testIntegrateADRSingleMass::displacements" );
+    Kokkos::View<double[num_masses][3], TEST_EXECSPACE> forces(
+        "testIntegrateADRSingleMass::forces" );
+
+    // calculate forces
+    auto force_lambda = KOKKOS_LAMBDA( int i )
+    {
+        forces( i, 0 ) = -stiffness * displacements( i, 0 );
+        forces( i, 1 ) = -stiffness * displacements( i, 1 );
+        forces( i, 2 ) = -stiffness * displacements( i, 2 );
+    };
+
+    // initialize displacements
+    Kokkos::parallel_for(
+        "testIntegrateADRSingleMass::initialize_displacements", num_masses,
+        KOKKOS_LAMBDA( int i ) {
+            displacements( i, 0 ) = -0.3;
+            displacements( i, 1 ) = -0.4;
+            displacements( i, 2 ) = -0.5;
+        } );
+
+    // initialize forces
+    Kokkos::parallel_for( "testIntegrateADRSingleMass::initialize_forces",
+                          num_masses, force_lambda );
+
+    double adrDeltaT = 1.0;
+    CabanaPD::ADRFictitiousMass adrMass{ adrDeltaT, 1.0, 1.0, stiffness, 5 };
+    CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass,
+                                                     adrDeltaT };
+    CabanaPD::ADRIntegrator integrator(
+        exec_space{}, adrMass, adrInitialVelocity, num_masses, adrDeltaT );
+
+    integrator.reset( exec_space{} );
+    // Integrate one step
+    for ( int s = 0; s < steps; ++s )
+    {
+        integrator.initialSubStep( exec_space{}, forces );
+        Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
+                              num_masses, force_lambda );
+        integrator.middleSubStep( exec_space{}, forces, velocities,
+                                  displacements );
+        integrator.finalSubStep( exec_space{}, velocities, displacements );
+    }
+
+    // Make a copy of final results on the host
+    auto displacements_host = Kokkos::create_mirror_view_and_copy(
+        Kokkos::HostSpace{}, displacements );
+
+    // Check the results
+    for ( std::size_t p = 0; p < num_masses; ++p )
+    {
+        EXPECT_NEAR( displacements_host( p, 0 ), 0.0, 0.01 );
+        EXPECT_NEAR( displacements_host( p, 1 ), 0.0, 0.01 );
+        EXPECT_NEAR( displacements_host( p, 2 ), 0.0, 0.01 );
+    }
+}
+
+void testIntegratorADRparticles( int steps )
+{
+    using exec_space = TEST_EXECSPACE;
+
+    std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
+    std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
+    std::array<int, 3> num_cells = { 10, 10, 10 };
+
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, CabanaPD::PMB{},
+                                   CabanaPD::TemperatureIndependent{} );
+    particles.domain( box_min, box_max, num_cells, 0 );
+    particles.create( exec_space{} );
+    auto displacements = particles.sliceDisplacement();
+    auto forces = particles.sliceForce();
+    std::size_t num_particle = displacements.size();
+
+    double adrDeltaT = 1.0;
+    double stiffness = 1000;
+    auto particleIntegrator = CabanaPD::createADRParticleIntegrator(
+        exec_space{}, forces, adrDeltaT, 1.0, 1.0, stiffness );
+
+    // how to calculate forces
+    auto force_lambda = KOKKOS_LAMBDA( int i )
+    {
+        forces( i, 0 ) = -stiffness * displacements( i, 0 );
+        forces( i, 1 ) = -stiffness * displacements( i, 1 );
+        forces( i, 2 ) = -stiffness * displacements( i, 2 );
+    };
+
+    // initialize displacements
+    auto positions = particles.sliceReferencePosition();
+    Kokkos::parallel_for(
+        "testIntegrateADRparticles::initialize_displacements", num_particle,
+        KOKKOS_LAMBDA( int i ) {
+            for ( int j = 0; j < 3; ++j )
+                displacements( i, j ) = positions( i, j );
+        } );
+
+    // initialize forces
+    Kokkos::parallel_for( "testIntegrateADRSingleMass::initialize_forces",
+                          num_particle, force_lambda );
+
+    particleIntegrator.reset( exec_space{} );
+    // Integrate one step
+    for ( int s = 0; s < steps; ++s )
+    {
+        particleIntegrator.initialSubStep( exec_space{}, particles );
+        Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
+                              num_particle, force_lambda );
+        particleIntegrator.middleSubStep( exec_space{}, particles );
+        particleIntegrator.finalSubStep( exec_space{}, particles );
+    }
+
+    // Make a copy of final results on the host
+    using DataTypes = Cabana::MemberTypes<double[3]>;
+    using HostAoSoA = Cabana::AoSoA<DataTypes, Kokkos::HostSpace>;
+    HostAoSoA displacements_aosoa_final( "displacements_final_host",
+                                         num_particle );
+    auto displacements_final = Cabana::slice<0>( displacements_aosoa_final );
+    Cabana::deep_copy( displacements_final, displacements );
+
+    // Check the results
+    for ( std::size_t p = 0; p < num_particle; ++p )
+        for ( std::size_t d = 0; d < 3; ++d )
+            EXPECT_NEAR( displacements_final( p, d ), 0.0, 0.01 );
+}
+
 //---------------------------------------------------------------------------//
 // TESTS
 //---------------------------------------------------------------------------//
 TEST( TEST_CATEGORY, test_integrate_reversibility )
 {
     testIntegratorReversibility( 100 );
+}
+
+TEST( TEST_CATEGORY, test_integrate_ADR_single_mass )
+{
+    testIntegratorADRSingleMass( 20 );
+}
+TEST( TEST_CATEGORY, test_integrate_ADR_particles )
+{
+    testIntegratorADRparticles( 20 );
 }
 
 //---------------------------------------------------------------------------//

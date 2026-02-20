@@ -198,6 +198,312 @@ class VelocityVerlet<Contact> : public VelocityVerlet<NoContact>
     using base_type::_timer;
 };
 
+//  S: Integrate d^2u/dt^2 = Force in time with Adaptive Dynamic Relaxation
+//  O: Can be extended by wrapping
+//  L: no inheritance
+//  I: uses "I need interfaces" and uses all passed values
+//  D: We do not depend on how the entities we are integrating are stored, only
+//  depend on "I need interface" for iteration via parallel_for. Doing one
+//  integrator per entity is suspected to lead to performance penalties
+
+template <typename ExecutionSpace, typename FictitiousMassType,
+          typename InitialVelocityType, int SpatialDimension = 3>
+struct ADRIntegrator
+{
+    static constexpr int dim = SpatialDimension;
+    using force_storage_base_type = double[dim];
+    using velocity_storage_base_type = double[dim];
+
+    Kokkos::View<force_storage_base_type*, ExecutionSpace> _forces_last_step;
+    Kokkos::View<velocity_storage_base_type*, ExecutionSpace>
+        _velocities_last_step;
+    FictitiousMassType _fictitious_mass;
+    InitialVelocityType _initial_velocity_type;
+    double _delta_t;
+
+  public:
+    ADRIntegrator( ExecutionSpace const& exec_space,
+                   FictitiousMassType const& fictitious_mass,
+                   InitialVelocityType const& initial_velocity,
+                   size_t num_masses, double dt )
+        : _forces_last_step(
+              Kokkos::View<force_storage_base_type*, ExecutionSpace>(
+                  Kokkos::view_alloc( exec_space, Kokkos::WithoutInitializing,
+                                      "Forces_Last_Step" ),
+                  num_masses ) )
+        , _velocities_last_step(
+              Kokkos::View<velocity_storage_base_type*, ExecutionSpace>(
+                  Kokkos::view_alloc( exec_space, Kokkos::WithoutInitializing,
+                                      "Velocities_Last_Step" ),
+                  num_masses ) )
+        , _fictitious_mass( fictitious_mass )
+        , _initial_velocity_type( initial_velocity )
+        , _delta_t( dt )
+    {
+    }
+
+    void reset( ExecutionSpace ) const
+    {
+        Kokkos::parallel_for(
+            "ADRIntegrator::reset",
+            Kokkos::RangePolicy<ExecutionSpace>(
+                0, _velocities_last_step.extent( 0 ) ),
+            KOKKOS_CLASS_LAMBDA( int64_t index ) {
+                for ( int i = 0; i < dim; ++i )
+                    _velocities_last_step( index, i ) =
+                        _initial_velocity_type( index, i );
+            } );
+        Kokkos::fence( "ADRIntegrator::Fence::reset" );
+    }
+
+    template <typename ForceType>
+    void initialSubStep( ExecutionSpace, ForceType const& forces ) const
+    {
+        Kokkos::parallel_for(
+            "ADRIntegrator::initialStep",
+            Kokkos::RangePolicy<ExecutionSpace>(
+                0, _forces_last_step.extent( 0 ) ),
+            KOKKOS_CLASS_LAMBDA( int64_t index ) {
+                for ( int i = 0; i < dim; ++i )
+                    _forces_last_step( index, i ) = forces( index, i );
+            } );
+        Kokkos::fence( "ADRIntegrator::Fence::intialStep" );
+    }
+
+    template <typename ForceType, typename VelocityType,
+              typename DisplacementType>
+    void middleSubStep( ExecutionSpace, ForceType const& forces,
+                        VelocityType const& velocities,
+                        DisplacementType const& displacements ) const
+    {
+        Kokkos::parallel_for(
+            "ADRIntegrator::middleStep",
+            Kokkos::RangePolicy<ExecutionSpace>(
+                0, _forces_last_step.extent( 0 ) ),
+            KOKKOS_CLASS_LAMBDA( int64_t index ) {
+                double mass[dim];
+                double stiffness[dim];
+                double damping_numerator = 0.;
+                double damping_denominator = 0.;
+                // compute damping coefficient
+                for ( int i = 0; i < dim; ++i )
+                {
+                    mass[i] = _fictitious_mass( index, i );
+                    stiffness[i] = ( -forces( index, i ) +
+                                     _forces_last_step( index, i ) ) /
+                                   mass[i] / _delta_t /
+                                   _velocities_last_step( index, i );
+                    if ( Kokkos::isnan( stiffness[i] ) )
+                        stiffness[i] = 0.;
+
+                    damping_numerator += displacements( index, i ) *
+                                         stiffness[i] *
+                                         displacements( index, i );
+                    damping_denominator +=
+                        displacements( index, i ) * displacements( index, i );
+                }
+                double c_damping = 2.0 * Kokkos::sqrt( damping_numerator /
+                                                       damping_denominator );
+
+                // nan check since we divide by the displacement and the
+                // velocity. Thus we can have a lot of 0s which are
+                // singularities in the formula for c_damping
+                if ( Kokkos::isnan( c_damping ) )
+                    c_damping = 0.;
+
+                // update velocity with old velocity and damping coefficient
+                double velocity_denomiator = 2.0 + c_damping * _delta_t;
+                for ( int i = 0; i < dim; ++i )
+                {
+                    // update velocity
+                    velocities( index, i ) =
+                        ( ( 2.0 - c_damping * _delta_t ) *
+                              _velocities_last_step( index, i ) +
+                          2.0 * _delta_t * forces( index, i ) / mass[i] ) /
+                        velocity_denomiator;
+                }
+            } );
+        Kokkos::fence( "ADRIntegrator::Fence::middleStep" );
+    }
+
+    template <typename VelocityType, typename DisplacementType>
+    void finalSubStep( ExecutionSpace, VelocityType const& velocities,
+                       DisplacementType const& displacements ) const
+    {
+        Kokkos::parallel_for(
+            "ADRIntegrator::finalStep",
+            Kokkos::RangePolicy<ExecutionSpace>(
+                0, _forces_last_step.extent( 0 ) ),
+            KOKKOS_CLASS_LAMBDA( int64_t index ) {
+                for ( int i = 0; i < dim; ++i )
+                {
+                    // update displacement with velocity
+                    displacements( index, i ) +=
+                        _delta_t * velocities( index, i );
+
+                    _velocities_last_step( index, i ) = velocities( index, i );
+                }
+            } );
+        Kokkos::fence( "ADRIntegrator::Fence::finalStep" );
+    }
+};
+
+struct ADRFictitiousMass
+{
+    double _delta_t;
+    double _horizon;
+    double _delta_x;
+    double _c;
+    double _safety_factor;
+
+    template <typename IndexType>
+    double KOKKOS_FUNCTION operator()( IndexType, int ) const
+    {
+        return _safety_factor *
+               ( _delta_t * _delta_t * Kokkos::numbers::pi * _horizon *
+                 _horizon * _horizon * _c ) /
+               ( 3.0 * _delta_x );
+    }
+};
+
+template <typename ForcesType, typename FictitiousMassType>
+struct ADRInitialVelocity
+{
+    ForcesType _forces;
+    FictitiousMassType _fictitious_mass;
+    double _delta_t;
+
+    template <typename IndexType>
+    auto KOKKOS_FUNCTION operator()( IndexType index, int dim ) const
+    {
+        return ( _forces( index, dim ) * _delta_t ) / 2.0 /
+               _fictitious_mass( index, dim );
+    }
+};
+
+template <typename ForcesType, typename FictitiousMassType>
+ADRInitialVelocity( ForcesType, FictitiousMassType, double )
+    -> ADRInitialVelocity<ForcesType, FictitiousMassType>;
+
+//  S: Adapt interface of particles to interface of Integrator
+//  O: can be extended by inheritance/composition
+//  L: no inheritance
+//  I: uses "I need interfaces" and uses all passed values
+//  D: No dependence on the impl of particles, just on the interface
+
+template <typename Integrator>
+struct ParticleIntegratorWrapper
+{
+    Integrator _integrator;
+
+    explicit ParticleIntegratorWrapper( Integrator const& integrator )
+        : _integrator( integrator )
+    {
+    }
+
+    template <typename ExecutionSpace>
+    void reset( ExecutionSpace const& exec_space )
+    {
+        _integrator.reset( exec_space );
+    }
+
+    template <typename ExecutionSpace, typename ParticleType>
+    void initialSubStep( ExecutionSpace const& exec_space,
+                         ParticleType const& particles )
+    {
+        auto forces = particles.sliceForce();
+        _integrator.initialSubStep( exec_space, forces );
+    }
+
+    template <typename ExecutionSpace, typename ParticleType>
+    void middleSubStep( ExecutionSpace const& exec_space,
+                        ParticleType const& particles )
+    {
+        auto forces = particles.sliceForce();
+        auto velocities = particles.sliceVelocity();
+        auto displacements = particles.sliceDisplacement();
+        _integrator.middleSubStep( exec_space, forces, velocities,
+                                   displacements );
+    }
+
+    template <typename ExecutionSpace, typename ParticleType>
+    void finalSubStep( ExecutionSpace const& exec_space,
+                       ParticleType const& particles )
+    {
+        auto velocities = particles.sliceVelocity();
+        auto displacements = particles.sliceDisplacement();
+        _integrator.finalSubStep( exec_space, velocities, displacements );
+    }
+};
+
+template <typename ExecutionSpace, typename ForceType>
+auto createADRParticleIntegrator( ExecutionSpace const& exec_space,
+                                  ForceType const& forces, double delta_t,
+                                  double horizon, double delta_x, double c,
+                                  double safety_factor = 5.0 )
+{
+    CabanaPD::ADRFictitiousMass adrMass{ delta_t, horizon, delta_x, c,
+                                         safety_factor };
+    CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass, delta_t };
+    CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrInitialVelocity,
+                                        forces.size(), delta_t );
+    CabanaPD::ParticleIntegratorWrapper particleIntegrator( integrator );
+    return particleIntegrator;
+}
+
+template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
+          typename ParticleType, typename BoundaryType, typename... ARGS>
+void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
+                                    SolverType& solver,
+                                    IntegratorType& integrator,
+                                    ParticleType const& particles,
+                                    BoundaryType boundary_condition,
+                                    double time, ARGS... args )
+{
+    integrator.initialSubStep( exec_space, particles, args... );
+
+    // Update ghost particles.
+    // TODO not public
+    // solver.comm->gatherDisplacement();
+    // Compute internal forces.
+    solver.updateForce();
+
+    // TODO typedef not public
+    // if constexpr ( is_contact<typename SolverType::ContactModelType>::value )
+    //     computeForce( solver.contact_model, solver.contact, particles,
+    //                   solver.contact_neighbor, false );
+
+    // TODO comm not public
+    // if constexpr ( is_temperature_dependent<
+    //                   typename
+    //                   SolverType::ForceModelType::thermal_type>::value )
+    //    solver.comm->gatherTemperature();
+
+    // Add force boundary condition.
+    if ( boundary_condition.forceUpdate() )
+        boundary_condition.apply( exec_space, particles, time );
+
+    integrator.middleSubStep( exec_space, particles, args... );
+
+    // Add non-force boundary condition.
+    if ( !boundary_condition.forceUpdate() )
+        boundary_condition.apply( exec_space, particles, time );
+
+    integrator.finalSubStep( exec_space, particles, args... );
+}
+
+template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
+          typename ParticleType, typename BoundaryType, typename... ARGS>
+void runStepWithExternalIntegratorAndOutput(
+    ExecutionSpace const& exec_space, SolverType& solver,
+    IntegratorType& integrator, ParticleType& particles,
+    BoundaryType boundary_condition, double time, unsigned step, ARGS... args )
+{
+    runStepWithExternalIntegrator( exec_space, solver, integrator, particles,
+                                   boundary_condition, time, args... );
+    particles.output( step, time, solver.output_reference );
+}
+
 } // namespace CabanaPD
 
 #endif
