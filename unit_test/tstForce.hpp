@@ -376,8 +376,7 @@ auto computeReferenceStress(
                 {
                     // We assume the dilatation and weighted volume are constant
                     f_mag =
-                        model( CabanaPD::ForceCoeffTag{},
-                               CabanaPD::SingleMaterial{}, 0, 0, s0, xi, vol,
+                        model( CabanaPD::ForceCoeffTag{}, 0, 0, s0, xi, vol,
                                weighted_volume, weighted_volume, theta, theta );
                     f_x = f_mag * xi_x / xi;
                     f_y = f_mag * xi_y / xi;
@@ -428,8 +427,7 @@ double computeReferenceStrainEnergyDensity(
 
                 if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
-                    W += model( CabanaPD::EnergyTag{},
-                                CabanaPD::SingleMaterial{}, 0, 0, s0, xi, vol,
+                    W += model( CabanaPD::EnergyTag{}, 0, 0, s0, xi, vol,
                                 weighted_volume, theta, num_neighbors );
                 }
             }
@@ -472,8 +470,7 @@ double computeReferenceStrainEnergyDensity(
 
                 if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
-                    W += model( CabanaPD::EnergyTag{},
-                                CabanaPD::SingleMaterial{}, 0, 0, s, xi, vol,
+                    W += model( CabanaPD::EnergyTag{}, 0, 0, s, xi, vol,
                                 weighted_volume, theta_i, num_neighbors );
                 }
             }
@@ -517,8 +514,7 @@ double computeReferenceForceX(
                     model, m, u11, vol, weighted_volume, x_j );
                 if ( xi > 0.0 && xi < model.force_horizon + 1e-14 )
                 {
-                    fx += model( CabanaPD::ForceCoeffTag{},
-                                 CabanaPD::SingleMaterial{}, 0, 0, s, xi, vol,
+                    fx += model( CabanaPD::ForceCoeffTag{}, 0, 0, s, xi, vol,
                                  weighted_volume, weighted_volume, theta_i,
                                  theta_j ) *
                           rx / r;
@@ -1546,10 +1542,10 @@ TEST( TEST_CATEGORY, test_forceModelsMulti_binary )
     static_assert( std::is_same_v<CabanaPD::TemperatureDependent,
                                   typename decltype( models )::thermal_type> );
 
-    models( FirstTestTag{}, CabanaPD::SingleMaterial{}, 0, 0, parameter[0] );
-    models( FirstTestTag{}, CabanaPD::SingleMaterial{}, 1, 1, parameter[1] );
-    models( FirstTestTag{}, CabanaPD::SingleMaterial{}, 0, 1, parameter[2] );
-    models( FirstTestTag{}, CabanaPD::SingleMaterial{}, 1, 0, parameter[3] );
+    models( FirstTestTag{}, 0, 0, parameter[0] );
+    models( FirstTestTag{}, 1, 1, parameter[1] );
+    models( FirstTestTag{}, 0, 1, parameter[2] );
+    models( FirstTestTag{}, 1, 0, parameter[3] );
 }
 
 } // end namespace Test

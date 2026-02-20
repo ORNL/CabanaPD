@@ -126,80 +126,37 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
         return 3.0 * theta_i / m_i;
     }
 
-    // In this case, we know that we only have one material so we use the first.
-    // This must be separate from the multi-material interface because no type
-    // information was passed here.
-    KOKKOS_INLINE_FUNCTION auto
-    operator()( ForceCoeffTag, SingleMaterial, const int, const int,
-                const double s, const double xi, const double vol,
-                const double m_i, const double m_j, const double theta_i,
-                const double theta_j ) const
+    KOKKOS_INLINE_FUNCTION auto operator()( ForceCoeffTag, const int, const int,
+                                            const double s, const double xi,
+                                            const double vol, const double m_i,
+                                            const double m_j,
+                                            const double theta_i,
+                                            const double theta_j ) const
     {
         auto influence = ( *this )( influence_tag, xi );
-
-        return ( theta_coeff[0] * ( theta_i / m_i + theta_j / m_j ) +
-                 s_coeff[0] * s * ( 1.0 / m_i + 1.0 / m_j ) ) *
-               influence * xi * vol;
-    }
-
-    // CI failures for gcc-13 in release show an apparent false-positive warning
-    // for array bounds of the coefficients.
-#pragma GCC diagnostic warning "-Warray-bounds"
-#pragma GCC diagnostic push
-    // In this case we may have any combination of material types. These
-    // coefficients may still be the same for some interaction pairs.
-    KOKKOS_INLINE_FUNCTION auto
-    operator()( ForceCoeffTag, MultiMaterial, const int type_i,
-                const int type_j, const double s, const double xi,
-                const double vol, const double m_i, const double m_j,
-                const double theta_i, const double theta_j ) const
-    {
-        KOKKOS_ASSERT( type_i < 2 );
-        KOKKOS_ASSERT( type_j < 2 );
-        auto influence = ( *this )( influence_tag, xi );
-        double theta_coeff_i = theta_coeff[type_i];
-        double theta_coeff_j = theta_coeff[type_j];
-        double s_coeff_i = s_coeff[type_i];
-        double s_coeff_j = s_coeff[type_j];
+        double theta_coeff_i = theta_coeff[0];
+        double theta_coeff_j = theta_coeff[1];
+        double s_coeff_i = s_coeff[0];
+        double s_coeff_j = s_coeff[1];
 
         return ( theta_coeff_i * theta_i / m_i + theta_coeff_j * theta_j / m_j +
                  s * ( s_coeff_i / m_i + s_coeff_j / m_j ) ) *
                influence * xi * vol;
     }
 
-    // In this case, we know that we only have one material so we use the first.
-    // This must be separate from the multi-material interface because no type
-    // information was passed here.
     KOKKOS_INLINE_FUNCTION
-    auto operator()( EnergyTag, SingleMaterial, const int, const int,
-                     const double s, const double xi, const double vol,
-                     const double m_i, const double theta_i,
-                     const double num_bonds ) const
-    {
-        auto influence = ( *this )( influence_tag, xi );
-        return 1.0 / num_bonds * 0.5 * theta_coeff[0] / 3.0 *
-                   ( theta_i * theta_i ) +
-               0.5 * ( s_coeff[0] / m_i ) * influence * s * s * xi * xi * vol;
-    }
-
-    // In this case we may have any combination of material types. These
-    // coefficients may still be the same for some interaction pairs.
-    KOKKOS_INLINE_FUNCTION
-    auto operator()( EnergyTag, MultiMaterial, const int type_i, const int,
-                     const double s, const double xi, const double vol,
-                     const double m_i, const double theta_i,
-                     const double num_bonds ) const
+    auto operator()( EnergyTag, const int, const int, const double s,
+                     const double xi, const double vol, const double m_i,
+                     const double theta_i, const double num_bonds ) const
     {
         auto influence = ( *this )( influence_tag, xi );
 
-        KOKKOS_ASSERT( type_i < 2 );
-        double theta_coeff_i = theta_coeff[type_i];
-        double s_coeff_i = s_coeff[type_i];
+        double theta_coeff_i = theta_coeff[0];
+        double s_coeff_i = s_coeff[0];
         return 1.0 / num_bonds * 0.5 * theta_coeff_i / 3.0 *
                    ( theta_i * theta_i ) +
                0.5 * ( s_coeff_i / m_i ) * influence * s * s * xi * xi * vol;
     }
-#pragma GCC diagnostic pop
 };
 
 template <>
