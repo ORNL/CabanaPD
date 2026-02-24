@@ -86,14 +86,17 @@ void thermalCrackExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
+    CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K );
+    CabanaPD::FractureModel fracture_model( horizon, K, G0 );
+
     auto temp = particles.sliceTemperature();
-    CabanaPD::ForceModel force_model( model_type{}, horizon, K, G0, temp, alpha,
-                                      temp0 );
+    CabanaPD::ThermalModel thermal_model( fracture_model, temp, alpha, temp0 );
+    CabanaPD::Experimental::ThermalForceModel force_model( mechanics_model,
+                                                           thermal_model );
 
     // ====================================================
     //                   Create solver
     // ====================================================
-
     CabanaPD::Solver solver( inputs, particles, force_model );
 
     // --------------------------------------------

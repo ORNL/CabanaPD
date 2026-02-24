@@ -92,8 +92,10 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     //                    Force model
     // ====================================================
     CabanaPD::ForceModel force_model( model_type{}, CabanaPD::NoFracture{},
-                                      horizon, K, temp, kappa, cp, alpha,
-                                      temp0 );
+                                      horizon, K );
+    CabanaPD::ThermalModel thermal_model( temp, horizon, kappa, cp, alpha,
+                                          temp0 );
+    CabanaPD::Experimental::ThermalForceModel( force_model, thermal_model );
 
     // ====================================================
     //                   Create solver
