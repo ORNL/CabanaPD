@@ -133,8 +133,12 @@ void thermalDeformationHeatTransferPrenotchedExample(
     // ====================================================
     //                    Force model
     // ====================================================
-    CabanaPD::ForceModel force_model( model_type{}, horizon, K, G0, temp, kappa,
-                                      cp, alpha, temp0 );
+    CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K );
+    CabanaPD::FractureModel fracture_model( horizon, K, G0 );
+    CabanaPD::ThermalModel thermal_model( fracture_model, temp, horizon, kappa,
+                                          cp, alpha, temp0 );
+    CabanaPD::Experimental::ThermalForceModel force_model( mechanics_model,
+                                                           thermal_model );
 
     // ====================================================
     //                   Create solver

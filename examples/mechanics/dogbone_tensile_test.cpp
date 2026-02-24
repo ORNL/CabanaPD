@@ -154,8 +154,11 @@ void dogboneTensileTestExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    CabanaPD::ForceModel force_model( model_type{}, mechanics_type{},
-                                      memory_space{}, horizon, K, G0, sigma_y );
+    CabanaPD::MechanicsModel mechanics_model(
+        model_type{}, mechanics_type{}, memory_space{}, horizon, K, sigma_y );
+    CabanaPD::FractureModel fracture_model( horizon, K, G0 );
+    CabanaPD::Experimental::ForceModel force_model( mechanics_model,
+                                                    fracture_model );
 
     // ====================================================
     //                   Create solver
