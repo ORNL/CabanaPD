@@ -189,6 +189,17 @@ template <typename ThermalType, typename TemperatureType,
           typename FractureType = NoFracture>
 struct ThermalModel;
 
+template <>
+struct ThermalModel<TemperatureIndependent, TemperatureIndependent, NoFracture>
+{
+    KOKKOS_FUNCTION
+    double operator()( ThermalStretchTag, const int, const int,
+                       const double s ) const
+    {
+        return s;
+    }
+};
+
 template <typename TemperatureType>
 struct ThermalModel<TemperatureDependent, TemperatureType, NoFracture>
 {
@@ -426,21 +437,29 @@ struct is_force_model<ForceModel<MechanicsType, FractureType>>
 
 template <typename MechanicsType,
           typename FractureType = FractureModel<NoFracture>>
-struct ForceModel : public MechanicsType, FractureType
+struct ForceModel
+    : public MechanicsType,
+      FractureType,
+      ThermalModel<TemperatureIndependent, TemperatureIndependent, NoFracture>
 {
     using MechanicsType::operator();
     using FractureType::operator();
     using typename FractureType::fracture_tag;
+    using thermal_type = ThermalModel<TemperatureIndependent,
+                                      TemperatureIndependent, NoFracture>;
+    using thermal_type::operator();
 
     ForceModel( MechanicsType mechanics, FractureType thermal )
         : MechanicsType( mechanics )
         , FractureType( thermal )
+        , thermal_type()
     {
     }
 
     ForceModel( MechanicsType mechanics )
         : MechanicsType( mechanics )
         , FractureType()
+        , thermal_type()
     {
     }
 
