@@ -926,7 +926,7 @@ void testForce( ModelType model, const double dx, const double m,
 {
     using force_tag = typename ModelType::force_tag;
     using model_tag = typename ModelType::model_tag;
-    using fracture_tag = typename ModelType::fracture_type;
+    using fracture_tag = typename ModelType::fracture_tag;
     auto particles = createParticles( model_tag{}, test_tag, dx, inputs.coeff );
 
     // This needs to exactly match the mesh spacing to compare with the single
@@ -1064,6 +1064,7 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
     particles.domain( box_min, box_max, num_cells, 0 );
     particles.create( TEST_EXECSPACE{} );
     auto temp = particles.sliceTemperature();
+    CabanaPD::ThermalModel thermal_model( temp, alpha, temp0 );
     {
         //  With elastic, without fracture.
         CabanaPD::ForceModel force_model( CabanaPD::PMB{},
@@ -1252,9 +1253,9 @@ TEST( TEST_CATEGORY, test_force_pmb_binary )
     static_assert( std::is_same_v<typename model_type::model_tag,
                                   typename decltype( models )::model_tag> );
     static_assert( std::is_same_v<CabanaPD::NoFracture,
-                                  typename decltype( models )::fracture_type> );
+                                  typename decltype( models )::fracture_tag> );
     static_assert( std::is_same_v<CabanaPD::TemperatureIndependent,
-                                  typename decltype( models )::thermal_type> );
+                                  typename decltype( models )::thermal_tag> );
 
     Inputs<model_type> inputs{ force_horizon, K, 0.1, 1.1 };
     testForce( models, dx, m, LinearTag{}, inputs );
@@ -1284,9 +1285,9 @@ TEST( TEST_CATEGORY, test_force_lps_binary )
     static_assert( std::is_same_v<typename model_type::model_tag,
                                   typename decltype( models )::model_tag> );
     static_assert( std::is_same_v<CabanaPD::Fracture,
-                                  typename decltype( models )::fracture_type> );
+                                  typename decltype( models )::fracture_tag> );
     static_assert( std::is_same_v<CabanaPD::TemperatureIndependent,
-                                  typename decltype( models )::thermal_type> );
+                                  typename decltype( models )::thermal_tag> );
 
     Inputs<model_type> inputs{ force_horizon, K, G, 0.1, 2.1 };
     testForce( models, dx, m, LinearTag{}, inputs );
@@ -1316,9 +1317,9 @@ TEST( TEST_CATEGORY, test_force_pmb_ternary )
     static_assert( std::is_same_v<typename model_type::model_tag,
                                   typename decltype( models )::model_tag> );
     static_assert( std::is_same_v<CabanaPD::NoFracture,
-                                  typename decltype( models )::fracture_type> );
+                                  typename decltype( models )::fracture_tag> );
     static_assert( std::is_same_v<CabanaPD::TemperatureIndependent,
-                                  typename decltype( models )::thermal_type> );
+                                  typename decltype( models )::thermal_tag> );
 
     Inputs<model_type> inputs{ force_horizon, K, 0.1, 1.1 };
     testForce( models, dx, m, LinearTag{}, inputs );
@@ -1349,9 +1350,9 @@ TEST( TEST_CATEGORY, test_force_lps_ternary )
     static_assert( std::is_same_v<typename model_type::model_tag,
                                   typename decltype( models )::model_tag> );
     static_assert( std::is_same_v<CabanaPD::Fracture,
-                                  typename decltype( models )::fracture_type> );
+                                  typename decltype( models )::fracture_tag> );
     static_assert( std::is_same_v<CabanaPD::TemperatureIndependent,
-                                  typename decltype( models )::thermal_type> );
+                                  typename decltype( models )::thermal_tag> );
 
     Inputs<model_type> inputs{ force_horizon, K, G, 0.1, 2.1 };
     testForce( models, dx, m, LinearTag{}, inputs );
@@ -1370,16 +1371,17 @@ TEST( TEST_CATEGORY, test_force_thermal_pmb_multi )
     double alpha = 1.0;
     double temp0 = 1.0;
     using model_type = CabanaPD::PMB;
-    using thermal_type = CabanaPD::DynamicTemperature;
+    using thermal_tag = CabanaPD::DynamicTemperature;
 
     auto particles =
         createParticles( model_type{}, LinearTag{}, dx, 0.1,
-                         CabanaPD::MultiMaterial{}, 2, thermal_type{}, temp0 );
+                         CabanaPD::MultiMaterial{}, 2, thermal_tag{}, temp0 );
     auto temp = particles.sliceTemperature();
 
-    CabanaPD::ForceModel model1( CabanaPD::PMB{}, horizon, K, G0, temp, kappa,
-                                 cp, alpha, temp0 );
-    CabanaPD::ForceModel model2( model1 );
+    CabanaPD::ForceModel model1( CabanaPD::PMB{}, horizon, K, G0, temp, horizon,
+                                 kappa, cp, alpha, temp0 );
+
+    auto model2( model1 );
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, model1, model2 );
 
@@ -1413,9 +1415,9 @@ TEST( TEST_CATEGORY, test_force_pmb_quaternary )
     static_assert( std::is_same_v<typename model_type::model_tag,
                                   typename decltype( models )::model_tag> );
     static_assert( std::is_same_v<CabanaPD::NoFracture,
-                                  typename decltype( models )::fracture_type> );
+                                  typename decltype( models )::fracture_tag> );
     static_assert( std::is_same_v<CabanaPD::TemperatureIndependent,
-                                  typename decltype( models )::thermal_type> );
+                                  typename decltype( models )::thermal_tag> );
 
     Inputs<model_type> inputs{ force_horizon, K, 0.1, 1.1 };
     testForce( models, dx, m, LinearTag{}, inputs );
@@ -1447,9 +1449,9 @@ TEST( TEST_CATEGORY, test_force_lps_quaternary )
     static_assert( std::is_same_v<typename model_type::model_tag,
                                   typename decltype( models )::model_tag> );
     static_assert( std::is_same_v<CabanaPD::Fracture,
-                                  typename decltype( models )::fracture_type> );
+                                  typename decltype( models )::fracture_tag> );
     static_assert( std::is_same_v<CabanaPD::TemperatureIndependent,
-                                  typename decltype( models )::thermal_type> );
+                                  typename decltype( models )::thermal_tag> );
 
     Inputs<model_type> inputs{ force_horizon, K, G, 0.1, 2.1 };
     testForce( models, dx, m, LinearTag{}, inputs );
@@ -1484,8 +1486,8 @@ struct TestModel
 {
     using force_tag = ForceType;
     using model_tag = ModelType;
-    using fracture_type = FractureType;
-    using thermal_type = ThermalType;
+    using fracture_tag = FractureType;
+    using thermal_tag = ThermalType;
 
     int expectedTypeI;
     int expectedTypeJ;
@@ -1538,9 +1540,9 @@ TEST( TEST_CATEGORY, test_forceModelsMulti_binary )
         Cabana::makeParameterPack( model1, model12, model21, model2 ) );
 
     static_assert( std::is_same_v<CabanaPD::Fracture,
-                                  typename decltype( models )::fracture_type> );
+                                  typename decltype( models )::fracture_tag> );
     static_assert( std::is_same_v<CabanaPD::TemperatureDependent,
-                                  typename decltype( models )::thermal_type> );
+                                  typename decltype( models )::thermal_tag> );
 
     models( FirstTestTag{}, 0, 0, parameter[0] );
     models( FirstTestTag{}, 1, 1, parameter[1] );
