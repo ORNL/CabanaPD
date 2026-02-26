@@ -27,10 +27,7 @@ struct CriticalStretch
 {
     using base_type = Fracture;
 };
-struct ThermalCriticalStretch
-{
-    using base_type = Fracture;
-};
+
 template <class, class SFINAE = void>
 struct is_fracture : public std::false_type
 {
@@ -41,10 +38,6 @@ struct is_fracture<Fracture> : public std::true_type
 };
 template <>
 struct is_fracture<CriticalStretch> : public std::true_type
-{
-};
-template <>
-struct is_fracture<ThermalCriticalStretch> : public std::true_type
 {
 };
 template <typename ModelType>
