@@ -122,9 +122,9 @@ TEST( TEST_CATEGORY, test_binaryIndexing )
     CabanaPD::BinaryIndexing indexing;
 
     // test binary indexing for N=3
-    for ( unsigned i = 0; 3 < i; ++i )
+    for ( unsigned i = 0; i < 3; ++i )
     {
-        for ( unsigned j = 0; 3 < j; ++j )
+        for ( unsigned j = 0; j < 3; ++j )
         {
             if ( i == j )
                 ASSERT_EQ( indexing( i, j ), 0 );
