@@ -171,31 +171,30 @@ struct FirstModelWithFractureType
             FractureType>>::type;
 };
 
-template <typename BaseModelPackType, typename IndexingType,
-          size_t... BaseIndices, size_t... AveragingIndices>
-auto generateAllModelCombinationsForDiagonalIndexing(
+template <typename BaseModelPackType, typename IndexingType, size_t Index>
+auto generateSingleModelCombination( BaseModelPackType const& baseModels )
+{
+    using type = typename BaseModelPackType::template value_type<
+        IndexingType::template getInverseIndexPair<Index>().first>;
+
+    auto firstModel =
+        Cabana::get<IndexingType::template getInverseIndexPair<Index>().first>(
+            baseModels );
+
+    auto secondModel =
+        Cabana::get<IndexingType::template getInverseIndexPair<Index>().second>(
+            baseModels );
+    return type{ firstModel, secondModel };
+}
+
+template <typename BaseModelPackType, typename IndexingType, size_t... Indices>
+auto generateAllModelCombinationsForIndexing(
     BaseModelPackType const& baseModels, IndexingType,
-    std::index_sequence<BaseIndices...>,
-    std::index_sequence<AveragingIndices...> )
+    std::index_sequence<Indices...> )
 {
     return Cabana::makeParameterPack(
-        // first unpack the base models
-        ( Cabana::get<BaseIndices>( baseModels ), ... ),
-        // then create one model per index pair for each index in the averaging
-        // indices the model is created as type of the basemodels of the first
-        // index in the pair and will get the basemodels of the first and second
-        // index in the pair as constructor arguments
-        (
-            typename BaseModelPackType::template value_type<
-                IndexingType::template getInverseIndexPair<AveragingIndices>()
-                    .first>{
-                Cabana::get<IndexingType::template getInverseIndexPair<
-                                AveragingIndices>()
-                                .first>( baseModels ),
-                Cabana::get<IndexingType::template getInverseIndexPair<
-                                AveragingIndices>()
-                                .second>( baseModels ) },
-            ... ) );
+        generateSingleModelCombination<BaseModelPackType, IndexingType,
+                                       Indices>( baseModels )... );
 }
 
 // Wrap multiple models in a single object.
@@ -376,47 +375,49 @@ template <typename ParticleType, typename IndexingType, typename... ModelTypes>
 auto createMultiForceModel( ParticleType particles, IndexingType indexing,
                             ModelTypes... m )
 {
+    static_assert(
+        is_Indexing<IndexingType>,
+        "Indexing requires is_Indexing trait to be usable in ForceModels" );
     auto type = particles.sliceType();
     return ForceModels( type, indexing, Cabana::makeParameterPack( m... ) );
 }
 
-template <
-    typename ParticleType, typename ModelType1, typename ModelType2,
-    std::enable_if_t<is_symmetric<typename ModelType1::model_tag>::value &&
-                         is_symmetric<typename ModelType2::model_tag>::value,
-                     int> = 0>
-auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
-                            ModelType2 m2 )
+template <typename ParticleType, typename... ModelTypes,
+          std::enable_if_t<std::conjunction_v<
+                               is_symmetric<typename ModelTypes::model_tag>...>,
+                           int> = 0>
+auto createMultiForceModel( ParticleType particles, AverageTag,
+                            ModelTypes... m )
 {
-    // IndexingType needs to support NumTotalModels and
-    // getInverseIndexPair as constexpr.
+    using IndexingType = DiagonalIndexing<sizeof...( ModelTypes )>;
+    IndexingType indexing;
     auto type = particles.sliceType();
     auto baseModels = Cabana::makeParameterPack( m... );
-
     return ForceModels(
         type, indexing,
-        CabanaPD::Impl::generateAllModelCombinationsForDiagonalIndexing(
+        CabanaPD::Impl::generateAllModelCombinationsForIndexing(
             baseModels, indexing,
-            std::make_index_sequence<sizeof...( ModelTypes )>{},
-            std::make_index_sequence<IndexingType::NumTotalModels -
-                                     sizeof...( ModelTypes )>{} ) );
+            std::make_index_sequence<IndexingType::NumTotalModels>{} ) );
 }
-template <
-    typename ParticleType, typename ModelType1, typename ModelType2,
-    std::enable_if_t<!is_symmetric<typename ModelType1::model_tag>::value &&
-                         !is_symmetric<typename ModelType2::model_tag>::value,
-                     int> = 0>
-auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
-                            ModelType2 m2 )
+
+template <typename ParticleType, typename... ModelTypes,
+          std::enable_if_t<!std::conjunction_v<
+                               is_symmetric<typename ModelTypes::model_tag>...>,
+                           int> = 0>
+auto createMultiForceModel( ParticleType particles, AverageTag,
+                            ModelTypes... m )
 {
-    ModelType1 m12( m1, m2 );
-    ModelType2 m21( m2, m1 );
-    // the indexing has to match the order that we pass the models to the
-    // multiforce model, as the return index of indexing is used to select the
-    // model from the model list.
-    FullIndexing<2> indexing;
-    return createMultiForceModel( particles, indexing, m1, m12, m21, m2 );
+    using IndexingType = FullIndexing<sizeof...( ModelTypes )>;
+    IndexingType indexing;
+    auto type = particles.sliceType();
+    auto baseModels = Cabana::makeParameterPack( m... );
+    return ForceModels(
+        type, indexing,
+        CabanaPD::Impl::generateAllModelCombinationsForIndexing(
+            baseModels, indexing,
+            std::make_index_sequence<IndexingType::NumTotalModels>{} ) );
 }
+
 } // namespace CabanaPD
 
 #endif
