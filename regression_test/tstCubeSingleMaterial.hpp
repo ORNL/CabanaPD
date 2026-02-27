@@ -35,6 +35,7 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
     double nu = 0.25;
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double G0 = inputs["fracture_energy"];
+    double final_time = inputs["final_time"];
     double horizon = inputs["horizon"];
     horizon += 1e-10;
 
@@ -91,21 +92,34 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
         low_corner[0], low_corner[0] + horizon, low_corner[1], high_corner[1],
         low_corner[2], high_corner[2] );
 
+    double distance_between_clamps =
+        high_corner[0] - low_corner[0] - 2 * horizon;
+
     // Create BC last to ensure ghost particles are included.
     auto u = solver.particles.sliceDisplacement();
+    double rate = 0.001;
+    double end_time_factor = 0.5;
     auto disp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
+        double time = t;
+        if ( t < end_time_factor * final_time )
+            time = end_time_factor * t;
+
         if ( right_grip.inside( x, pid ) )
         {
-            u( pid, 0 ) = 1e-0 * t;
-            u( pid, 1 ) = 0.0;
-            u( pid, 2 ) = 0.0;
+            u( pid, 0 ) = 0.5 * rate * time;
+            u( pid, 1 ) =
+                -x( pid, 1 ) * rate * time / distance_between_clamps * nu;
+            u( pid, 2 ) =
+                -x( pid, 2 ) * rate * time / distance_between_clamps * nu;
         }
         else if ( left_grip.inside( x, pid ) )
         {
-            u( pid, 0 ) = 0.0;
-            u( pid, 1 ) = 0.0;
-            u( pid, 2 ) = 0.0;
+            u( pid, 0 ) = -0.5 * rate * time;
+            u( pid, 1 ) =
+                -x( pid, 1 ) * rate * time / distance_between_clamps * nu;
+            u( pid, 2 ) =
+                -x( pid, 2 ) * rate * time / distance_between_clamps * nu;
         }
     };
     auto bc = CabanaPD::createBoundaryCondition( disp_func, exec_space{},
@@ -126,6 +140,29 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
     // We probably should test both, but I need to think about this some more
     // Also we probably want to check if the poisson ratio is correct. But I am
     // not sure if that works ... maybe just near the centerline
-}
+    CabanaPD::Region<CabanaPD::RectangularPrism> center_region(
+        low_corner[0], high_corner[0], -0.25 * horizon, +0.25 * horizon,
+        -0.25 * horizon, +0.25 * horizon );
 
-} // end namespace Test
+    double displacement_error_x;
+    Kokkos::parallel_reduce(
+        "displacement_midpoint_x",
+        Kokkos::RangePolicy<exec_space>( 0, particles.size() ),
+        KOKKOS_LAMBDA( const int pid, double& local_sum ) {
+            if ( !right_grip.inside( x, pid ) && !left_grip.inside( x, pid ) )
+            {
+                if ( center_region.inside( x, pid ) )
+                {
+                    // std::cout << x(pid,0) << " " << u(pid,0) << " " <<
+                    // x(pid,0)/distance_between_clamps * rate
+                    // *end_time_factor*final_time <<  std::endl;
+                    local_sum +=
+                        u( pid, 0 ) - x( pid, 0 ) / distance_between_clamps *
+                                          rate * end_time_factor * final_time;
+                }
+            }
+        },
+        displacement_error_x );
+    EXPECT_NEAR( displacement_error_x, 0., 1e-9 );
+};
+} // namespace Test
