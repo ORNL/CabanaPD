@@ -83,10 +83,6 @@ struct BinaryIndexing
     }
 };
 
-template <unsigned N, unsigned Index>
-constexpr auto getFullIndexPair()
-{
-}
 // Full indexing with all combinatoric indices
 template <unsigned NumBaseModels>
 struct FullIndexing
