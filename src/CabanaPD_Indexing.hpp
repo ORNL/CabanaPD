@@ -66,8 +66,9 @@ struct DiagonalIndexing
     template <unsigned Index>
     static constexpr auto getInverseIndexPair()
     {
-        static_assert( Index < NumTotalModels,
-                       "Requested inverse index out of range" );
+        static_assert(
+            Index < NumTotalModels,
+            "Requested inverse index out of range of DiagonalIndexing" );
         return getDiagonalIndexPair<NumBaseModels, Index>();
     }
 };
@@ -82,6 +83,12 @@ struct BinaryIndexing
     }
 };
 
+template <unsigned N, unsigned Index>
+constexpr auto getFullIndexPair()
+{
+}
+// Full indexing with all combinatoric indices
+template <unsigned NumBaseModels>
 struct FullIndexing
 {
     static_assert( NumBaseModels > 0, "NumBaseModels must be larger than 0" );
@@ -94,10 +101,24 @@ struct FullIndexing
 
         return firstType * NumBaseModels + secondType;
     }
+
+    static constexpr unsigned NumTotalModels = NumBaseModels * NumBaseModels;
+
+    template <unsigned Index>
+    static constexpr auto getInverseIndexPair()
+    {
+        static_assert( Index < NumTotalModels,
+                       "Requested inverse index out of range of FullIndexing" );
+        return IndexPair<Index / NumBaseModels,
+                         Index - ( Index / NumBaseModels ) * NumBaseModels>{};
+    }
 };
 
 template <unsigned NumBaseModels>
 static constexpr bool is_Indexing<DiagonalIndexing<NumBaseModels>> = true;
+
+template <unsigned NumBaseModels>
+static constexpr bool is_Indexing<FullIndexing<NumBaseModels>> = true;
 } // namespace CabanaPD
 
 #endif
