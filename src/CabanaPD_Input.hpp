@@ -77,7 +77,7 @@ class Inputs
             {
                 log( std::cout, "WARNING: the horizon is smaller than the "
                                 "distance between the particles. We are "
-                                "setting them equal for this run.\n" );
+                                "setting horizon = dx (m = 1).\n" );
                 m = 1;
             }
             inputs["m"]["value"] = m;
