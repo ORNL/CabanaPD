@@ -73,6 +73,13 @@ class Inputs
         {
             double horizon = inputs["horizon"]["value"];
             int m = std::floor( horizon / dx );
+            if ( horizon < dx )
+            {
+                log( std::cout, "WARNING: the horizon is smaller than the "
+                                "distance between the particles. We are "
+                                "setting horizon = dx (m = 1).\n" );
+                m = 1;
+            }
             inputs["m"]["value"] = m;
         }
 
