@@ -75,10 +75,9 @@ class Inputs
             int m = std::floor( horizon / dx );
             if ( horizon < dx )
             {
-                log( std::cout, "WARNING: the horizon is smaller than the "
-                                "distance between the particles. We are "
-                                "setting horizon = dx (m = 1).\n" );
-                m = 1;
+                throw std::runtime_error(
+                    "Input horizon must be greater than or equal to dx to "
+                    "result in any neighbour-particles" );
             }
             inputs["m"]["value"] = m;
         }
@@ -88,7 +87,8 @@ class Inputs
         {
             int m = inputs["m"]["value"];
             if ( m < 1 )
-                throw std::runtime_error( "Input m must be greater than or equal to 1." );
+                throw std::runtime_error(
+                    "Input m must be greater than or equal to 1." );
             double horizon = static_cast<double>( m ) * dx + 0.01 * dx;
             inputs["horizon"]["value"] = horizon;
         }
