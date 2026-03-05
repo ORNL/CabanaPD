@@ -1,0 +1,19 @@
+{
+    "num_cells_OLD"              : {"value": [400, 400, 80]},
+    "num_cells"              : {"value": [200, 200, 40]},
+    "system_size_OLD"            : {"value": [0.1, 0.04, 0.002], "unit": "m"},
+    "system_size"            : {"value": [0.1, 0.1, 0.02], "unit": "m"},
+    "density"                : {"value": 2440,  "unit": "kg/m^3"},
+    "elastic_modulus"        : {"value": 72e+9, "unit": "Pa"},
+    "fracture_energy"        : {"value": 3.8,   "unit": "J/m^2"},
+    "horizon_ref"                : {"value": 0.001, "unit": "m"},  
+    "horizon"                : {"value": 0.0015, "unit": "m"},  
+    "traction"               : {"value": 2e6,   "unit": "Pa"},
+    "final_time"             : {"value": 43e-6, "unit": "s"},
+    "timestep_OLD"               : {"value": 4.5e-8,  "unit": "s"},
+    "timestep"               : {"value": 6.75e-8,  "unit": "s"},
+    "timestep_safety_factor" : {"value": 0.85},
+    "output_frequency"       : {"value": 5},
+    "output_reference_OLD"       : {"value": true},
+    "output_reference"       : {"value": false}
+}
