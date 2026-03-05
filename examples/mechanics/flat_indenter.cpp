@@ -19,7 +19,7 @@
 #include <CabanaPD.hpp>
 
 // Simulate crack branching from an pre-crack.
-void crackBranchingExample( const std::string filename )
+void flatIndenterExample( const std::string filename )
 {
     // ====================================================
     //               Choose Kokkos spaces
@@ -157,7 +157,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    crackBranchingExample( argv[1] );
+    flatIndenterExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();
