@@ -120,7 +120,8 @@ class OutputTimeSeries
         double time = inputs["final_time"];
         double dt = inputs["timestep"];
         double freq = inputs["output_frequency"];
-        int output_steps = static_cast<int>( time / dt / freq );
+        // May or may not need an extra index for the initial state.
+        int output_steps = static_cast<int>( time / dt / freq ) + 1;
         // Purposely using zero-init here.
         _profile = profile_type( "time_output", output_steps );
     }
