@@ -90,9 +90,9 @@ void thermalCrackExample( const std::string filename )
     CabanaPD::FractureModel fracture_model( horizon, K, G0 );
 
     auto temp = particles.sliceTemperature();
-    CabanaPD::ThermalModel thermal_model( fracture_model, temp, alpha, temp0 );
-    CabanaPD::Experimental::ThermalForceModel force_model( mechanics_model,
-                                                           thermal_model );
+    const double s0 = fracture_model.criticalStretch();
+    CabanaPD::ThermalModel thermal_model( s0, temp, alpha, temp0 );
+    CabanaPD::ThermalForceModel force_model( mechanics_model, thermal_model );
 
     // ====================================================
     //                   Create solver

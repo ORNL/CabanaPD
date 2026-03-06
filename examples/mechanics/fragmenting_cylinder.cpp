@@ -62,8 +62,7 @@ void fragmentingCylinderExample( const std::string filename )
     using model_type = CabanaPD::PMB;
     CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K );
     CabanaPD::FractureModel fracture_model( horizon, K, G0 );
-    CabanaPD::Experimental::ForceModel force_model( mechanics_model,
-                                                    fracture_model );
+    CabanaPD::ForceModel force_model( mechanics_model, fracture_model );
 
     // ====================================================
     //    Custom particle generation and initialization
