@@ -39,6 +39,9 @@ struct InfluenceFunctionTag
 {
 };
 
+/******************************************************************************
+  Forward declarations.
+******************************************************************************/
 template <typename PDModelType, typename MechanicsType, typename... DataTypes>
 struct MechanicsModel;
 
@@ -53,12 +56,27 @@ struct is_mechanics_model<
 {
 };
 
+template <typename MechanicsType, typename FractureType>
+struct ForceModel;
+
+template <typename T>
+struct is_force_model : public std::false_type
+{
+};
+template <typename MechanicsType, typename FractureType>
+struct is_force_model<ForceModel<MechanicsType, FractureType>>
+    : public std::true_type
+{
+};
+
+/******************************************************************************
+  Base models.
+******************************************************************************/
 struct BaseForceModel
 {
     // Is there a field that needs to be updated later?
     using needs_update = std::false_type;
     using material_type = SingleMaterial;
-    using thermal_tag = TemperatureIndependent;
     double force_horizon;
     double K;
 
@@ -106,19 +124,46 @@ class BasePlasticity
 template <typename FractureType>
 struct FractureModel;
 
+template <typename T>
+struct is_fracture_model : public std::false_type
+{
+};
+template <typename FractureType>
+struct is_fracture_model<FractureModel<FractureType>> : public std::true_type
+{
+};
+
 template <>
 struct FractureModel<NoFracture>
 {
     using fracture_tag = NoFracture;
 
-    // This should only be used in multi-material models in which the current
-    // model does not support failure.
+    FractureModel() = default;
+
+    // Average from existing models.
+    template <typename ModelType1, typename ModelType2>
+    FractureModel(
+        const ModelType1&, const ModelType2&,
+        typename std::enable_if_t<( is_force_model<ModelType1>::value &&
+                                    is_force_model<ModelType2>::value ),
+                                  int>* = 0 )
+    {
+    }
+
+    // This should only be used in multi-material models in which the
+    // current model does not support failure.
     KOKKOS_INLINE_FUNCTION
     bool operator()( CriticalStretchTag, const int, const int, const double,
                      const double ) const
     {
         return false;
     }
+
+    KOKKOS_FUNCTION
+    auto criticalStretch() const { return DBL_MAX; }
+
+    KOKKOS_FUNCTION
+    auto fractureEnergy() const { return DBL_MAX; }
 };
 
 template <>
@@ -153,11 +198,16 @@ struct FractureModel<CriticalStretch>
 
     // Average from existing models.
     template <typename ModelType1, typename ModelType2>
-    FractureModel( const ModelType1& model1, const ModelType2& model2 )
+    FractureModel(
+        const ModelType1& model1, const ModelType2& model2,
+        typename std::enable_if_t<( is_force_model<ModelType1>::value &&
+                                    is_force_model<ModelType2>::value ),
+                                  int>* = 0 )
     {
-        G0 = ( model1.G0 + model2.G0 ) / 2.0;
-        s0 = Kokkos::sqrt( ( model1.s0 * model1.s0 * model1.K +
-                             model2.s0 * model2.s0 * model2.K ) /
+        G0 = ( model1.fractureEnergy() + model2.fractureEnergy() ) / 2.0;
+        const double s0_1 = model1.criticalStretch();
+        const double s0_2 = model2.criticalStretch();
+        s0 = Kokkos::sqrt( ( s0_1 * s0_1 * model1.K + s0_2 * s0_2 * model2.K ) /
                            ( model1.K + model2.K ) );
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
@@ -168,19 +218,20 @@ struct FractureModel<CriticalStretch>
     {
         return r * r >= bond_break_coeff * xi * xi;
     }
+
+    KOKKOS_FUNCTION
+    auto criticalStretch() const { return s0; }
+
+    KOKKOS_FUNCTION
+    auto fractureEnergy() const { return G0; }
+
+    KOKKOS_FUNCTION
+    auto influenceType() const { return influence_type; }
 };
 
 FractureModel( const double _force_horizon, const double _K, const double _G0,
                const int influence = 1 )
     ->FractureModel<CriticalStretch>;
-
-/******************************************************************************
-Force models forward declaration.
-******************************************************************************/
-template <typename PeridynamicsModelType, typename MechanicsModelType = Elastic,
-          typename DamageType = Fracture,
-          typename ThermalType = TemperatureIndependent, typename... DataTypes>
-struct ForceModel;
 
 /******************************************************************************
   Temperature-dependent models.
@@ -189,9 +240,22 @@ template <typename ThermalType, typename TemperatureType,
           typename FractureType = NoFracture>
 struct ThermalModel;
 
+template <typename T>
+struct is_thermal_model : public std::false_type
+{
+};
+template <typename ThermalType, typename TemperatureType, typename FractureType>
+struct is_thermal_model<
+    ThermalModel<ThermalType, TemperatureType, FractureType>>
+    : public std::true_type
+{
+};
+
 template <>
 struct ThermalModel<TemperatureIndependent, TemperatureIndependent, NoFracture>
 {
+    using thermal_tag = TemperatureIndependent;
+
     KOKKOS_FUNCTION
     double operator()( ThermalStretchTag, const int, const int,
                        const double s ) const
@@ -256,35 +320,28 @@ ThermalModel( const TemperatureType, const double, const double )
 
 template <typename TemperatureType>
 struct ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch>
-    : public FractureModel<CriticalStretch>,
-      public ThermalModel<TemperatureDependent, TemperatureType, NoFracture>
+    : public ThermalModel<TemperatureDependent, TemperatureType, NoFracture>
 {
-    using base_fracture_type = FractureModel<CriticalStretch>;
-    using base_temperature_type =
+    using base_type =
         ThermalModel<TemperatureDependent, TemperatureType, NoFracture>;
-    using typename base_fracture_type::fracture_tag;
+    using base_type::operator();
+    using fracture_tag = Fracture;
 
-    // Does not use the base bond_break_coeff.
-    using base_fracture_type::s0;
-    using base_temperature_type::alpha;
-    using base_temperature_type::temp0;
-    using base_temperature_type::temperature;
+    double s0;
+    using base_type::alpha;
+    using base_type::temp0;
+    using base_type::temperature;
 
-    // Does not use the base critical stretch.
-    using base_temperature_type::operator();
-
-    ThermalModel( const base_fracture_type fracture,
-                  const TemperatureType _temp, const double _alpha,
-                  const double _temp0 )
-        : base_fracture_type( fracture )
-        , base_temperature_type( _temp, _alpha, _temp0 )
+    ThermalModel( const double _s0, const TemperatureType _temp,
+                  const double _alpha, const double _temp0 )
+        : base_type( _temp, _alpha, _temp0 )
+        , s0( _s0 )
     {
     }
 
     template <typename ModelType1, typename ModelType2>
     ThermalModel( const ModelType1& model1, const ModelType2& model2 )
-        : base_fracture_type( model1, model2 )
-        , base_temperature_type( model1, model2 )
+        : base_type( model1, model2 )
     {
     }
 
@@ -299,9 +356,8 @@ struct ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch>
     }
 };
 
-template <typename ForceModelType, typename TemperatureType>
-ThermalModel( ForceModelType, const TemperatureType, const double,
-              const double )
+template <typename TemperatureType>
+ThermalModel( const double, const TemperatureType, const double, const double )
     -> ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch>;
 
 // This class stores temperature parameters needed for heat transfer, but not
@@ -356,32 +412,33 @@ struct ThermalModel<DynamicTemperature, TemperatureType, NoFracture>
     : public BaseDynamicTemperatureModel,
       ThermalModel<TemperatureDependent, TemperatureType, NoFracture>
 {
-    using thermal_tag = TemperatureDependent;
     using base_heattransfer_type = BaseDynamicTemperatureModel;
-    using base_temperature_type =
+    using typename base_heattransfer_type::thermal_tag;
+    using base_type =
         ThermalModel<TemperatureDependent, TemperatureType, NoFracture>;
-    using typename base_temperature_type::fracture_tag;
+    using typename base_type::fracture_tag;
+    using base_type::operator();
 
-    ThermalModel( const TemperatureType _temp, const double _thermal_horizon,
+    ThermalModel( const double _thermal_horizon, const TemperatureType _temp,
                   const double _alpha, const double _kappa, const double _cp,
                   const double _temp0,
                   const bool _constant_microconductivity = true )
         : base_heattransfer_type( _thermal_horizon, _kappa, _cp,
                                   _constant_microconductivity )
-        , base_temperature_type( _temp, _alpha, _temp0 )
+        , base_type( _temp, _alpha, _temp0 )
     {
     }
 
     template <typename ModelType1, typename ModelType2>
     ThermalModel( const ModelType1& model1, const ModelType2& model2 )
         : base_heattransfer_type( model1, model2 )
-        , base_temperature_type( model1, model2 )
+        , base_type( model1, model2 )
     {
     }
 };
 
 template <typename TemperatureType>
-ThermalModel( const TemperatureType, const double, const double, const double,
+ThermalModel( const double, const TemperatureType, const double, const double,
               const double, const double, const bool = true )
     -> ThermalModel<DynamicTemperature, TemperatureType, NoFracture>;
 
@@ -390,19 +447,19 @@ struct ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch>
     : public BaseDynamicTemperatureModel,
       ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch>
 {
-    using thermal_tag = TemperatureDependent;
     using base_heattransfer_type = BaseDynamicTemperatureModel;
-    using base_temperature_type =
+    using typename base_heattransfer_type::thermal_tag;
+    using base_type =
         ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch>;
+    using base_type::operator();
 
-    template <typename ForceModelType>
-    ThermalModel( ForceModelType force_model, const TemperatureType _temp,
-                  const double _thermal_horizon, const double _alpha,
+    ThermalModel( const double _thermal_horizon, const double _s0,
+                  const TemperatureType _temp, const double _alpha,
                   const double _kappa, const double _cp, const double _temp0,
                   const bool _constant_microconductivity = true )
         : base_heattransfer_type( _thermal_horizon, _kappa, _cp,
                                   _constant_microconductivity )
-        , base_temperature_type( force_model, _temp, _alpha, _temp0 )
+        , base_type( _s0, _temp, _alpha, _temp0 )
 
     {
     }
@@ -410,31 +467,19 @@ struct ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch>
     template <typename ModelType1, typename ModelType2>
     ThermalModel( const ModelType1& model1, const ModelType2& model2 )
         : base_heattransfer_type( model1, model2 )
-        , base_temperature_type( model1, model2 )
+        , base_type( model1, model2 )
     {
     }
 };
 
-template <typename ForceModelType, typename TemperatureType>
-ThermalModel( ForceModelType, const TemperatureType, const double, const double,
-              const double, const double, const double, const bool = true )
+template <typename TemperatureType>
+ThermalModel( const double, const double, const TemperatureType, const double,
+              const double, const double, const bool = true )
     -> ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch>;
 
-namespace Experimental
-{
-template <typename MechanicsType, typename FractureType>
-struct ForceModel;
-
-template <typename T>
-struct is_force_model : public std::false_type
-{
-};
-template <typename MechanicsType, typename FractureType>
-struct is_force_model<ForceModel<MechanicsType, FractureType>>
-    : public std::true_type
-{
-};
-
+/******************************************************************************
+Force models.
+******************************************************************************/
 template <typename MechanicsType,
           typename FractureType = FractureModel<NoFracture>>
 struct ForceModel
@@ -443,37 +488,45 @@ struct ForceModel
       ThermalModel<TemperatureIndependent, TemperatureIndependent, NoFracture>
 {
     using MechanicsType::operator();
+    using MechanicsType::influenceType;
     using FractureType::operator();
+    using thermal_tag = TemperatureIndependent;
     using typename FractureType::fracture_tag;
     using thermal_type = ThermalModel<TemperatureIndependent,
                                       TemperatureIndependent, NoFracture>;
     using thermal_type::operator();
 
-    ForceModel( MechanicsType mechanics, FractureType thermal )
+    ForceModel(
+        MechanicsType mechanics, FractureType fracture,
+        typename std::enable_if_t<( is_mechanics_model<MechanicsType>::value &&
+                                    is_fracture_model<FractureType>::value ),
+                                  int>* = 0 )
         : MechanicsType( mechanics )
-        , FractureType( thermal )
+        , FractureType( fracture )
         , thermal_type()
     {
     }
 
     ForceModel( MechanicsType mechanics )
-        : MechanicsType( mechanics )
-        , FractureType()
-        , thermal_type()
+        : ForceModel( mechanics, FractureType() )
     {
     }
 
     // Constructor to average from existing models.
     template <typename ModelType1, typename ModelType2>
-    ForceModel(
-        const ModelType1& model1, const ModelType2& model2,
-        typename std::enable_if_t<is_force_model<ModelType1>::value &&
-                                  is_force_model<ModelType2>::value> = 0 )
+    ForceModel( const ModelType1& model1, const ModelType2& model2,
+                typename std::enable_if_t<( is_force_model<ModelType1>::value &&
+                                            is_force_model<ModelType2>::value ),
+                                          int>* = 0 )
         : MechanicsType( model1, model2 )
         , FractureType( model1, model2 )
     {
     }
 };
+
+template <typename MechanicsType, typename PhysicsType>
+ForceModel( MechanicsType mechanics, PhysicsType thermal )
+    -> ForceModel<MechanicsType, PhysicsType>;
 
 template <typename MechanicsType, typename ThermalType>
 struct ThermalForceModel;
@@ -492,7 +545,11 @@ struct ThermalForceModel : public MechanicsType, ThermalType
     using typename ThermalType::needs_update;
     using typename ThermalType::thermal_tag;
 
-    ThermalForceModel( MechanicsType mechanics, ThermalType thermal )
+    ThermalForceModel(
+        MechanicsType mechanics, ThermalType thermal,
+        typename std::enable_if_t<( is_mechanics_model<MechanicsType>::value &&
+                                    is_thermal_model<ThermalType>::value ),
+                                  int>* = 0 )
         : MechanicsType( mechanics )
         , ThermalType( thermal )
     {
@@ -502,19 +559,15 @@ struct ThermalForceModel : public MechanicsType, ThermalType
     template <typename ModelType1, typename ModelType2>
     ThermalForceModel(
         const ModelType1& model1, const ModelType2& model2,
-        typename std::enable_if_t<is_force_model<ModelType1>::value &&
-                                  is_force_model<ModelType2>::value> = 0 )
+        typename std::enable_if_t<( is_force_model<ModelType1>::value &&
+                                    is_force_model<ModelType2>::value ),
+                                  int>* = 0 )
         : MechanicsType( model1, model2 )
         , ThermalType( model1, model2 )
     {
     }
 };
 
-template <typename MechanicsType, typename PhysicsType>
-ForceModel( MechanicsType mechanics, PhysicsType thermal )
-    -> ForceModel<MechanicsType, PhysicsType>;
-
-} // namespace Experimental
 } // namespace CabanaPD
 
 #endif

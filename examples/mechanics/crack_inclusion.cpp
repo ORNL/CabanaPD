@@ -82,14 +82,14 @@ void crackInclusionExample( const std::string filename )
     CabanaPD::FractureModel fracture_model_plate( horizon, K, G0 );
     CabanaPD::MechanicsModel mechanics_model_plate( model_type{}, horizon, K,
                                                     G );
-    CabanaPD::Experimental::ForceModel force_model_plate(
-        mechanics_model_plate, fracture_model_plate );
+    CabanaPD::ForceModel force_model_plate( mechanics_model_plate,
+                                            fracture_model_plate );
     // Inclusion material
     CabanaPD::FractureModel fracture_model_inclusion( horizon, K_I, G0_I );
     CabanaPD::MechanicsModel mechanics_model_inclusion( model_type{}, horizon,
                                                         K_I, G_I );
-    CabanaPD::Experimental::ForceModel force_model_inclusion(
-        mechanics_model_inclusion, fracture_model_inclusion );
+    CabanaPD::ForceModel force_model_inclusion( mechanics_model_inclusion,
+                                                fracture_model_inclusion );
 
     // ====================================================
     //                 Particle generation

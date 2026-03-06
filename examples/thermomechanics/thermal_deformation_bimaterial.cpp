@@ -95,10 +95,10 @@ void thermalDeformationExample( const std::string filename )
     auto temp = particles.sliceTemperature();
     CabanaPD::ThermalModel thermal_model_upper( temp, alpha[0], temp0 );
     CabanaPD::ThermalModel thermal_model_lower( temp, alpha[1], temp0 );
-    CabanaPD::Experimental::ThermalForceModel force_model_upper(
-        mechanics_model, thermal_model_upper );
-    CabanaPD::Experimental::ThermalForceModel force_model_lower(
-        mechanics_model, thermal_model_lower );
+    CabanaPD::ThermalForceModel force_model_upper( mechanics_model,
+                                                   thermal_model_upper );
+    CabanaPD::ThermalForceModel force_model_lower( mechanics_model,
+                                                   thermal_model_lower );
 
     auto models =
         CabanaPD::createMultiForceModel( particles, CabanaPD::AverageTag{},

@@ -82,8 +82,7 @@ void kalthoffWinklerExample( const std::string filename )
     // CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K, G );
 
     CabanaPD::FractureModel fracture_model( horizon, K, G0 );
-    CabanaPD::Experimental::ForceModel force_model( mechanics_model,
-                                                    fracture_model );
+    CabanaPD::ForceModel force_model( mechanics_model, fracture_model );
 
     // ====================================================
     //                 Particle generation

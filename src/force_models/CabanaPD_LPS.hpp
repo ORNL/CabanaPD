@@ -41,6 +41,12 @@ struct MechanicsModel<LPS, Elastic> : public BaseForceModel
     Kokkos::Array<double, 2> theta_coeff;
     Kokkos::Array<double, 2> s_coeff;
 
+    MechanicsModel( LPS tag, Elastic, const double _force_horizon,
+                    const double _K, const double _G, const int _influence = 0 )
+        : MechanicsModel( tag, _force_horizon, _K, _G, _influence )
+    {
+    }
+
     MechanicsModel( LPS, const double _force_horizon, const double _K,
                     const double _G, const int _influence = 0 )
         : base_type( _force_horizon, _K )
@@ -52,10 +58,7 @@ struct MechanicsModel<LPS, Elastic> : public BaseForceModel
 
     // Constructor to average from existing models.
     template <typename ModelType1, typename ModelType2>
-    MechanicsModel(
-        const ModelType1& model1, const ModelType2& model2,
-        typename std::enable_if_t<is_mechanics_model<ModelType1>::value &&
-                                  is_mechanics_model<ModelType2>::value> = 0 )
+    MechanicsModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
     {
         G = ( model1.G + model2.G ) / 2.0;
@@ -64,8 +67,8 @@ struct MechanicsModel<LPS, Elastic> : public BaseForceModel
         theta_coeff[1] = 3.0 * model2.K - 5.0 * model2.G;
         s_coeff[1] = 15.0 * model2.G;
 
-        influence_type = model1.influence_type;
-        if ( model2.influence_type != model1.influence_type )
+        influence_type = model1.influenceType();
+        if ( model2.influenceType() != model1.influenceType() )
             log_err( std::cout,
                      "Influence function type for each model must match for "
                      "multi-material systems" );
@@ -82,6 +85,9 @@ struct MechanicsModel<LPS, Elastic> : public BaseForceModel
         if ( influence_type > 1 || influence_type < 0 )
             log_err( std::cout, "Influence function type must be 0 or 1." );
     }
+
+    KOKKOS_FUNCTION
+    auto influenceType() const { return influence_type; }
 
     KOKKOS_INLINE_FUNCTION auto operator()( InfluenceFunctionTag,
                                             double xi ) const
@@ -167,143 +173,14 @@ struct MechanicsModel<LinearLPS, Elastic> : public MechanicsModel<LPS, Elastic>
     }
 };
 
-// Backwards compatibility wrapper.
-template <>
-struct ForceModel<LPS, Elastic, NoFracture>
-    : public Experimental::ForceModel<MechanicsModel<LPS, Elastic>,
-                                      FractureModel<NoFracture>>
-{
-    using base_type = Experimental::ForceModel<MechanicsModel<LPS, Elastic>,
-                                               FractureModel<NoFracture>>;
-    using base_type::operator();
-
-    ForceModel( LPS tag, const double _force_horizon, const double _K,
-                const double _G, const int _influence = 0 )
-        : base_type( MechanicsModel( tag, _force_horizon, _K, _G, _influence ),
-                     FractureModel() )
-    {
-    }
-
-    ForceModel( LPS tag, NoFracture, const double _force_horizon,
-                const double _K, const double _G, const int _influence = 0 )
-        : ForceModel( tag, _force_horizon, _K, _G, _influence )
-    {
-    }
-
-    ForceModel( LPS tag, Elastic, NoFracture, const double _force_horizon,
-                const double _K, const double _G, const int _influence = 0 )
-        : ForceModel( tag, _force_horizon, _K, _G, _influence )
-    {
-    }
-
-    template <typename ModelType1, typename ModelType2>
-    ForceModel( const ModelType1& model1, const ModelType2& model2 )
-        : base_type( model1, model2 )
-    {
-    }
-};
-
-template <>
-struct ForceModel<LPS, Elastic, Fracture>
-    : public Experimental::ForceModel<MechanicsModel<LPS, Elastic>,
-                                      FractureModel<CriticalStretch>>
-
-{
-    using base_type = Experimental::ForceModel<MechanicsModel<LPS, Elastic>,
-                                               FractureModel<CriticalStretch>>;
-    using base_type::operator();
-    ForceModel( LPS tag, const double _force_horizon, const double _K,
-                const double _G, const double _G0, const int _influence = 0 )
-        : base_type( MechanicsModel( tag, _force_horizon, _K, _G, _influence ),
-                     FractureModel( _force_horizon, _K, _G0, _influence ) )
-    {
-    }
-
-    ForceModel( LPS model, Fracture, const double _force_horizon,
-                const double _K, const double _G, const double _G0,
-                const int _influence = 0 )
-        : ForceModel( model, _force_horizon, _K, _G, _G0, _influence )
-    {
-    }
-
-    ForceModel( LPS model, Elastic, const double _force_horizon,
-                const double _K, const double _G, const double _G0,
-                const int _influence = 0 )
-        : ForceModel( model, _force_horizon, _K, _G, _G0, _influence )
-    {
-    }
-
-    ForceModel( LPS model, Elastic, Fracture, const double _force_horizon,
-                const double _K, const double _G, const double _G0,
-                const int _influence = 0 )
-        : ForceModel( model, _force_horizon, _K, _G, _G0, _influence )
-    {
-    }
-
-    template <typename ModelType1, typename ModelType2>
-    ForceModel( const ModelType1& model1, const ModelType2& model2 )
-        : base_type( model1, model2 )
-    {
-    }
-};
-
-template <typename MechanicsType, typename FractureType, typename ThermalType,
-          typename... FieldTypes>
-struct ForceModel<LinearLPS, MechanicsType, FractureType, ThermalType,
-                  FieldTypes...>
-    : public ForceModel<LPS, MechanicsType, FractureType, ThermalType,
-                        FieldTypes...>
-{
-    using base_type = ForceModel<LPS, MechanicsType, FractureType, ThermalType,
-                                 FieldTypes...>;
-    // Tag to dispatch to force iteration.
-    using force_tag = LinearLPS;
-
-    using base_type::base_type;
-    using base_type::operator();
-
-    template <typename... Args>
-    ForceModel( LinearLPS, Args&&... args )
-        : base_type( typename base_type::model_tag{},
-                     std::forward<Args>( args )... )
-    {
-    }
-};
-
 template <typename ModelType>
 MechanicsModel( ModelType, const double force_horizon, const double K,
-                const double G, const int influence = 0 )
+                const double G, const int _influence = 0 )
     -> MechanicsModel<ModelType, Elastic>;
-
 template <typename ModelType>
-ForceModel( ModelType, Elastic, NoFracture, const double force_horizon,
-            const double K, const double G, const int influence = 0 )
-    -> ForceModel<ModelType, Elastic, NoFracture>;
-
-template <typename ModelType>
-ForceModel( ModelType, NoFracture, const double force_horizon, const double K,
-            const double G, const int influence = 0 )
-    -> ForceModel<ModelType, Elastic, NoFracture>;
-
-template <typename ModelType>
-ForceModel( ModelType, Elastic, const double force_horizon, const double K,
-            const double G, const double _G0, const int influence = 0,
-            typename std::enable_if<( is_state_based<ModelType>::value ),
-                                    int>::type* = 0 )
-    -> ForceModel<ModelType, Elastic>;
-
-template <typename ModelType>
-ForceModel(
-    ModelType, Elastic, Fracture, const double force_horizon, const double K,
-    const double G, const double _G0, const int influence = 0,
-    typename std::enable_if<( is_state_based<ModelType>::value ), int>::type* =
-        0 ) -> ForceModel<ModelType, Elastic>;
-
-template <typename ModelType>
-ForceModel( ModelType, const double _force_horizon, const double _K,
-            const double _G, const double _G0, const int _influence = 0,
-            typename std::enable_if<( is_state_based<ModelType>::value ),
-                                    int>::type* = 0 ) -> ForceModel<ModelType>;
+MechanicsModel( ModelType, Elastic, const double force_horizon, const double K,
+                const double G, const int _influence = 0 )
+    -> MechanicsModel<ModelType, Elastic>;
 
 } // namespace CabanaPD
 
