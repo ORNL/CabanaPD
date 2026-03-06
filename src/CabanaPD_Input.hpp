@@ -99,6 +99,7 @@ class Inputs
         // Number of time steps.
         int num_steps = tf / dt;
         inputs["num_steps"]["value"] = num_steps;
+        setupOutput();
 
         // Output files.
         if ( !inputs.contains( "output_file" ) )
@@ -203,6 +204,15 @@ class Inputs
                      "Units for low_corner and high_corner do not match." );
         if ( inputs["dx"]["unit"] != inputs["high_corner"]["unit"] )
             log_err( std::cout, "Units for dx do not match system units." );
+    }
+
+    void setupOutput()
+    {
+        if ( !inputs.contains( "output_frequency" ) )
+            inputs["output_frequency"]["value"] = inputs["num_steps"]["value"];
+        if ( !inputs.contains( "particle_output_frequency" ) )
+            inputs["particle_output_frequency"]["value"] =
+                inputs["output_frequency"]["value"];
     }
 
     template <class ForceModel>

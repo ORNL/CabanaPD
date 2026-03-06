@@ -15,5 +15,6 @@
     "timestep"               : {"value": 3.0e-7, "unit": "s"},
     "timestep_safety_factor" : {"value": 0.85},
     "output_frequency"       : {"value": 200},
+    "particle_output_frequency"       : {"value": 400},
     "output_reference"       : {"value": false}
 }

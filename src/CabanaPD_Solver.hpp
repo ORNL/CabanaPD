@@ -158,6 +158,7 @@ class Solver
 
         num_steps = inputs["num_steps"];
         output_frequency = inputs["output_frequency"];
+        particle_output_frequency = inputs["particle_output_frequency"];
         output_reference = inputs["output_reference"];
 
         // Create integrator.
@@ -484,7 +485,7 @@ class Solver
             computeEnergy( force_model, *force, particles, *neighbor );
             computeStress( force_model, *force, particles, *neighbor );
 
-            particles.output( step / output_frequency, step * dt,
+            particles.output( step / particle_output_frequency, step * dt,
                               output_reference );
 
             // Timer has to be stopped before printing output.
@@ -609,6 +610,7 @@ class Solver
 
     int num_steps;
     int output_frequency;
+    int particle_output_frequency;
     bool output_reference;
     double dt;
     int thermal_subcycle_steps;
