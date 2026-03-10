@@ -50,20 +50,6 @@ void sphericalIndenterExample( const std::string filename )
     std::array<double, 3> high_corner = inputs["high_corner"];
 
     // ====================================================
-    //                    Pre-notch
-    // ====================================================
-/*	
-    double height = inputs["system_size"][0];
-    double thickness = inputs["system_size"][2];
-    double L_prenotch = height / 2.0;
-    double y_prenotch = 0.0;
-    Kokkos::Array<double, 3> p01 = { low_corner[0], y_prenotch, low_corner[2] };
-    Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
-    Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-    Kokkos::Array<Kokkos::Array<double, 3>, 1> notch_positions = { p01 };
-    CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
-*/
-    // ====================================================
     //                    Force model
     // ====================================================
     using model_type = CabanaPD::PMB;
@@ -83,9 +69,19 @@ void sphericalIndenterExample( const std::string filename )
     // ====================================================
 
     double dz = particles.dx[2];
+	double dy_bc = particles.dx[1];
+	double dx_bc = particles.dx[0];
     CabanaPD::Region<CabanaPD::RectangularPrism> square_pressure(
         0.5 * low_corner[0], 0.5 * high_corner[0], 0.5 * low_corner[1],
         0.5 * high_corner[1], high_corner[2] - dz, high_corner[2] + dz );
+
+	CabanaPD::Region<CabanaPD::RectangularPrism> no_x(
+       low_corner[0]-dx_bc, low_corner[0]+dx_bc, low_corner[1],
+	   high_corner[1], low_corner[2], high_corner[2]);
+	   
+   	CabanaPD::Region<CabanaPD::RectangularPrism> no_y(
+       low_corner[0], high_corner[0], low_corner[1]-dy_bc,
+   	   low_corner[1]+dy_bc, low_corner[2], high_corner[2]);   
 
     // ====================================================
     //            Custom particle initialization
@@ -99,15 +95,8 @@ void sphericalIndenterExample( const std::string filename )
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
-		
         // Density
         rho( pid ) = rho0;
-/*		
-        // No-fail zone
-        if ( x( pid, 1 ) <= plane1.low[1] + horizon + 1e-10 ||
-             x( pid, 1 ) >= plane2.high[1] - horizon - 1e-10 )
-            nofail( pid ) = 1;
-*/
     };
     particles.update( exec_space{}, init_functor );
 
@@ -127,26 +116,42 @@ void sphericalIndenterExample( const std::string filename )
     x = solver.particles.sliceReferencePosition();
 	v = solver.particles.sliceVelocity();
     // Create a symmetric force BC in the z-direction.
-	
-    auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
-    {		
-	  double xsq = x(pid,0) * x(pid,0);
-	  double ysq = x(pid,1) * x(pid,1);
-	  double v0 = 50.0; // m/s
-	  double R = 3e-3; //max indenter radius
-	  double t = 1e-4;
-	  double r = std::pow(v0*t * (2.0*R - v0*t), 0.5);
-	  
-	    
-	        if ( std::pow(xsq + ysq, 0.5) < r )
-	        {
-//	          f( pid, 2 ) += b0 * R*R - (xsq + ysq) / R*R;
-             f( pid, 2 ) += b0 * std::pow(R*R - (xsq + ysq), 0.5) / R;
-	        }  	 
 
+	double v0 = 50.0; // m/s indenter velocity
+	double R = 3e-3; //max indenter radius
+    auto u = solver.particles.sliceDisplacement();
+    auto disp_func = KOKKOS_LAMBDA( const int pid, const double t )
+    {
+	  double r = std::pow(std::pow(R, 2) - std::pow(R - v0*t, 2), 0.5);	//current radius of indenter
+      double xsq = x(pid,0) * x(pid,0); //current coordinate x
+      double ysq = x(pid,1) * x(pid,1); //current coordinate y
+//    double r_i = std::pow(xsq + ysq, 0.5); //radius of current point
+//    double inv_tan_z = atan( std::pow( (xsq+ysq) / (R*R - (xsq+ysq)), 0.5)); //current point angle from center
+//	  double inv_tan_x = atan( x(pid,0) / (r_i*r_i) ) / 0.785398163; //atan(1)
+//	  double inv_tan_y = atan( x(pid,1) / (r_i*r_i) ) / 0.785398163; //atan(1)
 		
+	  //indenter displacement
+      if ( std::pow(xsq + ysq, 0.5) <= r )
+      {
+        u( pid, 2) =  R - v0*t - std::pow( std::pow(R, 2) - (xsq+ysq), 0.5);
+      }
+	  
+	  
+	  //edge constraints
+      if ( no_x.inside(x, pid) )
+      {
+          u( pid,0) = 0;
+		  u( pid,2) = 0;
+      }
+      if ( no_y.inside(x,pid) )
+      {
+          u( pid,1) = 0;
+		  u( pid,2) = 0;
+      }
+	  
+	  
     };
-    auto bc = createBoundaryCondition( bc_op, exec_space{}, solver.particles,
+    auto bc = createBoundaryCondition( disp_func, exec_space{}, solver.particles,
                                        true, square_pressure );
 									   
 //									   
