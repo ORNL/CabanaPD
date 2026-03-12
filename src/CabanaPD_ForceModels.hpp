@@ -237,17 +237,18 @@ FractureModel( const double _force_horizon, const double _K, const double _G0,
 /******************************************************************************
   Temperature-dependent models.
 ******************************************************************************/
-template <typename ThermalType, typename TemperatureType, typename FunctorType,
-          typename FractureType = NoFracture>
+template <typename ThermalType, typename TemperatureType, typename FractureType,
+          typename... FunctorType>
 struct ThermalModel;
 
 template <typename T>
 struct is_thermal_model : public std::false_type
 {
 };
-template <typename ThermalType, typename TemperatureType, typename FractureType>
+template <typename ThermalType, typename TemperatureType, typename FractureType,
+          typename... FunctorType>
 struct is_thermal_model<
-    ThermalModel<ThermalType, TemperatureType, FractureType>>
+    ThermalModel<ThermalType, TemperatureType, FractureType, FunctorType...>>
     : public std::true_type
 {
 };
@@ -268,8 +269,8 @@ struct ThermalModel<TemperatureIndependent, TemperatureIndependent,
 };
 
 template <typename TemperatureType, typename FunctorType>
-struct ThermalModel<TemperatureDependent, TemperatureType, FunctorType,
-                    NoFracture>
+struct ThermalModel<TemperatureDependent, TemperatureType, NoFracture,
+                    FunctorType>
 {
     using thermal_tag = TemperatureDependent;
     using needs_update = std::true_type;
@@ -330,23 +331,22 @@ struct ThermalModel<TemperatureDependent, TemperatureType, FunctorType,
 
 template <typename TemperatureType>
 ThermalModel( const TemperatureType, const double, const double )
-    -> ThermalModel<TemperatureDependent, TemperatureType, ConstantProperty,
-                    NoFracture>;
+    -> ThermalModel<TemperatureDependent, TemperatureType, NoFracture,
+                    ConstantProperty>;
 
 template <typename TemperatureType, typename FunctorType>
 ThermalModel( const TemperatureType, const FunctorType, const double )
-    -> ThermalModel<TemperatureDependent, TemperatureType, FunctorType,
-                    NoFracture>;
+    -> ThermalModel<TemperatureDependent, TemperatureType, NoFracture,
+                    FunctorType>;
 
 template <typename TemperatureType, typename FunctorType>
-struct ThermalModel<TemperatureDependent, TemperatureType, FunctorType,
-                    CriticalStretch>
-    : public FractureModel<CriticalStretch>,
-      public ThermalModel<TemperatureDependent, TemperatureType, FunctorType,
-                          NoFracture>
+struct ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
+                    FunctorType>
+    : public ThermalModel<TemperatureDependent, TemperatureType, NoFracture,
+                          FunctorType>
 {
-    using base_type =
-        ThermalModel<TemperatureDependent, TemperatureType, NoFracture>;
+    using base_type = ThermalModel<TemperatureDependent, TemperatureType,
+                                   NoFracture, FunctorType>;
     using base_type::operator();
     using fracture_tag = Fracture;
 
@@ -387,38 +387,69 @@ struct ThermalModel<TemperatureDependent, TemperatureType, FunctorType,
 
 template <typename TemperatureType>
 ThermalModel( const double, const TemperatureType, const double, const double )
-    -> ThermalModel<TemperatureDependent, TemperatureType, ConstantProperty,
-                    CriticalStretch>;
+    -> ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
+                    ConstantProperty>;
 
 template <typename TemperatureType, typename FunctorType>
 ThermalModel( const double, const TemperatureType, const FunctorType,
               const double )
-    -> ThermalModel<TemperatureDependent, TemperatureType, FunctorType,
-                    CriticalStretch>;
+    -> ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
+                    FunctorType>;
 
 // This class stores temperature parameters needed for heat transfer, but not
 // the temperature itself (stored instead in the static temperature class
 // above).
+template <typename FunctorConductivity, typename FunctorHeatCapacity>
 struct BaseDynamicTemperatureModel
 {
     using thermal_tag = DynamicTemperature;
 
     double thermal_horizon;
     double thermal_coeff;
-    double kappa;
-    double cp;
+    FunctorConductivity kappa;
+    FunctorHeatCapacity cp;
     bool constant_microconductivity;
 
     BaseDynamicTemperatureModel( const double _thermal_horizon,
                                  const double _kappa, const double _cp,
                                  const bool _constant_microconductivity = true )
+        : BaseDynamicTemperatureModel(
+              _thermal_horizon, ConstantProperty( _kappa ),
+              ConstantProperty( _cp ), _constant_microconductivity )
     {
-        thermal_horizon = _thermal_horizon;
-        kappa = _kappa;
-        cp = _cp;
+    }
+
+    BaseDynamicTemperatureModel( const double _thermal_horizon,
+                                 const FunctorConductivity _kappa,
+                                 const double _cp,
+                                 const bool _constant_microconductivity = true )
+        : BaseDynamicTemperatureModel( _thermal_horizon, _kappa,
+                                       ConstantProperty( _cp ),
+                                       _constant_microconductivity )
+    {
+    }
+
+    BaseDynamicTemperatureModel( const double _thermal_horizon,
+                                 const double _kappa,
+                                 const FunctorHeatCapacity _cp,
+                                 const bool _constant_microconductivity = true )
+        : BaseDynamicTemperatureModel( _thermal_horizon,
+                                       ConstantProperty( _kappa ), _cp,
+                                       _constant_microconductivity )
+    {
+    }
+
+    BaseDynamicTemperatureModel( const double _thermal_horizon,
+                                 const FunctorConductivity _kappa,
+                                 const FunctorHeatCapacity _cp,
+                                 const bool _constant_microconductivity = true )
+        : thermal_horizon( _thermal_horizon )
+        , kappa( _kappa )
+        , cp( _cp )
+    {
         const double d3 =
             _thermal_horizon * _thermal_horizon * _thermal_horizon;
-        thermal_coeff = 9.0 / 2.0 * _kappa / pi / d3;
+        thermal_coeff = 9.0 / 2.0 / pi / d3;
         constant_microconductivity = _constant_microconductivity;
     }
 
@@ -426,40 +457,45 @@ struct BaseDynamicTemperatureModel
     template <typename ModelType1, typename ModelType2>
     BaseDynamicTemperatureModel( const ModelType1& model1,
                                  const ModelType2& model2 )
+        : kappa( ConstantProperty( model1.kappa, model2.kappa ) )
+        , cp( ConstantProperty( model1.cp, model2.cp ) )
     {
         constant_microconductivity = model1.constant_microconductivity;
         thermal_horizon = model1.thermal_horizon;
         thermal_coeff = ( model1.thermal_coeff + model2.thermal_coeff ) / 2.0;
-        kappa = ( model1.kappa + model2.kappa ) / 2.0;
-        cp = ( model1.cp + model2.cp ) / 2.0;
     }
 
-    KOKKOS_INLINE_FUNCTION double microconductivity_function( double r ) const
+    KOKKOS_INLINE_FUNCTION double
+    microconductivity_function( const double r, const int p ) const
     {
+        const double microconductivity = thermal_coeff * kappa( p );
         if ( constant_microconductivity )
-            return thermal_coeff;
+            return microconductivity;
         else
-            return 4.0 * thermal_coeff * ( 1.0 - r / thermal_horizon );
+            return 4.0 * microconductivity * ( 1.0 - r / thermal_horizon );
     }
 };
 
-template <typename TemperatureType, typename FunctoryType>
-struct ThermalModel<DynamicTemperature, TemperatureType, FunctoryType,
-                    NoFracture>
-    : public BaseDynamicTemperatureModel,
-      ThermalModel<TemperatureDependent, TemperatureType, FunctoryType,
-                   NoFracture>
+template <typename TemperatureType, typename FunctorCTE,
+          typename FunctorConductivity, typename FunctorHeatCapacity>
+struct ThermalModel<DynamicTemperature, TemperatureType, NoFracture, FunctorCTE,
+                    FunctorConductivity, FunctorHeatCapacity>
+    : public BaseDynamicTemperatureModel<FunctorConductivity,
+                                         FunctorHeatCapacity>,
+      ThermalModel<TemperatureDependent, TemperatureType, NoFracture,
+                   FunctorCTE>
 {
-    using base_heattransfer_type = BaseDynamicTemperatureModel;
+    using base_heattransfer_type =
+        BaseDynamicTemperatureModel<FunctorConductivity, FunctorHeatCapacity>;
     using typename base_heattransfer_type::thermal_tag;
     using base_type = ThermalModel<TemperatureDependent, TemperatureType,
-                                   NoFracture, FunctoryType>;
+                                   NoFracture, FunctorCTE>;
     using typename base_type::fracture_tag;
     using base_type::operator();
 
     ThermalModel( const double _thermal_horizon, const TemperatureType _temp,
-                  const double _alpha, const double _kappa, const double _cp,
-                  const double _temp0,
+                  const FunctorCTE _alpha, const double _kappa,
+                  const double _cp, const double _temp0,
                   const bool _constant_microconductivity = true )
         : base_heattransfer_type( _thermal_horizon, _kappa, _cp,
                                   _constant_microconductivity )
@@ -478,30 +514,33 @@ struct ThermalModel<DynamicTemperature, TemperatureType, FunctoryType,
 template <typename TemperatureType>
 ThermalModel( const double, const TemperatureType, const double, const double,
               const double, const double, const bool = true )
-    -> ThermalModel<DynamicTemperature, TemperatureType, ConstantProperty,
-                    NoFracture>;
+    -> ThermalModel<DynamicTemperature, TemperatureType, NoFracture,
+                    ConstantProperty, ConstantProperty, ConstantProperty>;
 
-template <typename TemperatureType, typename FunctorType>
-ThermalModel( const TemperatureType, const double, const FunctorType,
+template <typename TemperatureType, typename FunctorCTE>
+ThermalModel( const TemperatureType, const double, const FunctorCTE,
               const double, const double, const double, const bool = true )
-    -> ThermalModel<DynamicTemperature, TemperatureType, FunctorType,
-                    NoFracture>;
+    -> ThermalModel<DynamicTemperature, TemperatureType, NoFracture, FunctorCTE,
+                    ConstantProperty, ConstantProperty>;
 
-template <typename TemperatureType, typename FunctorType>
-struct ThermalModel<DynamicTemperature, TemperatureType, FunctorType,
-                    CriticalStretch>
-    : public BaseDynamicTemperatureModel,
-      ThermalModel<TemperatureDependent, TemperatureType, FunctorType,
-                   CriticalStretch>
+template <typename TemperatureType, typename FunctorCTE,
+          typename FunctorConductivity, typename FunctorHeatCapacity>
+struct ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch,
+                    FunctorCTE, FunctorConductivity, FunctorHeatCapacity>
+    : public BaseDynamicTemperatureModel<FunctorConductivity,
+                                         FunctorHeatCapacity>,
+      ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
+                   FunctorCTE>
 {
-    using base_heattransfer_type = BaseDynamicTemperatureModel;
+    using base_heattransfer_type =
+        BaseDynamicTemperatureModel<FunctorConductivity, FunctorHeatCapacity>;
     using typename base_heattransfer_type::thermal_tag;
     using base_type = ThermalModel<TemperatureDependent, TemperatureType,
-                                   CriticalStretch, FunctoryType>;
+                                   CriticalStretch, FunctorCTE>;
     using base_type::operator();
 
-    ThermalModel( const double _thermal_horizon, const double _s0,
-                  const TemperatureType _temp, const double _alpha,
+    ThermalModel( const double _s0, const TemperatureType _temp,
+                  const double _thermal_horizon, const FunctorCTE _alpha,
                   const double _kappa, const double _cp, const double _temp0,
                   const bool _constant_microconductivity = true )
         : base_heattransfer_type( _thermal_horizon, _kappa, _cp,
@@ -522,8 +561,16 @@ struct ThermalModel<DynamicTemperature, TemperatureType, FunctorType,
 template <typename TemperatureType>
 ThermalModel( const double, const TemperatureType, const double, const double,
               const double, const double, const double, const bool = true )
-    -> ThermalModel<DynamicTemperature, TemperatureType, ConstantProperty,
-                    CriticalStretch>;
+    -> ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch,
+                    ConstantProperty, ConstantProperty, ConstantProperty>;
+
+template <typename ForceModelType, typename TemperatureType,
+          typename FunctorType>
+ThermalModel( ForceModelType, const TemperatureType, const double,
+              const FunctorType, const double, const double, const double,
+              const bool = true )
+    -> ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch,
+                    FunctorType, ConstantProperty, ConstantProperty>;
 
 /******************************************************************************
 Force models.

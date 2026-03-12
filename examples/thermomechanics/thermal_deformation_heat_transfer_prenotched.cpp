@@ -44,7 +44,6 @@ void thermalDeformationHeatTransferPrenotchedExample(
     double G0 = inputs["fracture_energy"];
     double horizon = inputs["horizon"];
     horizon += 1e-10;
-    double alpha = inputs["thermal_expansion_coeff"];
     double kappa = inputs["thermal_conductivity"];
     double cp = inputs["specific_heat_capacity"];
 
@@ -136,7 +135,10 @@ void thermalDeformationHeatTransferPrenotchedExample(
     CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K );
     CabanaPD::FractureModel fracture_model( horizon, K, G0 );
     const double s0 = fracture_model.criticalStretch();
-    CabanaPD::ThermalModel thermal_model( horizon, s0, temp, alpha, kappa, cp,
+
+    std::vector<double> coeff = inputs["thermal_expansion_coeff"];
+    CabanaPD::PolynomialProperty alpha( coeff, temp );
+    CabanaPD::ThermalModel thermal_model( s0, temp, horizon, alpha, kappa, cp,
                                           temp0 );
     CabanaPD::ThermalForceModel force_model( mechanics_model, thermal_model );
 

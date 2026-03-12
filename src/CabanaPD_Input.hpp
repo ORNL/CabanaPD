@@ -296,8 +296,9 @@ class Inputs
                                                typename ForceModel::
                                                    thermal_tag>::value )
                             {
+                                // FIXME: need an interface to get the min
                                 double coeff =
-                                    model.microconductivity_function( xi );
+                                    model.microconductivity_function( xi, 0 );
                                 sum_ht += v_p * coeff / r2;
                             }
                         }
