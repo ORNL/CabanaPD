@@ -73,6 +73,12 @@ class Inputs
         {
             double horizon = inputs["horizon"]["value"];
             int m = std::floor( horizon / dx );
+            if ( horizon < dx )
+            {
+                throw std::runtime_error(
+                    "Input horizon must be greater than or equal to dx to "
+                    "result in any neighbour-particles" );
+            }
             inputs["m"]["value"] = m;
         }
 
@@ -80,6 +86,9 @@ class Inputs
         else if ( inputs.contains( "m" ) )
         {
             int m = inputs["m"]["value"];
+            if ( m < 1 )
+                throw std::runtime_error(
+                    "Input m must be greater than or equal to 1." );
             double horizon = static_cast<double>( m ) * dx + 0.01 * dx;
             inputs["horizon"]["value"] = horizon;
         }
