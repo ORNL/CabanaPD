@@ -53,12 +53,14 @@ void sphericalIndenterExample( const std::string filename )
     //                    Force model
     // ====================================================
     using model_type = CabanaPD::PMB;
+    // using contact_type = CabanaPD::NormalRepulsionModel;
     CabanaPD::ForceModel force_model( model_type{}, horizon, K, G0 );
 
     // ====================================================
     //                 Particle generation
     // ====================================================
     CabanaPD::Particles particles( memory_space{}, model_type{} );
+    // CabanaPD::Particles particles( memory_space{}, contact_type{} );
 
     // Note that individual inputs can be passed instead (see other examples).
     particles.domain( inputs );
@@ -70,7 +72,7 @@ void sphericalIndenterExample( const std::string filename )
     double dx = particles.dx[0];
     double dy = particles.dx[1];
     double dz = particles.dx[2];
-    double R = inputs["indenter radius"];
+    double R = inputs["indenter_radius"];
     double x_center = 0.5 * ( low_corner[0] + high_corner[0] );
     double y_center = 0.5 * ( low_corner[1] + high_corner[1] );
 
@@ -110,32 +112,47 @@ void sphericalIndenterExample( const std::string filename )
     // ====================================================
     CabanaPD::Solver solver( inputs, particles, force_model );
 
+    /*
+    // Use contact radius and extension relative to particle spacing.
+    double r_c = inputs["contact_horizon_factor"];
+    double r_extend = inputs["contact_horizon_extend_factor"];
+    // NOTE: dx/2 is when particles first touch.
+    r_c *= dx / 2.0;
+    r_extend *= dx;
+
+    contact_type contact_model( horizon, r_c, r_extend, K );
+    CabanaPD::Solver solver( inputs, particles, force_model,
+                                 contact_model );
+    */
+
     // ====================================================
     //                Boundary conditions
     // ====================================================
     // Create BC last to ensure ghost particles are included.
     auto x = solver.particles.sliceReferencePosition();
     auto u = solver.particles.sliceDisplacement();
-    double v0 = inputs["indenter velocity"];
+    double v0 = inputs["indenter_velocity"];
 
+    // z-coordinate of top layer of particles
+    double z_top = high_corner[2] - 0.5 * dz;
     // Initial z-coordinate of the indenter center
-    double z0_indenter = high_corner[2] + R;
+    double z0_indenter = z_top + R;
 
     auto disp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
         // z-coordinate of the indenter center
         double z_indenter = z0_indenter - v0 * t;
 
-        // Check if indenter touches the plate
-        if ( z_indenter - R < high_corner[2] )
+        // Check if indenter touches the plate (top layer of particles)
+        if ( z_indenter - R < z_top )
         {
             double r_indenter_sq;
 
-            if ( z_indenter > high_corner[2] )
+            if ( z_indenter > z_top )
             {
                 // Current radius of indenter squared
-                r_indenter_sq = R * R - ( z_indenter - high_corner[2] ) *
-                                            ( z_indenter - high_corner[2] );
+                r_indenter_sq =
+                    R * R - ( z_indenter - z_top ) * ( z_indenter - z_top );
             }
             else
             {
@@ -175,52 +192,46 @@ void sphericalIndenterExample( const std::string filename )
         disp_func, exec_space{}, solver.particles, true, pressure_region,
         low_x_plane, high_x_plane, low_y_plane, high_y_plane );
 
-    //
     //========================================
     //            OUTPUTS
     //========================================
-    //
-    /*
-
-    auto dx = solver.particles.dx[0];
-    auto dy = solver.particles.dx[1];
-    //auto dz = solver.particles.dx[2];
     auto f = solver.particles.sliceForce();
 
+    // Output force in x-direction.
     auto force_func_x = KOKKOS_LAMBDA( const int p )
     {
         return f( p, 0 ) * dx * dy * dz;
     };
     auto output_fx = CabanaPD::createOutputTimeSeries(
         "output_force_x.txt", inputs, exec_space{}, solver.particles,
-        force_func_x, square_pressure );
+        force_func_x, pressure_region );
 
-    // Output force on right grip in y-direction.
+    // Output force in y-direction.
     auto force_func_y = KOKKOS_LAMBDA( const int p )
     {
         return f( p, 1 ) * dx * dy * dz;
     };
     auto output_fy = CabanaPD::createOutputTimeSeries(
         "output_force_y.txt", inputs, exec_space{}, solver.particles,
-        force_func_y, square_pressure );
+        force_func_y, pressure_region );
 
-    // Output force on right grip in z-direction.
+    // Output force in z-direction.
     auto force_func_z = KOKKOS_LAMBDA( const int p )
     {
         return f( p, 2 ) * dx * dy * dz;
     };
     auto output_fz = CabanaPD::createOutputTimeSeries(
         "output_force_z.txt", inputs, exec_space{}, solver.particles,
-        force_func_z, square_pressure );
+        force_func_z, pressure_region );
 
-    */
     // ====================================================
     //                   Simulation run
     // ====================================================
-    // solver.init( bc, prenotch );
     solver.init( bc );
-    // solver.run( bc, output_fx, output_fy, output_fz);
-    solver.run( bc );
+
+    solver.updateRegion( output_fx, output_fy, output_fz );
+
+    solver.run( bc, output_fx, output_fy, output_fz );
 }
 
 // Initialize MPI+Kokkos.
