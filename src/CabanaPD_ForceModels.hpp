@@ -145,11 +145,10 @@ struct BaseFractureModel<TransverselyIsotropic>
     bool operator()( CriticalStretchTag, const int, const int, const double r,
                      const double xi, const double xi_z ) const
     {
-        auto bond_break_xy = ( 1.0 + s0[0] ) * ( 1.0 + s0[0] ) * xi * xi;
-        auto bond_break_z =
-            ( 1.0 + s0[1] - s0[0] ) * ( 1.0 + s0[1] - s0[0] ) * xi_z * xi_z;
+        auto s0_o = s0[0] + ( s0[1] - s0[0] ) * xi_z * xi_z / ( xi * xi );
+        auto bond_break_coeff = ( 1.0 + s0_o ) * ( 1.0 + s0_o );
 
-        return r * r >= bond_break_xy + bond_break_z;
+        return r * r >= bond_break_coeff * xi * xi;
     }
 };
 
