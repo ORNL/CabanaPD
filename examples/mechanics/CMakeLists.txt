@@ -25,7 +25,10 @@ target_link_libraries(CrackInclusion LINK_PUBLIC CabanaPD)
 add_executable(FlatIndenter flat_indenter.cpp)
 target_link_libraries(FlatIndenter LINK_PUBLIC CabanaPD)
 
-add_executable(SphereIndenter sphere_indenter.cpp)
-target_link_libraries(SphereIndenter LINK_PUBLIC CabanaPD)
+add_executable(SphericalIndenter spherical_indenter.cpp)
+target_link_libraries(SphericalIndenter LINK_PUBLIC CabanaPD)
 
-install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DogboneTensileTest PlateWithHole CrackInclusion FlatIndenter SphereIndenter DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(ConicalIndenter conical_indenter.cpp)
+target_link_libraries(ConicalIndenter LINK_PUBLIC CabanaPD)
+
+install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DogboneTensileTest PlateWithHole CrackInclusion FlatIndenter SphericalIndenter ConicalIndenter DESTINATION ${CMAKE_INSTALL_BINDIR})
