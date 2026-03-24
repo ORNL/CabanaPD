@@ -420,28 +420,8 @@ struct BaseDynamicTemperatureModel
     }
 
     BaseDynamicTemperatureModel( const double _thermal_horizon,
-                                 const FunctorConductivity _kappa,
-                                 const double _cp,
-                                 const bool _constant_microconductivity = true )
-        : BaseDynamicTemperatureModel( _thermal_horizon, _kappa,
-                                       ConstantProperty( _cp ),
-                                       _constant_microconductivity )
-    {
-    }
-
-    BaseDynamicTemperatureModel( const double _thermal_horizon,
-                                 const double _kappa,
-                                 const FunctorHeatCapacity _cp,
-                                 const bool _constant_microconductivity = true )
-        : BaseDynamicTemperatureModel( _thermal_horizon,
-                                       ConstantProperty( _kappa ), _cp,
-                                       _constant_microconductivity )
-    {
-    }
-
-    BaseDynamicTemperatureModel( const double _thermal_horizon,
-                                 const FunctorConductivity _kappa,
-                                 const FunctorHeatCapacity _cp,
+                                 FunctorConductivity _kappa,
+                                 FunctorHeatCapacity _cp,
                                  const bool _constant_microconductivity = true )
         : thermal_horizon( _thermal_horizon )
         , kappa( _kappa )
@@ -494,8 +474,18 @@ struct ThermalModel<DynamicTemperature, TemperatureType, NoFracture, FunctorCTE,
     using base_type::operator();
 
     ThermalModel( const double _thermal_horizon, const TemperatureType _temp,
-                  const FunctorCTE _alpha, const double _kappa,
-                  const double _cp, const double _temp0,
+                  const double _alpha, const double _kappa, const double _cp,
+                  const double _temp0,
+                  const bool _constant_microconductivity = true )
+        : base_heattransfer_type( _thermal_horizon, _kappa, _cp,
+                                  _constant_microconductivity )
+        , base_type( _temp, _alpha, _temp0 )
+    {
+    }
+
+    ThermalModel( const double _thermal_horizon, const TemperatureType _temp,
+                  FunctorCTE _alpha, FunctorConductivity _kappa,
+                  FunctorHeatCapacity _cp, const double _temp0,
                   const bool _constant_microconductivity = true )
         : base_heattransfer_type( _thermal_horizon, _kappa, _cp,
                                   _constant_microconductivity )
@@ -517,11 +507,13 @@ ThermalModel( const double, const TemperatureType, const double, const double,
     -> ThermalModel<DynamicTemperature, TemperatureType, NoFracture,
                     ConstantProperty, ConstantProperty, ConstantProperty>;
 
-template <typename TemperatureType, typename FunctorCTE>
-ThermalModel( const TemperatureType, const double, const FunctorCTE,
-              const double, const double, const double, const bool = true )
+template <typename TemperatureType, typename FunctorCTE,
+          typename FunctorConductivity, typename FunctorHeatCapacity>
+ThermalModel( const double, const TemperatureType, FunctorCTE,
+              FunctorConductivity, FunctorHeatCapacity, const double,
+              const bool = true )
     -> ThermalModel<DynamicTemperature, TemperatureType, NoFracture, FunctorCTE,
-                    ConstantProperty, ConstantProperty>;
+                    FunctorConductivity, FunctorHeatCapacity>;
 
 template <typename TemperatureType, typename FunctorCTE,
           typename FunctorConductivity, typename FunctorHeatCapacity>
@@ -539,9 +531,21 @@ struct ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch,
                                    CriticalStretch, FunctorCTE>;
     using base_type::operator();
 
-    ThermalModel( const double _s0, const TemperatureType _temp,
-                  const double _thermal_horizon, const FunctorCTE _alpha,
+    ThermalModel( const double _thermal_horizon, const double _s0,
+                  const TemperatureType _temp, const double _alpha,
                   const double _kappa, const double _cp, const double _temp0,
+                  const bool _constant_microconductivity = true )
+        : base_heattransfer_type( _thermal_horizon, _kappa, _cp,
+                                  _constant_microconductivity )
+        , base_type( _s0, _temp, _alpha, _temp0 )
+
+    {
+    }
+
+    ThermalModel( const double _thermal_horizon, const double _s0,
+                  const TemperatureType _temp, FunctorCTE _alpha,
+                  FunctorConductivity _kappa, FunctorHeatCapacity _cp,
+                  const double _temp0,
                   const bool _constant_microconductivity = true )
         : base_heattransfer_type( _thermal_horizon, _kappa, _cp,
                                   _constant_microconductivity )
@@ -559,18 +563,18 @@ struct ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch,
 };
 
 template <typename TemperatureType>
-ThermalModel( const double, const TemperatureType, const double, const double,
+ThermalModel( const double, const double, const TemperatureType, const double,
               const double, const double, const double, const bool = true )
     -> ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch,
                     ConstantProperty, ConstantProperty, ConstantProperty>;
 
-template <typename ForceModelType, typename TemperatureType,
-          typename FunctorType>
-ThermalModel( ForceModelType, const TemperatureType, const double,
-              const FunctorType, const double, const double, const double,
+template <typename TemperatureType, typename FunctorCTE,
+          typename FunctorConductivity, typename FunctorHeatCapacity>
+ThermalModel( const double, const double, const TemperatureType, FunctorCTE,
+              FunctorConductivity, FunctorHeatCapacity, const double,
               const bool = true )
     -> ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch,
-                    FunctorType, ConstantProperty, ConstantProperty>;
+                    FunctorCTE, FunctorConductivity, FunctorHeatCapacity>;
 
 /******************************************************************************
 Force models.
