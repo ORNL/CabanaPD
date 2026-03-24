@@ -296,11 +296,11 @@ struct ThermalModel<TemperatureDependent, TemperatureType, NoFracture,
     {
     }
 
-    // FIXME: use the first model temperature for now.
+    // FIXME: use the first model functional dependence for now.
     // FIXME: does not work for both constant and custom alpha yet
     template <typename ModelType1, typename ModelType2>
     ThermalModel( const ModelType1& model1, const ModelType2& model2 )
-        : alpha( ConstantProperty( model1.alpha, model2.alpha ) )
+        : alpha( model1.alpha )
     {
         static_assert( std::is_same_v<decltype( model1.temperature ),
                                       decltype( model2.temperature )>,
@@ -453,12 +453,12 @@ struct BaseDynamicTemperatureModel
         constant_microconductivity = _constant_microconductivity;
     }
 
-    // FIXME: use the first model horizon and microconductivity for now.
+    // FIXME: use the first model functional dependence for now.
     template <typename ModelType1, typename ModelType2>
     BaseDynamicTemperatureModel( const ModelType1& model1,
                                  const ModelType2& model2 )
-        : kappa( ConstantProperty( model1.kappa, model2.kappa ) )
-        , cp( ConstantProperty( model1.cp, model2.cp ) )
+        : kappa( model1.kappa )
+        , cp( model1.cp )
     {
         constant_microconductivity = model1.constant_microconductivity;
         thermal_horizon = model1.thermal_horizon;
