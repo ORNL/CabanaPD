@@ -53,7 +53,7 @@ struct PolynomialProperty
     auto operator()( const int p ) const
     {
         return coeff( 0 ) + coeff( 1 ) * temp( p ) +
-               coeff( 2 ) * Kokkos::pow( temp( p ), 2.0 );
+               coeff( 2 ) * temp( p ) * temp( p );
     }
 
     // Update with new temperature field.
