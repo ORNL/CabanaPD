@@ -308,7 +308,7 @@ struct ADRIntegrator
                 // nan check since we divide by the displacement and the
                 // velocity. Thus we can have a lot of 0s which are
                 // singularities in the formula for c_damping
-                if ( Kokkos::isnan( c_damping ) )
+                if ( Kokkos::isnan( c_damping ) || Kokkos::isinf( c_damping ) )
                     c_damping = 0.;
 
                 // update velocity with old velocity and damping coefficient
