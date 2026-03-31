@@ -371,6 +371,9 @@ struct ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
     template <typename ModelType1, typename ModelType2>
     ThermalModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
+        , s0( Kokkos::sqrt( model1.s0 * model1.s0 * model1.K +
+                            model2.s0 * model2.s0 * model2.K ) /
+              ( model1.K + model2.K ) )
     {
     }
 
