@@ -133,6 +133,14 @@ struct is_fracture_model<FractureModel<FractureType>> : public std::true_type
 {
 };
 
+KOKKOS_INLINE_FUNCTION
+auto averageCriticalStretch( const double s0_1, const double s0_2,
+                             const double K_1, const double K_2 )
+{
+    return Kokkos::sqrt( ( s0_1 * s0_1 * K_1 + s0_2 * s0_2 * K_2 ) /
+                         ( K_1 + K_2 ) );
+}
+
 template <>
 struct FractureModel<NoFracture>
 {
@@ -205,10 +213,9 @@ struct FractureModel<CriticalStretch>
                                   int>* = 0 )
     {
         G0 = ( model1.fractureEnergy() + model2.fractureEnergy() ) / 2.0;
-        const double s0_1 = model1.criticalStretch();
-        const double s0_2 = model2.criticalStretch();
-        s0 = Kokkos::sqrt( ( s0_1 * s0_1 * model1.K + s0_2 * s0_2 * model2.K ) /
-                           ( model1.K + model2.K ) );
+        s0 = averageCriticalStretch( model1.criticalStretch(),
+                                     model2.criticalStretch(), model1.K,
+                                     model2.K );
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 
@@ -342,6 +349,9 @@ struct ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch>
     template <typename ModelType1, typename ModelType2>
     ThermalModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
+        , s0( averageCriticalStretch( model1.criticalStretch(),
+                                      model2.criticalStretch(), model1.K,
+                                      model2.K ) )
     {
     }
 
@@ -354,6 +364,9 @@ struct ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch>
             ( 1.0 + s0 + alpha * temp_avg ) * ( 1.0 + s0 + alpha * temp_avg );
         return r * r >= bond_break_coeff * xi * xi;
     }
+
+    KOKKOS_FUNCTION
+    auto criticalStretch() const { return s0; }
 };
 
 template <typename TemperatureType>
