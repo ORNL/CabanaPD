@@ -184,7 +184,7 @@ void crackInclusionExample( const std::string filename )
             return 0.0;
     };
     auto output_yl = CabanaPD::createOutputTimeSeries<Kokkos::Max<double>>(
-        "output_crack_y.txt", inputs, exec_space{}, solver.particles,
+        "output_incl_crack_y.txt", inputs, exec_space{}, solver.particles,
         crack_y_func, box );
 
     // ====================================================
