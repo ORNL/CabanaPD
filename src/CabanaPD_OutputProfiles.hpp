@@ -12,6 +12,8 @@
 #ifndef DISPLACEMENTPROFILE_H
 #define DISPLACEMENTPROFILE_H
 
+#include <mpi.h>
+
 #include <Kokkos_Core.hpp>
 
 #include <Cabana_Core.hpp>
@@ -92,10 +94,25 @@ void createDisplacementMagnitudeProfile( std::string file_name,
     createOutputProfile( file_name, particles, profile_dim, magnitude );
 }
 
+template <typename T>
+struct MpiReduce;
+
+template <typename Scalar>
+struct MpiReduce<Kokkos::Sum<Scalar>>
+{
+    static MPI_Op type() { return MPI_SUM; }
+};
+
+template <typename Scalar>
+struct MpiReduce<Kokkos::Max<Scalar>>
+{
+    static MPI_Op type() { return MPI_MAX; }
+};
+
 /******************************************************************************
   Scalar time series
 ******************************************************************************/
-template <typename MemorySpace, typename FunctorType>
+template <typename ReduceType, typename MemorySpace, typename FunctorType>
 class OutputTimeSeries
 {
     using memory_space = MemorySpace;
@@ -108,6 +125,8 @@ class OutputTimeSeries
     profile_type _profile;
     FunctorType _output;
     std::size_t index;
+
+    MpiReduce<ReduceType> mpi_op;
 
   public:
     OutputTimeSeries( std::string name, Inputs inputs,
@@ -133,13 +152,14 @@ class OutputTimeSeries
         auto indices = _indices;
         auto output = _output;
         // Reduce into host view.
+        ReduceType reducer( _profile( index ) );
         Kokkos::parallel_reduce(
             "time_series", policy,
             KOKKOS_LAMBDA( const int b, double& px ) {
                 auto p = indices._view( b );
-                px += output( p );
+                reducer.join( px, output( p ) );
             },
-            _profile( index ) );
+            reducer );
         Kokkos::fence();
         index++;
     }
@@ -148,8 +168,9 @@ class OutputTimeSeries
     {
         auto profile_host = Kokkos::create_mirror_view_and_copy(
             Kokkos::HostSpace{}, _profile );
+
         MPI_Allreduce( MPI_IN_PLACE, profile_host.data(), profile_host.size(),
-                       MPI_DOUBLE, MPI_SUM, comm );
+                       MPI_DOUBLE, mpi_op.type(), comm );
         auto num_particles = static_cast<int>( _indices.size() );
         MPI_Allreduce( MPI_IN_PLACE, &num_particles, 1, MPI_INT, MPI_SUM,
                        comm );
@@ -176,7 +197,21 @@ auto createOutputTimeSeries( std::string name, const Inputs inputs,
                              const GeometryType geom )
 {
     ParticleSteeringVector indices( exec_space, particles, geom );
-    return OutputTimeSeries( name, inputs, indices, user );
+    return OutputTimeSeries<Kokkos::Sum<double>,
+                            typename ParticleType::memory_space, FunctorType>(
+        name, inputs, indices, user );
+}
+
+template <typename ReducerType, typename FunctorType, typename ExecSpace,
+          typename ParticleType, typename GeometryType>
+auto createOutputTimeSeries( std::string name, const Inputs inputs,
+                             ExecSpace exec_space,
+                             const ParticleType& particles, FunctorType user,
+                             const GeometryType geom )
+{
+    ParticleSteeringVector indices( exec_space, particles, geom );
+    return OutputTimeSeries<ReducerType, typename ParticleType::memory_space,
+                            FunctorType>( name, inputs, indices, user );
 }
 
 } // namespace CabanaPD

@@ -170,10 +170,28 @@ void crackInclusionExample( const std::string filename )
                                        true, plane1, plane2 );
 
     // ====================================================
+    //                      Outputs
+    // ====================================================
+    // Output maximum y-extent of the crack.
+    CabanaPD::Region<CabanaPD::RectangularPrism> box( low_corner, high_corner );
+    auto d = solver.particles.sliceDamage();
+    auto crack_y_func = KOKKOS_LAMBDA( const int p )
+    {
+        // Use a threshold of damage to only output damaged particles.
+        if ( d( p ) > 0.3 )
+            return x( p, 1 );
+        else
+            return 0.0;
+    };
+    auto output_yl = CabanaPD::createOutputTimeSeries<Kokkos::Max<double>>(
+        "output_crack_y.txt", inputs, exec_space{}, solver.particles,
+        crack_y_func, box );
+
+    // ====================================================
     //                   Simulation run
     // ====================================================
     solver.init( bc, prenotch );
-    solver.run( bc );
+    solver.run( bc, output_yl );
 }
 
 // Initialize MPI+Kokkos.
