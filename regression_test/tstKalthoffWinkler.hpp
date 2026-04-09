@@ -14,6 +14,7 @@
 #include <Kokkos_Core.hpp>
 #include <gtest/gtest.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 
@@ -27,8 +28,9 @@ TEST( TEST_CATEGORY, KalthoffWinkler )
     std::filesystem::remove( outname );
 
     // Run with smaller system than example/ for regression testing.
-    std::system(
+    auto sysreturn = std::system(
         "../examples/mechanics/KalthoffWinkler kalthoff_winkler.json" );
+    EXPECT_EQ( sysreturn, 0 );
 
     // This test is based on checking that the crack grows at the correct angle.
     std::ifstream outfile( outname );

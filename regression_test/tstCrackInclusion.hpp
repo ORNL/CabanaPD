@@ -14,6 +14,7 @@
 #include <Kokkos_Core.hpp>
 #include <gtest/gtest.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 
@@ -26,7 +27,9 @@ TEST( TEST_CATEGORY, CrackInclusion )
     std::filesystem::remove( outname );
 
     // Run with smaller system than example/ for regression testing.
-    std::system( "../examples/mechanics/CrackInclusion crack_inclusion.json" );
+    auto sysreturn = std::system(
+        "../examples/mechanics/CrackInclusion crack_inclusion.json" );
+    EXPECT_EQ( sysreturn, 0 );
 
     // This test is based on checking that the crack actually branches:
     // If the crack does not correctly branch around the inclusion, then the

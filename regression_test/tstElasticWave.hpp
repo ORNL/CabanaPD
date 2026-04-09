@@ -14,6 +14,7 @@
 #include <Kokkos_Core.hpp>
 #include <gtest/gtest.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -41,7 +42,9 @@ TEST( TEST_CATEGORY, ElasticWave )
     std::filesystem::remove( outname );
 
     // Run with smaller system than example/ for regression testing.
-    std::system( "../examples/mechanics/ElasticWave elastic_wave.json" );
+    auto sysreturn =
+        std::system( "../examples/mechanics/ElasticWave elastic_wave.json" );
+    EXPECT_EQ( sysreturn, 0 );
 
     // Coefficients in descending order.
     std::vector<double> coeff{
