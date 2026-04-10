@@ -46,6 +46,10 @@ TEST( TEST_CATEGORY, ElasticWave )
         std::system( "../examples/mechanics/ElasticWave elastic_wave.json" );
     EXPECT_EQ( sysreturn, 0 );
 
+    // Only need to check on rank zero.
+    if ( !CabanaPD::print_rank() )
+        return;
+
     // Coefficients in descending order.
     std::vector<double> coeff{
         1.61854683e+03, 9.92564555e+07, -2.04437979e+03, -1.25377266e+08,

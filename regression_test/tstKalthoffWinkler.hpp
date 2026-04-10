@@ -32,6 +32,10 @@ TEST( TEST_CATEGORY, KalthoffWinkler )
         "../examples/mechanics/KalthoffWinkler kalthoff_winkler.json" );
     EXPECT_EQ( sysreturn, 0 );
 
+    // Only need to check on rank zero.
+    if ( !CabanaPD::print_rank() )
+        return;
+
     // This test is based on checking that the crack grows at the correct angle.
     std::ifstream outfile( outname );
     std::string line;

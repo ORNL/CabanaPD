@@ -31,6 +31,10 @@ TEST( TEST_CATEGORY, CrackInclusion )
         "../examples/mechanics/CrackInclusion crack_inclusion.json" );
     EXPECT_EQ( sysreturn, 0 );
 
+    // Only need to check on rank zero.
+    if ( !CabanaPD::print_rank() )
+        return;
+
     // This test is based on checking that the crack actually branches:
     // If the crack does not correctly branch around the inclusion, then the
     // final extent is mostly likely to be near 0.0
