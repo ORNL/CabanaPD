@@ -84,47 +84,40 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
     // ====================================================
     //            Boundary condition
     // ====================================================
-    // Create region for both grips.
-    CabanaPD::Region<CabanaPD::RectangularPrism> right_grip(
-        high_corner[0] - horizon, high_corner[0], low_corner[1], high_corner[1],
-        low_corner[2], high_corner[2] );
-    CabanaPD::Region<CabanaPD::RectangularPrism> left_grip(
-        low_corner[0], low_corner[0] + horizon, low_corner[1], high_corner[1],
+    // Create region for cube.
+    std::cout << "low corner: " << low_corner[0] << " " << low_corner[1] << " "
+              << low_corner[2] << std::endl;
+    std::cout << "high corner: " << high_corner[0] << " " << high_corner[1]
+              << " " << high_corner[2] << std::endl;
+    CabanaPD::Region<CabanaPD::RectangularPrism> center_cube(
+        low_corner[0] + horizon, high_corner[0] - horizon,
+        low_corner[1] + horizon, high_corner[1] - horizon,
+        low_corner[2] + horizon, high_corner[2] - horizon );
+    CabanaPD::Region<CabanaPD::RectangularPrism> full_cube(
+        low_corner[0], high_corner[0], low_corner[1], high_corner[1],
         low_corner[2], high_corner[2] );
 
-    double distance_between_clamps =
-        high_corner[0] - low_corner[0] - 2 * horizon;
+    double edge_length_cube = high_corner[0] - low_corner[0] - 2 * horizon;
 
     // Create BC last to ensure ghost particles are included.
     auto u = solver.particles.sliceDisplacement();
-    double rate = 0.001;
+    double strain_rate = 0.0001;
     double end_time_factor = 0.5;
     auto disp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
-        double time = t;
-        if ( t < end_time_factor * final_time )
-            time = end_time_factor * t;
+        double non_dim_time = t / final_time;
+        if ( non_dim_time > end_time_factor )
+            non_dim_time = end_time_factor;
 
-        if ( right_grip.inside( x, pid ) )
+        if ( !center_cube.inside( x, pid ) )
         {
-            u( pid, 0 ) = 0.5 * rate * time;
-            u( pid, 1 ) =
-                -x( pid, 1 ) * rate * time / distance_between_clamps * nu;
-            u( pid, 2 ) =
-                -x( pid, 2 ) * rate * time / distance_between_clamps * nu;
-        }
-        else if ( left_grip.inside( x, pid ) )
-        {
-            u( pid, 0 ) = -0.5 * rate * time;
-            u( pid, 1 ) =
-                -x( pid, 1 ) * rate * time / distance_between_clamps * nu;
-            u( pid, 2 ) =
-                -x( pid, 2 ) * rate * time / distance_between_clamps * nu;
+            // uni-axial strain
+            u( pid, 0 ) =
+                x( pid, 0 ) / edge_length_cube * strain_rate * non_dim_time;
         }
     };
-    auto bc = CabanaPD::createBoundaryCondition( disp_func, exec_space{},
-                                                 solver.particles, false,
-                                                 left_grip, right_grip );
+    auto bc = CabanaPD::createBoundaryCondition(
+        disp_func, exec_space{}, solver.particles, false, full_cube );
 
     // ====================================================
     //                   Simulation run
@@ -135,34 +128,60 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
     // ====================================================
     //            Validation functor
     // ====================================================
-    // TODO we probably want to check the stresses.
-    // but either we use ADR or we find a good averaging.
-    // We probably should test both, but I need to think about this some more
-    // Also we probably want to check if the poisson ratio is correct. But I am
-    // not sure if that works ... maybe just near the centerline
+    using HostAoSoA =
+        Cabana::AoSoA<Cabana::MemberTypes<double[3], double[3], double[3]>,
+                      Kokkos::HostSpace>;
+    HostAoSoA aosoa_host( "host_aosoa", particles.size() );
+    auto u_host = Cabana::slice<0>( aosoa_host );
+    auto f_host = Cabana::slice<1>( aosoa_host );
+    auto x_host = Cabana::slice<2>( aosoa_host );
+
+    Cabana::deep_copy( u_host, u );
+    Cabana::deep_copy( f_host, f );
+    Cabana::deep_copy( x_host, x );
+
+    // Create region for center of cube. This helps eliminate surface effects
     CabanaPD::Region<CabanaPD::RectangularPrism> center_region(
         low_corner[0], high_corner[0], -0.25 * horizon, +0.25 * horizon,
         -0.25 * horizon, +0.25 * horizon );
 
-    double displacement_error_x;
-    Kokkos::parallel_reduce(
-        "displacement_midpoint_x",
+    // Primary check on the particle displacement that results from the
+    // displacement of the clamps check strain in main direction, which is x
+    Kokkos::parallel_for(
+        "displacement_center_region_x",
         Kokkos::RangePolicy<exec_space>( 0, particles.size() ),
-        KOKKOS_LAMBDA( const int pid, double& local_sum ) {
-            if ( !right_grip.inside( x, pid ) && !left_grip.inside( x, pid ) )
+        KOKKOS_LAMBDA( const int pid ) {
+            if ( center_cube.inside( x_host, pid ) )
             {
-                if ( center_region.inside( x, pid ) )
+                if ( center_region.inside( x_host, pid ) )
                 {
-                    // std::cout << x(pid,0) << " " << u(pid,0) << " " <<
-                    // x(pid,0)/distance_between_clamps * rate
-                    // *end_time_factor*final_time <<  std::endl;
-                    local_sum +=
-                        u( pid, 0 ) - x( pid, 0 ) / distance_between_clamps *
-                                          rate * end_time_factor * final_time;
+                    EXPECT_NEAR( u_host( pid, 0 ),
+                                 x( pid, 0 ) / edge_length_cube * strain_rate *
+                                     end_time_factor,
+                                 Kokkos::abs( u_host( pid, 0 ) ) * 1e-1 );
                 }
             }
-        },
-        displacement_error_x );
-    EXPECT_NEAR( displacement_error_x, 0., 1e-9 );
+        } );
+
+    // Secondary check on the particle displacement that results from the
+    // Poisson effect. We only check y check displacement created by nu
+    Kokkos::parallel_for(
+        "displacement_center_region_y",
+        Kokkos::RangePolicy<exec_space>( 0, particles.size() ),
+        KOKKOS_LAMBDA( const int pid ) {
+            if ( center_cube.inside( x_host, pid ) )
+            {
+                if ( center_region.inside( x_host, pid ) )
+                {
+                    EXPECT_NEAR( u_host( pid, 1 ),
+                                 ( -nu ) * x( pid, 1 ) / edge_length_cube *
+                                     strain_rate * end_time_factor,
+                                 Kokkos::abs( nu * u_host( pid, 0 ) ) * 1e-1 );
+                }
+            }
+        } );
+
+    // TODO we probably want to check the stresses.
+    // but either we use ADR or we find a good averaging.
 };
 } // namespace Test
