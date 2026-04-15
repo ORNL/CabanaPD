@@ -558,6 +558,10 @@ struct ThermalForceModel : public MechanicsType, ThermalType
     using typename ThermalType::needs_update;
     using typename ThermalType::thermal_tag;
 
+    static_assert( !is_state_based<MechanicsType>::value ||
+                       !is_temperature_dependent<ThermalType>::value,
+                   "State-based models do not yet support thermomechanics!" );
+
     ThermalForceModel(
         MechanicsType mechanics, ThermalType thermal,
         typename std::enable_if_t<( is_mechanics_model<MechanicsType>::value &&
