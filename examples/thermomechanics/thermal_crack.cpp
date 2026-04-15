@@ -19,9 +19,10 @@
 #include <CabanaPD.hpp>
 
 template <typename TemperatureType>
-struct CustomAlpha : public CabanaPD::PolynomialProperty<TemperatureType>
+struct CustomAlpha
+    : public CabanaPD::TemperatureDependentPolynomial<TemperatureType>
 {
-    using base_type = CabanaPD::PolynomialProperty<TemperatureType>;
+    using base_type = CabanaPD::TemperatureDependentPolynomial<TemperatureType>;
     using base_type::base_type;
     using base_type::coeff;
     using base_type::temp;

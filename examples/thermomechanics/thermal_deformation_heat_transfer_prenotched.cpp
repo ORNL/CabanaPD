@@ -19,9 +19,10 @@
 #include <CabanaPD.hpp>
 
 template <typename TemperatureType>
-struct CustomKappa : public CabanaPD::PolynomialProperty<TemperatureType>
+struct CustomKappa
+    : public CabanaPD::TemperatureDependentPolynomial<TemperatureType>
 {
-    using base_type = CabanaPD::PolynomialProperty<TemperatureType>;
+    using base_type = CabanaPD::TemperatureDependentPolynomial<TemperatureType>;
     using base_type::base_type;
     using base_type::coeff;
     using base_type::temp;
@@ -155,7 +156,7 @@ void thermalDeformationHeatTransferPrenotchedExample(
     const double s0 = fracture_model.criticalStretch();
 
     std::vector<double> alpha_coeff = inputs["thermal_expansion_coeff"];
-    CabanaPD::PolynomialProperty alpha( alpha_coeff, temp );
+    CabanaPD::TemperatureDependentPolynomial alpha( alpha_coeff, temp );
     std::vector<double> kappa_coeff = inputs["thermal_conductivity"];
     CustomKappa kappa( kappa_coeff, temp );
     CabanaPD::ConstantProperty alpha2( alpha_coeff[0] );
