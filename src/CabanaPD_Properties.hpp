@@ -38,13 +38,39 @@ struct ConstantProperty
 };
 
 template <typename TemperatureType>
-struct PolynomialProperty
+struct TemperatureDependentProperty
 {
+    // Constructor with temperature field.
+    TemperatureDependentProperty( const TemperatureType& t )
+        : temp( t )
+    {
+    }
+
+    // Update with new temperature field.
+    template <typename ParticleType>
+    void update( const ParticleType& particles )
+    {
+        temp = particles.sliceTemperature();
+    }
+
+    TemperatureType temp;
+};
+
+template <typename TemperatureType>
+TemperatureDependentProperty( const TemperatureType )
+    -> TemperatureDependentProperty<TemperatureType>;
+
+template <typename TemperatureType>
+struct TemperatureDependentPolynomial
+    : public TemperatureDependentProperty<TemperatureType>
+{
+    using base_type = TemperatureDependentProperty<TemperatureType>;
+
     // Constructor with polynomial coefficients and temperature field.
     template <typename ArrayType>
-    PolynomialProperty( ArrayType array, const TemperatureType& t )
-        : coeff( array.data() )
-        , temp( t )
+    TemperatureDependentPolynomial( ArrayType array, const TemperatureType& t )
+        : base_type( t )
+        , coeff( array.data() )
     {
     }
 
@@ -56,20 +82,13 @@ struct PolynomialProperty
                coeff( 2 ) * temp( p ) * temp( p );
     }
 
-    // Update with new temperature field.
-    template <typename ParticleType>
-    void update( const ParticleType& particles )
-    {
-        temp = particles.sliceTemperature();
-    }
-
     Kokkos::View<double*, typename TemperatureType::memory_space> coeff;
-    TemperatureType temp;
+    using base_type::temp;
 };
 
 template <typename ArrayType, typename TemperatureType>
-PolynomialProperty( const ArrayType, const TemperatureType )
-    -> PolynomialProperty<TemperatureType>;
+TemperatureDependentPolynomial( const ArrayType, const TemperatureType )
+    -> TemperatureDependentPolynomial<TemperatureType>;
 
 } // namespace CabanaPD
 
