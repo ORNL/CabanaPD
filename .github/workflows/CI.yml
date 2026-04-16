@@ -92,6 +92,10 @@ jobs:
         uses: actions/checkout@v3
       - name: Build CabanaPD
         run: |
+          cmake_opts=( -DCabanaPD_ENABLE_TESTING=ON -DCabanaPD_ENABLE_EXAMPLES=ON )
+          if [[ ${{ matrix.cmake_build_type }} == 'Release' ]]; then
+            cmake_opts+=( -DCabanaPD_ENABLE_REGRESSION_TESTING=ON )
+          fi
           cmake -B build \
             -D CMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }} \
             -D CMAKE_CXX_COMPILER=${{ matrix.cxx }} \
@@ -100,8 +104,7 @@ jobs:
             -D CMAKE_PREFIX_PATH="$HOME/Cabana" \
             -D MPIEXEC_MAX_NUMPROCS=2 \
             -D MPIEXEC_PREFLAGS="--oversubscribe" \
-            -D CabanaPD_ENABLE_TESTING=ON \
-            -D CabanaPD_ENABLE_EXAMPLES=ON
+            ${cmake_opts[@]}
           cmake --build build --parallel 2
           cmake --install build
       - name: Test CabanaPD

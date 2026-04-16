@@ -84,7 +84,8 @@ endif()
 ## Unit tests
 ##---------------------------------------------------------------------------##
 option(CabanaPD_ENABLE_TESTING "Build tests" OFF)
-if(CabanaPD_ENABLE_TESTING)
+option(CabanaPD_ENABLE_REGRESSION_TESTING "Build tests" OFF)
+if(CabanaPD_ENABLE_TESTING OR CabanaPD_ENABLE_REGRESSION_TESTING)
   find_package(GTest 1.10 REQUIRED)
   # Workaround for FindGTest module in CMake older than 3.20
   if(TARGET GTest::gtest)
@@ -95,7 +96,11 @@ if(CabanaPD_ENABLE_TESTING)
     message(FATAL_ERROR "bug in GTest find module workaround")
   endif()
   enable_testing()
+endif()
+if(CabanaPD_ENABLE_TESTING)
   add_subdirectory(unit_test)
+endif()
+if(CabanaPD_ENABLE_REGRESSION_TESTING)
   add_subdirectory(regression_test)
 endif()
 
