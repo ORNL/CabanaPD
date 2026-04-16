@@ -415,7 +415,7 @@ class Solver
             runStep( step );
             // FIXME: not included in timing
             if ( step % output_frequency == 0 )
-                updateRegion( region_output... );
+                updateRegion( step * dt, region_output... );
         }
 
         // Final output and timings.
@@ -436,7 +436,7 @@ class Solver
             runStep( step, boundary_condition );
             // FIXME: not included in timing
             if ( step % output_frequency == 0 )
-                updateRegion( region_output... );
+                updateRegion( step * dt, region_output... );
         }
 
         // Final output and timings.
@@ -446,14 +446,15 @@ class Solver
 
     // Iterate over all regions.
     template <typename... RegionType>
-    void updateRegion( RegionType&... region )
+    void updateRegion( [[maybe_unused]] const double time,
+                       RegionType&... region )
     {
-        ( updateRegion( region ), ... );
+        ( updateRegion( time, region ), ... );
     }
     template <typename RegionType>
-    void updateRegion( RegionType& region )
+    void updateRegion( const double time, RegionType& region )
     {
-        region.update();
+        region.update( time );
     }
 
     // Compute and communicate fields needed for force computation and update

@@ -144,7 +144,7 @@ class OutputTimeSeries
         _profile = profile_type( "time_output", output_steps );
     }
 
-    void update()
+    void update( const double time )
     {
         Kokkos::RangePolicy<typename memory_space::execution_space> policy(
             0, _indices.size() );
@@ -157,7 +157,7 @@ class OutputTimeSeries
             "time_series", policy,
             KOKKOS_LAMBDA( const int b, double& px ) {
                 auto p = indices._view( b );
-                reducer.join( px, output( p ) );
+                reducer.join( px, output( p, time ) );
             },
             reducer );
         Kokkos::fence();
