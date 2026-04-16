@@ -171,6 +171,32 @@ struct FirstModelWithFractureType
             FractureType>>::type;
 };
 
+template <typename BaseModelPackType, typename IndexingType, size_t Index>
+auto generateSingleModelCombination( BaseModelPackType const& baseModels )
+{
+    using type = typename BaseModelPackType::template value_type<
+        IndexingType::template getInverseIndexPair<Index>().first>;
+
+    auto firstModel =
+        Cabana::get<IndexingType::template getInverseIndexPair<Index>().first>(
+            baseModels );
+
+    auto secondModel =
+        Cabana::get<IndexingType::template getInverseIndexPair<Index>().second>(
+            baseModels );
+    return type{ firstModel, secondModel };
+}
+
+template <typename BaseModelPackType, typename IndexingType, size_t... Indices>
+auto generateAllModelCombinationsForIndexing(
+    BaseModelPackType const& baseModels, IndexingType,
+    std::index_sequence<Indices...> )
+{
+    return Cabana::makeParameterPack(
+        generateSingleModelCombination<BaseModelPackType, IndexingType,
+                                       Indices>( baseModels )... );
+}
+
 // Wrap multiple models in a single object.
 template <typename MaterialType, typename Indexing, typename ParameterPackType,
           typename OutsideRangeFunctorType, typename Sequence>
@@ -323,17 +349,18 @@ struct AbortIfOutsideRangeFunctor
     }
 };
 
-template <typename MaterialType, typename Indexing, typename ParameterPackType,
+template <typename MaterialType, typename IndexingType,
+          typename ParameterPackType,
           typename OutsideRangeFunctorType = AbortIfOutsideRangeFunctor>
-struct ForceModels
-    : CabanaPD::Impl::ForceModelsImpl<
-          MaterialType, Indexing, ParameterPackType, OutsideRangeFunctorType,
-          std::make_index_sequence<ParameterPackType::size>>
+struct ForceModels : CabanaPD::Impl::ForceModelsImpl<
+                         MaterialType, IndexingType, ParameterPackType,
+                         OutsideRangeFunctorType,
+                         std::make_index_sequence<ParameterPackType::size>>
 {
-    ForceModels( MaterialType t, Indexing i, ParameterPackType const& m,
+    ForceModels( MaterialType t, IndexingType i, ParameterPackType const& m,
                  OutsideRangeFunctorType const& o = OutsideRangeFunctorType() )
         : CabanaPD::Impl::ForceModelsImpl<
-              MaterialType, Indexing, ParameterPackType,
+              MaterialType, IndexingType, ParameterPackType,
               OutsideRangeFunctorType,
               std::make_index_sequence<ParameterPackType::size>>( t, i, m, o )
     {
@@ -344,168 +371,52 @@ struct AverageTag
 {
 };
 
-template <typename ParticleType, typename Indexing, typename... ModelTypes>
-auto createMultiForceModel( ParticleType particles, Indexing indexing,
+template <typename ParticleType, typename IndexingType, typename... ModelTypes>
+auto createMultiForceModel( ParticleType particles, IndexingType indexing,
                             ModelTypes... m )
 {
+    static_assert(
+        is_Indexing<IndexingType>,
+        "Indexing requires is_Indexing trait to be usable in ForceModels" );
     auto type = particles.sliceType();
     return ForceModels( type, indexing, Cabana::makeParameterPack( m... ) );
 }
 
-template <
-    typename ParticleType, typename ModelType1, typename ModelType2,
-    std::enable_if_t<is_symmetric<typename ModelType1::model_tag>::value &&
-                         is_symmetric<typename ModelType2::model_tag>::value,
-                     int> = 0>
-auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
-                            ModelType2 m2 )
+template <typename ParticleType, typename... ModelTypes,
+          std::enable_if_t<std::conjunction_v<
+                               is_symmetric<typename ModelTypes::model_tag>...>,
+                           int> = 0>
+auto createMultiForceModel( ParticleType particles, AverageTag,
+                            ModelTypes... m )
 {
-    ModelType1 m12( m1, m2 );
-    // the indexing has to match the order that we pass the models to the
-    // multiforce model, as the return index of indexing is used to select the
-    // model from the model list.
-    DiagonalIndexing<2> indexing;
-    return createMultiForceModel( particles, indexing, m1, m2, m12 );
-}
-template <
-    typename ParticleType, typename ModelType1, typename ModelType2,
-    std::enable_if_t<!is_symmetric<typename ModelType1::model_tag>::value &&
-                         !is_symmetric<typename ModelType2::model_tag>::value,
-                     int> = 0>
-auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
-                            ModelType2 m2 )
-{
-    ModelType1 m12( m1, m2 );
-    ModelType2 m21( m2, m1 );
-    // the indexing has to match the order that we pass the models to the
-    // multiforce model, as the return index of indexing is used to select the
-    // model from the model list.
-    FullIndexing<2> indexing;
-    return createMultiForceModel( particles, indexing, m1, m12, m21, m2 );
+    using IndexingType = DiagonalIndexing<sizeof...( ModelTypes )>;
+    IndexingType indexing;
+    auto type = particles.sliceType();
+    auto baseModels = Cabana::makeParameterPack( m... );
+    return ForceModels(
+        type, indexing,
+        CabanaPD::Impl::generateAllModelCombinationsForIndexing(
+            baseModels, indexing,
+            std::make_index_sequence<IndexingType::NumTotalModels>{} ) );
 }
 
-template <
-    typename ParticleType, typename ModelType1, typename ModelType2,
-    typename ModelType3,
-    std::enable_if_t<is_symmetric<typename ModelType1::model_tag>::value &&
-                         is_symmetric<typename ModelType2::model_tag>::value &&
-                         is_symmetric<typename ModelType3::model_tag>::value,
-                     int> = 0>
-auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
-                            ModelType2 m2, ModelType3 m3 )
+template <typename ParticleType, typename... ModelTypes,
+          std::enable_if_t<!std::conjunction_v<
+                               is_symmetric<typename ModelTypes::model_tag>...>,
+                           int> = 0>
+auto createMultiForceModel( ParticleType particles, AverageTag,
+                            ModelTypes... m )
 {
-    ModelType1 m12( m1, m2 );
-    ModelType2 m23( m2, m3 );
-    ModelType1 m13( m1, m3 );
-
-    // the indexing has to match the order that we pass the models to the
-    // multiforce model, as the return index of indexing is used to select the
-    // model from the model list.
-    DiagonalIndexing<3> indexing;
-    return createMultiForceModel( particles, indexing, m1, m2, m3, m12, m23,
-                                  m13 );
+    using IndexingType = FullIndexing<sizeof...( ModelTypes )>;
+    IndexingType indexing;
+    auto type = particles.sliceType();
+    auto baseModels = Cabana::makeParameterPack( m... );
+    return ForceModels(
+        type, indexing,
+        CabanaPD::Impl::generateAllModelCombinationsForIndexing(
+            baseModels, indexing,
+            std::make_index_sequence<IndexingType::NumTotalModels>{} ) );
 }
-
-template <
-    typename ParticleType, typename ModelType1, typename ModelType2,
-    typename ModelType3,
-    std::enable_if_t<!is_symmetric<typename ModelType1::model_tag>::value &&
-                         !is_symmetric<typename ModelType2::model_tag>::value &&
-                         !is_symmetric<typename ModelType3::model_tag>::value,
-                     int> = 0>
-auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
-                            ModelType2 m2, ModelType3 m3 )
-{
-    ModelType1 m12( m1, m2 );
-    ModelType2 m23( m2, m3 );
-    ModelType1 m13( m1, m3 );
-
-    ModelType2 m21( m2, m1 );
-    ModelType3 m32( m3, m2 );
-    ModelType3 m31( m3, m1 );
-
-    // the indexing has to match the order that we pass the models to the
-    // multiforce model, as the return index of indexing is used to select the
-    // model from the model list.
-    FullIndexing<3> indexing;
-    return createMultiForceModel( particles, indexing, m1, m12, m13, m21, m2,
-                                  m23, m31, m32, m3 );
-}
-
-template <
-    typename ParticleType, typename ModelType1, typename ModelType2,
-    typename ModelType3, typename ModelType4,
-    std::enable_if_t<is_symmetric<typename ModelType1::model_tag>::value &&
-                         is_symmetric<typename ModelType2::model_tag>::value &&
-                         is_symmetric<typename ModelType3::model_tag>::value &&
-                         is_symmetric<typename ModelType4::model_tag>::value,
-                     int> = 0>
-auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
-                            ModelType2 m2, ModelType3 m3, ModelType4 m4 )
-{
-    ModelType1 m12( m1, m2 );
-    ModelType2 m23( m2, m3 );
-    ModelType3 m34( m3, m4 );
-
-    ModelType1 m13( m1, m3 );
-    ModelType2 m24( m2, m4 );
-
-    ModelType1 m14( m1, m4 );
-
-    // the indexing has to match the order that we pass the models to the
-    // multiforce model, as the return index of indexing is used to select the
-    // model from the model list.
-    DiagonalIndexing<4> indexing;
-    return createMultiForceModel( particles, indexing, m1, m2, m3, m4, m12, m23,
-                                  m34, m13, m24, m14 );
-}
-
-template <
-    typename ParticleType, typename ModelType1, typename ModelType2,
-    typename ModelType3, typename ModelType4,
-    std::enable_if_t<!is_symmetric<typename ModelType1::model_tag>::value &&
-                         !is_symmetric<typename ModelType2::model_tag>::value &&
-                         !is_symmetric<typename ModelType3::model_tag>::value &&
-                         !is_symmetric<typename ModelType4::model_tag>::value,
-                     int> = 0>
-auto createMultiForceModel( ParticleType particles, AverageTag, ModelType1 m1,
-                            ModelType2 m2, ModelType3 m3, ModelType4 m4 )
-{
-    ModelType1 m12( m1, m2 );
-    ModelType1 m13( m1, m3 );
-    ModelType1 m14( m1, m4 );
-
-    ModelType2 m21( m2, m1 );
-    ModelType2 m23( m2, m3 );
-    ModelType2 m24( m2, m4 );
-
-    ModelType3 m31( m3, m1 );
-    ModelType3 m32( m3, m2 );
-    ModelType3 m34( m3, m4 );
-
-    ModelType4 m41( m4, m1 );
-    ModelType4 m42( m4, m2 );
-    ModelType4 m43( m4, m3 );
-
-    // the indexing has to match the order that we pass the models to the
-    // multiforce model, as the return index of indexing is used to select the
-    // model from the model list.
-    FullIndexing<4> indexing;
-    return createMultiForceModel( particles, indexing, m1, m12, m13, m14, m21,
-                                  m2, m23, m24, m31, m32, m3, m34, m41, m42,
-                                  m43, m4 );
-}
-
-// TODO autogenerate indexing for arbitrary case
-// template <typename ParticleType, typename... ModelTypes>
-// auto createMultiForceModel( ParticleType particles, AverageTag, ModelTypes...
-// m )
-//{
-//    DiagonalIndexing<sizeof(ModelTypes...)> indexing;
-//    auto models = //TODO
-//    return createMultiForceModel( particles, indexing,
-//    Cabana::makeParameterPack( models ) );
-//}
 
 } // namespace CabanaPD
 
