@@ -154,9 +154,9 @@ void testIntegratorADRSingleMass( int steps )
     // Check the results
     for ( std::size_t p = 0; p < num_masses; ++p )
     {
-        EXPECT_NEAR( displacements_host( p, 0 ), 0.0, 0.01 );
-        EXPECT_NEAR( displacements_host( p, 1 ), 0.0, 0.01 );
-        EXPECT_NEAR( displacements_host( p, 2 ), 0.0, 0.01 );
+        EXPECT_NEAR( displacements_host( p, 0 ), 0.0, 1e-16 );
+        EXPECT_NEAR( displacements_host( p, 1 ), 0.0, 1e-16 );
+        EXPECT_NEAR( displacements_host( p, 2 ), 0.0, 1e-16 );
     }
 }
 
@@ -224,7 +224,7 @@ void testIntegratorADRparticles( int steps )
     // Check the results
     for ( std::size_t p = 0; p < num_particle; ++p )
         for ( std::size_t d = 0; d < 3; ++d )
-            EXPECT_NEAR( displacements_final( p, d ), 0.0, 0.01 );
+            EXPECT_NEAR( displacements_final( p, d ), 0.0, 1e-16 );
 }
 
 //---------------------------------------------------------------------------//
@@ -237,11 +237,11 @@ TEST( TEST_CATEGORY, test_integrate_reversibility )
 
 TEST( TEST_CATEGORY, test_integrate_ADR_single_mass )
 {
-    testIntegratorADRSingleMass( 20 );
+    testIntegratorADRSingleMass( 1000 );
 }
 TEST( TEST_CATEGORY, test_integrate_ADR_particles )
 {
-    testIntegratorADRparticles( 20 );
+    testIntegratorADRparticles( 2000 );
 }
 
 //---------------------------------------------------------------------------//
