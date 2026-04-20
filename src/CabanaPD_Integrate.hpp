@@ -282,23 +282,22 @@ struct ADRIntegrator
                 0, _forces_last_step.extent( 0 ) ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 double mass[dim];
-                double stiffness[dim];
                 double damping_numerator = 0.;
                 double damping_denominator = 0.;
                 // compute damping coefficient
                 for ( int i = 0; i < dim; ++i )
                 {
                     mass[i] = _fictitious_mass( index, i );
-                    stiffness[i] = ( -forces( index, i ) +
-                                     _forces_last_step( index, i ) ) /
-                                   mass[i] / _delta_t /
-                                   _velocities_last_step( index, i );
-                    if ( Kokkos::isnan( stiffness[i] ) )
-                        stiffness[i] = 0.;
-
-                    damping_numerator += displacements( index, i ) *
-                                         stiffness[i] *
-                                         displacements( index, i );
+                    for ( int j = 0; j < dim; ++j )
+                    {
+                        damping_numerator +=
+                            ( -forces( index, i ) +
+                              _forces_last_step( index, i ) ) /
+                            ( mass[i] * _delta_t *
+                              _velocities_last_step( index, i ) ) *
+                            displacements( index, i ) *
+                            displacements( index, j );
+                    }
                     damping_denominator +=
                         displacements( index, i ) * displacements( index, i );
                 }
