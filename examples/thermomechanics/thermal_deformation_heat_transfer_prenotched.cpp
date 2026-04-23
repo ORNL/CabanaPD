@@ -153,7 +153,7 @@ void thermalDeformationHeatTransferPrenotchedExample(
     // ====================================================
     CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K );
     CabanaPD::FractureModel fracture_model( horizon, K, G0 );
-    const double s0 = fracture_model.criticalStretch();
+    const double s0 = CabanaPD::criticalStretch( horizon, K, G0 );
 
     std::vector<double> alpha_coeff = inputs["thermal_expansion_coeff"];
     CabanaPD::TemperatureDependentPolynomial alpha( alpha_coeff, temp );

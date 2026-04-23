@@ -106,13 +106,12 @@ void thermalCrackExample( const std::string filename )
     //                    Force model
     // ====================================================
     CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K );
-    CabanaPD::FractureModel fracture_model( horizon, K, G0 );
 
     auto temp = particles.sliceTemperature();
     std::vector<double> coeff = inputs["thermal_expansion_coeff"];
 
     CustomAlpha alpha( coeff, temp );
-    const double s0 = fracture_model.criticalStretch();
+    const double s0 = CabanaPD::criticalStretch( horizon, K, G0 );
     CabanaPD::ThermalModel thermal_model( s0, temp, alpha, temp0 );
     CabanaPD::ThermalForceModel force_model( mechanics_model, thermal_model );
 

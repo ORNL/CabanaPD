@@ -134,6 +134,17 @@ struct is_fracture_model<FractureModel<FractureType>> : public std::true_type
 };
 
 KOKKOS_INLINE_FUNCTION
+auto criticalStretch( const double horizon, const double K, const double G0,
+                      const int influence = 1 )
+{
+    double s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / K / horizon ); // 1/xi
+    if ( influence == 0 )
+        s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / K / horizon ); // 1
+
+    return s0;
+}
+
+KOKKOS_INLINE_FUNCTION
 auto averageCriticalStretch( const double s0_1, const double s0_2,
                              const double K_1, const double K_2 )
 {
@@ -184,9 +195,7 @@ struct FractureModel<CriticalStretch>
                    const double _G0, const int influence = 1 )
         : influence_type( influence )
     {
-        s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / _K / _force_horizon ); // 1/xi
-        if ( influence_type == 0 )
-            s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / _K / _force_horizon ); // 1
+        s0 = CabanaPD::criticalStretch( _force_horizon, _K, _G0, influence );
 
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
