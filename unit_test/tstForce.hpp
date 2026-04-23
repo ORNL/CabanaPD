@@ -1070,9 +1070,8 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
     }
     {
         //  With fracture.
-        CabanaPD::FractureModel fracture_model( horizon, K, G0 );
-        CabanaPD::ThermalModel thermal_model( fracture_model.criticalStretch(),
-                                              temp, alpha, temp0 );
+        const double s0 = CabanaPD::criticalStretch( horizon, K, G0 );
+        CabanaPD::ThermalModel thermal_model( s0, temp, alpha, temp0 );
         CabanaPD::ThermalForceModel force_model( mechanics_model,
                                                  thermal_model );
     }
@@ -1089,10 +1088,9 @@ TEST( TEST_CATEGORY, test_force_pmb_construct )
     }
     {
         //  With fracture.
-        CabanaPD::FractureModel fracture_model( horizon, K, G0 );
-        CabanaPD::ThermalModel thermal_model( horizon,
-                                              fracture_model.criticalStretch(),
-                                              temp, alpha, kappa, cp, temp0 );
+        const double s0 = CabanaPD::criticalStretch( horizon, K, G0 );
+        CabanaPD::ThermalModel thermal_model( horizon, s0, temp, alpha, kappa,
+                                              cp, temp0 );
         CabanaPD::ThermalForceModel force_model( mechanics_model,
                                                  thermal_model );
     }

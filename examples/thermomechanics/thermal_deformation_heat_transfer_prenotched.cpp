@@ -134,8 +134,7 @@ void thermalDeformationHeatTransferPrenotchedExample(
     //                    Force model
     // ====================================================
     CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K );
-    CabanaPD::FractureModel fracture_model( horizon, K, G0 );
-    const double s0 = fracture_model.criticalStretch();
+    const double s0 = CabanaPD::criticalStretch( horizon, K, G0 );
     CabanaPD::ThermalModel thermal_model( horizon, s0, temp, alpha, kappa, cp,
                                           temp0 );
     CabanaPD::ThermalForceModel force_model( mechanics_model, thermal_model );
