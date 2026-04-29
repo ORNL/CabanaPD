@@ -29,8 +29,6 @@
 #include <Kokkos_Core.hpp>
 
 #include <CabanaPD.hpp>
-//#include <CabanaPD_Particles.hpp>
-//#include <CabanaPD_ForceModelsMulti.hpp>
 
 namespace Test
 {
