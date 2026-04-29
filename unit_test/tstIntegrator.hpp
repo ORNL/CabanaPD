@@ -28,9 +28,9 @@
 #include <Cabana_Core.hpp>
 #include <Kokkos_Core.hpp>
 
-#include <CabanaPD_Integrate.hpp>
-#include <CabanaPD_Particles.hpp>
-#include <CabanaPD_config.hpp>
+#include <CabanaPD.hpp>
+//#include <CabanaPD_Particles.hpp>
+//#include <CabanaPD_ForceModelsMulti.hpp>
 
 namespace Test
 {
@@ -227,6 +227,84 @@ void testIntegratorADRparticles( int steps )
             EXPECT_NEAR( displacements_final( p, d ), 0.0, 1e-16 );
 }
 
+void testIntegratorADRparticlesMultiMaterial( int steps )
+{
+    using exec_space = TEST_EXECSPACE;
+    const int numMaterials = 2;
+
+    std::array<double, 3> box_min = { -1.0, -1.0, -1.0 };
+    std::array<double, 3> box_max = { 1.0, 1.0, 1.0 };
+    std::array<int, 3> num_cells = { 10, 10, 10 };
+
+    CabanaPD::Particles particles( TEST_MEMSPACE{}, CabanaPD::PMB{},
+                                   CabanaPD::TemperatureIndependent{} );
+    particles.domain( box_min, box_max, num_cells, 0 );
+    particles.create( exec_space{} );
+    auto displacements = particles.sliceDisplacement();
+    auto forces = particles.sliceForce();
+    auto type = particles.sliceType();
+    std::size_t num_particle = displacements.size();
+    double stiffness[numMaterials] = { 1000, 10 };
+
+    using model_type = CabanaPD::PMB;
+    CabanaPD::ForceModel force_model_0( model_type{}, CabanaPD::NoFracture{},
+                                        1.0, stiffness[0] );
+    CabanaPD::ForceModel force_model_1( model_type{}, CabanaPD::NoFracture{},
+                                        1.0, stiffness[1] );
+
+    auto models = CabanaPD::createMultiForceModel(
+        particles, CabanaPD::AverageTag{}, force_model_0, force_model_1 );
+
+    double adrDeltaT = 1.0;
+    auto particleIntegrator = CabanaPD::createADRParticleIntegrator(
+        exec_space{}, forces, particles, models, adrDeltaT, 1.0, 1.0 );
+
+    // how to calculate forces
+    auto force_lambda = KOKKOS_LAMBDA( int i )
+    {
+        forces( i, 0 ) = -stiffness[i % numMaterials] * displacements( i, 0 );
+        forces( i, 1 ) = -stiffness[i % numMaterials] * displacements( i, 1 );
+        forces( i, 2 ) = -stiffness[i % numMaterials] * displacements( i, 2 );
+    };
+
+    // initialize displacements
+    auto positions = particles.sliceReferencePosition();
+    Kokkos::parallel_for(
+        "testIntegrateADRparticles::initialize_displacements_and_type",
+        num_particle, KOKKOS_LAMBDA( int i ) {
+            for ( int j = 0; j < 3; ++j )
+                displacements( i, j ) = positions( i, j );
+            type( i ) = i % 2; // two materials
+        } );
+
+    // initialize forces
+    Kokkos::parallel_for( "testIntegrateADRSingleMass::initialize_forces",
+                          num_particle, force_lambda );
+
+    particleIntegrator.reset( exec_space{} );
+    // Integrate one step
+    for ( int s = 0; s < steps; ++s )
+    {
+        particleIntegrator.initialSubStep( exec_space{}, particles );
+        Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
+                              num_particle, force_lambda );
+        particleIntegrator.middleSubStep( exec_space{}, particles );
+        particleIntegrator.finalSubStep( exec_space{}, particles );
+    }
+
+    // Make a copy of final results on the host
+    using DataTypes = Cabana::MemberTypes<double[3]>;
+    using HostAoSoA = Cabana::AoSoA<DataTypes, Kokkos::HostSpace>;
+    HostAoSoA displacements_aosoa_final( "displacements_final_host",
+                                         num_particle );
+    auto displacements_final = Cabana::slice<0>( displacements_aosoa_final );
+    Cabana::deep_copy( displacements_final, displacements );
+
+    // Check the results
+    for ( std::size_t p = 0; p < num_particle; ++p )
+        for ( std::size_t d = 0; d < 3; ++d )
+            EXPECT_NEAR( displacements_final( p, d ), 0.0, 1e-16 );
+}
 //---------------------------------------------------------------------------//
 // TESTS
 //---------------------------------------------------------------------------//
@@ -242,6 +320,11 @@ TEST( TEST_CATEGORY, test_integrate_ADR_single_mass )
 TEST( TEST_CATEGORY, test_integrate_ADR_particles )
 {
     testIntegratorADRparticles( 2000 );
+}
+
+TEST( TEST_CATEGORY, test_integrate_ADR_particles_multi_material )
+{
+    testIntegratorADRparticlesMultiMaterial( 3000 );
 }
 
 //---------------------------------------------------------------------------//
