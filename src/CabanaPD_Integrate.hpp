@@ -365,6 +365,64 @@ struct ADRFictitiousMass
     }
 };
 
+struct GetCFunctor
+{
+    template <typename Model>
+    KOKKOS_FUNCTION auto operator()( Model& model ) const
+    {
+        return model.c;
+    }
+};
+
+template <typename ParticleTypeType, typename IndexingType,
+          typename ForceModelsType>
+struct ADRMultiMaterialFictitiousMass
+{
+    ADRMultiMaterialFictitiousMass( ParticleTypeType const& particleType,
+                                    IndexingType const& indexing,
+                                    ForceModelsType const& models,
+                                    double delta_t, double horizon,
+                                    double delta_x, double safety_factor = 5.0 )
+        : _particleType( particleType )
+        , _indexing( indexing )
+        , _models( models )
+        , _delta_t( delta_t )
+        , _horizon( horizon )
+        , _delta_x( delta_x )
+        , _safety_factor( safety_factor )
+    {
+        // We need to extract the c values for each material from the models. We
+        // do this in the constructor since we only need to do it once and then
+        // we can reuse the c values in the operator() without needing to
+        // extract them again.
+        for ( unsigned i = 0; i < IndexingType::NumBaseModels; ++i )
+        {
+            _c[i] = CabanaPD::Impl::run_functor_for_index_in_pack_with_args(
+                GetCFunctor{}, i, _models.models );
+        }
+    }
+
+    template <typename IndexType>
+    double KOKKOS_FUNCTION operator()( IndexType index, int ) const
+    {
+        auto materialIndex =
+            _indexing( _particleType( index ), _particleType( index ) );
+        return _safety_factor *
+               ( _delta_t * _delta_t * Kokkos::numbers::pi * _horizon *
+                 _horizon * _horizon * _c[materialIndex] ) /
+               ( 3.0 * _delta_x );
+    }
+
+    ParticleTypeType _particleType;
+    IndexingType _indexing;
+    ForceModelsType _models;
+    double _delta_t;
+    double _horizon;
+    double _delta_x;
+    double _safety_factor;
+    Kokkos::Array<double, IndexingType::NumBaseModels> _c;
+};
+
 template <typename ForcesType, typename FictitiousMassType>
 struct ADRInitialVelocity
 {
@@ -443,6 +501,29 @@ auto createADRParticleIntegrator( ExecutionSpace const& exec_space,
 {
     CabanaPD::ADRFictitiousMass adrMass{ delta_t, horizon, delta_x, c,
                                          safety_factor };
+    CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass, delta_t };
+    CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrInitialVelocity,
+                                        forces.size(), delta_t );
+    CabanaPD::ParticleIntegratorWrapper particleIntegrator( integrator );
+    return particleIntegrator;
+}
+
+template <typename ExecutionSpace, typename ForceType, typename ParticleType,
+          typename ForceModelsType>
+auto createADRParticleIntegrator( ExecutionSpace const& exec_space,
+                                  ForceType const& forces,
+                                  ParticleType const& particles,
+                                  ForceModelsType const& force_models,
+                                  double delta_t, double horizon,
+                                  double delta_x, double safety_factor = 5.0 )
+{
+    auto particleType = particles.sliceType();
+    CabanaPD::ADRMultiMaterialFictitiousMass<decltype( particleType ),
+                                             decltype( force_models.indexing ),
+                                             decltype( force_models )>
+        adrMass{
+            particleType, force_models.indexing, force_models, delta_t, horizon,
+            delta_x,      safety_factor };
     CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass, delta_t };
     CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrInitialVelocity,
                                         forces.size(), delta_t );
