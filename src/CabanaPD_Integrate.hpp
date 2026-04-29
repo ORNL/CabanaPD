@@ -294,7 +294,7 @@ struct ADRIntegrator
                             ( -forces( index, i ) +
                               _forces_last_step( index, i ) ) /
                             ( mass[i] * _delta_t *
-                              _velocities_last_step( index, i ) ) *
+                              _velocities_last_step( index, j ) ) *
                             displacements( index, i ) *
                             displacements( index, j );
                     }
