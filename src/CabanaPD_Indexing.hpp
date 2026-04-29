@@ -15,9 +15,10 @@
 namespace CabanaPD
 {
 // Index along each diagonal sequentially (symmetric).
-template <unsigned NumBaseModels>
+template <unsigned NBaseModels>
 struct DiagonalIndexing
 {
+    static constexpr unsigned NumBaseModels = NBaseModels;
     static_assert( NumBaseModels > 0, "NumBaseModels must be larger than 0" );
 
     KOKKOS_FUNCTION unsigned operator()( unsigned firstType,
@@ -44,6 +45,7 @@ struct DiagonalIndexing
 // Index same type as 0 and differing types as 1.
 struct BinaryIndexing
 {
+    static constexpr unsigned NumBaseModels = 2;
     KOKKOS_FUNCTION unsigned operator()( unsigned firstType,
                                          unsigned secondType ) const
     {
@@ -51,9 +53,10 @@ struct BinaryIndexing
     }
 };
 
-template <unsigned NumBaseModels>
+template <unsigned NBaseModels>
 struct FullIndexing
 {
+    static constexpr unsigned NumBaseModels = NBaseModels;
     static_assert( NumBaseModels > 0, "NumBaseModels must be larger than 0" );
 
     KOKKOS_FUNCTION unsigned operator()( unsigned firstType,
