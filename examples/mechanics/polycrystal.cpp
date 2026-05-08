@@ -13,6 +13,7 @@
 constexpr std::size_t NUM_GRAINS = 4;
 constexpr double PI = 3.141592653589793238462643383;
 
+// Get flat index into ND array
 template <std::size_t n>
 int indexND( const std::array<int, n>& index, const std::array<int, n>& shape )
 {
@@ -28,6 +29,7 @@ int indexND( const std::array<int, n>& index, const std::array<int, n>& shape )
     return outIndex;
 }
 
+// Check if ND array multi-index is valid
 template <std::size_t n>
 bool isValid( const std::array<int, n>& idx, const std::array<int, n>& shape )
 {
@@ -41,6 +43,7 @@ bool isValid( const std::array<int, n>& idx, const std::array<int, n>& shape )
     return true;
 }
 
+// Recursive helper function for makeNeighborRelativeIndices
 template <std::size_t n>
 void makeRelativeIndicesRecursive(
     int axis, std::array<int, n>& curIndex,
@@ -62,6 +65,7 @@ void makeRelativeIndicesRecursive(
     }
 }
 
+// Get ND array neighbor relative multi-indices
 template <std::size_t n>
 void makeNeighborRelativeIndices(
     std::vector<std::array<int, n>>& outRelativeIndices )
@@ -82,12 +86,13 @@ double distSquared( const std::array<double, n>& a,
     return r2;
 }
 
+// n-dimensional Poisson disc sampling in a rectangular prism domain
 template <std::size_t n, class RNGType>
 void poissonDiscSampling( const std::array<double, n>& extent, double r, int k,
                           std::vector<std::array<double, n>>& outPoints,
                           RNGType& gen )
 {
-    // Dimension of problem
+    // Precompute reused values for sampling
     double rn = std::pow( r, static_cast<double>( n ) );
     double rn2 = std::pow( 2.0 * r, static_cast<double>( n ) );
 
@@ -199,7 +204,7 @@ void poissonDiscSampling( const std::array<double, n>& extent, double r, int k,
                 break;
             }
 
-            // Use inverse method to sample distance from see
+            // New point is not too close to any existing, so add it
             if ( !isClose )
             {
                 outPoints.push_back( x );
@@ -218,6 +223,8 @@ void poissonDiscSampling( const std::array<double, n>& extent, double r, int k,
     }
 }
 
+// Generates numGrains random polycrystal grain centers using
+// Poisson disc sampling
 template <std::size_t numGrains>
 void getPolycrystalGrains(
     const std::array<double, 3>& extent,
@@ -252,8 +259,8 @@ void getPolycrystalGrains(
     }
 }
 
-// Simulate a crack interacting with an inclusion.
-void crackInclusionExample( const std::string filename )
+// Simulate a crack in a polycrystal
+void crackPolycrystalExample( const std::string filename )
 {
     // ====================================================
     //               Choose Kokkos spaces
@@ -438,7 +445,7 @@ void crackInclusionExample( const std::string filename )
             return 0.0;
     };
     auto output_yl = CabanaPD::createOutputTimeSeries<Kokkos::Max<double>>(
-        "output_incl_crack_y.txt", inputs, exec_space{}, solver.particles,
+        "output_polycrystal_crack_y.txt", inputs, exec_space{}, solver.particles,
         crack_y_func, box );
 
     // ====================================================
