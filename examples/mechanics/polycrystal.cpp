@@ -13,201 +13,6 @@
 constexpr std::size_t NUM_GRAINS = 4;
 constexpr double PI = 3.141592653589793238462643383;
 
-// Simulate a crack interacting with an inclusion.
-void crackInclusionExample( const std::string filename )
-{
-    // ====================================================
-    //               Choose Kokkos spaces
-    // ====================================================
-    using exec_space = Kokkos::DefaultExecutionSpace;
-    using memory_space = typename exec_space::memory_space;
-
-    // ====================================================
-    //                   Read inputs
-    // ====================================================
-    CabanaPD::Inputs inputs( filename );
-
-    // ====================================================
-    //                  Discretization
-    // ====================================================
-    std::array<double, 3> low_corner = inputs["low_corner"];
-    std::array<double, 3> high_corner = inputs["high_corner"];
-
-    // ====================================================
-    //                Material parameters
-    // ====================================================
-    std::array<double, NUM_GRAINS> rho;
-    std::array<double, NUM_GRAINS> E;
-    std::array<double, NUM_GRAINS> nu;
-    std::array<double, NUM_GRAINS> G0;
-    std::array<double, NUM_GRAINS> K;
-    std::array<double, NUM_GRAINS> G;
-
-    for(int i = 0; i < NUM_GRAINS; ++i)
-    {
-        rho[i] = inputs["density"][i];
-        E[i] = inputs["elastic_modulus"][i];
-        nu[i] = inputs["Poisson's_ratio"][i];
-        G0[i] = inputs["fracture_energy"][i];
-        K[i] = E[i] / ( 3 * (1 - 2 * nu[i] ) );
-        G[i] = E[i] / (2 * (1 + nu[i] ) );
-    }
-
-    double horizon = inputs["horizon"];
-    horizon += 1e-10;
-    
-    // ====================================================
-    //                Polycrystal grains
-    // ====================================================
-    std::array<double, 3> extent = inputs["system_size"];
-    std::array<std::array<double, 3>, NUM_GRAINS> grainPos;
-    getPolycrystalGrains(extent, grainPos);
-    
-    // Shift grains relative to low_corner
-    for( int i = 0; i < NUM_GRAINS; ++i )
-    {
-        grainPos[i] = { 
-            grainPos[i][0] + low_corner[0],
-            grainPos[i][1] + low_corner[1],
-            grainPos[i][2] + low_corner[2]
-        }
-    }
-    
-    // ====================================================
-    //                    Pre-notch
-    // ====================================================
-    double height = inputs["system_size"][0];
-    double thickness = inputs["system_size"][2];
-    double L_prenotch = height / 2.0;
-    double y_prenotch = 0.5 * ( low_corner[1] + high_corner[1] );
-    Kokkos::Array<double, 3> p01 = { low_corner[0], y_prenotch, low_corner[2] };
-    Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
-    Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-    Kokkos::Array<Kokkos::Array<double, 3>, 1> notch_positions = { p01 };
-    CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
-
-    // ====================================================
-    //                   Force models
-    // ====================================================
-    using model_type = CabanaPD::LPS;
-
-    // Grain materials
-    std::array<CabanaPD::ForceModel, NUM_GRAINS> force_models;
-    for ( int i = 0; i < num_grains; ++i )
-    {
-        force_models[i] = CabanaPD::ForceModel( model_type{}, horizon, K[i], G[i], G0[i] );
-    }
-
-    // ====================================================
-    //                 Particle generation
-    // ====================================================
-    // Note that individual inputs can be passed instead (see other examples).
-    CabanaPD::Particles particles( memory_space{}, model_type{} );
-    particles.domain( inputs );
-    particles.create( exec_space{} );
-
-    // ====================================================
-    //                Boundary conditions planes
-    // ====================================================
-    double dy = particles.dx[1];
-    CabanaPD::Region<CabanaPD::RectangularPrism> plane1(
-        low_corner[0], high_corner[0], low_corner[1] - dy, low_corner[1] + dy,
-        low_corner[2], high_corner[2] );
-    CabanaPD::Region<CabanaPD::RectangularPrism> plane2(
-        low_corner[0], high_corner[0], high_corner[1] - dy, high_corner[1] + dy,
-        low_corner[2], high_corner[2] );
-
-    // ====================================================
-    //            Custom particle initialization
-    // ====================================================
-    auto rho = particles.sliceDensity();
-    auto x = particles.sliceReferencePosition();
-    auto v = particles.sliceVelocity();
-    auto f = particles.sliceForce();
-    auto nofail = particles.sliceNoFail();
-    auto type = particles.sliceType();
-
-    auto init_functor = KOKKOS_LAMBDA( const int pid )
-    {
-        // No-fail zone
-        if ( x( pid, 1 ) <= plane1.low[1] + horizon + 1e-10 ||
-             x( pid, 1 ) >= plane2.high[1] - horizon - 1e-10 )
-            nofail( pid ) = 1;
-        
-        // Distance squared from nearest grain location
-        double distSq = 0.0;
-        int grainIndex = 0;
-        for ( int i = 0; i < NUM_GRAINS; ++i )
-        {
-            const std::array<double, 3>& pos = grainPos[i];
-            double dx = x( pid, 0 ) - pos[0];
-            double dy = x( pid, 1 ) - pos[1];
-            double dz = x( pid, 2 ) - pos[2];
-            double check = dx * dx + dy * dy + dz * dz;
-            if ( i == 0 || check < distSq )
-            {
-                distSq = check;
-                grainIndex = i;
-            }
-        }
-        
-        // Density and material type
-        type( pid ) = grainIndex;
-        rho( pid ) = rho[grainIndex];
-    };
-    particles.update( exec_space{}, init_functor );
-
-    // ====================================================
-    //                   Create solver
-    // ====================================================
-    auto models = CabanaPD::createMultiForceModel(
-        particles, CabanaPD::AverageTag{}, force_models[0],
-        force_models[1], force_models[2], force_models[3] );
-    CabanaPD::Solver solver( inputs, particles, models );
-
-    // ====================================================
-    //                Boundary conditions
-    // ====================================================
-    // Create BC last to ensure ghost particles are included.
-    double sigma0 = inputs["traction"];
-    double b0 = sigma0 / dy;
-    f = solver.particles.sliceForce();
-    x = solver.particles.sliceReferencePosition();
-    // Create a symmetric force BC in the y-direction.
-    auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
-    {
-        auto ypos = x( pid, 1 );
-        auto sign = std::abs( ypos ) / ypos;
-        f( pid, 1 ) += b0 * sign;
-    };
-    auto bc = createBoundaryCondition( bc_op, exec_space{}, solver.particles,
-                                       true, plane1, plane2 );
-
-    // ====================================================
-    //                      Outputs
-    // ====================================================
-    // Output maximum y-extent of the crack.
-    CabanaPD::Region<CabanaPD::RectangularPrism> box( low_corner, high_corner );
-    auto d = solver.particles.sliceDamage();
-    auto crack_y_func = KOKKOS_LAMBDA( const int p )
-    {
-        // Use a threshold of damage to only output damaged particles.
-        if ( d( p ) > 0.3 )
-            return x( p, 1 );
-        else
-            return 0.0;
-    };
-    auto output_yl = CabanaPD::createOutputTimeSeries<Kokkos::Max<double>>(
-        "output_incl_crack_y.txt", inputs, exec_space{}, solver.particles,
-        crack_y_func, box );
-
-    // ====================================================
-    //                   Simulation run
-    // ====================================================
-    solver.init( bc, prenotch );
-    solver.run( bc, output_yl );
-}
-
 template<std::size_t n>
 int indexND(const std::array<int, n>& index, const std::array<int, n>& shape)
 {
@@ -446,6 +251,199 @@ void getPolycrystalGrains(
     }
 }
 
+// Simulate a crack interacting with an inclusion.
+void crackInclusionExample( const std::string filename )
+{
+    // ====================================================
+    //               Choose Kokkos spaces
+    // ====================================================
+    using exec_space = Kokkos::DefaultExecutionSpace;
+    using memory_space = typename exec_space::memory_space;
+
+    // ====================================================
+    //                   Read inputs
+    // ====================================================
+    CabanaPD::Inputs inputs( filename );
+
+    // ====================================================
+    //                  Discretization
+    // ====================================================
+    std::array<double, 3> low_corner = inputs["low_corner"];
+    std::array<double, 3> high_corner = inputs["high_corner"];
+
+    // ====================================================
+    //                Material parameters
+    // ====================================================
+    std::array<double, NUM_GRAINS> grainRho;
+    std::array<double, NUM_GRAINS> E;
+    std::array<double, NUM_GRAINS> nu;
+    std::array<double, NUM_GRAINS> G0;
+    std::array<double, NUM_GRAINS> K;
+    std::array<double, NUM_GRAINS> G;
+
+    for(int i = 0; i < NUM_GRAINS; ++i)
+    {
+        grainRho[i] = inputs["density"][i];
+        E[i] = inputs["elastic_modulus"][i];
+        nu[i] = inputs["Poisson's_ratio"][i];
+        G0[i] = inputs["fracture_energy"][i];
+        K[i] = E[i] / ( 3 * (1 - 2 * nu[i] ) );
+        G[i] = E[i] / (2 * (1 + nu[i] ) );
+    }
+
+    double horizon = inputs["horizon"];
+    horizon += 1e-10;
+    
+    // ====================================================
+    //                Polycrystal grains
+    // ====================================================
+    std::array<double, 3> extent = inputs["system_size"];
+    std::array<std::array<double, 3>, NUM_GRAINS> grainPos;
+    getPolycrystalGrains(extent, grainPos);
+    
+    // Shift grains relative to low_corner
+    for( int i = 0; i < NUM_GRAINS; ++i )
+    {
+        grainPos[i] = { 
+            grainPos[i][0] + low_corner[0],
+            grainPos[i][1] + low_corner[1],
+            grainPos[i][2] + low_corner[2]
+        };
+    }
+    
+    // ====================================================
+    //                    Pre-notch
+    // ====================================================
+    double height = inputs["system_size"][0];
+    double thickness = inputs["system_size"][2];
+    double L_prenotch = height / 2.0;
+    double y_prenotch = 0.5 * ( low_corner[1] + high_corner[1] );
+    Kokkos::Array<double, 3> p01 = { low_corner[0], y_prenotch, low_corner[2] };
+    Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
+    Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
+    Kokkos::Array<Kokkos::Array<double, 3>, 1> notch_positions = { p01 };
+    CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
+
+    // ====================================================
+    //                   Force models
+    // ====================================================
+    using model_type = CabanaPD::LPS;
+
+    // Grain materials
+    CabanaPD::ForceModel force_models0( model_type{}, horizon, K[0], G[0], G0[0] );
+    CabanaPD::ForceModel force_models1( model_type{}, horizon, K[1], G[1], G0[1] );
+    CabanaPD::ForceModel force_models2( model_type{}, horizon, K[2], G[2], G0[2] );
+    CabanaPD::ForceModel force_models3( model_type{}, horizon, K[3], G[3], G0[3] );
+
+    // ====================================================
+    //                 Particle generation
+    // ====================================================
+    // Note that individual inputs can be passed instead (see other examples).
+    CabanaPD::Particles particles( memory_space{}, model_type{} );
+    particles.domain( inputs );
+    particles.create( exec_space{} );
+
+    // ====================================================
+    //                Boundary conditions planes
+    // ====================================================
+    double dy = particles.dx[1];
+    CabanaPD::Region<CabanaPD::RectangularPrism> plane1(
+        low_corner[0], high_corner[0], low_corner[1] - dy, low_corner[1] + dy,
+        low_corner[2], high_corner[2] );
+    CabanaPD::Region<CabanaPD::RectangularPrism> plane2(
+        low_corner[0], high_corner[0], high_corner[1] - dy, high_corner[1] + dy,
+        low_corner[2], high_corner[2] );
+
+    // ====================================================
+    //            Custom particle initialization
+    // ====================================================
+    auto rho = particles.sliceDensity();
+    auto x = particles.sliceReferencePosition();
+    auto v = particles.sliceVelocity();
+    auto f = particles.sliceForce();
+    auto nofail = particles.sliceNoFail();
+    auto type = particles.sliceType();
+
+    auto init_functor = KOKKOS_LAMBDA( const int pid )
+    {
+        // No-fail zone
+        if ( x( pid, 1 ) <= plane1.low[1] + horizon + 1e-10 ||
+             x( pid, 1 ) >= plane2.high[1] - horizon - 1e-10 )
+            nofail( pid ) = 1;
+        
+        // Distance squared from nearest grain location
+        double distSq = 0.0;
+        int grainIndex = 0;
+        for ( int i = 0; i < NUM_GRAINS; ++i )
+        {
+            const std::array<double, 3>& pos = grainPos[i];
+            double dx = x( pid, 0 ) - pos[0];
+            double dy = x( pid, 1 ) - pos[1];
+            double dz = x( pid, 2 ) - pos[2];
+            double check = dx * dx + dy * dy + dz * dz;
+            if ( i == 0 || check < distSq )
+            {
+                distSq = check;
+                grainIndex = i;
+            }
+        }
+        
+        // Density and material type
+        type( pid ) = grainIndex;
+        rho( pid ) = grainRho[grainIndex];
+    };
+    particles.update( exec_space{}, init_functor );
+
+    // ====================================================
+    //                   Create solver
+    // ====================================================
+    auto models = CabanaPD::createMultiForceModel(
+        particles, CabanaPD::AverageTag{}, force_models0,
+        force_models1, force_models2, force_models3 );
+    CabanaPD::Solver solver( inputs, particles, models );
+
+    // ====================================================
+    //                Boundary conditions
+    // ====================================================
+    // Create BC last to ensure ghost particles are included.
+    double sigma0 = inputs["traction"];
+    double b0 = sigma0 / dy;
+    f = solver.particles.sliceForce();
+    x = solver.particles.sliceReferencePosition();
+    // Create a symmetric force BC in the y-direction.
+    auto bc_op = KOKKOS_LAMBDA( const int pid, const double )
+    {
+        auto ypos = x( pid, 1 );
+        auto sign = std::abs( ypos ) / ypos;
+        f( pid, 1 ) += b0 * sign;
+    };
+    auto bc = createBoundaryCondition( bc_op, exec_space{}, solver.particles,
+                                       true, plane1, plane2 );
+
+    // ====================================================
+    //                      Outputs
+    // ====================================================
+    // Output maximum y-extent of the crack.
+    CabanaPD::Region<CabanaPD::RectangularPrism> box( low_corner, high_corner );
+    auto d = solver.particles.sliceDamage();
+    auto crack_y_func = KOKKOS_LAMBDA( const int p )
+    {
+        // Use a threshold of damage to only output damaged particles.
+        if ( d( p ) > 0.3 )
+            return x( p, 1 );
+        else
+            return 0.0;
+    };
+    auto output_yl = CabanaPD::createOutputTimeSeries<Kokkos::Max<double>>(
+        "output_incl_crack_y.txt", inputs, exec_space{}, solver.particles,
+        crack_y_func, box );
+
+    // ====================================================
+    //                   Simulation run
+    // ====================================================
+    solver.init( bc, prenotch );
+    solver.run( bc, output_yl );
+}
 
 // Initialize MPI+Kokkos.
 int main( int argc, char* argv[] )
