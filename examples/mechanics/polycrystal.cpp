@@ -233,7 +233,7 @@ void getPolycrystalGrains(
     double volume = extent[0] * extent[1] * extent[2];
     double radius =
         2.0 *
-        std::pow( 0.75 / PI / static_cast<double>( numGrains ), 1.0 / 3.0 );
+        std::pow( 0.75 * volume / PI / static_cast<double>( numGrains ), 1.0 / 3.0 );
     std::vector<std::array<double, 3>> testPoints;
     do
     {
