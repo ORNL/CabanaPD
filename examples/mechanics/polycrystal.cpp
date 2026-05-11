@@ -15,7 +15,7 @@ constexpr double PI = 3.141592653589793238462643383;
 
 // Get flat index into ND array
 template <std::size_t n>
-int indexND( const std::array<int, n>& index, const std::array<int, n>& shape )
+int indexND( const Kokkos::Array<int, n>& index, const Kokkos::Array<int, n>& shape )
 {
     int outIndex = 0;
     int stride = 1;
@@ -31,7 +31,7 @@ int indexND( const std::array<int, n>& index, const std::array<int, n>& shape )
 
 // Check if ND array multi-index is valid
 template <std::size_t n>
-bool isValid( const std::array<int, n>& idx, const std::array<int, n>& shape )
+bool isValid( const Kokkos::Array<int, n>& idx, const Kokkos::Array<int, n>& shape )
 {
     for ( int i = 0; i < n; ++i )
     {
@@ -46,8 +46,8 @@ bool isValid( const std::array<int, n>& idx, const std::array<int, n>& shape )
 // Recursive helper function for makeNeighborRelativeIndices
 template <std::size_t n>
 void makeRelativeIndicesRecursive(
-    int axis, std::array<int, n>& curIndex,
-    std::vector<std::array<int, n>>& outRelativeIndices )
+    int axis, Kokkos::Array<int, n>& curIndex,
+    std::vector<Kokkos::Array<int, n>>& outRelativeIndices )
 {
     int maxDist = std::ceil( std::sqrt( static_cast<double>( n ) ) );
     for ( int i = -maxDist; i <= maxDist; ++i )
@@ -68,15 +68,15 @@ void makeRelativeIndicesRecursive(
 // Get ND array neighbor relative multi-indices
 template <std::size_t n>
 void makeNeighborRelativeIndices(
-    std::vector<std::array<int, n>>& outRelativeIndices )
+    std::vector<Kokkos::Array<int, n>>& outRelativeIndices )
 {
-    std::array<int, n> curIndex = {};
+    Kokkos::Array<int, n> curIndex = {};
     makeRelativeIndicesRecursive( 0, curIndex, outRelativeIndices );
 }
 
 template <std::size_t n>
-double distSquared( const std::array<double, n>& a,
-                    const std::array<double, n>& b )
+double distSquared( const Kokkos::Array<double, n>& a,
+                    const Kokkos::Array<double, n>& b )
 {
     double r2 = 0.0;
     for ( int axis = 0; axis < n; ++axis )
@@ -88,8 +88,8 @@ double distSquared( const std::array<double, n>& a,
 
 // n-dimensional Poisson disc sampling in a rectangular prism domain
 template <std::size_t n, class RNGType>
-void poissonDiscSampling( const std::array<double, n>& extent, double r, int k,
-                          std::vector<std::array<double, n>>& outPoints,
+void poissonDiscSampling( const Kokkos::Array<double, n>& extent, double r, int k,
+                          std::vector<Kokkos::Array<double, n>>& outPoints,
                           RNGType& gen )
 {
     // Precompute reused values for sampling
@@ -98,7 +98,7 @@ void poissonDiscSampling( const std::array<double, n>& extent, double r, int k,
 
     // Calculate shape of grid
     double cellSize = r / std::sqrt( static_cast<double>( n ) );
-    std::array<int, n> gridShape = {};
+    Kokkos::Array<int, n> gridShape = {};
     int totalCells = 1;
     for ( int axis = 0; axis < n; ++axis )
     {
@@ -113,15 +113,15 @@ void poissonDiscSampling( const std::array<double, n>& extent, double r, int k,
     std::vector<int> grid( totalCells, -1 );
 
     // Calculate grid search relative indices
-    std::vector<std::array<int, n>> nbrIndicesRel;
+    std::vector<Kokkos::Array<int, n>> nbrIndicesRel;
     makeNeighborRelativeIndices( nbrIndicesRel );
 
     // Choose first point
     std::uniform_real_distribution<double> coordDist( 0.0, 1.0 );
     auto coordGen = std::bind( coordDist, gen );
 
-    std::array<double, n> x0 = {};
-    std::array<int, n> idx0 = {};
+    Kokkos::Array<double, n> x0 = {};
+    Kokkos::Array<int, n> idx0 = {};
     for ( int axis = 0; axis < n; ++axis )
     {
         x0[axis] = coordGen() * extent[axis];
@@ -139,14 +139,14 @@ void poissonDiscSampling( const std::array<double, n>& extent, double r, int k,
         std::uniform_int_distribution<int> pointDist( 0, activeSet.size() - 1 );
         int seedIndexInActive = pointDist( gen );
         int seedIndex = activeSet[seedIndexInActive];
-        std::array<double, n> seedX = outPoints[seedIndex];
+        Kokkos::Array<double, n> seedX = outPoints[seedIndex];
 
         bool addedPoint = false;
 
         for ( int i = 0; i < k; ++i )
         {
-            std::array<double, n> x = {};
-            std::array<int, n> idx = {};
+            Kokkos::Array<double, n> x = {};
+            Kokkos::Array<int, n> idx = {};
 
             // Use inverse method to sample distance from seed
             double xR = std::pow( rn + coordGen() * ( rn2 - rn ),
@@ -172,10 +172,10 @@ void poissonDiscSampling( const std::array<double, n>& extent, double r, int k,
             }
 
             // Check if point is too close to any existing points
-            std::array<int, n> checkIdx = idx;
+            Kokkos::Array<int, n> checkIdx = idx;
             bool isClose = false;
 
-            for ( const std::array<int, n>& relIdx : nbrIndicesRel )
+            for ( const Kokkos::Array<int, n>& relIdx : nbrIndicesRel )
             {
                 for ( int axis = 0; axis < n; ++axis )
                 {
@@ -193,7 +193,7 @@ void poissonDiscSampling( const std::array<double, n>& extent, double r, int k,
                     continue;
                 }
 
-                const std::array<double, n>& checkX = outPoints[checkPoint];
+                const Kokkos::Array<double, n>& checkX = outPoints[checkPoint];
 
                 if ( distSquared( checkX, x ) > r * r )
                 {
@@ -227,8 +227,8 @@ void poissonDiscSampling( const std::array<double, n>& extent, double r, int k,
 // Poisson disc sampling
 template <std::size_t numGrains>
 void getPolycrystalGrains(
-    const std::array<double, 3>& extent,
-    std::array<std::array<double, 3>, numGrains>& outLocations )
+    const Kokkos::Array<double, 3>& extent,
+    Kokkos::Array<Kokkos::Array<double, 3>, numGrains>& outLocations )
 {
     // Initialize RNG
     std::random_device trueRng;
@@ -241,7 +241,7 @@ void getPolycrystalGrains(
     double radius =
         2.0 * std::pow( 0.75 * volume / PI / static_cast<double>( numGrains ),
                         1.0 / 3.0 );
-    std::vector<std::array<double, 3>> testPoints;
+    std::vector<Kokkos::Array<double, 3>> testPoints;
     do
     {
         testPoints.clear();
@@ -276,18 +276,18 @@ void crackPolycrystalExample( const std::string filename )
     // ====================================================
     //                  Discretization
     // ====================================================
-    std::array<double, 3> low_corner = inputs["low_corner"];
-    std::array<double, 3> high_corner = inputs["high_corner"];
+    Kokkos::Array<double, 3> low_corner = inputs["low_corner"];
+    Kokkos::Array<double, 3> high_corner = inputs["high_corner"];
 
     // ====================================================
     //                Material parameters
     // ====================================================
-    std::array<double, NUM_GRAINS> grainRho;
-    std::array<double, NUM_GRAINS> E;
-    std::array<double, NUM_GRAINS> nu;
-    std::array<double, NUM_GRAINS> G0;
-    std::array<double, NUM_GRAINS> K;
-    std::array<double, NUM_GRAINS> G;
+    Kokkos::Array<double, NUM_GRAINS> grainRho;
+    Kokkos::Array<double, NUM_GRAINS> E;
+    Kokkos::Array<double, NUM_GRAINS> nu;
+    Kokkos::Array<double, NUM_GRAINS> G0;
+    Kokkos::Array<double, NUM_GRAINS> K;
+    Kokkos::Array<double, NUM_GRAINS> G;
 
     for ( int i = 0; i < NUM_GRAINS; ++i )
     {
@@ -305,8 +305,8 @@ void crackPolycrystalExample( const std::string filename )
     // ====================================================
     //                Polycrystal grains
     // ====================================================
-    std::array<double, 3> extent = inputs["system_size"];
-    std::array<std::array<double, 3>, NUM_GRAINS> grainPos;
+    Kokkos::Array<double, 3> extent = inputs["system_size"];
+    Kokkos::Array<Kokkos::Array<double, 3>, NUM_GRAINS> grainPos;
     getPolycrystalGrains( extent, grainPos );
 
     // Shift grains relative to low_corner
@@ -386,7 +386,7 @@ void crackPolycrystalExample( const std::string filename )
         int grainIndex = 0;
         for ( int i = 0; i < NUM_GRAINS; ++i )
         {
-            const std::array<double, 3>& pos = grainPos[i];
+            const Kokkos::Array<double, 3>& pos = grainPos[i];
             double dx = x( pid, 0 ) - pos[0];
             double dy = x( pid, 1 ) - pos[1];
             double dz = x( pid, 2 ) - pos[2];
