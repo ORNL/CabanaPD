@@ -445,8 +445,8 @@ void crackPolycrystalExample( const std::string filename )
             return 0.0;
     };
     auto output_yl = CabanaPD::createOutputTimeSeries<Kokkos::Max<double>>(
-        "output_polycrystal_crack_y.txt", inputs, exec_space{}, solver.particles,
-        crack_y_func, box );
+        "output_polycrystal_crack_y.txt", inputs, exec_space{},
+        solver.particles, crack_y_func, box );
 
     // ====================================================
     //                   Simulation run
