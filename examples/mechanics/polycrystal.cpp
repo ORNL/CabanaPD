@@ -277,8 +277,8 @@ void polycrystalExample( const std::string filename )
     //                  Discretization
     // ====================================================
     std::array<double, 3> low_corner = {
-        inputs["low_corner"][0];
-        inputs["low_corner"][1];
+        inputs["low_corner"][0],
+        inputs["low_corner"][1],
         inputs["low_corner"][2]
     };
     std::array<double, 3> high_corner = {
