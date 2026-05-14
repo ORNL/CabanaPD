@@ -260,7 +260,7 @@ void getPolycrystalGrains(
 }
 
 // Simulate a crack in a polycrystal
-void crackPolycrystalExample( const std::string filename )
+void polycrystalExample( const std::string filename )
 {
     // ====================================================
     //               Choose Kokkos spaces
@@ -469,7 +469,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    crackInclusionExample( argv[1] );
+    polycrystalExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();
