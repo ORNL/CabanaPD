@@ -243,7 +243,7 @@ struct ForceModelsImpl<MaterialType, Indexing, ParameterPackType,
           ... );
     }
 
-    KOKKOS_INLINE_FUNCTION int getIndex( const int i, const int j ) const
+    KOKKOS_INLINE_FUNCTION unsigned getIndex( const int i, const int j ) const
     {
         return indexing( type( i ), type( j ) );
     }
@@ -258,6 +258,10 @@ struct ForceModelsImpl<MaterialType, Indexing, ParameterPackType,
             const int, Args...>;
 
         auto t = getIndex( i, j );
+        if ( t > Indexing::MaxValidIndex )
+            Kokkos::abort( "CabanaPD: Indexing computed an index that is out "
+                           "of its valid range" );
+
         // Call individual model.
         // if inside the pack
         if ( static_cast<unsigned>( t ) < ParameterPackType::size )
