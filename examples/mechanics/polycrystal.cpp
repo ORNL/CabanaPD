@@ -325,7 +325,7 @@ void crackPolycrystalExample( const std::string filename )
         grainPos[i] = { grainPos[i][0] + low_corner[0],
                         grainPos[i][1] + low_corner[1],
                         grainPos[i][2] + low_corner[2] };
-        std::cout << grainPos[i][0] << ", " << grainPos[i][1] << ", " grainPos[i][2] << std::endl;
+        std::cout << grainPos[i][0] << ", " << grainPos[i][1] << ", " << grainPos[i][2] << std::endl;
     }
 
     // ====================================================
