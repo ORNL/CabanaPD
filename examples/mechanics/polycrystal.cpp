@@ -230,10 +230,11 @@ void getPolycrystalGrains(
     const std::array<double, 3>& extent,
     std::array<std::array<double, 3>, numGrains>& outLocations )
 {
-    // Initialize RNG
-    std::random_device trueRng;
-    std::seed_seq randomSeed{ trueRng(), trueRng(), trueRng(), trueRng(),
-                              trueRng(), trueRng(), trueRng(), trueRng() };
+    // Initialize RNG (for now with FIXED seed)
+    std::mnistd_rand baseRng;
+    baseRng.seed(12345);
+    std::seed_seq randomSeed{ baseRng(), baseRng(), baseRng(), baseRng(),
+                              baseRng(), baseRng(), baseRng(), baseRng() };
     std::mt19937 gen( randomSeed );
 
     // Generate random, evenly-spaced candidate grain locations
