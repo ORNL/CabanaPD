@@ -71,16 +71,16 @@ void fragmentingCylinderExample( const std::string filename )
     double R_out = inputs["cylinder_outer_radius"];
     double R_in = inputs["cylinder_inner_radius"];
     double H = inputs["cylinder_height"];
+    CabanaPD::Region<CabanaPD::Cylinder> cylinder(
+        R_in, R_out, -0.5 * H + z_center, 0.5 * H + z_center, x_center,
+        y_center );
 
     // Do not create particles outside given cylindrical region
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
     {
-        double rsq = ( x[0] - x_center ) * ( x[0] - x_center ) +
-                     ( x[1] - y_center ) * ( x[1] - y_center );
-        if ( rsq < R_in * R_in || rsq > R_out * R_out ||
-             x[2] > z_center + 0.5 * H || x[2] < z_center - 0.5 * H )
-            return false;
-        return true;
+        if ( cylinder.inside( x ) )
+            return true;
+        return false;
     };
 
     // ====================================================
