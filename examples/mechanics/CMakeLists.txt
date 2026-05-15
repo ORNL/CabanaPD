@@ -22,4 +22,16 @@ target_link_libraries(PlateWithHole LINK_PUBLIC CabanaPD)
 add_executable(CrackInclusion crack_inclusion.cpp)
 target_link_libraries(CrackInclusion LINK_PUBLIC CabanaPD)
 
-install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DogboneTensileTest PlateWithHole CrackInclusion DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(FlatIndenter flat_indenter.cpp)
+target_link_libraries(FlatIndenter LINK_PUBLIC CabanaPD)
+
+add_executable(SphericalIndenter spherical_indenter.cpp)
+target_link_libraries(SphericalIndenter LINK_PUBLIC CabanaPD)
+
+add_executable(ConicalIndenter conical_indenter.cpp)
+target_link_libraries(ConicalIndenter LINK_PUBLIC CabanaPD)
+
+add_executable(BerkovichIndenter berkovich_indenter.cpp)
+target_link_libraries(BerkovichIndenter LINK_PUBLIC CabanaPD)
+
+install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DogboneTensileTest PlateWithHole CrackInclusion FlatIndenter SphericalIndenter ConicalIndenter BerkovichIndenter DESTINATION ${CMAKE_INSTALL_BINDIR})
