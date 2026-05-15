@@ -19,6 +19,8 @@ template <unsigned NumBaseModels>
 struct DiagonalIndexing
 {
     static_assert( NumBaseModels > 0, "NumBaseModels must be larger than 0" );
+    static constexpr unsigned MaxValidIndex =
+        ( NumBaseModels * NumBaseModels + NumBaseModels ) / 2;
 
     KOKKOS_FUNCTION unsigned operator()( unsigned firstType,
                                          unsigned secondType ) const
@@ -44,6 +46,8 @@ struct DiagonalIndexing
 // Index same type as 0 and differing types as 1.
 struct BinaryIndexing
 {
+    static constexpr unsigned MaxValidIndex =
+        Kokkos::Experimental::finite_max_v<unsigned>;
     KOKKOS_FUNCTION unsigned operator()( unsigned firstType,
                                          unsigned secondType ) const
     {
@@ -55,6 +59,7 @@ template <unsigned NumBaseModels>
 struct FullIndexing
 {
     static_assert( NumBaseModels > 0, "NumBaseModels must be larger than 0" );
+    static constexpr unsigned MaxValidIndex = NumBaseModels * NumBaseModels;
 
     KOKKOS_FUNCTION unsigned operator()( unsigned firstType,
                                          unsigned secondType ) const
