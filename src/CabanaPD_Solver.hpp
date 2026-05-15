@@ -167,7 +167,8 @@ class Solver
         // Add ghosts from other MPI ranks.
         comm = std::make_shared<comm_type>( particles );
 
-        if constexpr ( is_contact<ContactModelType>::value )
+        if constexpr ( is_contact<ForceModelType>::value ||
+                       is_contact<ContactModelType>::value )
         {
             if ( comm->size() > 1 )
                 throw std::runtime_error(
@@ -415,7 +416,7 @@ class Solver
             runStep( step );
             // FIXME: not included in timing
             if ( step % output_frequency == 0 )
-                updateRegion( region_output... );
+                updateRegion( step * dt, region_output... );
         }
 
         // Final output and timings.
@@ -436,7 +437,7 @@ class Solver
             runStep( step, boundary_condition );
             // FIXME: not included in timing
             if ( step % output_frequency == 0 )
-                updateRegion( region_output... );
+                updateRegion( step * dt, region_output... );
         }
 
         // Final output and timings.
@@ -446,14 +447,14 @@ class Solver
 
     // Iterate over all regions.
     template <typename... RegionType>
-    void updateRegion( RegionType&... region )
+    void updateRegion( const double time, RegionType&... region )
     {
-        ( updateRegion( region ), ... );
+        ( updateRegion( time, region ), ... );
     }
     template <typename RegionType>
-    void updateRegion( RegionType& region )
+    void updateRegion( const double time, RegionType& region )
     {
-        region.update();
+        region.update( time );
     }
 
     // Compute and communicate fields needed for force computation and update
