@@ -303,7 +303,7 @@ class Inputs
                             // Compute denominator for heat transfer.
                             if constexpr ( is_heat_transfer<
                                                typename ForceModel::
-                                                   thermal_type>::value )
+                                                   thermal_tag>::value )
                             {
                                 double coeff =
                                     model.microconductivity_function( xi );
@@ -322,7 +322,7 @@ class Inputs
 
         // Heat transfer timestep.
         if constexpr ( is_heat_transfer<
-                           typename ForceModel::thermal_type>::value )
+                           typename ForceModel::thermal_tag>::value )
         {
             double dt_ht = inputs.at( "thermal_subcycle_steps" )["value"];
             dt_ht *= dt;
