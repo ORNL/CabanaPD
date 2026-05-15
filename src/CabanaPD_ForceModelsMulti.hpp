@@ -264,7 +264,7 @@ struct ForceModelsImpl<MaterialType, Indexing, ParameterPackType,
 
         // Call individual model.
         // if inside the pack
-        if ( static_cast<unsigned>( t ) < ParameterPackType::size )
+        if ( t < ParameterPackType::size )
             return run_functor_for_index_in_pack_with_args(
                 IdentityFunctor{}, t, models, tag, i, j, args... );
         else
