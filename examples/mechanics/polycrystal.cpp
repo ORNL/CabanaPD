@@ -417,8 +417,9 @@ void polycrystalExample( const std::string filename )
     // ====================================================
     //                   Create solver
     // ====================================================
+    CabanaPD::BinaryIndexing indexing;
     auto models = CabanaPD::createMultiForceModel(
-        particles, CabanaPD::AverageTag{}, force_model_within, force_model_between );
+        particles, indexing, force_model_within, force_model_between );
     CabanaPD::Solver solver( inputs, particles, models );
 
     // ====================================================
