@@ -386,8 +386,8 @@ void polycrystalExample( const std::string filename )
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // No-fail zone
-        if ( x( pid, 1 ) <= plane1.low[1] + horizon + 1e-10 ||
-             x( pid, 1 ) >= plane2.high[1] - horizon - 1e-10 )
+        if ( x( pid, 1 ) <= plane1.low[1] + horizon ||
+             x( pid, 1 ) >= plane2.high[1] - horizon )
             nofail( pid ) = 1;
 
         // Distance squared from nearest grain location
