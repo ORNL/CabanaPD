@@ -460,8 +460,8 @@ void polycrystalExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
-    solver.init( bc, prenotch );
-    solver.run( bc, output_yl );
+    solver.init( bc );
+    solver.run( bc );
 }
 
 // Initialize MPI+Kokkos.
