@@ -319,13 +319,11 @@ void polycrystalExample( const std::string filename )
     getPolycrystalGrains( extent, grainPos );
 
     // Shift grains relative to low_corner
-    std::cout << "Generated " << NUM_GRAINS << " polycrystal grains" << std::endl;
     for ( int i = 0; i < NUM_GRAINS; ++i )
     {
         grainPos[i] = { grainPos[i][0] + low_corner[0],
                         grainPos[i][1] + low_corner[1],
                         grainPos[i][2] + low_corner[2] };
-        std::cout << grainPos[i][0] << ", " << grainPos[i][1] << ", " << grainPos[i][2] << std::endl;
     }
 
     // ====================================================
