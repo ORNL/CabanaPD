@@ -12,5 +12,5 @@
     "density"                : {"value": [2440, 2440, 2440, 2440], "unit": "kg/m^3"},
     "elastic_modulus"        : {"value": [72e+9, 72e+9], "unit": "Pa"},
     "Poisson's_ratio"        : {"value": [0.22, 0.22]},
-    "fracture_energy"        : {"value": [38.0, 3.8], "unit": "J/m^2"},
+    "fracture_energy"        : {"value": [38.0, 3.8], "unit": "J/m^2"}
 }
