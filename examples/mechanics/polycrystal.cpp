@@ -298,16 +298,16 @@ void polycrystalExample( const std::string filename )
     }
 
     // Within-grain parameters
-    double E_within = inputs["elastic_modulus_within"];
-    double nu_within = inputs["Poisson's_ratio_within"];
-    double G0_within = inputs["fracture_energy_within"];
+    double E_within = inputs["elastic_modulus"][0];
+    double nu_within = inputs["Poisson's_ratio"][0];
+    double G0_within = inputs["fracture_energy"][0];
     double K_within = E_within / ( 3 * ( 1 - 2 * nu_within ) );
     double G_within = E_within / ( 2 * ( 1 + nu_within ) );
 
     // Between-grain parameters
-    double E_between = inputs["elastic_modulus_between"];
-    double nu_between = inputs["Poisson's_ratio_between"];
-    double G0_between = inputs["fracture_energy_between"];
+    double E_between = inputs["elastic_modulus"][1];
+    double nu_between = inputs["Poisson's_ratio"][1];
+    double G0_between = inputs["fracture_energy"][1];
     double K_between = E_between / ( 3 * ( 1 - 2 * nu_between ) );
     double G_between = E_between / ( 2 * ( 1 + nu_between ) );
 
