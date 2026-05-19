@@ -231,7 +231,7 @@ void getPolycrystalGrains(
     std::array<std::array<double, 3>, numGrains>& outLocations )
 {
     // Initialize RNG (for now with FIXED seed)
-    std::mnistd_rand baseRng;
+    std::minstd_rand baseRng;
     baseRng.seed(12345);
     std::seed_seq randomSeed{ baseRng(), baseRng(), baseRng(), baseRng(),
                               baseRng(), baseRng(), baseRng(), baseRng() };
