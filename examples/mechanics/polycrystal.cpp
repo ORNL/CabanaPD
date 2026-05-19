@@ -291,22 +291,25 @@ void polycrystalExample( const std::string filename )
     // ====================================================
     //                Material parameters
     // ====================================================
-    std::array<double, NUM_GRAINS> grainRho;
-    std::array<double, NUM_GRAINS> E;
-    std::array<double, NUM_GRAINS> nu;
-    std::array<double, NUM_GRAINS> G0;
-    std::array<double, NUM_GRAINS> K;
-    std::array<double, NUM_GRAINS> G;
-
+    Kokkos::Array<double, NUM_GRAINS> grainRho;
     for ( int i = 0; i < NUM_GRAINS; ++i )
     {
         grainRho[i] = inputs["density"][i];
-        E[i] = inputs["elastic_modulus"][i];
-        nu[i] = inputs["Poisson's_ratio"][i];
-        G0[i] = inputs["fracture_energy"][i];
-        K[i] = E[i] / ( 3 * ( 1 - 2 * nu[i] ) );
-        G[i] = E[i] / ( 2 * ( 1 + nu[i] ) );
     }
+
+    // Within-grain parameters
+    double E_within = inputs["elastic_modulus_within"];
+    double nu_within = inputs["Poisson's_ratio_within"];
+    double G0_within = inputs["fracture_energy_within"];
+    double K_within = E_within / ( 3 * ( 1 - 2 * nu_within ) );
+    double G_within = E_within / ( 2 * ( 1 + nu_within ) );
+
+    // Between-grain parameters
+    double E_between = inputs["elastic_modulus_between"];
+    double nu_between = inputs["Poisson's_ratio_between"];
+    double G0_between = inputs["fracture_energy_between"];
+    double K_between = E_between / ( 3 * ( 1 - 2 * nu_between ) );
+    double G_between = E_between / ( 2 * ( 1 + nu_between ) );
 
     double horizon = inputs["horizon"];
     horizon += 1e-10;
@@ -315,15 +318,16 @@ void polycrystalExample( const std::string filename )
     //                Polycrystal grains
     // ====================================================
     std::array<double, 3> extent = inputs["system_size"];
-    std::array<std::array<double, 3>, NUM_GRAINS> grainPos;
-    getPolycrystalGrains( extent, grainPos );
+    std::array<std::array<double, 3>, NUM_GRAINS> grainPosStd;
+    getPolycrystalGrains( extent, grainPosStd );
 
-    // Shift grains relative to low_corner
+    // Shift grains relative to low_corner and copy to Kokkos::Array
+    Kokkos::Array<Kokkos::Array<double, 3>, NUM_GRAINS> grainPos;
     for ( int i = 0; i < NUM_GRAINS; ++i )
     {
-        grainPos[i] = { grainPos[i][0] + low_corner[0],
-                        grainPos[i][1] + low_corner[1],
-                        grainPos[i][2] + low_corner[2] };
+        grainPos[i] = { grainPosStd[i][0] + low_corner[0],
+                        grainPosStd[i][1] + low_corner[1],
+                        grainPosStd[i][2] + low_corner[2] };
     }
 
     // ====================================================
@@ -345,14 +349,10 @@ void polycrystalExample( const std::string filename )
     using model_type = CabanaPD::LPS;
 
     // Grain materials
-    CabanaPD::ForceModel force_models0( model_type{}, horizon, K[0], G[0],
-                                        G0[0] );
-    CabanaPD::ForceModel force_models1( model_type{}, horizon, K[1], G[1],
-                                        G0[1] );
-    CabanaPD::ForceModel force_models2( model_type{}, horizon, K[2], G[2],
-                                        G0[2] );
-    CabanaPD::ForceModel force_models3( model_type{}, horizon, K[3], G[3],
-                                        G0[3] );
+    CabanaPD::ForceModel force_model_within( model_type{}, horizon, K_within, G_within,
+                                             G0_within );
+    CabanaPD::ForceModel force_model_between( model_type{}, horizon, K_between, G_between,
+                                              G0_between );
 
     // ====================================================
     //                 Particle generation
@@ -395,7 +395,7 @@ void polycrystalExample( const std::string filename )
         int grainIndex = 0;
         for ( int i = 0; i < NUM_GRAINS; ++i )
         {
-            const std::array<double, 3>& pos = grainPos[i];
+            const Kokkos::Array<double, 3>& pos = grainPos[i];
             double dx = x( pid, 0 ) - pos[0];
             double dy = x( pid, 1 ) - pos[1];
             double dz = x( pid, 2 ) - pos[2];
@@ -417,8 +417,7 @@ void polycrystalExample( const std::string filename )
     //                   Create solver
     // ====================================================
     auto models = CabanaPD::createMultiForceModel(
-        particles, CabanaPD::AverageTag{}, force_models0, force_models1,
-        force_models2, force_models3 );
+        particles, CabanaPD::AverageTag{}, force_model_within, force_model_between );
     CabanaPD::Solver solver( inputs, particles, models );
 
     // ====================================================

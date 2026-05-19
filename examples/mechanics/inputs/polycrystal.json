@@ -10,7 +10,12 @@
     "output_reference"       : {"value": true},
     
     "density"                : {"value": [2440, 2440, 2440, 2440], "unit": "kg/m^3"},
-    "elastic_modulus"        : {"value": [72e+9, 144e+9, 72e+9, 72e+9], "unit": "Pa"},
-    "Poisson's_ratio"        : {"value": [0.22, 0.22, 0.22, 0.22]},
-    "fracture_energy"        : {"value": [3.8, 38.0, 3.8, 3.8], "unit": "J/m^2"}
+
+    "elastic_modulus_within"        : {"value": 72e+9, "unit": "Pa"},
+    "Poisson's_ratio_within"        : {"value": 0.22},
+    "fracture_energy_within"        : {"value": 38.0, "unit": "J/m^2"},
+    
+    "elastic_modulus_between"       : {"value": 72e+9, "unit": "Pa"},
+    "Poisson's_ratio_between"       : {"value": 0.22},
+    "fracture_energy_between"       : {"value": 3.8, "unit": "J/m^2"}
 }
