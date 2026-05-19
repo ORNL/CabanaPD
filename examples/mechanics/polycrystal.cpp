@@ -331,7 +331,7 @@ void polycrystalExample( const std::string filename )
     // ====================================================
     using model_type = CabanaPD::PMB;
 
-    // Grain materials
+    // Grain force models
     CabanaPD::ForceModel force_model_within( model_type{}, horizon, K_within,
                                              G0_within );
     CabanaPD::ForceModel force_model_between( model_type{}, horizon, K_between,
