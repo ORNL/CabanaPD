@@ -10,7 +10,7 @@
 
 #include <CabanaPD.hpp>
 
-constexpr std::size_t NUM_GRAINS = 4;
+constexpr std::size_t NUM_GRAINS = 16;
 constexpr double PI = 3.141592653589793238462643383;
 
 // Get flat index into ND array
