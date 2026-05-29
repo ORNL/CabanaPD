@@ -1,3 +1,22 @@
+# Version 0.5.0
+
+## New Features
+ - Enabled multi-material simulation with any number of materials
+ - Added initial regression test suite
+ - Added sliding friction for DEM within JKR model
+
+## Bug Fixes and Improvements
+- Added `CabanaPD_ENABLE_EXAMPLES` CMake option
+- Improved JSON input error handling
+- Created separate `Neighbor` class
+- Enabled thermomechanics with multiple materials
+- Enabled heat transfer with plasticity models
+- Fixed custom boundary condition
+- Fixed lambda capture by reference for C++20
+
+## Minimum dependency version updates
+ - Cabana 0.8.0 or later is required
+
 # Version 0.4.0
 
 ## New Features
