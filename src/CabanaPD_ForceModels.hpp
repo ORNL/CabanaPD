@@ -169,9 +169,6 @@ struct FractureModel<NoFracture>
 
     KOKKOS_FUNCTION
     auto criticalStretch() const { return DBL_MAX; }
-
-    KOKKOS_FUNCTION
-    auto fractureEnergy() const { return DBL_MAX; }
 };
 
 template <>
@@ -179,27 +176,24 @@ struct FractureModel<CriticalStretch>
 {
     using fracture_tag = Fracture;
 
-    double G0;
     double s0;
     double bond_break_coeff;
     int influence_type;
 
     FractureModel( const double _force_horizon, const double _K,
                    const double _G0, const int influence = 1 )
-        : G0( _G0 )
-        , influence_type( influence )
+        : influence_type( influence )
     {
         s0 = Kokkos::sqrt( 5.0 * G0 / 9.0 / _K / _force_horizon ); // 1/xi
         if ( influence_type == 0 )
             s0 = Kokkos::sqrt( 8.0 * G0 / 15.0 / _K / _force_horizon ); // 1
 
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
-    };
+    }
 
     // Constructor to work with plasticity.
-    FractureModel( const double _G0, const double _s0 )
-        : G0( _G0 )
-        , s0( _s0 )
+    FractureModel( const double _s0 )
+        : s0( _s0 )
     {
         bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
@@ -212,7 +206,6 @@ struct FractureModel<CriticalStretch>
                                     is_force_model<ModelType2>::value ),
                                   int>* = 0 )
     {
-        G0 = ( model1.fractureEnergy() + model2.fractureEnergy() ) / 2.0;
         s0 = averageCriticalStretch( model1.criticalStretch(),
                                      model2.criticalStretch(), model1.K,
                                      model2.K );
@@ -228,9 +221,6 @@ struct FractureModel<CriticalStretch>
 
     KOKKOS_FUNCTION
     auto criticalStretch() const { return s0; }
-
-    KOKKOS_FUNCTION
-    auto fractureEnergy() const { return G0; }
 
     KOKKOS_FUNCTION
     auto influenceType() const { return influence_type; }
