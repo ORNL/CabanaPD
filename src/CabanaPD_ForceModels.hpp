@@ -43,16 +43,18 @@ struct InfluenceFunctionTag
 /******************************************************************************
   Forward declarations.
 ******************************************************************************/
-template <typename PDModelType, typename MechanicsType, typename... DataTypes>
+template <typename PDModelType, typename MechanicsType, typename FunctorType,
+          typename... DataTypes>
 struct MechanicsModel;
 
 template <typename T>
 struct is_mechanics_model : public std::false_type
 {
 };
-template <typename PDModelType, typename MechanicsType, typename... DataTypes>
+template <typename PDModelType, typename MechanicsType, typename FunctorType,
+          typename... DataTypes>
 struct is_mechanics_model<
-    MechanicsModel<PDModelType, MechanicsType, DataTypes...>>
+    MechanicsModel<PDModelType, MechanicsType, FunctorType, DataTypes...>>
     : public std::true_type
 {
 };
@@ -79,11 +81,9 @@ struct BaseForceModel
     using needs_update = std::false_type;
     using material_type = SingleMaterial;
     double force_horizon;
-    double K;
 
-    BaseForceModel( const double _force_horizon, const double _K )
+    BaseForceModel( const double _force_horizon )
         : force_horizon( _force_horizon )
-        , K( _K )
     {
     }
 
@@ -92,7 +92,6 @@ struct BaseForceModel
     BaseForceModel( const ModelType1& model1, const ModelType2& model2 )
     {
         force_horizon = model1.force_horizon;
-        K = ( model1.K + model2.K ) / 2.0;
     }
 
     auto cutoff() const { return force_horizon; }

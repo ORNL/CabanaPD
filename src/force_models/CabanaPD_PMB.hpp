@@ -21,8 +21,8 @@
 namespace CabanaPD
 {
 
-template <>
-struct MechanicsModel<PMB, Elastic> : public BaseForceModel
+template <typename FunctorType>
+struct MechanicsModel<PMB, Elastic, FunctorType> : public BaseForceModel
 {
     using base_type = BaseForceModel;
     using mechanics_type = Elastic;
@@ -32,39 +32,42 @@ struct MechanicsModel<PMB, Elastic> : public BaseForceModel
     using force_tag = PMB;
 
     using base_type::force_horizon;
-    using base_type::K;
-    double c;
+    FunctorType K;
+    double c_factor;
 
     MechanicsModel( PMB tag, Elastic, const double force_horizon,
                     const double _K )
-        : MechanicsModel( tag, force_horizon, _K )
+        : MechanicsModel( tag, force_horizon, ConstantProperty( _K ) )
     {
     }
 
     MechanicsModel( PMB, const double force_horizon, const double _K )
-        : base_type( force_horizon, _K )
+        : base_type( force_horizon )
     {
-        c = 18.0 * K /
-            ( pi * force_horizon * force_horizon * force_horizon *
-              force_horizon );
+        c_factor = 18.0 / ( pi * force_horizon * force_horizon * force_horizon *
+                            force_horizon );
     }
 
     // Constructor to average from existing models.
+    // FIXME: use the first model functional dependence for now.
     template <typename ModelType1, typename ModelType2>
     MechanicsModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
+        , K( model.K )
     {
-        c = ( model1.c + model2.c ) / 2.0;
     }
+
+    KOKKOS_FUNCTION
+    auto c( const int i ) { return K( i ) * c_factor; }
 
     KOKKOS_FUNCTION
     int influenceType() const { return 1; }
 
     KOKKOS_INLINE_FUNCTION
-    auto operator()( ForceCoeffTag, const int, const int, const double s,
+    auto operator()( ForceCoeffTag, const int i, const int, const double s,
                      const double vol, const int = -1 ) const
     {
-        return c * s * vol;
+        return c( i ) * s * vol;
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -73,30 +76,39 @@ struct MechanicsModel<PMB, Elastic> : public BaseForceModel
     {
         // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
         // the integrand (pairwise potential).
-        return 0.25 * c * s * s * xi * vol;
+        return 0.25 * c( i ) * s * s * xi * vol;
     }
 };
 
 template <typename ModelType>
 MechanicsModel( ModelType, Elastic, const double force_horizon, const double K )
-    -> MechanicsModel<ModelType, Elastic>;
+    -> MechanicsModel<ModelType, Elastic, ConstantProperty>;
 
 template <typename ModelType>
 MechanicsModel( ModelType, const double force_horizon, const double K )
-    -> MechanicsModel<ModelType, Elastic>;
+    -> MechanicsModel<ModelType, Elastic, ConstantProperty>;
 
-template <typename MemorySpace>
-struct MechanicsModel<PMB, ElasticPerfectlyPlastic, MemorySpace>
-    : public MechanicsModel<PMB, Elastic>, public BasePlasticity<MemorySpace>
+template <typename ModelType>
+MechanicsModel( ModelType, Elastic, const double force_horizon, const double K )
+    -> MechanicsModel<ModelType, Elastic, ConstantProperty>;
+
+template <typename ModelType>
+MechanicsModel( ModelType, const double force_horizon, const double K )
+    -> MechanicsModel<ModelType, Elastic, ConstantProperty>;
+
+template <typename MemorySpace, typename FunctorModulus, typename FunctorYield>
+struct MechanicsModel<PMB, ElasticPerfectlyPlastic, FunctorModulus,
+                      FunctorYield, MemorySpace>
+    : public MechanicsModel<PMB, Elastic, FunctorModulus>,
+      public BasePlasticity<MemorySpace>
 {
-    using base_type = MechanicsModel<PMB, Elastic>;
+    using base_type = MechanicsModel<PMB, Elastic, FunctorModulus>;
     using base_plasticity_type = BasePlasticity<MemorySpace>;
 
     using mechanics_type = ElasticPerfectlyPlastic;
 
     using base_plasticity_type::_s_p;
-    using base_type::c;
-    double s_Y;
+    FunctorYield s_Y;
 
     using base_plasticity_type::updateBonds;
 
@@ -105,17 +117,27 @@ struct MechanicsModel<PMB, ElasticPerfectlyPlastic, MemorySpace>
                     const double sigma_y )
         : base_type( tag, force_horizon, K )
         , base_plasticity_type()
-        , s_Y( sigma_y / 3.0 / K )
+        , s_Y( ConstantProperty( sigma_y / 3.0 / K ) )
+    {
+    }
+
+    MechanicsModel( PMB tag, ElasticPerfectlyPlastic, MemorySpace,
+                    const double force_horizon, const double K,
+                    const FunctorYield _s_Y )
+        : base_type( tag, force_horizon, K )
+        , base_plasticity_type()
+        , s_Y( _s_Y )
     {
     }
 
     // Constructor to average from existing models.
+    // FIXME: use the first model functional dependence for now.
     template <typename ModelType1, typename ModelType2>
     MechanicsModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
         , base_plasticity_type()
+        , s_Y( model1.s_Y )
     {
-        s_Y = ( model1.s_Y + model2.s_Y ) / 2.0;
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -161,10 +183,11 @@ struct MechanicsModel<PMB, ElasticPerfectlyPlastic, MemorySpace>
     }
 };
 
-template <>
-struct MechanicsModel<LinearPMB, Elastic> : public MechanicsModel<PMB, Elastic>
+template <typename FunctorType>
+struct MechanicsModel<LinearPMB, Elastic, FunctorType>
+    : public MechanicsModel<PMB, Elastic, FunctorType>
 {
-    using base_type = MechanicsModel<PMB, Elastic>;
+    using base_type = MechanicsModel<PMB, Elastic, FunctorType>;
     // Tag to dispatch to force iteration.
     using force_tag = LinearPMB;
 
