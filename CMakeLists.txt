@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.11)
 project(CabanaPD LANGUAGES CXX C)
-set(PROJECT_VERSION "0.5.0-dev")
+set(PROJECT_VERSION "0.5.0")
 
 cmake_policy(SET CMP0074 NEW)
 
@@ -27,7 +27,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/CabanaPDConfig.cmake ${CMAKE_CURRENT_B
 ##---------------------------------------------------------------------------##
 # Set up main options (inherit from Kokkos and Cabana CMake)
 ##---------------------------------------------------------------------------##
-find_package(Cabana REQUIRED 0.7.0)
+find_package(Cabana REQUIRED 0.8.0)
 
 macro(CabanaPD_check_optional)
   cmake_parse_arguments(CABANA "" "OPTION" "" ${ARGN})
