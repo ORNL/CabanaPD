@@ -35,14 +35,26 @@ struct MechanicsModel<PMB, Elastic, FunctorType> : public BaseForceModel
     FunctorType K;
     double c_factor;
 
-    MechanicsModel( PMB tag, Elastic, const double force_horizon,
+    MechanicsModel( PMB tag, Elastic mech, const double force_horizon,
                     const double _K )
+        : MechanicsModel( tag, mech, force_horizon, ConstantProperty( _K ) )
+    {
+    }
+
+    MechanicsModel( PMB tag, const double force_horizon, const double _K )
         : MechanicsModel( tag, force_horizon, ConstantProperty( _K ) )
     {
     }
 
-    MechanicsModel( PMB, const double force_horizon, const double _K )
+    MechanicsModel( PMB tag, const double force_horizon, const FunctorType _K )
+        : MechanicsModel( tag, Elastic{}, force_horizon, _K )
+    {
+    }
+
+    MechanicsModel( PMB, Elastic, const double force_horizon,
+                    const FunctorType _K )
         : base_type( force_horizon )
+        , K( _K )
     {
         c_factor = 18.0 / ( pi * force_horizon * force_horizon * force_horizon *
                             force_horizon );
@@ -53,12 +65,12 @@ struct MechanicsModel<PMB, Elastic, FunctorType> : public BaseForceModel
     template <typename ModelType1, typename ModelType2>
     MechanicsModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
-        , K( model.K )
+        , K( model1.K )
     {
     }
 
     KOKKOS_FUNCTION
-    auto c( const int i ) { return K( i ) * c_factor; }
+    auto c( const int i ) const { return K( i ) * c_factor; }
 
     KOKKOS_FUNCTION
     int influenceType() const { return 1; }
@@ -71,7 +83,7 @@ struct MechanicsModel<PMB, Elastic, FunctorType> : public BaseForceModel
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto operator()( EnergyTag, const int, const int, const double s,
+    auto operator()( EnergyTag, const int i, const int, const double s,
                      const double xi, const double vol, const int = -1 ) const
     {
         // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
@@ -88,13 +100,10 @@ template <typename ModelType>
 MechanicsModel( ModelType, const double force_horizon, const double K )
     -> MechanicsModel<ModelType, Elastic, ConstantProperty>;
 
-template <typename ModelType>
-MechanicsModel( ModelType, Elastic, const double force_horizon, const double K )
-    -> MechanicsModel<ModelType, Elastic, ConstantProperty>;
-
-template <typename ModelType>
-MechanicsModel( ModelType, const double force_horizon, const double K )
-    -> MechanicsModel<ModelType, Elastic, ConstantProperty>;
+template <typename ModelType, typename FunctorType>
+MechanicsModel( ModelType, Elastic, const double force_horizon,
+                const FunctorType K )
+    -> MechanicsModel<ModelType, Elastic, FunctorType>;
 
 template <typename MemorySpace, typename FunctorModulus, typename FunctorYield>
 struct MechanicsModel<PMB, ElasticPerfectlyPlastic, FunctorModulus,
@@ -122,7 +131,7 @@ struct MechanicsModel<PMB, ElasticPerfectlyPlastic, FunctorModulus,
     }
 
     MechanicsModel( PMB tag, ElasticPerfectlyPlastic, MemorySpace,
-                    const double force_horizon, const double K,
+                    const double force_horizon, const FunctorModulus K,
                     const FunctorYield _s_Y )
         : base_type( tag, force_horizon, K )
         , base_plasticity_type()
@@ -147,16 +156,16 @@ struct MechanicsModel<PMB, ElasticPerfectlyPlastic, FunctorModulus,
         // Update bond plastic stretch.
         auto s_p = _s_p( i, n );
         // Yield in tension.
-        if ( s >= s_p + s_Y )
-            _s_p( i, n ) = s - s_Y;
+        if ( s >= s_p + s_Y( i ) )
+            _s_p( i, n ) = s - s_Y( i );
         // Yield in compression.
-        else if ( s <= s_p - s_Y )
-            _s_p( i, n ) = s + s_Y;
+        else if ( s <= s_p - s_Y( i ) )
+            _s_p( i, n ) = s + s_Y( i );
         // else: Elastic (in between), do not modify.
 
         // Must extract again if in the plastic regime.
         s_p = _s_p( i, n );
-        return c * ( s - s_p ) * vol;
+        return base_type::c( i ) * ( s - s_p ) * vol;
     }
 
     // This energy calculation is only valid for pure tension or pure
@@ -168,18 +177,18 @@ struct MechanicsModel<PMB, ElasticPerfectlyPlastic, FunctorModulus,
         auto s_p = _s_p( i, n );
         double stretch_term;
         // Yield in tension.
-        if ( s >= s_p + s_Y )
-            stretch_term = s_Y * ( 2.0 * s - s_Y );
+        if ( s >= s_p + s_Y( i ) )
+            stretch_term = s_Y( i ) * ( 2.0 * s - s_Y( i ) );
         // Yield in compression.
-        else if ( s <= s_p - s_Y )
-            stretch_term = s_Y * ( -2.0 * s - s_Y );
+        else if ( s <= s_p - s_Y( i ) )
+            stretch_term = s_Y( i ) * ( -2.0 * s - s_Y( i ) );
         else
             // Elastic (in between).
             stretch_term = s * s;
 
         // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
         // the integrand (pairwise potential).
-        return 0.25 * c * stretch_term * xi * vol;
+        return 0.25 * base_type::c( i ) * stretch_term * xi * vol;
     }
 };
 
@@ -206,7 +215,16 @@ template <typename ModelType, typename MemorySpace>
 MechanicsModel( ModelType, ElasticPerfectlyPlastic, MemorySpace,
                 const double force_horizon, const double K,
                 const double sigma_y )
-    -> MechanicsModel<ModelType, ElasticPerfectlyPlastic, MemorySpace>;
+    -> MechanicsModel<ModelType, ElasticPerfectlyPlastic, ConstantProperty,
+                      ConstantProperty, MemorySpace>;
+
+template <typename ModelType, typename FunctorModulus, typename FunctorYield,
+          typename MemorySpace>
+MechanicsModel( ModelType, ElasticPerfectlyPlastic, MemorySpace,
+                const double force_horizon, const FunctorModulus K,
+                const FunctorYield sigma_y )
+    -> MechanicsModel<ModelType, ElasticPerfectlyPlastic, FunctorModulus,
+                      FunctorYield, MemorySpace>;
 
 } // namespace CabanaPD
 

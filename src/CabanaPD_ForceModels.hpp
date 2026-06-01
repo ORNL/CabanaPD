@@ -89,7 +89,7 @@ struct BaseForceModel
 
     // FIXME: use the first model cutoff for now.
     template <typename ModelType1, typename ModelType2>
-    BaseForceModel( const ModelType1& model1, const ModelType2& model2 )
+    BaseForceModel( const ModelType1& model1, const ModelType2& )
     {
         force_horizon = model1.force_horizon;
     }
@@ -121,15 +121,16 @@ class BasePlasticity
 /******************************************************************************
   Fracture models.
 ******************************************************************************/
-template <typename FractureType>
+template <typename FractureType, typename FunctorType = void>
 struct FractureModel;
 
 template <typename T>
 struct is_fracture_model : public std::false_type
 {
 };
-template <typename FractureType>
-struct is_fracture_model<FractureModel<FractureType>> : public std::true_type
+template <typename FractureType, typename FunctorType>
+struct is_fracture_model<FractureModel<FractureType, FunctorType>>
+    : public std::true_type
 {
 };
 
@@ -177,59 +178,52 @@ struct FractureModel<NoFracture>
     {
         return false;
     }
-
-    KOKKOS_FUNCTION
-    auto criticalStretch() const { return DBL_MAX; }
 };
 
-template <>
-struct FractureModel<CriticalStretch>
+template <typename FunctorType>
+struct FractureModel<CriticalStretch, FunctorType>
 {
     using fracture_tag = Fracture;
 
-    double s0;
-    double bond_break_coeff;
+    FunctorType s0;
     int influence_type;
 
     FractureModel( const double _force_horizon, const double _K,
-                   const double _G0, const int influence = 1 )
-        : influence_type( influence )
+                   const double G0, const int influence = 1 )
+        : s0( ConstantProperty(
+              CabanaPD::criticalStretch( _force_horizon, _K, G0, influence ) ) )
+        , influence_type( influence )
     {
-        s0 = CabanaPD::criticalStretch( _force_horizon, _K, _G0, influence );
-
-        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 
-    // Constructor to work with plasticity.
     FractureModel( const double _s0 )
         : s0( _s0 )
     {
-        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
+    }
+
+    FractureModel( const FunctorType _s0 )
+        : s0( _s0 )
+    {
     }
 
     // Average from existing models.
     template <typename ModelType1, typename ModelType2>
     FractureModel(
-        const ModelType1& model1, const ModelType2& model2,
+        const ModelType1& model1, const ModelType2&,
         typename std::enable_if_t<( is_force_model<ModelType1>::value &&
                                     is_force_model<ModelType2>::value ),
                                   int>* = 0 )
+        : s0( model1.s0 )
     {
-        s0 = averageCriticalStretch( model1.criticalStretch(),
-                                     model2.criticalStretch(), model1.K,
-                                     model2.K );
-        bond_break_coeff = ( 1.0 + s0 ) * ( 1.0 + s0 );
     }
 
     KOKKOS_INLINE_FUNCTION
-    bool operator()( CriticalStretchTag, const int, const int, const double r,
+    bool operator()( CriticalStretchTag, const int i, const int, const double r,
                      const double xi ) const
     {
-        return r * r >= bond_break_coeff * xi * xi;
+        const double break_coeff = ( 1.0 + s0( i ) ) * ( 1.0 + s0( i ) );
+        return r * r >= break_coeff * xi * xi;
     }
-
-    KOKKOS_FUNCTION
-    auto criticalStretch() const { return s0; }
 
     KOKKOS_FUNCTION
     auto influenceType() const { return influence_type; }
@@ -237,7 +231,11 @@ struct FractureModel<CriticalStretch>
 
 FractureModel( const double _force_horizon, const double _K, const double _G0,
                const int influence = 1 )
-    ->FractureModel<CriticalStretch>;
+    ->FractureModel<CriticalStretch, ConstantProperty>;
+
+template <typename FunctorType>
+FractureModel( const FunctorType s0 )
+    -> FractureModel<CriticalStretch, FunctorType>;
 
 /******************************************************************************
   Temperature-dependent models.
@@ -344,30 +342,32 @@ ThermalModel( const TemperatureType, const FunctorType, const double )
     -> ThermalModel<TemperatureDependent, TemperatureType, NoFracture,
                     FunctorType>;
 
-template <typename TemperatureType, typename FunctorType>
+template <typename TemperatureType, typename FunctorStretch,
+          typename FunctorAlpha>
 struct ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
-                    FunctorType>
+                    FunctorStretch, FunctorAlpha>
     : public ThermalModel<TemperatureDependent, TemperatureType, NoFracture,
-                          FunctorType>
+                          FunctorAlpha>
 {
     using base_type = ThermalModel<TemperatureDependent, TemperatureType,
-                                   NoFracture, FunctorType>;
+                                   NoFracture, FunctorAlpha>;
     using base_type::operator();
     using fracture_tag = Fracture;
 
-    double s0;
+    FunctorStretch s0;
     using base_type::alpha;
     using base_type::temp0;
     using base_type::temperature;
 
     ThermalModel( const double _s0, const TemperatureType _temp,
                   const double _alpha, const double _temp0 )
-        : ThermalModel( _s0, _temp, ConstantProperty( _alpha ), _temp0 )
+        : ThermalModel( ConstantProperty( _s0 ), _temp,
+                        ConstantProperty( _alpha ), _temp0 )
     {
     }
 
-    ThermalModel( const double _s0, const TemperatureType _temp,
-                  const FunctorType _alpha, const double _temp0 )
+    ThermalModel( const FunctorStretch _s0, const TemperatureType _temp,
+                  const FunctorAlpha _alpha, const double _temp0 )
         : base_type( _temp, _alpha, _temp0 )
         , s0( _s0 )
     {
@@ -376,9 +376,7 @@ struct ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
     template <typename ModelType1, typename ModelType2>
     ThermalModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
-        , s0( averageCriticalStretch( model1.criticalStretch(),
-                                      model2.criticalStretch(), model1.K,
-                                      model2.K ) )
+        , s0( model1.s0 )
     {
     }
 
@@ -387,25 +385,23 @@ struct ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
                      const double r, const double xi ) const
     {
         double temp_avg = 0.5 * ( temperature( i ) + temperature( j ) ) - temp0;
-        double bond_break_coeff = ( 1.0 + s0 + alpha( temp_avg ) * temp_avg ) *
-                                  ( 1.0 + s0 + alpha( temp_avg ) * temp_avg );
+        double bond_break_coeff = ( 1.0 + s0( i ) + alpha( i ) * temp_avg ) *
+                                  ( 1.0 + s0( i ) + alpha( i ) * temp_avg );
         return r * r >= bond_break_coeff * xi * xi;
     }
-
-    KOKKOS_FUNCTION
-    auto criticalStretch() const { return s0; }
 };
 
 template <typename TemperatureType>
 ThermalModel( const double, const TemperatureType, const double, const double )
     -> ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
-                    ConstantProperty>;
+                    ConstantProperty, ConstantProperty>;
 
-template <typename TemperatureType, typename FunctorType>
-ThermalModel( const double, const TemperatureType, const FunctorType,
+template <typename TemperatureType, typename FunctorStretch,
+          typename FunctorAlpha>
+ThermalModel( const FunctorStretch, const TemperatureType, const FunctorAlpha,
               const double )
     -> ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
-                    FunctorType>;
+                    FunctorStretch, FunctorAlpha>;
 
 // This class stores temperature parameters needed for heat transfer, but not
 // the temperature itself (stored instead in the static temperature class
@@ -421,9 +417,9 @@ struct BaseDynamicTemperatureModel
     FunctorHeatCapacity cp;
     bool constant_microconductivity;
 
-    BaseDynamicTemperatureModel( const double _thermal_horizon,
-                                 const double _kappa, const double _cp,
-                                 const bool _constant_microconductivity = true )
+    explicit BaseDynamicTemperatureModel(
+        const double _thermal_horizon, const double _kappa, const double _cp,
+        const bool _constant_microconductivity = true )
         : BaseDynamicTemperatureModel(
               _thermal_horizon, ConstantProperty( _kappa ),
               ConstantProperty( _cp ), _constant_microconductivity )
@@ -526,20 +522,22 @@ ThermalModel( const double, const TemperatureType, FunctorCTE,
     -> ThermalModel<DynamicTemperature, TemperatureType, NoFracture, FunctorCTE,
                     FunctorConductivity, FunctorHeatCapacity>;
 
-template <typename TemperatureType, typename FunctorCTE,
-          typename FunctorConductivity, typename FunctorHeatCapacity>
+template <typename TemperatureType, typename FunctorStretch,
+          typename FunctorCTE, typename FunctorConductivity,
+          typename FunctorHeatCapacity>
 struct ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch,
-                    FunctorCTE, FunctorConductivity, FunctorHeatCapacity>
+                    FunctorStretch, FunctorCTE, FunctorConductivity,
+                    FunctorHeatCapacity>
     : public BaseDynamicTemperatureModel<FunctorConductivity,
                                          FunctorHeatCapacity>,
       ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
-                   FunctorCTE>
+                   FunctorStretch, FunctorCTE>
 {
     using base_heattransfer_type =
         BaseDynamicTemperatureModel<FunctorConductivity, FunctorHeatCapacity>;
     using typename base_heattransfer_type::thermal_tag;
     using base_type = ThermalModel<TemperatureDependent, TemperatureType,
-                                   CriticalStretch, FunctorCTE>;
+                                   CriticalStretch, FunctorStretch, FunctorCTE>;
     using base_type::operator();
 
     ThermalModel( const double _thermal_horizon, const double _s0,
@@ -553,7 +551,7 @@ struct ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch,
     {
     }
 
-    ThermalModel( const double _thermal_horizon, const double _s0,
+    ThermalModel( const double _thermal_horizon, FunctorStretch _s0,
                   const TemperatureType _temp, FunctorCTE _alpha,
                   FunctorConductivity _kappa, FunctorHeatCapacity _cp,
                   const double _temp0,
@@ -577,15 +575,18 @@ template <typename TemperatureType>
 ThermalModel( const double, const double, const TemperatureType, const double,
               const double, const double, const double, const bool = true )
     -> ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch,
-                    ConstantProperty, ConstantProperty, ConstantProperty>;
+                    ConstantProperty, ConstantProperty, ConstantProperty,
+                    ConstantProperty>;
 
-template <typename TemperatureType, typename FunctorCTE,
-          typename FunctorConductivity, typename FunctorHeatCapacity>
-ThermalModel( const double, const double, const TemperatureType, FunctorCTE,
+template <typename TemperatureType, typename FunctorStretch,
+          typename FunctorCTE, typename FunctorConductivity,
+          typename FunctorHeatCapacity>
+ThermalModel( const double, FunctorStretch, const TemperatureType, FunctorCTE,
               FunctorConductivity, FunctorHeatCapacity, const double,
               const bool = true )
     -> ThermalModel<DynamicTemperature, TemperatureType, CriticalStretch,
-                    FunctorCTE, FunctorConductivity, FunctorHeatCapacity>;
+                    FunctorStretch, FunctorCTE, FunctorConductivity,
+                    FunctorHeatCapacity>;
 
 /******************************************************************************
 Force models.

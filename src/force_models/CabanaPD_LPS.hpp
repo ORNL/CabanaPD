@@ -21,7 +21,7 @@
 namespace CabanaPD
 {
 template <>
-struct MechanicsModel<LPS, Elastic> : public BaseForceModel
+struct MechanicsModel<LPS, Elastic, ConstantProperty> : public BaseForceModel
 {
     using base_type = BaseForceModel;
     using thermal_type = TemperatureIndependent;
@@ -34,7 +34,7 @@ struct MechanicsModel<LPS, Elastic> : public BaseForceModel
     int influence_type;
     InfluenceFunctionTag influence_tag;
 
-    using base_type::K;
+    double K;
     double G;
     // Store coefficients for multi-material systems.
     // TODO: this currently only supports bi-material systems.
@@ -49,8 +49,9 @@ struct MechanicsModel<LPS, Elastic> : public BaseForceModel
 
     MechanicsModel( LPS, const double _force_horizon, const double _K,
                     const double _G, const int _influence = 0 )
-        : base_type( _force_horizon, _K )
+        : base_type( _force_horizon )
         , influence_type( _influence )
+        , K( _K )
         , G( _G )
     {
         init();
@@ -156,9 +157,10 @@ struct MechanicsModel<LPS, Elastic> : public BaseForceModel
 };
 
 template <>
-struct MechanicsModel<LinearLPS, Elastic> : public MechanicsModel<LPS, Elastic>
+struct MechanicsModel<LinearLPS, Elastic, ConstantProperty>
+    : public MechanicsModel<LPS, Elastic, ConstantProperty>
 {
-    using base_type = MechanicsModel<LPS, Elastic>;
+    using base_type = MechanicsModel<LPS, Elastic, ConstantProperty>;
     // Tag to dispatch to force iteration.
     using force_tag = LinearLPS;
 
@@ -176,11 +178,11 @@ struct MechanicsModel<LinearLPS, Elastic> : public MechanicsModel<LPS, Elastic>
 template <typename ModelType>
 MechanicsModel( ModelType, const double force_horizon, const double K,
                 const double G, const int _influence = 0 )
-    -> MechanicsModel<ModelType, Elastic>;
+    -> MechanicsModel<ModelType, Elastic, ConstantProperty>;
 template <typename ModelType>
 MechanicsModel( ModelType, Elastic, const double force_horizon, const double K,
                 const double G, const int _influence = 0 )
-    -> MechanicsModel<ModelType, Elastic>;
+    -> MechanicsModel<ModelType, Elastic, ConstantProperty>;
 
 } // namespace CabanaPD
 
