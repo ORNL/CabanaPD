@@ -92,7 +92,9 @@ void testIntegratorReversibility( int steps )
             EXPECT_DOUBLE_EQ( x_final( p, d ), x_init( p, d ) );
 }
 
-void testIntegratorADRSingleMass( int steps )
+template <bool GoBySteps>
+void testIntegratorADRSingleMass( int steps, double iteration_force_tolerance,
+                                  double displacement_epsilon )
 {
     using exec_space = TEST_EXECSPACE;
     constexpr int num_masses = 1;
@@ -122,10 +124,6 @@ void testIntegratorADRSingleMass( int steps )
             displacements( i, 2 ) = -0.5;
         } );
 
-    // initialize forces
-    Kokkos::parallel_for( "testIntegrateADRSingleMass::initialize_forces",
-                          num_masses, force_lambda );
-
     double adrDeltaT = 1.0;
     CabanaPD::ADRFictitiousMass adrMass{ adrDeltaT, 1.0, 1.0, stiffness, 5 };
     CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass,
@@ -134,15 +132,35 @@ void testIntegratorADRSingleMass( int steps )
         exec_space{}, adrMass, adrInitialVelocity, num_masses, adrDeltaT );
 
     integrator.reset( exec_space{} );
-    // Integrate one step
-    for ( int s = 0; s < steps; ++s )
+
+    if constexpr ( GoBySteps )
     {
-        integrator.initialSubStep( exec_space{}, forces );
-        Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
-                              num_masses, force_lambda );
-        integrator.middleSubStep( exec_space{}, forces, velocities,
-                                  displacements );
-        integrator.finalSubStep( exec_space{}, velocities, displacements );
+        for ( int s = 0; s < steps; ++s )
+        {
+            integrator.initialSubStep( exec_space{}, forces );
+            Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
+                                  num_masses, force_lambda );
+            integrator.middleSubStep( exec_space{}, forces, velocities,
+                                      displacements );
+            integrator.finalSubStep( exec_space{}, velocities, displacements );
+        }
+    }
+    else
+    {
+        int step = 0;
+        while ( !integrator.isConverged( iteration_force_tolerance ) &&
+                step < steps )
+        {
+            integrator.initialSubStep( exec_space{}, forces );
+            Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
+                                  num_masses, force_lambda );
+            integrator.middleSubStep( exec_space{}, forces, velocities,
+                                      displacements );
+            integrator.finalSubStep( exec_space{}, velocities, displacements );
+            ++step;
+        }
+        // check that it took less than the maximum number of steps
+        EXPECT_GT( steps, step );
     }
 
     // Make a copy of final results on the host
@@ -152,13 +170,15 @@ void testIntegratorADRSingleMass( int steps )
     // Check the results
     for ( std::size_t p = 0; p < num_masses; ++p )
     {
-        EXPECT_NEAR( displacements_host( p, 0 ), 0.0, 1e-16 );
-        EXPECT_NEAR( displacements_host( p, 1 ), 0.0, 1e-16 );
-        EXPECT_NEAR( displacements_host( p, 2 ), 0.0, 1e-16 );
+        EXPECT_NEAR( displacements_host( p, 0 ), 0.0, displacement_epsilon );
+        EXPECT_NEAR( displacements_host( p, 1 ), 0.0, displacement_epsilon );
+        EXPECT_NEAR( displacements_host( p, 2 ), 0.0, displacement_epsilon );
     }
 }
 
-void testIntegratorADRparticles( int steps )
+template <bool GoBySteps>
+void testIntegratorADRparticles( int steps, double iteration_force_tolerance,
+                                 double displacement_epsilon )
 {
     using exec_space = TEST_EXECSPACE;
 
@@ -196,19 +216,35 @@ void testIntegratorADRparticles( int steps )
                 displacements( i, j ) = positions( i, j );
         } );
 
-    // initialize forces
-    Kokkos::parallel_for( "testIntegrateADRSingleMass::initialize_forces",
-                          num_particle, force_lambda );
-
     particleIntegrator.reset( exec_space{} );
-    // Integrate one step
-    for ( int s = 0; s < steps; ++s )
+
+    if constexpr ( GoBySteps )
     {
-        particleIntegrator.initialSubStep( exec_space{}, particles );
-        Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
-                              num_particle, force_lambda );
-        particleIntegrator.middleSubStep( exec_space{}, particles );
-        particleIntegrator.finalSubStep( exec_space{}, particles );
+        // Integrate one step
+        for ( int s = 0; s < steps; ++s )
+        {
+            particleIntegrator.initialSubStep( exec_space{}, particles );
+            Kokkos::parallel_for( "testIntegrateADRParticles::update_forces",
+                                  num_particle, force_lambda );
+            particleIntegrator.middleSubStep( exec_space{}, particles );
+            particleIntegrator.finalSubStep( exec_space{}, particles );
+        }
+    }
+    else
+    {
+        int step = 0;
+        while ( !particleIntegrator.isConverged( iteration_force_tolerance ) &&
+                step < steps )
+        {
+            particleIntegrator.initialSubStep( exec_space{}, particles );
+            Kokkos::parallel_for( "testIntegrateADRParticles::update_forces",
+                                  num_particle, force_lambda );
+            particleIntegrator.middleSubStep( exec_space{}, particles );
+            particleIntegrator.finalSubStep( exec_space{}, particles );
+            ++step;
+        }
+        // check that it took less than the maximum number of steps
+        EXPECT_GT( steps, step );
     }
 
     // Make a copy of final results on the host
@@ -222,10 +258,14 @@ void testIntegratorADRparticles( int steps )
     // Check the results
     for ( std::size_t p = 0; p < num_particle; ++p )
         for ( std::size_t d = 0; d < 3; ++d )
-            EXPECT_NEAR( displacements_final( p, d ), 0.0, 1e-16 );
+            EXPECT_NEAR( displacements_final( p, d ), 0.0,
+                         displacement_epsilon );
 }
 
-void testIntegratorADRparticlesMultiMaterial( int steps )
+template <bool GoBySteps>
+void testIntegratorADRparticlesMultiMaterial( int steps,
+                                              double iteration_force_tolerance,
+                                              double displacement_epsilon )
 {
     using exec_space = TEST_EXECSPACE;
     const int numMaterials = 2;
@@ -268,26 +308,43 @@ void testIntegratorADRparticlesMultiMaterial( int steps )
     // initialize displacements
     auto positions = particles.sliceReferencePosition();
     Kokkos::parallel_for(
-        "testIntegrateADRparticles::initialize_displacements_and_type",
+        "testIntegrateADRparticlesMultiMaterial::initialize_displacements_and_"
+        "type",
         num_particle, KOKKOS_LAMBDA( int i ) {
             for ( int j = 0; j < 3; ++j )
                 displacements( i, j ) = positions( i, j );
             type( i ) = i % 2; // two materials
         } );
 
-    // initialize forces
-    Kokkos::parallel_for( "testIntegrateADRSingleMass::initialize_forces",
-                          num_particle, force_lambda );
-
     particleIntegrator.reset( exec_space{} );
-    // Integrate one step
-    for ( int s = 0; s < steps; ++s )
+    if constexpr ( GoBySteps )
     {
-        particleIntegrator.initialSubStep( exec_space{}, particles );
-        Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
-                              num_particle, force_lambda );
-        particleIntegrator.middleSubStep( exec_space{}, particles );
-        particleIntegrator.finalSubStep( exec_space{}, particles );
+        for ( int s = 0; s < steps; ++s )
+        {
+            particleIntegrator.initialSubStep( exec_space{}, particles );
+            Kokkos::parallel_for(
+                "testIntegrateADRparticlesMultiMaterial::update_forces",
+                num_particle, force_lambda );
+            particleIntegrator.middleSubStep( exec_space{}, particles );
+            particleIntegrator.finalSubStep( exec_space{}, particles );
+        }
+    }
+    else
+    {
+        int step = 0;
+        while ( !particleIntegrator.isConverged( iteration_force_tolerance ) &&
+                step < steps )
+        {
+            particleIntegrator.initialSubStep( exec_space{}, particles );
+            Kokkos::parallel_for(
+                "testIntegrateADRparticlesMultiMaterial::update_forces",
+                num_particle, force_lambda );
+            particleIntegrator.middleSubStep( exec_space{}, particles );
+            particleIntegrator.finalSubStep( exec_space{}, particles );
+            ++step;
+        }
+        // check that it took less than the maximum number of steps
+        EXPECT_GT( steps, step );
     }
 
     // Make a copy of final results on the host
@@ -301,7 +358,8 @@ void testIntegratorADRparticlesMultiMaterial( int steps )
     // Check the results
     for ( std::size_t p = 0; p < num_particle; ++p )
         for ( std::size_t d = 0; d < 3; ++d )
-            EXPECT_NEAR( displacements_final( p, d ), 0.0, 1e-16 );
+            EXPECT_NEAR( displacements_final( p, d ), 0.0,
+                         displacement_epsilon );
 }
 //---------------------------------------------------------------------------//
 // TESTS
@@ -313,16 +371,19 @@ TEST( TEST_CATEGORY, test_integrate_reversibility )
 
 TEST( TEST_CATEGORY, test_integrate_ADR_single_mass )
 {
-    testIntegratorADRSingleMass( 1000 );
+    testIntegratorADRSingleMass<true>( 1000, 1e-16, 1e-10 );
+    testIntegratorADRSingleMass<false>( 1000, 1e-16, 1e-10 );
 }
 TEST( TEST_CATEGORY, test_integrate_ADR_particles )
 {
-    testIntegratorADRparticles( 2000 );
+    testIntegratorADRparticles<true>( 2000, 1e-16, 1e-10 );
+    testIntegratorADRparticles<false>( 2000, 1e-16, 1e-10 );
 }
 
 TEST( TEST_CATEGORY, test_integrate_ADR_particles_multi_material )
 {
-    testIntegratorADRparticlesMultiMaterial( 3000 );
+    testIntegratorADRparticlesMultiMaterial<true>( 3000, 1e-16, 1e-10 );
+    testIntegratorADRparticlesMultiMaterial<false>( 3000, 1e-16, 1e-10 );
 }
 
 //---------------------------------------------------------------------------//
