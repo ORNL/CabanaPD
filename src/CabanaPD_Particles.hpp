@@ -651,7 +651,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         _output_timer.stop();
     }
 
-    auto gridSize() { return _grid_size; }
+    auto gridSize() const { return _grid_size; }
     auto rank() { return local_grid->globalGrid().blockId(); }
     auto comm() { return local_grid->globalGrid().comm(); }
 
