@@ -156,16 +156,10 @@ void dogboneTensileTestExample( const std::string filename )
     // ====================================================
     CabanaPD::ForceModel force_model( model_type{}, mechanics_type{},
                                       memory_space{}, horizon, K, G0, sigma_y );
-
-    CabanaPD::ForceModel stationary_force_model(
-        model_type{}, CabanaPD::Elastic{}, CabanaPD::NoFracture{}, horizon, K );
-
     // ====================================================
     //                   Create solver
     // ====================================================
     CabanaPD::Solver solver( inputs, particles, force_model );
-    CabanaPD::Solver stationary_solver( inputs, particles,
-                                        stationary_force_model );
 
     // ====================================================
     //                  Boundary conditions
@@ -279,29 +273,23 @@ void dogboneTensileTestExample( const std::string filename )
     //                   Simulation run
     // ====================================================
     solver.init( bc );
-    stationary_solver.init( bc );
     particleADRIntegator.reset( exec_space{} );
 
     // TODO think about this can be integrated in a non ugly manner
     double time = 0.0;
     double adrFinalTime = 0.8 * static_cast<double>( inputs["final_time"] );
-    double adrDeltaT = 0.1 * static_cast<double>( inputs["final_time"] );
+    double adrDeltaT = 0.001 * static_cast<double>( inputs["final_time"] );
     int numADRSteps = adrFinalTime / adrDeltaT;
 
     for ( int adrTimeStep = 1; adrTimeStep < numADRSteps; ++adrTimeStep )
     {
         time = adrDeltaT * adrTimeStep;
-        unsigned num_subIterations = 3000;
-        for ( unsigned subIterations = 0; subIterations < num_subIterations;
-              subIterations++ )
-        {
-            CabanaPD::runStepWithExternalIntegrator(
-                exec_space{}, stationary_solver, particleADRIntegator,
-                particles, bc, time );
-        }
+        CabanaPD::runUntilConvergedWithExternalIntegrator(
+            exec_space{}, solver, particleADRIntegator, particles, bc, time,
+            true, 1e10, 10'000 );
         CabanaPD::runStepWithExternalIntegratorAndOutput(
-            exec_space{}, stationary_solver, particleADRIntegator, particles,
-            bc, time, adrTimeStep );
+            exec_space{}, solver, particleADRIntegator, particles, bc, time,
+            adrTimeStep );
     }
 
     // TODO same here ... this is probably not what we want for our users
