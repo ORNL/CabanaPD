@@ -442,6 +442,52 @@ template <typename ForcesType, typename FictitiousMassType>
 ADRInitialVelocity( ForcesType, FictitiousMassType, double )
     -> ADRInitialVelocity<ForcesType, FictitiousMassType>;
 
+//  S: copy NoFail field when enabling or disabling NoFail
+//  O: can be extended by inheritance/composition
+//  L: no inheritance
+//  I: uses "I need interfaces" and uses all passed values
+//  D: No dependence on the impl of particles, just on the interface
+
+template <typename MemorySpace>
+struct NoFailSwitch
+{
+    using noFail_storage_type = int;
+    Kokkos::View<noFail_storage_type*, MemorySpace> _noFail_map;
+
+    template <typename ExecutionSpace, typename ParticleType>
+    void enableNoFail( ExecutionSpace const& exec_space,
+                       ParticleType const& particles )
+    {
+        auto sliceNoFail = particles.sliceNoFail();
+        Kokkos::resize( Kokkos::WithoutInitializing, _noFail_map,
+                        sliceNoFail.size() );
+        Kokkos::parallel_for(
+            "NoFailSwitch::enableNoFail",
+            Kokkos::RangePolicy<ExecutionSpace>( 0, _noFail_map.extent( 0 ) ),
+            KOKKOS_CLASS_LAMBDA( int64_t index ) {
+                _noFail_map( index ) = sliceNoFail( index );
+                sliceNoFail( index ) = 1;
+            } );
+
+        Kokkos::fence( "NoFailSwitch::enableNoFailFence" );
+    }
+
+    template <typename ExecutionSpace, typename ParticleType>
+    void disableNoFail( ExecutionSpace const& exec_space,
+                        ParticleType const& particles )
+    {
+        auto sliceNoFail = particles.sliceNoFail();
+        Kokkos::parallel_for(
+            "NoFailSwitch::disableNoFail",
+            Kokkos::RangePolicy<ExecutionSpace>( 0, _noFail_map.extent( 0 ) ),
+            KOKKOS_CLASS_LAMBDA( int64_t index ) {
+                sliceNoFail( index ) = _noFail_map( index );
+            } );
+
+        Kokkos::fence( "NoFailSwitch::disableNoFailFence" );
+    }
+};
+
 //  S: Adapt interface of particles to interface of Integrator
 //  O: can be extended by inheritance/composition
 //  L: no inheritance
