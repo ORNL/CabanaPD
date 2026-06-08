@@ -278,6 +278,10 @@ void dogboneTensileTestExample( const std::string filename )
     // TODO think about this can be integrated in a non ugly manner
     double time = 0.0;
     double adrFinalTime = 0.8 * static_cast<double>( inputs["final_time"] );
+    // as this simulation is elastic percectly plastic, we need small time steps
+    // to also have small load steps so we don't immediately end in the plastic
+    // regime. We are using the nofail flag nevertheless (to show it), even
+    // though not triggering plasticiy also means we do not trigger failure
     double adrDeltaT = 0.001 * static_cast<double>( inputs["final_time"] );
     int numADRSteps = adrFinalTime / adrDeltaT;
 
