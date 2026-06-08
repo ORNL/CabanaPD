@@ -649,6 +649,50 @@ void runStepWithExternalIntegratorAndOutput(
     particles.output( step, time, solver.output_reference );
 }
 
+template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
+          typename ParticleType, typename BoundaryType, typename... ARGS>
+bool runUntilConvergedWithExternalIntegrator(
+    ExecutionSpace const& exec_space, SolverType& solver,
+    IntegratorType& integrator, ParticleType const& particles,
+    BoundaryType boundary_condition, double time, bool noFail, double tolerance,
+    int maxSteps, ARGS... args )
+{
+    NoFailSwitch<typename ExecutionSpace::memory_space> noFailSwitch;
+    if ( noFail )
+    {
+        noFailSwitch.enableNoFail( exec_space, particles );
+    }
+
+    int step = 0;
+    // TODO this will need to be adapted for MPI
+    while ( !integrator.isConverged( tolerance * particles.gridSize() ) &&
+            step < maxSteps )
+    {
+        runStepWithExternalIntegrator( exec_space, solver, integrator,
+                                       particles, boundary_condition, time,
+                                       args... );
+        ++step;
+        if ( step % 1000 == 0 )
+        {
+            std::cout << "Finished " << step << " ADR steps, residual "
+                      << integrator.getResidual() * particles.gridSize()
+                      << "\n";
+        }
+        if ( step == maxSteps )
+        {
+            std::cerr << "Warning: maximum number of steps reached without "
+                         "convergence.\n";
+        }
+    }
+
+    if ( noFail )
+    {
+        noFailSwitch.disableNoFail( exec_space, particles );
+    }
+
+    return step < maxSteps;
+}
+
 } // namespace CabanaPD
 
 #endif
