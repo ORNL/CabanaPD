@@ -220,6 +220,7 @@ struct ADRIntegrator
     FictitiousMassType _fictitious_mass;
     InitialVelocityType _initial_velocity_type;
     double _delta_t;
+    double _l2_force_residual = Kokkos::Experimental::finite_max_v<double>;
 
   public:
     ADRIntegrator( ExecutionSpace const& exec_space,
@@ -274,19 +275,23 @@ struct ADRIntegrator
               typename DisplacementType>
     void middleSubStep( ExecutionSpace, ForceType const& forces,
                         VelocityType const& velocities,
-                        DisplacementType const& displacements ) const
+                        DisplacementType const& displacements )
     {
-        Kokkos::parallel_for(
+        Kokkos::parallel_reduce(
             "ADRIntegrator::middleStep",
             Kokkos::RangePolicy<ExecutionSpace>(
                 0, _forces_last_step.extent( 0 ) ),
-            KOKKOS_CLASS_LAMBDA( int64_t index ) {
+            KOKKOS_CLASS_LAMBDA( int64_t index, double& local_force_residual ) {
                 double mass[dim];
                 double damping_numerator = 0.;
                 double damping_denominator = 0.;
                 // compute damping coefficient
                 for ( int i = 0; i < dim; ++i )
                 {
+                    local_force_residual +=
+                        ( -forces( index, i ) +
+                          _forces_last_step( index, i ) ) *
+                        ( -forces( index, i ) + _forces_last_step( index, i ) );
                     mass[i] = _fictitious_mass( index, i );
                     for ( int j = 0; j < dim; ++j )
                     {
@@ -321,8 +326,8 @@ struct ADRIntegrator
                           2.0 * _delta_t * forces( index, i ) / mass[i] ) /
                         velocity_denomiator;
                 }
-            } );
-        Kokkos::fence( "ADRIntegrator::Fence::middleStep" );
+            },
+            _l2_force_residual );
     }
 
     template <typename VelocityType, typename DisplacementType>
@@ -345,6 +350,13 @@ struct ADRIntegrator
             } );
         Kokkos::fence( "ADRIntegrator::Fence::finalStep" );
     }
+
+    bool isConverged( double tolerance )
+    {
+        return _l2_force_residual < tolerance;
+    }
+
+    double getResidual() { return _l2_force_residual; }
 };
 
 struct ADRFictitiousMass
@@ -537,6 +549,13 @@ struct ParticleIntegratorWrapper
         auto displacements = particles.sliceDisplacement();
         _integrator.finalSubStep( exec_space, velocities, displacements );
     }
+
+    bool isConverged( double tolerance )
+    {
+        return _integrator.isConverged( tolerance );
+    }
+
+    double getResidual() { return _integrator.getResidual(); }
 };
 
 template <typename ExecutionSpace, typename ForceType>
