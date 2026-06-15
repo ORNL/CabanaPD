@@ -178,6 +178,7 @@ void dogboneTensileTestExample( const std::string filename )
     // Create BC last to ensure ghost particles are included.
     auto x = solver.particles.sliceReferencePosition();
     auto u = solver.particles.sliceDisplacement();
+    auto f = solver.particles.sliceForce();
     auto disp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
         if ( right_grip.inside( x, pid ) )
@@ -203,7 +204,6 @@ void dogboneTensileTestExample( const std::string filename )
     auto dx = solver.particles.dx[0];
     auto dy = solver.particles.dx[1];
     auto dz = solver.particles.dx[2];
-    auto f = solver.particles.sliceForce();
 
     // Generate force outputs for right grip to compute stress.
     // Output force on right grip in x-direction.
