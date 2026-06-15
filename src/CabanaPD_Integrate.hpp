@@ -490,7 +490,7 @@ struct NoFailSwitch
                 sliceNoFail( index ) = 1;
             } );
 
-        Kokkos::fence( "NoFailSwitch::enableNoFailFence" );
+        exec_space.fence( "NoFailSwitch::enableNoFailFence" );
     }
 
     template <typename ExecutionSpace, typename ParticleType>
@@ -505,7 +505,7 @@ struct NoFailSwitch
                 sliceNoFail( index ) = _noFail_map( index );
             } );
 
-        Kokkos::fence( "NoFailSwitch::disableNoFailFence" );
+        exec_space.fence( "NoFailSwitch::disableNoFailFence" );
     }
 };
 
