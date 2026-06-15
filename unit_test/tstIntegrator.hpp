@@ -93,8 +93,9 @@ void testIntegratorReversibility( int steps )
 }
 
 template <bool GoBySteps>
-void testIntegratorADRSingleMass( int steps, double iteration_force_tolerance,
-                                  double displacement_epsilon )
+void testIntegratorADRSingleMass(
+    int steps, [[maybe_unused]] double iteration_force_tolerance,
+    double displacement_epsilon )
 {
     using exec_space = TEST_EXECSPACE;
     constexpr int num_masses = 1;
@@ -177,8 +178,9 @@ void testIntegratorADRSingleMass( int steps, double iteration_force_tolerance,
 }
 
 template <bool GoBySteps>
-void testIntegratorADRparticles( int steps, double iteration_force_tolerance,
-                                 double displacement_epsilon )
+void testIntegratorADRparticles(
+    int steps, [[maybe_unused]] double iteration_force_tolerance,
+    double displacement_epsilon )
 {
     using exec_space = TEST_EXECSPACE;
 
@@ -264,9 +266,9 @@ void testIntegratorADRparticles( int steps, double iteration_force_tolerance,
 }
 
 template <bool GoBySteps>
-void testIntegratorADRparticlesMultiMaterial( int steps,
-                                              double iteration_force_tolerance,
-                                              double displacement_epsilon )
+void testIntegratorADRparticlesMultiMaterial(
+    int steps, [[maybe_unused]] double iteration_force_tolerance,
+    double displacement_epsilon )
 {
     using exec_space = TEST_EXECSPACE;
     const int numMaterials = 2;
