@@ -267,7 +267,7 @@ void dogboneTensileTestExample( const std::string filename )
         ( high_corner[0] - low_corner[0] ) / num_cells[0],
         18.0 * static_cast<double>( K ) /
             ( Kokkos::numbers::pi * horizon * horizon * horizon * horizon ),
-        5. );
+        2. );
 
     // ====================================================
     //                   Simulation run
