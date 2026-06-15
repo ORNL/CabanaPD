@@ -273,7 +273,7 @@ void dogboneTensileTestExample( const std::string filename )
     //                   Simulation run
     // ====================================================
     solver.init( bc );
-    particleADRIntegator.reset( exec_space{} );
+    particleADRIntegator.reset( exec_space{}, particles );
 
     // TODO think about this can be integrated in a non ugly manner
     double time = 0.0;
@@ -290,7 +290,7 @@ void dogboneTensileTestExample( const std::string filename )
         time = adrDeltaT * adrTimeStep;
         CabanaPD::runUntilConvergedWithExternalIntegrator(
             exec_space{}, solver, particleADRIntegator, particles, bc, time,
-            true, 1e10, 10'000 );
+            false, 1e6, 1e-16, 100'000 );
         CabanaPD::runStepWithExternalIntegratorAndOutput(
             exec_space{}, solver, particleADRIntegator, particles, bc, time,
             adrTimeStep );

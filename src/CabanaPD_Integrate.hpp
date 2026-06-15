@@ -221,6 +221,8 @@ struct ADRIntegrator
     InitialVelocityType _initial_velocity_type;
     double _delta_t;
     double _l2_force_residual = Kokkos::Experimental::finite_max_v<double>;
+    double _l2_displacement_residual =
+        Kokkos::Experimental::finite_max_v<double>;
 
   public:
     ADRIntegrator( ExecutionSpace const& exec_space,
@@ -243,7 +245,9 @@ struct ADRIntegrator
     {
     }
 
-    void reset( ExecutionSpace ) const
+    template <typename VelocityType, typename DisplacementType>
+    void reset( ExecutionSpace, VelocityType const& velocity,
+                DisplacementType const& displacement ) const
     {
         Kokkos::parallel_for(
             "ADRIntegrator::reset",
@@ -251,8 +255,11 @@ struct ADRIntegrator
                 0, _velocities_last_step.extent( 0 ) ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 for ( int i = 0; i < dim; ++i )
-                    _velocities_last_step( index, i ) =
-                        _initial_velocity_type( index, i );
+                {
+                    velocity( index, i ) = _initial_velocity_type( index, i );
+                    displacement( index, i ) += _delta_t * velocity( index, i );
+                    _velocities_last_step( index, i ) = velocity( index, i );
+                }
             } );
         Kokkos::fence( "ADRIntegrator::Fence::reset" );
     }
@@ -281,7 +288,8 @@ struct ADRIntegrator
             "ADRIntegrator::middleStep",
             Kokkos::RangePolicy<ExecutionSpace>(
                 0, _forces_last_step.extent( 0 ) ),
-            KOKKOS_CLASS_LAMBDA( int64_t index, double& local_force_residual ) {
+            KOKKOS_CLASS_LAMBDA( int64_t index, double& local_force_residual,
+                                 double& local_displacement_residual ) {
                 double mass[dim];
                 double damping_numerator = 0.;
                 double damping_denominator = 0.;
@@ -312,8 +320,10 @@ struct ADRIntegrator
                 // nan check since we divide by the displacement and the
                 // velocity. Thus we can have a lot of 0s which are
                 // singularities in the formula for c_damping
-                if ( Kokkos::isnan( c_damping ) || Kokkos::isinf( c_damping ) )
+                if ( Kokkos::isnan( c_damping ) )
                     c_damping = 0.;
+                if ( c_damping >= 2.0 )
+                    c_damping = 1.9;
 
                 // update velocity with old velocity and damping coefficient
                 double velocity_denomiator = 2.0 + c_damping * _delta_t;
@@ -325,9 +335,12 @@ struct ADRIntegrator
                               _velocities_last_step( index, i ) +
                           2.0 * _delta_t * forces( index, i ) / mass[i] ) /
                         velocity_denomiator;
+                    local_displacement_residual +=
+                        ( _delta_t * velocities( index, i ) ) *
+                        ( _delta_t * velocities( index, i ) );
                 }
             },
-            _l2_force_residual );
+            _l2_force_residual, _l2_displacement_residual );
     }
 
     template <typename VelocityType, typename DisplacementType>
@@ -351,12 +364,8 @@ struct ADRIntegrator
         Kokkos::fence( "ADRIntegrator::Fence::finalStep" );
     }
 
-    bool isConverged( double tolerance )
-    {
-        return _l2_force_residual < tolerance;
-    }
-
-    double getResidual() { return _l2_force_residual; }
+    double getForceResidual() { return _l2_force_residual; }
+    double getDisplacementResidual() { return _l2_displacement_residual; }
 };
 
 struct ADRFictitiousMass
@@ -516,10 +525,13 @@ struct ParticleIntegratorWrapper
     {
     }
 
-    template <typename ExecutionSpace>
-    void reset( ExecutionSpace const& exec_space )
+    template <typename ExecutionSpace, typename ParticleType>
+    void reset( ExecutionSpace const& exec_space,
+                ParticleType const& particles )
     {
-        _integrator.reset( exec_space );
+        auto velocities = particles.sliceVelocity();
+        auto displacements = particles.sliceVelocity();
+        _integrator.reset( exec_space, velocities, displacements );
     }
 
     template <typename ExecutionSpace, typename ParticleType>
@@ -550,12 +562,11 @@ struct ParticleIntegratorWrapper
         _integrator.finalSubStep( exec_space, velocities, displacements );
     }
 
-    bool isConverged( double tolerance )
+    double getForceResidual() { return _integrator.getForceResidual(); }
+    double getDisplacementResidual()
     {
-        return _integrator.isConverged( tolerance );
+        return _integrator.getDisplacementResidual();
     }
-
-    double getResidual() { return _integrator.getResidual(); }
 };
 
 template <typename ExecutionSpace, typename ForceType>
@@ -629,12 +640,10 @@ void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
         boundary_condition.apply( exec_space, particles, time );
 
     integrator.middleSubStep( exec_space, particles, args... );
-
+    integrator.finalSubStep( exec_space, particles, args... );
     // Add non-force boundary condition.
     if ( !boundary_condition.forceUpdate() )
         boundary_condition.apply( exec_space, particles, time );
-
-    integrator.finalSubStep( exec_space, particles, args... );
 }
 
 template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
@@ -654,8 +663,9 @@ template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
 bool runUntilConvergedWithExternalIntegrator(
     ExecutionSpace const& exec_space, SolverType& solver,
     IntegratorType& integrator, ParticleType const& particles,
-    BoundaryType boundary_condition, double time, bool noFail, double tolerance,
-    int maxSteps, ARGS... args )
+    BoundaryType boundary_condition, double time, bool noFail,
+    double forceTolerance, double displacementTolerance, int maxSteps,
+    ARGS... args )
 {
     NoFailSwitch<typename ExecutionSpace::memory_space> noFailSwitch;
     if ( noFail )
@@ -665,8 +675,12 @@ bool runUntilConvergedWithExternalIntegrator(
 
     int step = 0;
     // TODO this will need to be adapted for MPI
-    while ( !integrator.isConverged( tolerance * particles.gridSize() ) &&
-            step < maxSteps )
+    while ( ( integrator.getForceResidual() >
+                  forceTolerance * particles.gridSize() &&
+              integrator.getDisplacementResidual() >
+                  displacementTolerance * particles.gridSize() &&
+              step < maxSteps ) ||
+            step < 2 )
     {
         runStepWithExternalIntegrator( exec_space, solver, integrator,
                                        particles, boundary_condition, time,
@@ -674,8 +688,11 @@ bool runUntilConvergedWithExternalIntegrator(
         ++step;
         if ( step % 1000 == 0 )
         {
-            std::cout << "Finished " << step << " ADR steps, residual "
-                      << integrator.getResidual() * particles.gridSize()
+            std::cout << "Finished " << step << " ADR steps, forceResidual "
+                      << integrator.getForceResidual() / particles.gridSize()
+                      << ", displacementResidual "
+                      << integrator.getDisplacementResidual() /
+                             particles.gridSize()
                       << "\n";
         }
         if ( step == maxSteps )
@@ -684,6 +701,13 @@ bool runUntilConvergedWithExternalIntegrator(
                          "convergence.\n";
         }
     }
+
+    if ( step < maxSteps )
+        std::cout << "Converged after " << step << " steps, forceResidual "
+                  << integrator.getForceResidual() / particles.gridSize()
+                  << ", displacementResidual "
+                  << integrator.getDisplacementResidual() / particles.gridSize()
+                  << "\n";
 
     if ( noFail )
     {
