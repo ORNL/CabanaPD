@@ -131,7 +131,7 @@ void testIntegratorADRSingleMass( int steps, double iteration_force_tolerance,
     CabanaPD::ADRIntegrator integrator(
         exec_space{}, adrMass, adrInitialVelocity, num_masses, adrDeltaT );
 
-    integrator.reset( exec_space{} );
+    integrator.reset( exec_space{}, velocities, displacements );
 
     if constexpr ( GoBySteps )
     {
@@ -148,7 +148,7 @@ void testIntegratorADRSingleMass( int steps, double iteration_force_tolerance,
     else
     {
         int step = 0;
-        while ( !integrator.isConverged( iteration_force_tolerance ) &&
+        while ( integrator.getForceResidual() > iteration_force_tolerance &&
                 step < steps )
         {
             integrator.initialSubStep( exec_space{}, forces );
@@ -216,7 +216,7 @@ void testIntegratorADRparticles( int steps, double iteration_force_tolerance,
                 displacements( i, j ) = positions( i, j );
         } );
 
-    particleIntegrator.reset( exec_space{} );
+    particleIntegrator.reset( exec_space{}, particles );
 
     if constexpr ( GoBySteps )
     {
@@ -233,7 +233,8 @@ void testIntegratorADRparticles( int steps, double iteration_force_tolerance,
     else
     {
         int step = 0;
-        while ( !particleIntegrator.isConverged( iteration_force_tolerance ) &&
+        while ( particleIntegrator.getForceResidual() >
+                    iteration_force_tolerance &&
                 step < steps )
         {
             particleIntegrator.initialSubStep( exec_space{}, particles );
@@ -316,7 +317,7 @@ void testIntegratorADRparticlesMultiMaterial( int steps,
             type( i ) = i % 2; // two materials
         } );
 
-    particleIntegrator.reset( exec_space{} );
+    particleIntegrator.reset( exec_space{}, particles );
     if constexpr ( GoBySteps )
     {
         for ( int s = 0; s < steps; ++s )
@@ -332,7 +333,8 @@ void testIntegratorADRparticlesMultiMaterial( int steps,
     else
     {
         int step = 0;
-        while ( !particleIntegrator.isConverged( iteration_force_tolerance ) &&
+        while ( particleIntegrator.getForceResidual() >
+                    iteration_force_tolerance &&
                 step < steps )
         {
             particleIntegrator.initialSubStep( exec_space{}, particles );
