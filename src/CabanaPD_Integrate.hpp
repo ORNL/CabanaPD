@@ -368,7 +368,7 @@ struct ADRIntegrator
     double getDisplacementResidual() { return _l2_displacement_residual; }
 };
 
-struct ADRFictitiousMass
+struct ADRMassPMBSingleMaterial
 {
     double _delta_t;
     double _horizon;
@@ -397,13 +397,13 @@ struct GetCFunctor
 
 template <typename ParticleTypeType, typename IndexingType,
           typename ForceModelsType>
-struct ADRMultiMaterialFictitiousMass
+struct ADRMassPMBMultiMaterialSimple
 {
-    ADRMultiMaterialFictitiousMass( ParticleTypeType const& particleType,
-                                    IndexingType const& indexing,
-                                    ForceModelsType const& models,
-                                    double delta_t, double horizon,
-                                    double delta_x, double safety_factor = 5.0 )
+    ADRMassPMBMultiMaterialSimple( ParticleTypeType const& particleType,
+                                   IndexingType const& indexing,
+                                   ForceModelsType const& models,
+                                   double delta_t, double horizon,
+                                   double delta_x, double safety_factor = 5.0 )
         : _particleType( particleType )
         , _indexing( indexing )
         , _models( models )
@@ -575,8 +575,8 @@ auto createADRParticleIntegrator( ExecutionSpace const& exec_space,
                                   double horizon, double delta_x, double c,
                                   double safety_factor = 5.0 )
 {
-    CabanaPD::ADRFictitiousMass adrMass{ delta_t, horizon, delta_x, c,
-                                         safety_factor };
+    CabanaPD::ADRMassPMBSingleMaterial adrMass{ delta_t, horizon, delta_x, c,
+                                                safety_factor };
     CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass, delta_t };
     CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrInitialVelocity,
                                         forces.size(), delta_t );
@@ -594,9 +594,9 @@ auto createADRParticleIntegrator( ExecutionSpace const& exec_space,
                                   double delta_x, double safety_factor = 5.0 )
 {
     auto particleType = particles.sliceType();
-    CabanaPD::ADRMultiMaterialFictitiousMass<decltype( particleType ),
-                                             decltype( force_models.indexing ),
-                                             decltype( force_models )>
+    CabanaPD::ADRMassPMBMultiMaterialSimple<decltype( particleType ),
+                                            decltype( force_models.indexing ),
+                                            decltype( force_models )>
         adrMass{
             particleType, force_models.indexing, force_models, delta_t, horizon,
             delta_x,      safety_factor };
