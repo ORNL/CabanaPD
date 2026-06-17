@@ -262,12 +262,13 @@ void dogboneTensileTestExample( const std::string filename )
     double adrSubDeltaT = 1.0;
     // TODO the constants in this should be easier to get from some model and
     // not recalculating
-    auto particleADRIntegator = CabanaPD::createADRParticleIntegrator(
-        exec_space{}, f, adrSubDeltaT, horizon,
-        ( high_corner[0] - low_corner[0] ) / num_cells[0],
-        18.0 * static_cast<double>( K ) /
-            ( Kokkos::numbers::pi * horizon * horizon * horizon * horizon ),
-        2. );
+    auto particleADRIntegator =
+        CabanaPD::createADRParticleIntegratorWithSimpleMass(
+            exec_space{}, f, adrSubDeltaT, horizon,
+            ( high_corner[0] - low_corner[0] ) / num_cells[0],
+            18.0 * static_cast<double>( K ) /
+                ( Kokkos::numbers::pi * horizon * horizon * horizon * horizon ),
+            2. );
 
     // ====================================================
     //                   Simulation run
