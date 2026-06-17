@@ -460,6 +460,15 @@ struct ADRMassPMBMultiMaterialExact
                      Kokkos::WithoutInitializing ),
                  particles.gridSize() )
     {
+        init( exec_space, particles, neighbor, indexing, models, delta_t,
+              delta_x, safety_factor );
+    }
+
+    void init( ExecutionSpaceType exec_space, ParticleType const& particles,
+               NeighborType const& neighbor, IndexingType const& indexing,
+               ForceModelsType const& models, double delta_t, double delta_x,
+               double safety_factor ) const
+    {
         // We need to extract the c values for each material from the models. We
         // do this in the constructor since we only need to do it once and then
         // we can reuse the c values in the operator() without needing to
