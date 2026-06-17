@@ -444,6 +444,59 @@ struct ADRMassPMBMultiMaterialSimple
     Kokkos::Array<double, IndexingType::NumBaseModels> _c;
 };
 
+template <typename ExecutionSpaceType, typename ParticleType,
+          typename NeighborType, typename IndexingType,
+          typename ForceModelsType>
+struct ADRMassPMBMultiMaterialExact
+{
+    ADRMassPMBMultiMaterialExact( ExecutionSpaceType exec_space,
+                                  ParticleType const& particles,
+                                  NeighborType const& neighbor,
+                                  IndexingType const& indexing,
+                                  ForceModelsType const& models, double delta_t,
+                                  double delta_x, double safety_factor = 5.0 )
+        : _mass( Kokkos::view_alloc(
+                     "CabanaPD::ADRMassPMBMultiMaterialExact::mass",
+                     Kokkos::WithoutInitializing ),
+                 particles.gridSize() )
+    {
+        // We need to extract the c values for each material from the models. We
+        // do this in the constructor since we only need to do it once and then
+        // we can reuse the c values in the operator() without needing to
+        // extract them again.
+
+        auto volume = particles.sliceVolume();
+        auto type = particles.sliceType();
+        auto mass_from_stiffness_integration =
+            KOKKOS_LAMBDA( const int i, const int j )
+        {
+            double c_ij =
+                CabanaPD::Impl::run_functor_for_index_in_pack_with_args(
+                    GetCFunctor{}, indexing( type( i ), type( j ) ),
+                    models.models );
+            double mass_fraction =
+                0.25 * delta_t * delta_t / delta_x * c_ij * volume( j );
+
+            _mass( i ) += mass_fraction;
+        };
+
+        neighbor.iterate( exec_space, mass_from_stiffness_integration,
+                          particles,
+                          "CabanaPD::ADRMassPMBMultiMaterialExact::mass_from_"
+                          "stiffness_integration" );
+        exec_space.fence(
+            "CabanaPD::ADRMassPMBMultiMaterialExact::Constructor" );
+    }
+
+    template <typename IndexType>
+    double KOKKOS_FUNCTION operator()( IndexType index, int ) const
+    {
+        return _mass( index );
+    }
+
+    Kokkos::View<double*, typename ExecutionSpaceType::memory_space> _mass;
+};
+
 template <typename ForcesType, typename FictitiousMassType>
 struct ADRInitialVelocity
 {
@@ -570,10 +623,9 @@ struct ParticleIntegratorWrapper
 };
 
 template <typename ExecutionSpace, typename ForceType>
-auto createADRParticleIntegrator( ExecutionSpace const& exec_space,
-                                  ForceType const& forces, double delta_t,
-                                  double horizon, double delta_x, double c,
-                                  double safety_factor = 5.0 )
+auto createADRParticleIntegratorWithSimpleMass(
+    ExecutionSpace const& exec_space, ForceType const& forces, double delta_t,
+    double horizon, double delta_x, double c, double safety_factor = 5.0 )
 {
     CabanaPD::ADRMassPMBSingleMaterial adrMass{ delta_t, horizon, delta_x, c,
                                                 safety_factor };
@@ -586,12 +638,10 @@ auto createADRParticleIntegrator( ExecutionSpace const& exec_space,
 
 template <typename ExecutionSpace, typename ForceType, typename ParticleType,
           typename ForceModelsType>
-auto createADRParticleIntegrator( ExecutionSpace const& exec_space,
-                                  ForceType const& forces,
-                                  ParticleType const& particles,
-                                  ForceModelsType const& force_models,
-                                  double delta_t, double horizon,
-                                  double delta_x, double safety_factor = 5.0 )
+auto createADRParticleIntegratorWithSimpleMass(
+    ExecutionSpace const& exec_space, ForceType const& forces,
+    ParticleType const& particles, ForceModelsType const& force_models,
+    double delta_t, double horizon, double delta_x, double safety_factor = 5.0 )
 {
     auto particleType = particles.sliceType();
     CabanaPD::ADRMassPMBMultiMaterialSimple<decltype( particleType ),
@@ -600,6 +650,26 @@ auto createADRParticleIntegrator( ExecutionSpace const& exec_space,
         adrMass{
             particleType, force_models.indexing, force_models, delta_t, horizon,
             delta_x,      safety_factor };
+    CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass, delta_t };
+    CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrInitialVelocity,
+                                        forces.size(), delta_t );
+    CabanaPD::ParticleIntegratorWrapper particleIntegrator( integrator );
+    return particleIntegrator;
+}
+
+template <typename ExecutionSpace, typename ForceType, typename ParticleType,
+          typename NeighborType, typename ForceModelsType>
+auto createADRParticleIntegratorWithExactMass(
+    ExecutionSpace const& exec_space, ForceType const& forces,
+    ParticleType const& particles, NeighborType const& neighbors,
+    ForceModelsType const& force_models, double delta_t, double delta_x,
+    double safety_factor = 5.0 )
+{
+    CabanaPD::ADRMassPMBMultiMaterialExact<
+        ExecutionSpace, ParticleType, NeighborType,
+        decltype( force_models.indexing ), decltype( force_models )>
+        adrMass{ exec_space,   particles, neighbors, force_models.indexing,
+                 force_models, delta_t,   delta_x,   safety_factor };
     CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass, delta_t };
     CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrInitialVelocity,
                                         forces.size(), delta_t );
