@@ -468,7 +468,7 @@ struct ADRMassPMBMultiMaterialExact
         auto volume = particles.sliceVolume();
         auto type = particles.sliceType();
         auto mass_from_stiffness_integration =
-            KOKKOS_LAMBDA( const int i, const int j )
+            KOKKOS_CLASS_LAMBDA( const int i, const int j )
         {
             double c_ij =
                 CabanaPD::Impl::run_functor_for_index_in_pack_with_args(
