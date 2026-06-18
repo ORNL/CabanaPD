@@ -493,8 +493,7 @@ struct ADRMassPMBMultiMaterialExact
                           particles,
                           "CabanaPD::ADRMassPMBMultiMaterialExact::mass_from_"
                           "stiffness_integration" );
-        exec_space.fence(
-            "CabanaPD::ADRMassPMBMultiMaterialExact::Constructor" );
+        Kokkos::fence( "CabanaPD::ADRMassPMBMultiMaterialExact::Constructor" );
     }
 
     template <typename IndexType>
