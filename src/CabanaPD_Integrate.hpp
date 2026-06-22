@@ -483,7 +483,7 @@ struct ADRMassPMBMultiMaterialExact
                 CabanaPD::Impl::run_functor_for_index_in_pack_with_args(
                     GetCFunctor{}, indexing( type( i ), type( j ) ),
                     models.models );
-            double mass_fraction = safety_factor * 0.25 * delta_t * delta_t /
+            double mass_fraction = safety_factor * 1.5 * delta_t * delta_t /
                                    delta_x * c_ij * volume( j );
 
             _mass( i ) += mass_fraction;

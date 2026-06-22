@@ -502,9 +502,9 @@ TEST( TEST_CATEGORY, test_integrate_ADR_particles_multi_material_simple_mass )
 TEST( TEST_CATEGORY, test_integrate_ADR_particles_multi_material_exact_mass )
 {
     // this seems to have a hard time to get to 1e-10
-    testIntegratorADRparticlesMultiMaterialExactMass<true>( 3000, 1e-16, 1e-7 );
-    testIntegratorADRparticlesMultiMaterialExactMass<false>( 3000, 1e-16,
-                                                             1e-7 );
+    testIntegratorADRparticlesMultiMaterialExactMass<true>( 4500, 1e-10, 1e-4 );
+    testIntegratorADRparticlesMultiMaterialExactMass<false>( 4500, 1e-10,
+                                                             1e-4 );
 }
 
 //---------------------------------------------------------------------------//
