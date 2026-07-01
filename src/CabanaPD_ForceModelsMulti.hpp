@@ -109,7 +109,7 @@ struct CheckTemperatureDependence<ParameterPackType,
         typename IfElseType<TemperatureDependent, TemperatureIndependent,
                             std::disjunction_v<std::is_same<
                                 typename ParameterPackType::template value_type<
-                                    Indices>::thermal_type,
+                                    Indices>::thermal_tag,
                                 TemperatureDependent>...>>::type;
 };
 
@@ -127,7 +127,7 @@ struct CheckFractureModel<ParameterPackType, std::index_sequence<Indices...>>
         typename IfElseType<Fracture, NoFracture,
                             std::disjunction_v<std::is_same<
                                 typename ParameterPackType::template value_type<
-                                    Indices>::fracture_type,
+                                    Indices>::fracture_tag,
                                 Fracture>...>>::type;
 };
 
@@ -157,7 +157,7 @@ struct FirstModelWithFractureTypeImpl<FractureType, ParameterPackType, Index,
     using type = typename FirstModelWithFractureTypeImpl<
         FractureType, ParameterPackType, Index + 1,
         std::is_same_v<typename ParameterPackType::template value_type<
-                           Index + 1>::fracture_type,
+                           Index + 1>::fracture_tag,
                        FractureType>>::type;
 };
 
@@ -167,7 +167,7 @@ struct FirstModelWithFractureType
     using type = typename FirstModelWithFractureTypeImpl<
         FractureType, ParameterPackType, 0,
         std::is_same_v<
-            typename ParameterPackType::template value_type<0>::fracture_type,
+            typename ParameterPackType::template value_type<0>::fracture_tag,
             FractureType>>::type;
 };
 
@@ -212,15 +212,15 @@ struct ForceModelsImpl<MaterialType, Indexing, ParameterPackType,
                        is_symmetric<Indexing>::value,
                    "Symmetry of model and indexing must match" );
 
-    using fracture_type = typename CheckFractureModel<
+    using fracture_tag = typename CheckFractureModel<
         ParameterPackType,
         std::make_index_sequence<ParameterPackType::size>>::type;
-    using thermal_type = typename CheckTemperatureDependence<
+    using thermal_tag = typename CheckTemperatureDependence<
         ParameterPackType,
         std::make_index_sequence<ParameterPackType::size>>::type;
 
     using force_tag =
-        typename FirstModelWithFractureType<fracture_type,
+        typename FirstModelWithFractureType<fracture_tag,
                                             ParameterPackType>::type::force_tag;
 
     ForceModelsImpl( MaterialType t, Indexing const& i,
