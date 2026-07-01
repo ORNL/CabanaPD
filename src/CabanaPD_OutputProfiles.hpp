@@ -140,11 +140,11 @@ class OutputTimeSeries
         double dt = inputs["timestep"];
         double freq = inputs["output_frequency"];
         int output_steps = static_cast<int>( time / dt / freq );
-        // Purposely using zero-init here.
-        _profile = profile_type( "time_output", output_steps );
+        // Purposely using zero-init here. Add space for initial output as well.
+        _profile = profile_type( "time_output", output_steps + 1 );
     }
 
-    void update()
+    void update( const double time )
     {
         Kokkos::RangePolicy<typename memory_space::execution_space> policy(
             0, _indices.size() );
@@ -157,7 +157,7 @@ class OutputTimeSeries
             "time_series", policy,
             KOKKOS_LAMBDA( const int b, double& px ) {
                 auto p = indices._view( b );
-                reducer.join( px, output( p ) );
+                reducer.join( px, output( p, time ) );
             },
             reducer );
         Kokkos::fence();

@@ -175,7 +175,7 @@ void crackInclusionExample( const std::string filename )
     // Output maximum y-extent of the crack.
     CabanaPD::Region<CabanaPD::RectangularPrism> box( low_corner, high_corner );
     auto d = solver.particles.sliceDamage();
-    auto crack_y_func = KOKKOS_LAMBDA( const int p )
+    auto crack_y_func = KOKKOS_LAMBDA( const int p, const double )
     {
         // Use a threshold of damage to only output damaged particles.
         if ( d( p ) > 0.3 )

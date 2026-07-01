@@ -208,7 +208,7 @@ void dogboneTensileTestExample( const std::string filename )
 
     // Generate force outputs for right grip to compute stress.
     // Output force on right grip in x-direction.
-    auto force_func_x = KOKKOS_LAMBDA( const int p )
+    auto force_func_x = KOKKOS_LAMBDA( const int p, const double )
     {
         return f( p, 0 ) * dx * dy * dz;
     };
@@ -217,7 +217,7 @@ void dogboneTensileTestExample( const std::string filename )
         force_func_x, right_grip );
 
     // Output force on right grip in y-direction.
-    auto force_func_y = KOKKOS_LAMBDA( const int p )
+    auto force_func_y = KOKKOS_LAMBDA( const int p, const double )
     {
         return f( p, 1 ) * dx * dy * dz;
     };
@@ -226,7 +226,7 @@ void dogboneTensileTestExample( const std::string filename )
         force_func_y, right_grip );
 
     // Output force on right grip in z-direction.
-    auto force_func_z = KOKKOS_LAMBDA( const int p )
+    auto force_func_z = KOKKOS_LAMBDA( const int p, const double )
     {
         return f( p, 2 ) * dx * dy * dz;
     };
@@ -236,7 +236,10 @@ void dogboneTensileTestExample( const std::string filename )
 
     // Generate position outputs for gage to compute strain.
     auto y = solver.particles.sliceCurrentPosition();
-    auto pos_func = KOKKOS_LAMBDA( const int p ) { return y( p, 0 ); };
+    auto pos_func = KOKKOS_LAMBDA( const int p, const double )
+    {
+        return y( p, 0 );
+    };
     double dG = 0.1 * G;
 
     // Output x-position of left side of gage.
@@ -261,6 +264,8 @@ void dogboneTensileTestExample( const std::string filename )
     //                   Simulation run
     // ====================================================
     solver.init( bc );
+    solver.updateRegion( 0.0, output_fx, output_fy, output_fz, output_yl,
+                         output_yr );
     solver.run( bc, output_fx, output_fy, output_fz, output_yl, output_yr );
 }
 
