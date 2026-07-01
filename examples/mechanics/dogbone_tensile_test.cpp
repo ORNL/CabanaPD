@@ -264,6 +264,8 @@ void dogboneTensileTestExample( const std::string filename )
     //                   Simulation run
     // ====================================================
     solver.init( bc );
+    solver.updateRegion( 0.0, output_fx, output_fy, output_fz, output_yl,
+                         output_yr );
     solver.run( bc, output_fx, output_fy, output_fz, output_yl, output_yr );
 }
 
