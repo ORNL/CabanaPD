@@ -305,8 +305,25 @@ class Inputs
                                                typename ForceModel::
                                                    thermal_type>::value )
                             {
-                                double coeff =
-                                    model.microconductivity_function( xi );
+                                double coeff;
+                                if constexpr ( is_multi_material<
+                                                   ForceModel>::value )
+                                {
+                                    std::vector<double> coeff_vec;
+                                    for ( std::size_t idx = 0;
+                                          idx < ForceModel::size; idx++ )
+                                        for ( std::size_t jdx = 0;
+                                              jdx < ForceModel::size; jdx++ )
+                                            coeff_vec.emplace_back(
+                                                model
+                                                    .microconductivity_function(
+                                                        idx, jdx, xi ) );
+                                    coeff = *std::max_element(
+                                        coeff_vec.begin(), coeff_vec.end() );
+                                }
+                                else
+                                    coeff =
+                                        model.microconductivity_function( xi );
                                 sum_ht += v_p * coeff / r2;
                             }
                         }
@@ -328,9 +345,16 @@ class Inputs
             dt_ht *= dt;
 
             // Does not currently support multi-material.
-            double cp = inputs.at( "specific_heat_capacity" )["value"];
-            double rho = inputs.at( "density" )["value"];
-            double dt_ht_crit = rho * cp / sum_ht;
+            auto cp = getVector( "specific_heat_capacity" );
+            auto rho = getVector( "density" );
+            if ( cp.size() != rho.size() )
+                Kokkos::abort( "Thermal simulations with multiple models "
+                               "require density and specific_heat_capacity to "
+                               "be vectors of the same length" );
+
+            double dt_ht_crit = *std::min_element( rho.begin(), rho.end() ) *
+                                *std::min_element( cp.begin(), cp.end() ) /
+                                sum_ht;
             compareCriticalTimeStep( "heat_transfer", dt_ht, dt_ht_crit );
         }
     }
