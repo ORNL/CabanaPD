@@ -227,7 +227,7 @@ void berkovichIndenterExample( const std::string filename )
     auto f = solver.particles.sliceForce();
 
     // Output force in x-direction.
-    auto force_func_x = KOKKOS_LAMBDA( const int p )
+    auto force_func_x = KOKKOS_LAMBDA( const int p, const double )
     {
         return f( p, 0 ) * dx * dy * dz;
     };
@@ -236,7 +236,7 @@ void berkovichIndenterExample( const std::string filename )
         force_func_x, pressure_region );
 
     // Output force in y-direction.
-    auto force_func_y = KOKKOS_LAMBDA( const int p )
+    auto force_func_y = KOKKOS_LAMBDA( const int p, const double )
     {
         return f( p, 1 ) * dx * dy * dz;
     };
@@ -245,7 +245,7 @@ void berkovichIndenterExample( const std::string filename )
         force_func_y, pressure_region );
 
     // Output force in z-direction.
-    auto force_func_z = KOKKOS_LAMBDA( const int p )
+    auto force_func_z = KOKKOS_LAMBDA( const int p, const double )
     {
         return f( p, 2 ) * dx * dy * dz;
     };
@@ -258,7 +258,7 @@ void berkovichIndenterExample( const std::string filename )
     // ====================================================
     solver.init( bc );
 
-    solver.updateRegion( output_fx, output_fy, output_fz );
+    solver.updateRegion( 0.0, output_fx, output_fy, output_fz );
 
     solver.run( bc, output_fx, output_fy, output_fz );
 }
