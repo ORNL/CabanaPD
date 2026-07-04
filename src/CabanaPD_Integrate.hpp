@@ -214,9 +214,14 @@ struct ADRIntegrator
     using force_storage_base_type = double[dim];
     using velocity_storage_base_type = double[dim];
 
-    Kokkos::View<force_storage_base_type*, ExecutionSpace> _forces_last_step;
-    Kokkos::View<velocity_storage_base_type*, ExecutionSpace>
+    Kokkos::View<force_storage_base_type*,
+                 typename ExecutionSpace::memory_space>
+        _forces_last_step;
+    Kokkos::View<velocity_storage_base_type*,
+                 typename ExecutionSpace::memory_space>
         _velocities_last_step;
+    Kokkos::View<double*, typename ExecutionSpace::memory_space>
+        _damping_coefficients;
     FictitiousMassType _fictitious_mass;
     InitialVelocityType _initial_velocity_type;
     double _delta_t;
@@ -239,6 +244,10 @@ struct ADRIntegrator
                   Kokkos::view_alloc( exec_space, Kokkos::WithoutInitializing,
                                       "Velocities_Last_Step" ),
                   num_masses ) )
+        , _damping_coefficients( Kokkos::View<double*, ExecutionSpace>(
+              Kokkos::view_alloc( exec_space, Kokkos::WithoutInitializing,
+                                  "damping_current_Step" ),
+              num_masses ) )
         , _fictitious_mass( fictitious_mass )
         , _initial_velocity_type( initial_velocity )
         , _delta_t( dt )
@@ -284,22 +293,20 @@ struct ADRIntegrator
                         VelocityType const& velocities,
                         DisplacementType const& displacements )
     {
+        double l2_displacement_denominator;
         Kokkos::parallel_reduce(
             "ADRIntegrator::middleStep",
             Kokkos::RangePolicy<ExecutionSpace>(
                 0, _forces_last_step.extent( 0 ) ),
             KOKKOS_CLASS_LAMBDA( int64_t index, double& local_force_residual,
-                                 double& local_displacement_residual ) {
+                                 double& local_displacement_residual,
+                                 double& local_displacement_denominator ) {
                 double mass[dim];
                 double damping_numerator = 0.;
                 double damping_denominator = 0.;
                 // compute damping coefficient
                 for ( int i = 0; i < dim; ++i )
                 {
-                    local_force_residual +=
-                        ( -forces( index, i ) +
-                          _forces_last_step( index, i ) ) *
-                        ( -forces( index, i ) + _forces_last_step( index, i ) );
                     mass[i] = _fictitious_mass( index, i );
                     for ( int j = 0; j < dim; ++j )
                     {
@@ -325,26 +332,38 @@ struct ADRIntegrator
                 if ( c_damping >= 2.0 )
                     c_damping = 1.9;
 
-                // update velocity with old velocity and damping coefficient
+                // store damping coefficient for final sub-step
+                _damping_coefficients( index ) = c_damping;
+
+                // compute residuals
                 double velocity_denomiator = 2.0 + c_damping * _delta_t;
                 for ( int i = 0; i < dim; ++i )
                 {
-                    // update velocity
-                    velocities( index, i ) =
-                        ( ( 2.0 - c_damping * _delta_t ) *
-                              _velocities_last_step( index, i ) +
-                          2.0 * _delta_t * forces( index, i ) / mass[i] ) /
-                        velocity_denomiator;
-                    local_displacement_residual +=
-                        ( _delta_t * velocities( index, i ) ) *
-                        ( _delta_t * velocities( index, i ) );
+                    local_force_residual += Kokkos::pow(
+                        -forces( index, i ) + _forces_last_step( index, i ),
+                        2 );
+                    local_displacement_residual += Kokkos::pow(
+                        _delta_t *
+                            ( ( 2.0 - c_damping * _delta_t ) *
+                                  _velocities_last_step( index, i ) +
+                              2.0 * _delta_t * forces( index, i ) / mass[i] ) /
+                            velocity_denomiator,
+                        2 );
+
+                    local_displacement_denominator +=
+                        Kokkos::pow( displacements( index, i ), 2 );
                 }
             },
-            _l2_force_residual, _l2_displacement_residual );
+            _l2_force_residual, _l2_displacement_residual,
+            l2_displacement_denominator );
+        Kokkos::fence( "ADRIntegrator::Fence::middleStep" );
+        _l2_displacement_residual /= l2_displacement_denominator;
     }
 
-    template <typename VelocityType, typename DisplacementType>
-    void finalSubStep( ExecutionSpace, VelocityType const& velocities,
+    template <typename ForceType, typename VelocityType,
+              typename DisplacementType>
+    void finalSubStep( ExecutionSpace, ForceType const& forces,
+                       VelocityType const& velocities,
                        DisplacementType const& displacements ) const
     {
         Kokkos::parallel_for(
@@ -352,8 +371,18 @@ struct ADRIntegrator
             Kokkos::RangePolicy<ExecutionSpace>(
                 0, _forces_last_step.extent( 0 ) ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
+                // update velocity with old velocity and damping coefficient
+                double c_damping = _damping_coefficients( index );
+                double velocity_denomiator = 2.0 + c_damping * _delta_t;
                 for ( int i = 0; i < dim; ++i )
                 {
+                    // update velocity
+                    velocities( index, i ) =
+                        ( ( 2.0 - c_damping * _delta_t ) *
+                              _velocities_last_step( index, i ) +
+                          2.0 * _delta_t * forces( index, i ) /
+                              _fictitious_mass( index, i ) ) /
+                        velocity_denomiator;
                     // update displacement with velocity
                     displacements( index, i ) +=
                         _delta_t * velocities( index, i );
@@ -364,8 +393,11 @@ struct ADRIntegrator
         Kokkos::fence( "ADRIntegrator::Fence::finalStep" );
     }
 
-    double getForceResidual() { return _l2_force_residual; }
-    double getDisplacementResidual() { return _l2_displacement_residual; }
+    double getForceResidual() { return Kokkos::sqrt( _l2_force_residual ); }
+    double getDisplacementResidual()
+    {
+        return Kokkos::sqrt( _l2_displacement_residual );
+    }
 };
 
 struct ADRMassPMBSingleMaterial
@@ -618,9 +650,11 @@ struct ParticleIntegratorWrapper
     void finalSubStep( ExecutionSpace const& exec_space,
                        ParticleType const& particles )
     {
+        auto forces = particles.sliceForce();
         auto velocities = particles.sliceVelocity();
         auto displacements = particles.sliceDisplacement();
-        _integrator.finalSubStep( exec_space, velocities, displacements );
+        _integrator.finalSubStep( exec_space, forces, velocities,
+                                  displacements );
     }
 
     double getForceResidual() { return _integrator.getForceResidual(); }
@@ -686,15 +720,16 @@ auto createADRParticleIntegratorWithExactMass(
 }
 
 template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
-          typename ParticleType, typename BoundaryType, typename... ARGS>
+          typename ParticleType, typename BoundaryType>
 void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
                                     SolverType& solver,
                                     IntegratorType& integrator,
                                     ParticleType const& particles,
                                     BoundaryType boundary_condition,
-                                    double time, ARGS... args )
+                                    double time, double force_tolerance = 0.0,
+                                    double displacement_tolerance = 0.0 )
 {
-    integrator.initialSubStep( exec_space, particles, args... );
+    integrator.initialSubStep( exec_space, particles );
 
     // Update ghost particles.
     // TODO not public
@@ -717,33 +752,35 @@ void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
     if ( boundary_condition.forceUpdate() )
         boundary_condition.apply( exec_space, particles, time );
 
-    integrator.middleSubStep( exec_space, particles, args... );
-    integrator.finalSubStep( exec_space, particles, args... );
+    integrator.middleSubStep( exec_space, particles );
+    integrator.finalSubStep( exec_space, particles );
+
     // Add non-force boundary condition.
     if ( !boundary_condition.forceUpdate() )
         boundary_condition.apply( exec_space, particles, time );
 }
 
 template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
-          typename ParticleType, typename BoundaryType, typename... ARGS>
-void runStepWithExternalIntegratorAndOutput(
-    ExecutionSpace const& exec_space, SolverType& solver,
-    IntegratorType& integrator, ParticleType& particles,
-    BoundaryType boundary_condition, double time, unsigned step, ARGS... args )
+          typename ParticleType, typename BoundaryType>
+void runStepWithExternalIntegratorAndOutput( ExecutionSpace const& exec_space,
+                                             SolverType& solver,
+                                             IntegratorType& integrator,
+                                             ParticleType& particles,
+                                             BoundaryType boundary_condition,
+                                             double time, unsigned step )
 {
     runStepWithExternalIntegrator( exec_space, solver, integrator, particles,
-                                   boundary_condition, time, args... );
+                                   boundary_condition, time );
     particles.output( step, time, solver.output_reference );
 }
 
 template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
-          typename ParticleType, typename BoundaryType, typename... ARGS>
+          typename ParticleType, typename BoundaryType>
 bool runUntilConvergedWithExternalIntegrator(
     ExecutionSpace const& exec_space, SolverType& solver,
     IntegratorType& integrator, ParticleType const& particles,
     BoundaryType boundary_condition, double time, bool noFail,
-    double forceTolerance, double displacementTolerance, int maxSteps,
-    ARGS... args )
+    double forceTolerance, double displacementTolerance, int maxSteps )
 {
     NoFailSwitch<typename ExecutionSpace::memory_space> noFailSwitch;
     if ( noFail )
@@ -753,16 +790,51 @@ bool runUntilConvergedWithExternalIntegrator(
 
     int step = 0;
     // TODO this will need to be adapted for MPI
-    while ( ( integrator.getForceResidual() >
-                  forceTolerance * particles.gridSize() &&
-              integrator.getDisplacementResidual() >
-                  displacementTolerance * particles.gridSize() &&
-              step < maxSteps ) ||
-            step < 2 )
+    while ( step < maxSteps )
     {
-        runStepWithExternalIntegrator( exec_space, solver, integrator,
-                                       particles, boundary_condition, time,
-                                       args... );
+        integrator.initialSubStep( exec_space, particles );
+
+        // Update ghost particles.
+        // TODO not public
+        // solver.comm->gatherDisplacement();
+        // Compute internal forces.
+        solver.updateForce();
+
+        // TODO typedef not public
+        // if constexpr ( is_contact<typename
+        // SolverType::ContactModelType>::value )
+        //     computeForce( solver.contact_model, solver.contact, particles,
+        //                   solver.contact_neighbor, false );
+
+        // TODO comm not public
+        // if constexpr ( is_temperature_dependent<
+        //                   typename
+        //                   SolverType::ForceModelType::thermal_type>::value )
+        //    solver.comm->gatherTemperature();
+
+        // Add force boundary condition.
+        if ( boundary_condition.forceUpdate() )
+            boundary_condition.apply( exec_space, particles, time );
+
+        integrator.middleSubStep( exec_space, particles );
+        // check if we are not-converged, if so do update
+        // always do 2 steps as we might start with a force residual of 0 but
+        // that originates from displacement boundaries only being applied after
+        // we did the first step
+        if ( step < 2 || !( integrator.getForceResidual() <
+                                forceTolerance * particles.gridSize() ||
+                            integrator.getDisplacementResidual() <
+                                displacementTolerance * particles.gridSize() ) )
+        {
+            integrator.finalSubStep( exec_space, particles );
+        }
+        else
+        {
+            break;
+        }
+        // Add non-force boundary condition.
+        if ( !boundary_condition.forceUpdate() )
+            boundary_condition.apply( exec_space, particles, time );
         ++step;
         if ( step % 1000 == 0 )
         {
