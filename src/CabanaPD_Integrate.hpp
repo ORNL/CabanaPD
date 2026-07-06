@@ -722,8 +722,7 @@ void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
                                     IntegratorType& integrator,
                                     ParticleType const& particles,
                                     BoundaryType boundary_condition,
-                                    double time, double force_tolerance = 0.0,
-                                    double displacement_tolerance = 0.0 )
+                                    double time )
 {
     integrator.initialSubStep( exec_space, particles );
 
