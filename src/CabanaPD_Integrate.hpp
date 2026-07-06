@@ -287,10 +287,8 @@ struct ADRIntegrator
         Kokkos::fence( "ADRIntegrator::Fence::intialStep" );
     }
 
-    template <typename ForceType, typename VelocityType,
-              typename DisplacementType>
+    template <typename ForceType, typename DisplacementType>
     void middleSubStep( ExecutionSpace, ForceType const& forces,
-                        VelocityType const& velocities,
                         DisplacementType const& displacements )
     {
         double l2_displacement_denominator;
@@ -640,10 +638,8 @@ struct ParticleIntegratorWrapper
                         ParticleType const& particles )
     {
         auto forces = particles.sliceForce();
-        auto velocities = particles.sliceVelocity();
         auto displacements = particles.sliceDisplacement();
-        _integrator.middleSubStep( exec_space, forces, velocities,
-                                   displacements );
+        _integrator.middleSubStep( exec_space, forces, displacements );
     }
 
     template <typename ExecutionSpace, typename ParticleType>

@@ -142,8 +142,7 @@ void testIntegratorADRSingleMass(
             integrator.initialSubStep( exec_space{}, forces );
             Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
                                   num_masses, force_lambda );
-            integrator.middleSubStep( exec_space{}, forces, velocities,
-                                      displacements );
+            integrator.middleSubStep( exec_space{}, forces, displacements );
             integrator.finalSubStep( exec_space{}, forces, velocities,
                                      displacements );
         }
@@ -156,8 +155,7 @@ void testIntegratorADRSingleMass(
             integrator.initialSubStep( exec_space{}, forces );
             Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
                                   num_masses, force_lambda );
-            integrator.middleSubStep( exec_space{}, forces, velocities,
-                                      displacements );
+            integrator.middleSubStep( exec_space{}, forces, displacements );
             if ( integrator.getForceResidual() < iteration_force_tolerance )
                 break;
 
