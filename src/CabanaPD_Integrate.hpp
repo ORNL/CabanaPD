@@ -486,8 +486,7 @@ struct ADRMassPMBMultiMaterialExact
                                   ForceModelsType const& models, double delta_t,
                                   double delta_x, double safety_factor = 5.0 )
         : _mass( Kokkos::view_alloc(
-                     "CabanaPD::ADRMassPMBMultiMaterialExact::mass",
-                     Kokkos::WithoutInitializing ),
+                     "CabanaPD::ADRMassPMBMultiMaterialExact::mass" ),
                  particles.gridSize() )
     {
         init( exec_space, particles, neighbor, indexing, models, delta_t,

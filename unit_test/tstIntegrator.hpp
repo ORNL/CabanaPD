@@ -487,21 +487,21 @@ TEST( TEST_CATEGORY, test_integrate_reversibility )
 
 TEST( TEST_CATEGORY, test_integrate_ADR_single_mass )
 {
-    // testIntegratorADRSingleMass<true>( 1000, 1e-16, 1e-10 );
-    // testIntegratorADRSingleMass<false>( 1000, 1e-16, 1e-10 );
+    testIntegratorADRSingleMass<true>( 1000, 1e-16, 1e-10 );
+    testIntegratorADRSingleMass<false>( 1000, 1e-16, 1e-10 );
 }
 TEST( TEST_CATEGORY, test_integrate_ADR_particles )
 {
-    // testIntegratorADRparticles<true>( 2000, 1e-16, 1e-10 );
-    // testIntegratorADRparticles<false>( 2000, 1e-16, 1e-10 );
+    testIntegratorADRparticles<true>( 2000, 1e-16, 1e-10 );
+    testIntegratorADRparticles<false>( 2000, 1e-16, 1e-10 );
 }
 
 TEST( TEST_CATEGORY, test_integrate_ADR_particles_multi_material_simple_mass )
 {
-    // testIntegratorADRparticlesMultiMaterialSimpleMass<true>( 3000, 1e-16,
-    //                                                          1e-10 );
-    // testIntegratorADRparticlesMultiMaterialSimpleMass<false>( 3000, 1e-16,
-    //                                                           1e-10 );
+    testIntegratorADRparticlesMultiMaterialSimpleMass<true>( 3000, 1e-16,
+                                                             1e-10 );
+    testIntegratorADRparticlesMultiMaterialSimpleMass<false>( 3000, 1e-16,
+                                                              1e-10 );
 }
 
 TEST( TEST_CATEGORY, test_integrate_ADR_particles_multi_material_exact_mass )
