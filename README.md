@@ -278,6 +278,9 @@ Below are some basic guidelines for how to perform the initial steps in order to
 
 4. To control the size of the visualized points, scroll down within the Properties window until the Point Gaussian menu and choose a value for Gaussian Radius.
 
+## Documentation
+
+The documentation consists of markdown files in the `docs` directory and can be build with [zensical](https://zensical.org). They also provide instructions on [how to install zensical](https://zensical.org/docs/get-started/) and [build the website locally while writing](https://zensical.org/docs/create-your-site/#preview-as-you-write).
 
 ## References
 
