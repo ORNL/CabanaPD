@@ -14,6 +14,26 @@
 
 namespace CabanaPD
 {
+
+template <typename T, typename... Args>
+static constexpr bool is_Indexing = false;
+
+template <unsigned FIRST, unsigned SECOND>
+struct IndexPair
+{
+    static constexpr unsigned first = FIRST;
+    static constexpr unsigned second = SECOND;
+};
+
+template <unsigned N, unsigned Index, unsigned Diagonal = 0>
+constexpr auto getDiagonalIndexPair()
+{
+    if constexpr ( Index < N )
+        return IndexPair<Index, Index + Diagonal>{};
+    else
+        return getDiagonalIndexPair<N - 1, Index - N, Diagonal + 1>();
+}
+
 // Index along each diagonal sequentially (symmetric).
 template <unsigned NumBaseModels>
 struct DiagonalIndexing
@@ -41,6 +61,18 @@ struct DiagonalIndexing
 
         return offset + indexAlongDiagonal;
     }
+
+    static constexpr unsigned NumTotalModels =
+        ( NumBaseModels * NumBaseModels + NumBaseModels ) / 2;
+
+    template <unsigned Index>
+    static constexpr auto getInverseIndexPair()
+    {
+        static_assert(
+            Index < NumTotalModels,
+            "Requested inverse index out of range of DiagonalIndexing" );
+        return getDiagonalIndexPair<NumBaseModels, Index>();
+    }
 };
 
 // Index same type as 0 and differing types as 1.
@@ -55,6 +87,7 @@ struct BinaryIndexing
     }
 };
 
+// Full indexing with all combinatoric indices
 template <unsigned NumBaseModels>
 struct FullIndexing
 {
@@ -69,8 +102,24 @@ struct FullIndexing
 
         return firstType * NumBaseModels + secondType;
     }
+
+    static constexpr unsigned NumTotalModels = NumBaseModels * NumBaseModels;
+
+    template <unsigned Index>
+    static constexpr auto getInverseIndexPair()
+    {
+        static_assert( Index < NumTotalModels,
+                       "Requested inverse index out of range of FullIndexing" );
+        return IndexPair<Index / NumBaseModels,
+                         Index - ( Index / NumBaseModels ) * NumBaseModels>{};
+    }
 };
 
+template <unsigned NumBaseModels>
+static constexpr bool is_Indexing<DiagonalIndexing<NumBaseModels>> = true;
+
+template <unsigned NumBaseModels>
+static constexpr bool is_Indexing<FullIndexing<NumBaseModels>> = true;
 } // namespace CabanaPD
 
 #endif
