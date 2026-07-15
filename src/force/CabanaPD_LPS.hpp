@@ -129,6 +129,9 @@ class Force<MemorySpace, LPS, NoFracture> : public BaseForce<MemorySpace>
             // Get the bond distance, displacement, and stretch.
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
+
+            s = model( ThermalStretchTag{}, i, j, s );
+
             theta( i ) +=
                 model( DilatationTag{}, i, j, s, xi, vol( j ), m( i ) );
         };
@@ -161,6 +164,8 @@ class Force<MemorySpace, LPS, NoFracture> : public BaseForce<MemorySpace>
             double xi, r, s;
             double rx, ry, rz;
             getDistance( x, u, i, j, xi, r, s, rx, ry, rz );
+
+            s = model( ThermalStretchTag{}, i, j, s );
 
             const double coeff =
                 model( ForceCoeffTag{}, i, j, s, xi, vol( j ), m( i ), m( j ),
@@ -200,6 +205,8 @@ class Force<MemorySpace, LPS, NoFracture> : public BaseForce<MemorySpace>
             double xi, r, s;
             getDistance( x, u, i, j, xi, r, s );
 
+            s = model( ThermalStretchTag{}, i, j, s );
+
             double num_neighbors = static_cast<double>(
                 Cabana::NeighborList<neighbor_list_type>::numNeighbor(
                     neigh_list, i ) );
@@ -237,6 +244,8 @@ class Force<MemorySpace, LPS, NoFracture> : public BaseForce<MemorySpace>
             double rx, ry, rz;
             double xi_x, xi_y, xi_z;
             getDistance( x, u, i, j, xi, r, s, rx, ry, rz, xi_x, xi_y, xi_z );
+
+            s = model( ThermalStretchTag{}, i, j, s );
 
             double coeff = model( ForceCoeffTag{}, i, j, s, xi, vol( j ),
                                   m( i ), m( j ), theta( i ), theta( j ) );

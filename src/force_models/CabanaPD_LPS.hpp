@@ -148,6 +148,42 @@ struct BaseForceModelLPS<Elastic> : public BaseForceModel
     }
 };
 
+template <typename TemperatureType>
+struct BaseTemperatureModelLPS
+{
+    using thermal_type = TemperatureDependent;
+    using needs_update = std::true_type;
+
+    double alpha;
+    double temp0;
+
+    // Temperature field
+    TemperatureType temperature;
+
+    BaseTemperatureModelLPS( const TemperatureType _temp, const double _alpha,
+                             const double _temp0 )
+        : alpha( _alpha )
+        , temp0( _temp0 )
+        , temperature( _temp )
+    {
+    }
+
+    template <typename ParticleType>
+    void update( const ParticleType& particles )
+    {
+        temperature = particles.sliceTemperature();
+    }
+
+    // Update stretch with temperature effects.
+    KOKKOS_INLINE_FUNCTION
+    double operator()( ThermalStretchTag, const int i, const int,
+                       const double s ) const
+    {
+        double thermal_stretch = alpha * ( temperature( i ) - temp0 );
+        return s - thermal_stretch;
+    }
+};
+
 template <>
 struct ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
     : public BaseForceModelLPS<Elastic>,
@@ -177,6 +213,45 @@ struct ForceModel<LPS, Elastic, NoFracture, TemperatureIndependent>
     ForceModel( LPS, Elastic, NoFracture, const double _force_horizon,
                 const double _K, const double _G, const int _influence = 0 )
         : base_type( _force_horizon, _K, _G, _influence )
+    {
+    }
+};
+
+template <typename TemperatureType>
+struct ForceModel<LPS, Elastic, NoFracture, TemperatureDependent,
+                  TemperatureType> : public BaseForceModelLPS<Elastic>,
+                                     BaseNoFractureModel,
+                                     BaseTemperatureModelLPS<TemperatureType>
+{
+    using base_type = BaseForceModelLPS<Elastic>;
+    using base_fracture_type = BaseNoFractureModel;
+    using base_temperature_type = BaseTemperatureModelLPS<TemperatureType>;
+    using fracture_type = NoFracture;
+    using thermal_type = typename base_temperature_type::thermal_type;
+    using typename base_temperature_type::needs_update;
+
+    using base_type::base_type;
+    using base_type::operator();
+    using base_fracture_type::operator();
+    using base_temperature_type::operator();
+
+    using base_type::influence_type;
+
+    ForceModel( LPS, NoFracture, const double _force_horizon, const double _K,
+                const double _G, const TemperatureType _temp,
+                const double _alpha, const double _temp0 = 0.0,
+                const int _influence = 0 )
+        : base_type( _force_horizon, _K, _G, _influence )
+        , base_temperature_type( _temp, _alpha, _temp0 )
+    {
+    }
+
+    ForceModel( LPS, Elastic, NoFracture, const double _force_horizon,
+                const double _K, const double _G, const TemperatureType _temp,
+                const double _alpha, const double _temp0 = 0.0,
+                const int _influence = 0 )
+        : base_type( _force_horizon, _K, _G, _influence )
+        , base_temperature_type( _temp, _alpha, _temp0 )
     {
     }
 };
@@ -300,6 +375,13 @@ ForceModel( ModelType, const double _force_horizon, const double _K,
             const double _G, const double _G0, const int _influence = 0,
             typename std::enable_if<( is_state_based<ModelType>::value ),
                                     int>::type* = 0 ) -> ForceModel<ModelType>;
+
+template <typename ModelType, typename TemperatureType>
+ForceModel( ModelType, NoFracture, const double _force_horizon, const double _K,
+            const double _G, const TemperatureType _temp, const double _alpha,
+            const double _temp0 = 0.0, const int _influence = 0 )
+    -> ForceModel<ModelType, Elastic, NoFracture, TemperatureDependent,
+                  TemperatureType>;
 
 } // namespace CabanaPD
 
