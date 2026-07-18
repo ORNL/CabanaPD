@@ -456,8 +456,7 @@ struct ADRMassPMBMultiMaterialSimple
     template <typename IndexType>
     double KOKKOS_FUNCTION operator()( IndexType index, int ) const
     {
-        auto materialIndex =
-            _indexing( _particleType( index ), _particleType( index ) );
+        auto materialIndex = _particleType( index );
         return _safety_factor *
                ( _delta_t * _delta_t * Kokkos::numbers::pi * _horizon *
                  _horizon * _horizon * _c[materialIndex] ) /
