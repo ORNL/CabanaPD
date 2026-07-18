@@ -449,7 +449,7 @@ struct ADRMassPMBMultiMaterialSimple
         for ( unsigned i = 0; i < IndexingType::NumBaseModels; ++i )
         {
             _c[i] = CabanaPD::Impl::run_functor_for_index_in_pack_with_args(
-                GetCFunctor{}, i, _models.models );
+                GetCFunctor{}, _indexing( i, i ), _models.models );
         }
     }
 
