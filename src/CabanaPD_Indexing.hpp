@@ -15,9 +15,10 @@
 namespace CabanaPD
 {
 // Index along each diagonal sequentially (symmetric).
-template <unsigned NumBaseModels>
+template <unsigned NBaseModels>
 struct DiagonalIndexing
 {
+    static constexpr unsigned NumBaseModels = NBaseModels;
     static_assert( NumBaseModels > 0, "NumBaseModels must be larger than 0" );
     static constexpr unsigned MaxValidIndex =
         ( NumBaseModels * NumBaseModels + NumBaseModels ) / 2;
@@ -48,6 +49,7 @@ struct BinaryIndexing
 {
     static constexpr unsigned MaxValidIndex =
         Kokkos::Experimental::finite_max_v<unsigned>;
+    static constexpr unsigned NumBaseModels = 2;
     KOKKOS_FUNCTION unsigned operator()( unsigned firstType,
                                          unsigned secondType ) const
     {
@@ -55,9 +57,10 @@ struct BinaryIndexing
     }
 };
 
-template <unsigned NumBaseModels>
+template <unsigned NBaseModels>
 struct FullIndexing
 {
+    static constexpr unsigned NumBaseModels = NBaseModels;
     static_assert( NumBaseModels > 0, "NumBaseModels must be larger than 0" );
     static constexpr unsigned MaxValidIndex = NumBaseModels * NumBaseModels;
 
