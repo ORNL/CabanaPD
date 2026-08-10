@@ -260,8 +260,6 @@ void dogboneTensileTestExample( const std::string filename )
     //                   ADR Integrator
     // ====================================================
     double adrSubDeltaT = 1.0;
-    // TODO the constants in this should be easier to get from some model and
-    // not recalculating
     auto particleADRIntegator =
         CabanaPD::createADRParticleIntegratorWithSimpleMass(
             exec_space{}, f, adrSubDeltaT, horizon,
@@ -276,7 +274,7 @@ void dogboneTensileTestExample( const std::string filename )
     solver.init( bc );
     particleADRIntegator.reset( exec_space{}, particles );
 
-    // TODO think about this can be integrated in a non ugly manner
+    // do large part of the simulation with ADR integration.
     double time = 0.0;
     double adrFinalTime = 0.8 * static_cast<double>( inputs["final_time"] );
     // as this simulation is elastic percectly plastic, we need small time steps
@@ -297,7 +295,8 @@ void dogboneTensileTestExample( const std::string filename )
             adrTimeStep );
     }
 
-    // TODO same here ... this is probably not what we want for our users
+    // switch to verlet integration for the rest of the simulation (when we
+    // expect it to break)
     unsigned numVerletSteps =
         ( static_cast<double>( inputs["final_time"] ) - time ) / solver.dt;
     for ( unsigned i = 1; i < numVerletSteps; i++ )
