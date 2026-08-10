@@ -1,0 +1,210 @@
+/****************************************************************************
+ * Copyright (c) 2022 by Oak Ridge National Laboratory                      *
+ * All rights reserved.                                                     *
+ *                                                                          *
+ * This file is part of CabanaPD. CabanaPD is distributed under a           *
+ * BSD 3-clause license. For the licensing terms see the LICENSE file in    *
+ * the top-level directory.                                                 *
+ *                                                                          *
+ * SPDX-License-Identifier: BSD-3-Clause                                    *
+ ****************************************************************************/
+
+#include <fstream>
+#include <iostream>
+
+#include "mpi.h"
+
+#include <Kokkos_Core.hpp>
+
+#include <CabanaPD.hpp>
+
+// Simulate heat transfer in a pseudo-1d cube.
+void thermalDeformationHeatTransferExample( const std::string filename )
+{
+    // ====================================================
+    //               Choose Kokkos spaces
+    // ====================================================
+    using exec_space = Kokkos::DefaultExecutionSpace;
+    using memory_space = typename exec_space::memory_space;
+
+    // ====================================================
+    //                   Read inputs
+    // ====================================================
+    CabanaPD::Inputs inputs( filename );
+
+    // ====================================================
+    //            Material and problem parameters
+    // ====================================================
+    // Material parameters
+    double rho0 = inputs["density"];
+    double E = inputs["elastic_modulus"];
+    double nu = 0.25;
+    double K = E / ( 3 * ( 1 - 2 * nu ) );
+    double horizon = inputs["horizon"];
+    horizon += 1e-10;
+    double alpha = inputs["thermal_expansion_coeff"];
+    double kappa = inputs["thermal_conductivity"];
+    double cp = inputs["specific_heat_capacity"];
+
+    // Problem parameters
+    double temp0 = inputs["reference_temperature"];
+
+    // ====================================================
+    //                  Discretization
+    // ====================================================
+    std::array<double, 3> low_corner = inputs["low_corner"];
+    std::array<double, 3> high_corner = inputs["high_corner"];
+    std::array<int, 3> num_cells = inputs["num_cells"];
+    int m = std::floor( horizon /
+                        ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
+    int halo_width = m + 1; // Just to be safe.
+
+    // ====================================================
+    //                Force model type
+    // ====================================================
+    using model_type = CabanaPD::PMB;
+    using thermal_type = CabanaPD::DynamicTemperature;
+
+    // ====================================================
+    //                 Particle generation
+    // ====================================================
+    // Does not set displacements, velocities, etc.
+    CabanaPD::Particles particles( memory_space{}, model_type{},
+                                   thermal_type{} );
+    particles.domain( low_corner, high_corner, num_cells, halo_width );
+    particles.create( exec_space{} );
+
+    // ====================================================
+    //            Custom particle initialization
+    // ====================================================
+    auto rho = particles.sliceDensity();
+    auto temp = particles.sliceTemperature();
+    auto init_functor = KOKKOS_LAMBDA( const int pid )
+    {
+        // Density
+        rho( pid ) = rho0;
+        // Temperature
+        temp( pid ) = temp0;
+    };
+    particles.update( exec_space{}, init_functor );
+
+    // ====================================================
+    //                    Force model
+    // ====================================================
+    CabanaPD::ForceModel force_model( model_type{}, CabanaPD::NoFracture{},
+                                      horizon, K, temp, kappa, cp, alpha,
+                                      temp0 );
+
+    // ====================================================
+    //                   Create solver
+    // ====================================================
+    CabanaPD::Solver solver( inputs, particles, force_model );
+
+    // ====================================================
+    //                   Boundary condition
+    // ====================================================
+    // Temperature profile imposed on top and bottom surfaces
+    double dy = solver.particles.dx[1];
+    using plane_type = CabanaPD::Region<CabanaPD::RectangularPrism>;
+
+    // Top surface
+    plane_type plane1( low_corner[0], high_corner[0], high_corner[1] - dy,
+                       high_corner[1] + dy, low_corner[2], high_corner[2] );
+
+    // Bottom surface
+    plane_type plane2( low_corner[0], high_corner[0], low_corner[1] - dy,
+                       low_corner[1] + dy, low_corner[2], high_corner[2] );
+
+    // This is purposely delayed until after solver init so that ghosted
+    // particles are correctly taken into account for lambda capture here.
+    temp = solver.particles.sliceTemperature();
+    auto temp_bc = KOKKOS_LAMBDA( const int pid, const double )
+    {
+        temp( pid ) = 0.0;
+    };
+
+    auto bc = CabanaPD::createBoundaryCondition(
+        temp_bc, exec_space{}, solver.particles, false, plane1, plane2 );
+
+    // ====================================================
+    //                   ADR Integrator
+    // ====================================================
+    double adrSubDeltaT = 1.0;
+    auto f = particles.sliceForce();
+    auto particleADRIntegator =
+        CabanaPD::createADRParticleIntegratorWithSimpleMass(
+            exec_space{}, f, adrSubDeltaT, horizon,
+            ( high_corner[0] - low_corner[0] ) / num_cells[0],
+            18.0 * static_cast<double>( K ) /
+                ( Kokkos::numbers::pi * horizon * horizon * horizon * horizon ),
+            2. );
+
+    // ====================================================
+    //                   Simulation run
+    // ====================================================
+    solver.init( bc );
+    particleADRIntegator.reset( exec_space{}, particles );
+
+    // do large part of the simulation with ADR integration.
+    double time = 0.0;
+    double adrFinalTime = 0.8 * static_cast<double>( inputs["final_time"] );
+    // as this simulation is elastic percectly plastic, we need small time steps
+    // to also have small load steps so we don't immediately end in the plastic
+    // regime. We are using the nofail flag nevertheless (to show it), even
+    // though not triggering plasticiy also means we do not trigger failure
+    double adrDeltaT = 0.1 * static_cast<double>( inputs["final_time"] );
+    double adrThermalSubSteps = 1000;
+    int numADRSteps = adrFinalTime / adrDeltaT;
+
+    for ( int adrTimeStep = 1; adrTimeStep < numADRSteps; ++adrTimeStep )
+    {
+        time = adrDeltaT * adrTimeStep;
+        // integrate thermals if enabled
+        if constexpr ( CabanaPD::is_heat_transfer<thermal_type>::value )
+        {
+            for ( int thermal_step = 0; thermal_step < adrThermalSubSteps;
+                  ++thermal_step )
+                computeHeatTransfer( force_model, *( solver.heat_transfer ),
+                                     particles, *( solver.neighbor ),
+                                     adrDeltaT / adrThermalSubSteps );
+        }
+
+        CabanaPD::runUntilConvergedWithExternalIntegrator(
+            exec_space{}, solver, particleADRIntegator, particles, bc, time,
+            false, 5e-1, 1e-14, 10'000 );
+        CabanaPD::runStepWithExternalIntegratorAndOutput(
+            exec_space{}, solver, particleADRIntegator, particles, bc, time,
+            adrTimeStep );
+    }
+
+    // switch to verlet integration for the rest of the simulation (when we
+    // expect it to break)
+    unsigned numVerletSteps =
+        ( static_cast<double>( inputs["final_time"] ) - time ) / solver.dt;
+    for ( unsigned i = 1; i < numVerletSteps; i++ )
+    {
+        int step = ( time / solver.dt ) + i;
+        solver.runStep( step, bc );
+    }
+
+    // ====================================================
+    //                      Outputs
+    // ====================================================
+    // Output temperature along the y-axis
+    int profile_dim = 1;
+    auto value = KOKKOS_LAMBDA( const int pid ) { return temp( pid ); };
+    std::string file_name = "temperature_yaxis_profile.txt";
+    createOutputProfile( file_name, solver.particles, profile_dim, value );
+}
+
+// Initialize MPI+Kokkos.
+int main( int argc, char* argv[] )
+{
+    MPI_Init( &argc, &argv );
+    Kokkos::initialize( argc, argv );
+
+    thermalDeformationHeatTransferExample( argv[1] );
+
+    Kokkos::finalize();
+    MPI_Finalize();
+}
