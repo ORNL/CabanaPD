@@ -636,11 +636,9 @@ class Solver
     Inputs inputs;
     std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
-    std::shared_ptr<neighbor_type> neighbor;
     std::shared_ptr<force_type> force;
     ForceModelType force_model;
     // Optional modules.
-    std::shared_ptr<heat_transfer_type> heat_transfer;
     std::shared_ptr<contact_type> contact;
     std::unique_ptr<ContactModelType> contact_model;
     std::shared_ptr<contact_neighbor_type> contact_neighbor;
@@ -656,6 +654,12 @@ class Solver
     Timer _total_timer;
     bool print;
     output_type timing_output;
+
+    // TODO this is a workaround to allow external integration like ADR to use
+    // this (should I just go and run a solver step with thermals instead?)
+  public:
+    std::shared_ptr<neighbor_type> neighbor;
+    std::shared_ptr<heat_transfer_type> heat_transfer;
 };
 
 } // namespace CabanaPD
