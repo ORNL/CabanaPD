@@ -60,6 +60,8 @@
 #ifndef INTEGRATOR_H
 #define INTEGRATOR_H
 
+#include <mpi.h>
+
 #include <Kokkos_Core.hpp>
 
 #include <CabanaPD_Particles.hpp>
@@ -773,7 +775,7 @@ bool runUntilConvergedWithExternalIntegrator(
     ExecutionSpace const& exec_space, SolverType& solver,
     IntegratorType& integrator, BoundaryType boundary_condition, double time,
     bool noFail, double forceTolerance, double displacementTolerance,
-    int maxSteps )
+    int maxSteps, MPI_Comm comm )
 {
     NoFailSwitch<typename ExecutionSpace::memory_space> noFailSwitch;
     if ( noFail )
@@ -782,8 +784,9 @@ bool runUntilConvergedWithExternalIntegrator(
     }
 
     int step = 0;
+    int local_done = 0;
+    int global_done = 0;
     const auto grid_size = solver.particles.gridSize();
-    // TODO this will need to be adapted for MPI
     while ( step < maxSteps )
     {
         integrator.initialSubStep( exec_space, solver.particles );
@@ -816,13 +819,18 @@ bool runUntilConvergedWithExternalIntegrator(
         }
         else
         {
-            break;
+            local_done = 1;
         }
         // Add non-force boundary condition.
         if ( !boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space, solver.particles, time );
+
+        MPI_Allreduce( &local_done, &global_done, 1, MPI_INT, MPI_MAX, comm );
+        if ( global_done )
+            break;
+
         ++step;
-        if ( step % 1000 == 0 )
+        if ( step % 1000 == 0 && print_rank() )
         {
             std::cout << "Finished " << step << " ADR steps, forceResidual "
                       << integrator.getForceResidual() / grid_size
@@ -830,14 +838,14 @@ bool runUntilConvergedWithExternalIntegrator(
                       << integrator.getDisplacementResidual() / grid_size
                       << "\n";
         }
-        if ( step == maxSteps )
+        if ( step == maxSteps && print_rank() )
         {
             std::cerr << "Warning: maximum number of steps reached without "
                          "convergence.\n";
         }
     }
 
-    if ( step < maxSteps )
+    if ( step < maxSteps && print_rank() )
         std::cout << "Converged after " << step << " steps, forceResidual "
                   << integrator.getForceResidual() / grid_size
                   << ", displacementResidual "

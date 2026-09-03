@@ -289,7 +289,7 @@ void dogboneTensileTestExample( const std::string filename )
         time = adrDeltaT * adrTimeStep;
         CabanaPD::runUntilConvergedWithExternalIntegrator(
             exec_space{}, solver, particleADRIntegator, bc, time, false, 5e0,
-            1e-10, 100'000 );
+            1e-10, 100'000, MPI_COMM_WORLD );
         CabanaPD::runStepWithExternalIntegratorAndOutput(
             exec_space{}, solver, particleADRIntegator, bc, time, adrTimeStep );
     }
