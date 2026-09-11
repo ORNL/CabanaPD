@@ -720,15 +720,14 @@ auto createADRParticleIntegratorWithExactMass(
 }
 
 template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
-          typename ParticleType, typename BoundaryType>
+          typename BoundaryType>
 void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
                                     SolverType& solver,
                                     IntegratorType& integrator,
-                                    ParticleType const& particles,
                                     BoundaryType boundary_condition,
                                     double time )
 {
-    integrator.initialSubStep( exec_space, particles );
+    integrator.initialSubStep( exec_space, solver.particles );
 
     // Update ghost particles.
     // TODO not public
@@ -745,49 +744,49 @@ void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
 
     // Add force boundary condition.
     if ( boundary_condition.forceUpdate() )
-        boundary_condition.apply( exec_space, particles, time );
+        boundary_condition.apply( exec_space, solver.particles, time );
 
-    integrator.middleSubStep( exec_space, particles );
-    integrator.finalSubStep( exec_space, particles );
+    integrator.middleSubStep( exec_space, solver.particles );
+    integrator.finalSubStep( exec_space, solver.particles );
 
     // Add non-force boundary condition.
     if ( !boundary_condition.forceUpdate() )
-        boundary_condition.apply( exec_space, particles, time );
+        boundary_condition.apply( exec_space, solver.particles, time );
 }
 
 template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
-          typename ParticleType, typename BoundaryType>
+          typename BoundaryType>
 void runStepWithExternalIntegratorAndOutput( ExecutionSpace const& exec_space,
                                              SolverType& solver,
                                              IntegratorType& integrator,
-                                             ParticleType& particles,
                                              BoundaryType boundary_condition,
                                              double time, unsigned step )
 {
-    runStepWithExternalIntegrator( exec_space, solver, integrator, particles,
+    runStepWithExternalIntegrator( exec_space, solver, integrator,
                                    boundary_condition, time );
-    particles.output( step, time, solver.output_reference );
+    solver.particles.output( step, time, solver.output_reference );
 }
 
 template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
-          typename ParticleType, typename BoundaryType>
+          typename BoundaryType>
 bool runUntilConvergedWithExternalIntegrator(
     ExecutionSpace const& exec_space, SolverType& solver,
-    IntegratorType& integrator, ParticleType const& particles,
-    BoundaryType boundary_condition, double time, bool noFail,
-    double forceTolerance, double displacementTolerance, int maxSteps )
+    IntegratorType& integrator, BoundaryType boundary_condition, double time,
+    bool noFail, double forceTolerance, double displacementTolerance,
+    int maxSteps )
 {
     NoFailSwitch<typename ExecutionSpace::memory_space> noFailSwitch;
     if ( noFail )
     {
-        noFailSwitch.enableNoFail( exec_space, particles );
+        noFailSwitch.enableNoFail( exec_space, solver.particles );
     }
 
     int step = 0;
+    const auto grid_size = solver.particles.gridSize();
     // TODO this will need to be adapted for MPI
     while ( step < maxSteps )
     {
-        integrator.initialSubStep( exec_space, particles );
+        integrator.initialSubStep( exec_space, solver.particles );
 
         // Update ghost particles.
         solver.comm->gatherDisplacement();
@@ -795,25 +794,25 @@ bool runUntilConvergedWithExternalIntegrator(
         // Compute internal forces.
         solver.updateForce();
         if constexpr ( is_temperature_dependent<
-                           typename SolverType::ForceModelType::thermal_type>::
-                           value )
+                           typename SolverType::force_model_type::
+                               thermal_type>::value )
             solver.comm->gatherTemperature();
 
         // Add force boundary condition.
         if ( boundary_condition.forceUpdate() )
-            boundary_condition.apply( exec_space, particles, time );
+            boundary_condition.apply( exec_space, solver.particles, time );
 
-        integrator.middleSubStep( exec_space, particles );
+        integrator.middleSubStep( exec_space, solver.particles );
         // check if we are not-converged, if so do update
         // always do 2 steps as we might start with a force residual of 0 but
         // that originates from displacement boundaries only being applied after
         // we did the first step
-        if ( step < 2 || !( integrator.getForceResidual() <
-                                forceTolerance * particles.gridSize() ||
-                            integrator.getDisplacementResidual() <
-                                displacementTolerance * particles.gridSize() ) )
+        if ( step < 2 ||
+             !( integrator.getForceResidual() < forceTolerance * grid_size ||
+                integrator.getDisplacementResidual() <
+                    displacementTolerance * grid_size ) )
         {
-            integrator.finalSubStep( exec_space, particles );
+            integrator.finalSubStep( exec_space, solver.particles );
         }
         else
         {
@@ -821,15 +820,14 @@ bool runUntilConvergedWithExternalIntegrator(
         }
         // Add non-force boundary condition.
         if ( !boundary_condition.forceUpdate() )
-            boundary_condition.apply( exec_space, particles, time );
+            boundary_condition.apply( exec_space, solver.particles, time );
         ++step;
         if ( step % 1000 == 0 )
         {
             std::cout << "Finished " << step << " ADR steps, forceResidual "
-                      << integrator.getForceResidual() / particles.gridSize()
+                      << integrator.getForceResidual() / grid_size
                       << ", displacementResidual "
-                      << integrator.getDisplacementResidual() /
-                             particles.gridSize()
+                      << integrator.getDisplacementResidual() / grid_size
                       << "\n";
         }
         if ( step == maxSteps )
@@ -841,14 +839,13 @@ bool runUntilConvergedWithExternalIntegrator(
 
     if ( step < maxSteps )
         std::cout << "Converged after " << step << " steps, forceResidual "
-                  << integrator.getForceResidual() / particles.gridSize()
+                  << integrator.getForceResidual() / grid_size
                   << ", displacementResidual "
-                  << integrator.getDisplacementResidual() / particles.gridSize()
-                  << "\n";
+                  << integrator.getDisplacementResidual() / grid_size << "\n";
 
     if ( noFail )
     {
-        noFailSwitch.disableNoFail( exec_space, particles );
+        noFailSwitch.disableNoFail( exec_space, solver.particles );
     }
 
     return step < maxSteps;

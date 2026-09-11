@@ -905,6 +905,14 @@ class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
         atomic_type temp_a = temp;
         return temp_a;
     }
+    auto sliceTemperatureConductionAtomic() const
+    {
+        auto temp = sliceTemperature();
+        using slice_type = decltype( temp );
+        using atomic_type = typename slice_type::atomic_access_slice;
+        atomic_type temp_a = temp;
+        return temp_a;
+    }
 
     template <typename... Args>
     void resize( Args&&... args )
