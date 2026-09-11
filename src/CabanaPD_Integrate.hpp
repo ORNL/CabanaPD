@@ -274,12 +274,12 @@ struct ADRIntegrator
     }
 
     template <typename ForceType>
-    void initialSubStep( ExecutionSpace, ForceType const& forces ) const
+    void initialSubStep( ExecutionSpace, const int start, const int end,
+                         ForceType const& forces ) const
     {
         Kokkos::parallel_for(
             "ADRIntegrator::initialStep",
-            Kokkos::RangePolicy<ExecutionSpace>(
-                0, _forces_last_step.extent( 0 ) ),
+            Kokkos::RangePolicy<ExecutionSpace>( start, end ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 for ( int i = 0; i < dim; ++i )
                     _forces_last_step( index, i ) = forces( index, i );
@@ -288,14 +288,14 @@ struct ADRIntegrator
     }
 
     template <typename ForceType, typename DisplacementType>
-    void middleSubStep( ExecutionSpace, ForceType const& forces,
+    void middleSubStep( ExecutionSpace, const int start, const int end,
+                        ForceType const& forces,
                         DisplacementType const& displacements )
     {
         double l2_displacement_denominator;
         Kokkos::parallel_reduce(
             "ADRIntegrator::middleStep",
-            Kokkos::RangePolicy<ExecutionSpace>(
-                0, _forces_last_step.extent( 0 ) ),
+            Kokkos::RangePolicy<ExecutionSpace>( start, end ),
             KOKKOS_CLASS_LAMBDA( int64_t index, double& local_force_residual,
                                  double& local_displacement_residual,
                                  double& local_displacement_denominator ) {
@@ -360,14 +360,13 @@ struct ADRIntegrator
 
     template <typename ForceType, typename VelocityType,
               typename DisplacementType>
-    void finalSubStep( ExecutionSpace, ForceType const& forces,
-                       VelocityType const& velocities,
+    void finalSubStep( ExecutionSpace, const int start, const int end,
+                       ForceType const& forces, VelocityType const& velocities,
                        DisplacementType const& displacements ) const
     {
         Kokkos::parallel_for(
             "ADRIntegrator::finalStep",
-            Kokkos::RangePolicy<ExecutionSpace>(
-                0, _forces_last_step.extent( 0 ) ),
+            Kokkos::RangePolicy<ExecutionSpace>( start, end ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 // update velocity with old velocity and damping coefficient
                 double c_damping = _damping_coefficients( index );
@@ -628,7 +627,9 @@ struct ParticleIntegratorWrapper
                          ParticleType const& particles )
     {
         auto forces = particles.sliceForce();
-        _integrator.initialSubStep( exec_space, forces );
+        auto start = particles.numFrozen();
+        auto end = particles.localOffset();
+        _integrator.initialSubStep( exec_space, start, end, forces );
     }
 
     template <typename ExecutionSpace, typename ParticleType>
@@ -637,7 +638,10 @@ struct ParticleIntegratorWrapper
     {
         auto forces = particles.sliceForce();
         auto displacements = particles.sliceDisplacement();
-        _integrator.middleSubStep( exec_space, forces, displacements );
+        auto start = particles.numFrozen();
+        auto end = particles.localOffset();
+        _integrator.middleSubStep( exec_space, start, end, forces,
+                                   displacements );
     }
 
     template <typename ExecutionSpace, typename ParticleType>
@@ -647,7 +651,9 @@ struct ParticleIntegratorWrapper
         auto forces = particles.sliceForce();
         auto velocities = particles.sliceVelocity();
         auto displacements = particles.sliceDisplacement();
-        _integrator.finalSubStep( exec_space, forces, velocities,
+        auto start = particles.numFrozen();
+        auto end = particles.localOffset();
+        _integrator.finalSubStep( exec_space, start, end, forces, velocities,
                                   displacements );
     }
 
@@ -726,20 +732,16 @@ void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
 
     // Update ghost particles.
     // TODO not public
-    // solver.comm->gatherDisplacement();
+    solver.comm->gatherDisplacement();
+
     // Compute internal forces.
     solver.updateForce();
 
-    // TODO typedef not public
-    // if constexpr ( is_contact<typename SolverType::ContactModelType>::value )
-    //     computeForce( solver.contact_model, solver.contact, particles,
-    //                   solver.contact_neighbor, false );
-
     // TODO comm not public
-    // if constexpr ( is_temperature_dependent<
-    //                   typename
-    //                   SolverType::ForceModelType::thermal_type>::value )
-    //    solver.comm->gatherTemperature();
+    if constexpr ( is_temperature_dependent<
+                       typename SolverType::force_model_type::thermal_type>::
+                       value )
+        solver.comm->gatherTemperature();
 
     // Add force boundary condition.
     if ( boundary_condition.forceUpdate() )
@@ -788,22 +790,14 @@ bool runUntilConvergedWithExternalIntegrator(
         integrator.initialSubStep( exec_space, particles );
 
         // Update ghost particles.
-        // TODO not public
-        // solver.comm->gatherDisplacement();
+        solver.comm->gatherDisplacement();
+
         // Compute internal forces.
         solver.updateForce();
-
-        // TODO typedef not public
-        // if constexpr ( is_contact<typename
-        // SolverType::ContactModelType>::value )
-        //     computeForce( solver.contact_model, solver.contact, particles,
-        //                   solver.contact_neighbor, false );
-
-        // TODO comm not public
-        // if constexpr ( is_temperature_dependent<
-        //                   typename
-        //                   SolverType::ForceModelType::thermal_type>::value )
-        //    solver.comm->gatherTemperature();
+        if constexpr ( is_temperature_dependent<
+                           typename SolverType::ForceModelType::thermal_type>::
+                           value )
+            solver.comm->gatherTemperature();
 
         // Add force boundary condition.
         if ( boundary_condition.forceUpdate() )

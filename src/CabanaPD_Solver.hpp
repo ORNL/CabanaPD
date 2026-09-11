@@ -93,6 +93,7 @@ class Solver
     using exec_space = typename memory_space::execution_space;
 
     // Core module types - required for all problems.
+    using force_model_type = ForceModelType;
     using force_model_tag = typename ForceModelType::force_tag;
     using force_fracture_tag = typename ForceModelType::fracture_tag;
     using force_type = Force<memory_space, force_model_tag, force_fracture_tag>;
@@ -634,7 +635,6 @@ class Solver
 
     // Core modules.
     Inputs inputs;
-    std::shared_ptr<comm_type> comm;
     std::shared_ptr<integrator_type> integrator;
     std::shared_ptr<force_type> force;
     ForceModelType force_model;
@@ -658,6 +658,7 @@ class Solver
     // TODO this is a workaround to allow external integration like ADR to use
     // this (should I just go and run a solver step with thermals instead?)
   public:
+    std::shared_ptr<comm_type> comm;
     std::shared_ptr<neighbor_type> neighbor;
     std::shared_ptr<heat_transfer_type> heat_transfer;
 };
