@@ -1,0 +1,18 @@
+{
+    "num_cells"              : {"value": [16, 16, 16]},
+    "system_size"            : {"value": [16e-4, 16e-4, 16e-4], "unit": "m"},
+    "density"                : {"value": 1, "unit": "kg/m^3"},
+    "elastic_modulus"        : {"value": 1e-9, "unit": "Pa"},
+    "fracture_energy"        : {"value": 3000, "unit": "J/m^2"},
+    "thermal_conductivity"    : {"value": 3, "unit": "W/(m.K)"},
+    "specific_heat_capacity"  : {"value": 1, "unit": "J/(kg.K)"},
+    "reference_temperature"   : {"value": 20.0, "unit": "oC"},
+    "horizon"                : {"value": 0.0003, "unit": "m"},
+    "yield_stress"           : {"value": 30e6, "unit": "Pa"},
+    "final_time"             : {"value": 2000e-9, "unit": "s"},
+    "timestep"               : {"value": 1e-9, "unit": "s"},
+    "timestep_safety_factor" : {"value": 0.85},
+    "thermal_subcycle_steps" : {"value": 1},
+    "output_frequency"       : {"value": 10000},
+    "output_reference"       : {"value": false}
+}
