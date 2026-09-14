@@ -101,9 +101,6 @@ void test_cube_linear_temperature_single( ModelType )
         low_corner[0] + horizon, high_corner[0] - horizon,
         low_corner[1] + horizon, high_corner[1] - horizon,
         low_corner[2] + horizon, high_corner[2] - horizon );
-    CabanaPD::Region<CabanaPD::RectangularPrism> full_cube(
-        low_corner[0], high_corner[0], low_corner[1], high_corner[1],
-        low_corner[2], high_corner[2] );
 
     double edge_length_cube = high_corner[0] - low_corner[0] - 2 * horizon;
 
