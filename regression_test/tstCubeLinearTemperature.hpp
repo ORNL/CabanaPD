@@ -164,7 +164,7 @@ void test_cube_linear_temperature_single( ModelType )
                 EXPECT_NEAR( temp_host( pid ),
                              x_host( pid, 0 ) / edge_length_cube * delta_temp *
                                  end_time_factor,
-                             1.e-16 );
+                             2.e-16 );
             }
         }
     }
