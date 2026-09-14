@@ -135,7 +135,7 @@ void testIntegratorADRSingleMass(
 
     integrator.reset( exec_space{}, velocities, displacements );
 
-    const auto size = forces.size();
+    const std::size_t size = forces.extent( 0 );
     if constexpr ( GoBySteps )
     {
         for ( int s = 0; s < steps; ++s )
@@ -154,7 +154,6 @@ void testIntegratorADRSingleMass(
         int step = 0;
         while ( step < steps )
         {
-            const auto size = forces.size();
             integrator.initialSubStep( exec_space{}, 0, size, forces );
             Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
                                   num_masses, force_lambda );
