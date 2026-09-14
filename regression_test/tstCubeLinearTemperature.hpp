@@ -70,8 +70,6 @@ void test_cube_linear_temperature_single( ModelType )
     // ====================================================
     auto rho = particles.sliceDensity();
     auto x = particles.sliceReferencePosition();
-    auto v = particles.sliceVelocity();
-    auto f = particles.sliceForce();
     auto temp = particles.sliceTemperature();
     auto type = particles.sliceType();
 
@@ -111,6 +109,8 @@ void test_cube_linear_temperature_single( ModelType )
 
     // Create BC last to ensure ghost particles are included.
     auto u = solver.particles.sliceDisplacement();
+    x = solver.particles.sliceReferencePosition();
+    temp = solver.particles.sliceTemperature();
     double delta_temp = 1.;
     double end_time_factor = 0.5;
     auto linear_temp_func = KOKKOS_LAMBDA( const int pid, const double t )
@@ -126,8 +126,7 @@ void test_cube_linear_temperature_single( ModelType )
                 x( pid, 0 ) / edge_length_cube * delta_temp * non_dim_time;
         }
     };
-    CabanaPD::BodyTerm bc(
-        linear_temp_func, solver.particles.size(), false );
+    CabanaPD::BodyTerm bc( linear_temp_func, solver.particles.size(), false );
     // ====================================================
     //                   Simulation run
     // ====================================================
