@@ -126,9 +126,8 @@ void test_cube_linear_temperature_single( ModelType )
                 x( pid, 0 ) / edge_length_cube * delta_temp * non_dim_time;
         }
     };
-    auto bc = CabanaPD::createBoundaryCondition(
-        linear_temp_func, exec_space{}, solver.particles, false, full_cube );
-
+    CabanaPD::BodyTerm bc(
+        linear_temp_func, solver.particles.size(), false );
     // ====================================================
     //                   Simulation run
     // ====================================================
