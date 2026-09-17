@@ -22,6 +22,24 @@ namespace Impl
 {
 template <std::size_t current, typename FunctorType, typename ParameterPackType,
           typename... ARGS,
+          std::enable_if_t<current == ParameterPackType::size - 1, int> = 0>
+KOKKOS_INLINE_FUNCTION auto recursion_functor_for_index_in_pack_with_args(
+    FunctorType const& functor, std::size_t index,
+    ParameterPackType& parameterPack, ARGS... args )
+{
+    if ( index == current )
+    {
+        return functor( Cabana::get<current>( parameterPack ), args... );
+    }
+    else
+    {
+        Kokkos::abort( "Requested index not contained in ParameterPack" );
+        return functor( Cabana::get<current>( parameterPack ), args... );
+    }
+}
+
+template <std::size_t current, typename FunctorType, typename ParameterPackType,
+          typename... ARGS,
           std::enable_if_t<current<ParameterPackType::size - 1, int> = 0>
               KOKKOS_INLINE_FUNCTION auto
                   recursion_functor_for_index_in_pack_with_args(
@@ -36,24 +54,6 @@ template <std::size_t current, typename FunctorType, typename ParameterPackType,
     {
         return recursion_functor_for_index_in_pack_with_args<current + 1>(
             functor, index, parameterPack, args... );
-    }
-}
-
-template <std::size_t current, typename FunctorType, typename ParameterPackType,
-          typename... ARGS,
-          std::enable_if_t<current == ParameterPackType::size - 1, int> = 0>
-KOKKOS_INLINE_FUNCTION auto recursion_functor_for_index_in_pack_with_args(
-    FunctorType const& functor, std::size_t index,
-    ParameterPackType& parameterPack, ARGS... args )
-{
-    if ( index == current )
-    {
-        return functor( Cabana::get<current>( parameterPack ), args... );
-    }
-    else
-    {
-        Kokkos::abort( "Requested index not contained in ParameterPack" );
-        return functor( Cabana::get<current>( parameterPack ), args... );
     }
 }
 
