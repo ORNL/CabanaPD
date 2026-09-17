@@ -66,13 +66,13 @@ void plateWithHoleExample( const std::string filename )
     double x_center = 0.5 * ( low_corner[0] + high_corner[0] );
     double y_center = 0.5 * ( low_corner[1] + high_corner[1] );
     double R = inputs["hole_radius"];
+    CabanaPD::Region<CabanaPD::Cylinder> cylinder(
+        0.0, R, low_corner[2], high_corner[2], x_center, y_center );
 
     // Do not create particles inside given cylindrical region
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
     {
-        double rsq = ( x[0] - x_center ) * ( x[0] - x_center ) +
-                     ( x[1] - y_center ) * ( x[1] - y_center );
-        if ( rsq < R * R )
+        if ( cylinder.inside( x ) )
             return false;
         return true;
     };

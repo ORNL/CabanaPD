@@ -117,6 +117,8 @@ void crackInclusionExample( const std::string filename )
     double R = inputs["inclusion_radius"];
     double xI = inputs["inclusion_center"][0];
     double yI = inputs["inclusion_center"][1];
+    CabanaPD::Region<CabanaPD::Cylinder> inclusion( 0.0, R, low_corner[2],
+                                                    high_corner[2], xI, yI );
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
@@ -126,11 +128,8 @@ void crackInclusionExample( const std::string filename )
         if ( x( pid, 1 ) <= plane1.low[1] + horizon + 1e-10 ||
              x( pid, 1 ) >= plane2.high[1] - horizon - 1e-10 )
             nofail( pid ) = 1;
-        // Distance squared from inclusion center on the XY-plane
-        double rsq = ( x( pid, 0 ) - xI ) * ( x( pid, 0 ) - xI ) +
-                     ( x( pid, 1 ) - yI ) * ( x( pid, 1 ) - yI );
         // Inclusion material
-        if ( rsq < R * R )
+        if ( inclusion.inside( x, pid ) )
         {
             type( pid ) = 1;
             rho( pid ) = rho0_I;
