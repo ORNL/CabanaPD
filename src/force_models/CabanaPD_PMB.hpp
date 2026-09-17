@@ -455,6 +455,7 @@ struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
     ForceModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
         , base_temperature_type( model1, model2 )
+        , base_heat_transfer_type( model1, model2 )
     {
     }
 };

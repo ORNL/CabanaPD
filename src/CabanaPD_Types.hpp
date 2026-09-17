@@ -293,5 +293,19 @@ struct is_particle_init<Cabana::InitRandom> : public std::true_type
 {
 };
 
+template <typename MaterialType, typename Indexing, typename ParameterPackType,
+          typename OutsideRangeFunctorType>
+struct ForceModels;
+
+template <typename... ARGS>
+struct is_multi_material : std::false_type
+{
+};
+
+template <typename... ARGS>
+struct is_multi_material<ForceModels<ARGS...>> : std::true_type
+{
+};
+
 } // namespace CabanaPD
 #endif
