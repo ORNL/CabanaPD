@@ -94,22 +94,21 @@ class Solver
 
     // Core module types - required for all problems.
     using force_model_tag = typename ForceModelType::force_tag;
-    using force_fracture_type = typename ForceModelType::fracture_type;
-    using force_type =
-        Force<memory_space, force_model_tag, force_fracture_type>;
-    using force_thermal_type = typename ForceModelType::thermal_type::base_type;
+    using force_fracture_tag = typename ForceModelType::fracture_tag;
+    using force_type = Force<memory_space, force_model_tag, force_fracture_tag>;
+    using force_thermal_tag = typename ForceModelType::thermal_tag::base_type;
     using comm_type =
         Comm<ParticleType, typename ForceModelType::model_tag::base_type,
-             typename ForceModelType::material_type, force_thermal_type>;
-    using neighbor_type = Neighbor<memory_space, force_fracture_type>;
+             typename ForceModelType::material_type, force_thermal_tag>;
+    using neighbor_type = Neighbor<memory_space, force_fracture_tag>;
 
     // Optional module types.
-    using heat_transfer_type = HeatTransfer<memory_space, force_fracture_type>;
+    using heat_transfer_type = HeatTransfer<memory_space, force_fracture_tag>;
     using contact_model_tag = typename ContactModelType::force_tag;
-    using contact_fracture_type = typename ContactModelType::fracture_type;
+    using contact_fracture_tag = typename ContactModelType::fracture_tag;
     using contact_type =
-        Force<memory_space, contact_model_tag, contact_fracture_type>;
-    using contact_neighbor_type = Neighbor<memory_space, contact_fracture_type>;
+        Force<memory_space, contact_model_tag, contact_fracture_tag>;
+    using contact_neighbor_type = Neighbor<memory_space, contact_fracture_tag>;
 
     // Flexible module types.
     // Integration should include max displacement tracking if either model
@@ -194,7 +193,7 @@ class Solver
         // Create heat transfer if needed, using the same neighbor list as
         // the mechanics.
         if constexpr ( is_heat_transfer<
-                           typename ForceModelType::thermal_type>::value )
+                           typename ForceModelType::thermal_tag>::value )
         {
             thermal_subcycle_steps = inputs["thermal_subcycle_steps"];
             heat_transfer = std::make_shared<heat_transfer_type>();
@@ -261,7 +260,7 @@ class Solver
                                     MultiMaterial>::value )
             comm->gatherMaterial();
         if constexpr ( is_temperature_dependent<
-                           typename ForceModelType::thermal_type>::value )
+                           typename ForceModelType::thermal_tag>::value )
             comm->gatherTemperature();
         _total_timer.stop();
 
@@ -340,7 +339,7 @@ class Solver
         comm->gatherDisplacement();
 
         if constexpr ( is_heat_transfer<
-                           typename ForceModelType::thermal_type>::value )
+                           typename ForceModelType::thermal_tag>::value )
         {
             if ( step % thermal_subcycle_steps == 0 )
                 computeHeatTransfer( force_model, *heat_transfer, particles,
@@ -352,7 +351,7 @@ class Solver
             boundary_condition.apply( exec_space(), particles, step * dt );
 
         if constexpr ( is_temperature_dependent<
-                           typename ForceModelType::thermal_type>::value )
+                           typename ForceModelType::thermal_tag>::value )
             comm->gatherTemperature();
 
         // Compute internal forces.
@@ -392,7 +391,7 @@ class Solver
                           *contact_neighbor, false );
 
         if constexpr ( is_temperature_dependent<
-                           typename ForceModelType::thermal_type>::value )
+                           typename ForceModelType::thermal_tag>::value )
             comm->gatherTemperature();
 
         // Integrate - velocity Verlet second half.
