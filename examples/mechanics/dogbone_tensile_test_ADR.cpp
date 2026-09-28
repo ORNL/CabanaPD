@@ -274,13 +274,14 @@ void dogboneTensileTestExample( const std::string filename )
     solver.init( bc );
     particleADRIntegator.reset( exec_space{}, particles );
 
-    // do large part of the simulation with ADR integration.
+    // Do large part of the simulation with ADR integration.
     double time = 0.0;
     double adrFinalTime = 0.8 * static_cast<double>( inputs["final_time"] );
-    // as this simulation is elastic percectly plastic, we need small time steps
-    // to also have small load steps so we don't immediately end in the plastic
-    // regime. We are using the nofail flag nevertheless (to show it), even
-    // though not triggering plasticiy also means we do not trigger failure
+    // As this simulation is elastic-perfectly plastic, we need small time steps
+    // to also have small load increments so that we do not immediately end up
+    // in the plastic regime. We are using the no-fail flag nevertheless, to
+    // demonstrate its use, even though not triggering plasticiy also means that
+    // we do not trigger failure.
     double adrDeltaT = 0.001 * static_cast<double>( inputs["final_time"] );
     int numADRSteps = adrFinalTime / adrDeltaT;
 
@@ -294,8 +295,8 @@ void dogboneTensileTestExample( const std::string filename )
             exec_space{}, solver, particleADRIntegator, bc, time, adrTimeStep );
     }
 
-    // switch to verlet integration for the rest of the simulation (when we
-    // expect it to break)
+    // Switch to velocity Verlet integration for the remainder of the
+    // simulation, when we expect it to break.
     unsigned numVerletSteps =
         ( static_cast<double>( inputs["final_time"] ) - time ) / solver.dt;
     for ( unsigned i = 1; i < numVerletSteps; i++ )
