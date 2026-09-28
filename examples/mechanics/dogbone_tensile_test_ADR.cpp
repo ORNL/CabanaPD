@@ -296,7 +296,7 @@ void dogboneTensileTestExample( const std::string filename )
     }
 
     // Switch to velocity Verlet integration for the remainder of the
-    // simulation, when we expect it to break.
+    // simulation, when failure is expected.
     unsigned numVerletSteps =
         ( static_cast<double>( inputs["final_time"] ) - time ) / solver.dt;
     for ( unsigned i = 1; i < numVerletSteps; i++ )
