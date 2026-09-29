@@ -145,21 +145,18 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     solver.init( bc );
     particleADRIntegator.reset( exec_space{}, particles );
 
-    // do large part of the simulation with ADR integration.
+    // Do large part of the simulation with ADR integration.
     double time = 0.0;
-    double adrFinalTime = 0.8 * static_cast<double>( inputs["final_time"] );
-    // as this simulation is elastic percectly plastic, we need small time steps
-    // to also have small load steps so we don't immediately end in the plastic
-    // regime. We are using the nofail flag nevertheless (to show it), even
-    // though not triggering plasticiy also means we do not trigger failure
-    double adrDeltaT = 0.1 * static_cast<double>( inputs["final_time"] );
+    double finalTime = static_cast<double>( inputs["final_time"] );
+    double adrFinalTime = 0.8 * finalTime;
+    double adrDeltaT = 0.1 * finalTime;
     double adrThermalSubSteps = 1000;
     int numADRSteps = adrFinalTime / adrDeltaT;
 
-    for ( int adrTimeStep = 1; adrTimeStep < numADRSteps; ++adrTimeStep )
+    for ( int adrStep = 1; adrStep < numADRSteps; ++adrStep )
     {
-        time = adrDeltaT * adrTimeStep;
-        // integrate thermals if enabled
+        time = adrDeltaT * adrStep;
+        // Advance temperature via heat transfer if enabled
         if constexpr ( CabanaPD::is_heat_transfer<thermal_type>::value )
         {
             for ( int thermal_step = 0; thermal_step < adrThermalSubSteps;
@@ -173,13 +170,12 @@ void thermalDeformationHeatTransferExample( const std::string filename )
             exec_space{}, solver, particleADRIntegator, bc, time, false, 5e-1,
             1e-14, 10'000, MPI_COMM_WORLD );
         CabanaPD::runStepWithExternalIntegratorAndOutput(
-            exec_space{}, solver, particleADRIntegator, bc, time, adrTimeStep );
+            exec_space{}, solver, particleADRIntegator, bc, time, adrStep );
     }
 
-    // switch to verlet integration for the rest of the simulation (when we
-    // expect it to break)
-    unsigned numVerletSteps =
-        ( static_cast<double>( inputs["final_time"] ) - time ) / solver.dt;
+    // Switch to velocity Verlet integration for the remainder of the
+    // simulation, where failure is expected.
+    unsigned numVerletSteps = ( finalTime - time ) / solver.dt;
     for ( unsigned i = 1; i < numVerletSteps; i++ )
     {
         int step = ( time / solver.dt ) + i;
