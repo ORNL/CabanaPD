@@ -156,6 +156,7 @@ void dogboneTensileTestExample( const std::string filename )
     // ====================================================
     CabanaPD::ForceModel force_model( model_type{}, mechanics_type{},
                                       memory_space{}, horizon, K, G0, sigma_y );
+
     // ====================================================
     //                   Create solver
     // ====================================================
@@ -178,7 +179,6 @@ void dogboneTensileTestExample( const std::string filename )
     // Create BC last to ensure ghost particles are included.
     auto x = solver.particles.sliceReferencePosition();
     auto u = solver.particles.sliceDisplacement();
-    auto f = solver.particles.sliceForce();
     auto disp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
         if ( right_grip.inside( x, pid ) )
@@ -204,6 +204,7 @@ void dogboneTensileTestExample( const std::string filename )
     auto dx = solver.particles.dx[0];
     auto dy = solver.particles.dx[1];
     auto dz = solver.particles.dx[2];
+    auto f = solver.particles.sliceForce();
 
     // Generate force outputs for right grip to compute stress.
     // Output force on right grip in x-direction.
@@ -276,29 +277,29 @@ void dogboneTensileTestExample( const std::string filename )
 
     // Do large part of the simulation with ADR integration.
     double time = 0.0;
-    double adrFinalTime = 0.8 * static_cast<double>( inputs["final_time"] );
+    double finalTime = static_cast<double>( inputs["final_time"] );
+    double adrFinalTime = 0.8 * finalTime;
     // As this simulation is elastic-perfectly plastic, we need small time steps
     // to also have small load increments so that we do not immediately end up
     // in the plastic regime. We are using the no-fail flag nevertheless, to
     // demonstrate its use, even though not triggering plasticity also means
     // that we do not trigger failure.
-    double adrDeltaT = 0.001 * static_cast<double>( inputs["final_time"] );
+    double adrDeltaT = 0.001 * finalTime;
     int numADRSteps = adrFinalTime / adrDeltaT;
 
-    for ( int adrTimeStep = 1; adrTimeStep < numADRSteps; ++adrTimeStep )
+    for ( int adrStep = 1; adrStep < numADRSteps; ++adrStep )
     {
-        time = adrDeltaT * adrTimeStep;
+        time = adrDeltaT * adrStep;
         CabanaPD::runUntilConvergedWithExternalIntegrator(
             exec_space{}, solver, particleADRIntegator, bc, time, false, 5e0,
             1e-10, 100'000, MPI_COMM_WORLD );
         CabanaPD::runStepWithExternalIntegratorAndOutput(
-            exec_space{}, solver, particleADRIntegator, bc, time, adrTimeStep );
+            exec_space{}, solver, particleADRIntegator, bc, time, adrStep );
     }
 
     // Switch to velocity Verlet integration for the remainder of the
     // simulation, where failure is expected.
-    unsigned numVerletSteps =
-        ( static_cast<double>( inputs["final_time"] ) - time ) / solver.dt;
+    unsigned numVerletSteps = ( finalTime - time ) / solver.dt;
     for ( unsigned i = 1; i < numVerletSteps; i++ )
     {
         int step = ( time / solver.dt ) + i;
