@@ -651,7 +651,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         _output_timer.stop();
     }
 
-    auto gridSize() { return _grid_size; }
+    auto gridSize() const { return _grid_size; }
     auto rank() { return local_grid->globalGrid().blockId(); }
     auto comm() { return local_grid->globalGrid().comm(); }
 
@@ -898,6 +898,14 @@ class Particles<MemorySpace, ModelType, TemperatureDependent, BaseOutput,
         return Cabana::slice<1>( _aosoa_temp, "temperature_conduction" );
     }
     auto sliceTemperatureConductionAtomic()
+    {
+        auto temp = sliceTemperature();
+        using slice_type = decltype( temp );
+        using atomic_type = typename slice_type::atomic_access_slice;
+        atomic_type temp_a = temp;
+        return temp_a;
+    }
+    auto sliceTemperatureConductionAtomic() const
     {
         auto temp = sliceTemperature();
         using slice_type = decltype( temp );
