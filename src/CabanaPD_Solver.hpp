@@ -324,7 +324,10 @@ class Solver
                                  Kokkos::Sum<int>( num_keep ) );
         Kokkos::fence();
         particles.remove( num_keep, keep );
+
         // FIXME: Will need to rebuild ghosts.
+        neighbor->update( particles, force_model, true );
+
         _total_timer.stop();
         _other_time += _total_timer.lastTime();
     }
