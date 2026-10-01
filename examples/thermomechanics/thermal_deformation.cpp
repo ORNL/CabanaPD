@@ -40,6 +40,7 @@ void thermalDeformationExample( const std::string filename )
     double E = inputs["elastic_modulus"];
     double nu = 0.25;
     double K = E / ( 3 * ( 1 - 2 * nu ) );
+    double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
     double horizon = inputs["horizon"];
     horizon += 1e-10;
     double alpha = inputs["thermal_expansion_coeff"];
@@ -60,7 +61,7 @@ void thermalDeformationExample( const std::string filename )
     // ====================================================
     //                Force model type
     // ====================================================
-    using model_type = CabanaPD::PMB;
+    using model_type = CabanaPD::LPS;
     using thermal_type = CabanaPD::TemperatureDependent;
 
     // ====================================================
@@ -84,7 +85,7 @@ void thermalDeformationExample( const std::string filename )
     // ====================================================
     auto temp = particles.sliceTemperature();
     CabanaPD::ForceModel force_model( model_type{}, CabanaPD::NoFracture{},
-                                      horizon, K, temp, alpha, temp0 );
+                                      horizon, K, G, temp, alpha, temp0 );
 
     // ====================================================
     //                   Create solver
