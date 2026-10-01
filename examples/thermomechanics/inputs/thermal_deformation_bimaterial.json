@@ -10,7 +10,7 @@
     "horizon"                 : {"value": 0.03, "unit": "m"},
     "final_time"              : {"value": 0.01, "unit": "s"},
     "timestep"                : {"value": 7.5E-7,  "unit": "s"},
-    "thermal_subcycle_steps": {"value": 100},
+    "thermal_subcycle_steps"  : {"value": 100},
     "output_frequency"        : {"value": 100},
     "output_reference"        : {"value": true}
 }
