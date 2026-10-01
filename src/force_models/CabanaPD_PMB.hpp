@@ -21,11 +21,8 @@
 namespace CabanaPD
 {
 
-template <typename MechanicsModelType, typename... DataTypes>
-struct BaseForceModelPMB;
-
-template <>
-struct BaseForceModelPMB<Elastic> : public BaseForceModel
+template <typename FunctorType>
+struct MechanicsModel<PMB, Elastic, FunctorType> : public BaseForceModel
 {
     using base_type = BaseForceModel;
     using mechanics_type = Elastic;
@@ -35,72 +32,121 @@ struct BaseForceModelPMB<Elastic> : public BaseForceModel
     using force_tag = PMB;
 
     using base_type::force_horizon;
-    using base_type::K;
-    double c;
+    FunctorType K;
+    double c_factor;
 
-    BaseForceModelPMB( const double force_horizon, const double _K )
-        : base_type( force_horizon, _K )
+    MechanicsModel( PMB tag, Elastic mech, const double force_horizon,
+                    const double _K )
+        : MechanicsModel( tag, mech, force_horizon, ConstantProperty( _K ) )
     {
-        c = 18.0 * K /
-            ( pi * force_horizon * force_horizon * force_horizon *
-              force_horizon );
+    }
+
+    MechanicsModel( PMB tag, const double force_horizon, const double _K )
+        : MechanicsModel( tag, force_horizon, ConstantProperty( _K ) )
+    {
+    }
+
+    MechanicsModel( PMB tag, const double force_horizon, const FunctorType _K )
+        : MechanicsModel( tag, Elastic{}, force_horizon, _K )
+    {
+    }
+
+    MechanicsModel( PMB, Elastic, const double force_horizon,
+                    const FunctorType _K )
+        : base_type( force_horizon )
+        , K( _K )
+    {
+        c_factor = 18.0 / ( pi * force_horizon * force_horizon * force_horizon *
+                            force_horizon );
     }
 
     // Constructor to average from existing models.
+    // FIXME: use the first model functional dependence for now.
     template <typename ModelType1, typename ModelType2>
-    BaseForceModelPMB( const ModelType1& model1, const ModelType2& model2 )
+    MechanicsModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
+        , K( model1.K )
     {
-        c = ( model1.c + model2.c ) / 2.0;
     }
 
+    KOKKOS_FUNCTION
+    auto c( const int i ) const { return K( i ) * c_factor; }
+
+    KOKKOS_FUNCTION
+    int influenceType() const { return 1; }
+
     KOKKOS_INLINE_FUNCTION
-    auto operator()( ForceCoeffTag, const int, const int, const double s,
+    auto operator()( ForceCoeffTag, const int i, const int, const double s,
                      const double vol, const int = -1 ) const
     {
-        return c * s * vol;
+        return c( i ) * s * vol;
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto operator()( EnergyTag, const int, const int, const double s,
+    auto operator()( EnergyTag, const int i, const int, const double s,
                      const double xi, const double vol, const int = -1 ) const
     {
         // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
         // the integrand (pairwise potential).
-        return 0.25 * c * s * s * xi * vol;
+        return 0.25 * c( i ) * s * s * xi * vol;
     }
 };
 
-template <typename MemorySpace>
-struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
-    : public BaseForceModelPMB<Elastic>, public BasePlasticity<MemorySpace>
+template <typename ModelType>
+MechanicsModel( ModelType, Elastic, const double force_horizon, const double K )
+    -> MechanicsModel<ModelType, Elastic, ConstantProperty>;
+
+template <typename ModelType>
+MechanicsModel( ModelType, const double force_horizon, const double K )
+    -> MechanicsModel<ModelType, Elastic, ConstantProperty>;
+
+template <typename ModelType, typename FunctorType>
+MechanicsModel( ModelType, Elastic, const double force_horizon,
+                const FunctorType K )
+    -> MechanicsModel<ModelType, Elastic, FunctorType>;
+
+template <typename MemorySpace, typename FunctorModulus, typename FunctorYield>
+struct MechanicsModel<PMB, ElasticPerfectlyPlastic, FunctorModulus,
+                      FunctorYield, MemorySpace>
+    : public MechanicsModel<PMB, Elastic, FunctorModulus>,
+      public BasePlasticity<MemorySpace>
 {
-    using base_type = BaseForceModelPMB<Elastic>;
+    using base_type = MechanicsModel<PMB, Elastic, FunctorModulus>;
     using base_plasticity_type = BasePlasticity<MemorySpace>;
 
     using mechanics_type = ElasticPerfectlyPlastic;
 
     using base_plasticity_type::_s_p;
-    using base_type::c;
-    double s_Y;
+    FunctorYield s_Y;
 
     using base_plasticity_type::updateBonds;
 
-    BaseForceModelPMB( MemorySpace, const double force_horizon, const double K,
-                       const double sigma_y )
-        : base_type( force_horizon, K )
+    MechanicsModel( PMB tag, ElasticPerfectlyPlastic, MemorySpace,
+                    const double force_horizon, const double K,
+                    const double sigma_y )
+        : base_type( tag, force_horizon, K )
         , base_plasticity_type()
-        , s_Y( sigma_y / 3.0 / K )
+        , s_Y( ConstantProperty( sigma_y / 3.0 / K ) )
+    {
+    }
+
+    MechanicsModel( PMB tag, ElasticPerfectlyPlastic, MemorySpace,
+                    const double force_horizon, const FunctorModulus K,
+                    const FunctorYield _s_Y )
+        : base_type( tag, force_horizon, K )
+        , base_plasticity_type()
+        , s_Y( _s_Y )
     {
     }
 
     // Constructor to average from existing models.
+    // FIXME: use the first model functional dependence for now.
     template <typename ModelType1, typename ModelType2>
-    BaseForceModelPMB( const ModelType1& model1, const ModelType2& model2 )
+    MechanicsModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
         , base_plasticity_type()
+        , s_Y( model1.s_Y )
     {
-        s_Y = ( model1.s_Y + model2.s_Y ) / 2.0;
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -110,16 +156,16 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
         // Update bond plastic stretch.
         auto s_p = _s_p( i, n );
         // Yield in tension.
-        if ( s >= s_p + s_Y )
-            _s_p( i, n ) = s - s_Y;
+        if ( s >= s_p + s_Y( i ) )
+            _s_p( i, n ) = s - s_Y( i );
         // Yield in compression.
-        else if ( s <= s_p - s_Y )
-            _s_p( i, n ) = s + s_Y;
+        else if ( s <= s_p - s_Y( i ) )
+            _s_p( i, n ) = s + s_Y( i );
         // else: Elastic (in between), do not modify.
 
         // Must extract again if in the plastic regime.
         s_p = _s_p( i, n );
-        return c * ( s - s_p ) * vol;
+        return base_type::c( i ) * ( s - s_p ) * vol;
     }
 
     // This energy calculation is only valid for pure tension or pure
@@ -131,467 +177,54 @@ struct BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>
         auto s_p = _s_p( i, n );
         double stretch_term;
         // Yield in tension.
-        if ( s >= s_p + s_Y )
-            stretch_term = s_Y * ( 2.0 * s - s_Y );
+        if ( s >= s_p + s_Y( i ) )
+            stretch_term = s_Y( i ) * ( 2.0 * s - s_Y( i ) );
         // Yield in compression.
-        else if ( s <= s_p - s_Y )
-            stretch_term = s_Y * ( -2.0 * s - s_Y );
+        else if ( s <= s_p - s_Y( i ) )
+            stretch_term = s_Y( i ) * ( -2.0 * s - s_Y( i ) );
         else
             // Elastic (in between).
             stretch_term = s * s;
 
         // 0.25 factor is due to 1/2 from outside the integral and 1/2 from
         // the integrand (pairwise potential).
-        return 0.25 * c * stretch_term * xi * vol;
+        return 0.25 * base_type::c( i ) * stretch_term * xi * vol;
     }
 };
 
-template <>
-struct ForceModel<PMB, Elastic, NoFracture, TemperatureIndependent>
-    : public BaseForceModelPMB<Elastic>,
-      BaseNoFractureModel,
-      BaseTemperatureModel<TemperatureIndependent>
+template <typename FunctorType>
+struct MechanicsModel<LinearPMB, Elastic, FunctorType>
+    : public MechanicsModel<PMB, Elastic, FunctorType>
 {
-    using base_type = BaseForceModelPMB<Elastic>;
-    using base_fracture_type = BaseNoFractureModel;
-    using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
-
-    using base_type::base_type;
-    using base_type::force_horizon;
-    using base_type::operator();
-    using base_fracture_type::operator();
-    using base_temperature_type::operator();
-
-    ForceModel( PMB, NoFracture, const double force_horizon, const double K )
-        : base_type( force_horizon, K )
-    {
-    }
-
-    ForceModel( PMB, Elastic, NoFracture, const double force_horizon,
-                const double K )
-        : base_type( force_horizon, K )
-    {
-    }
-};
-
-template <>
-struct ForceModel<PMB, Elastic, Fracture, TemperatureIndependent>
-    : public BaseForceModelPMB<Elastic>,
-      BaseFractureModel,
-      BaseTemperatureModel<TemperatureIndependent>
-{
-    using base_type = BaseForceModelPMB<Elastic>;
-    using base_fracture_type = BaseFractureModel;
-    using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
-
-    using base_type::operator();
-    using base_fracture_type::operator();
-    using base_temperature_type::operator();
-
-    ForceModel( PMB, const double force_horizon, const double K,
-                const double G0, const int influence_type = 1 )
-        : base_type( force_horizon, K )
-        , base_fracture_type( force_horizon, K, G0, influence_type )
-    {
-    }
-
-    ForceModel( PMB model, Elastic, const double force_horizon, const double K,
-                const double G0, const int influence_type = 1 )
-        : ForceModel( model, force_horizon, K, G0, influence_type )
-    {
-    }
-
-    ForceModel( PMB model, Fracture, const double force_horizon, const double K,
-                const double G0, const int influence_type = 1 )
-        : ForceModel( model, force_horizon, K, G0, influence_type )
-    {
-    }
-
-    ForceModel( PMB model, Elastic, Fracture, const double force_horizon,
-                const double K, const double G0, const int influence_type = 1 )
-        : ForceModel( model, force_horizon, K, G0, influence_type )
-    {
-    }
-
-    // Constructor to work with plasticity.
-    ForceModel( PMB, Elastic, const double force_horizon, const double K,
-                const double G0, const double s0 )
-        : base_type( force_horizon, K )
-        , base_fracture_type( G0, s0 )
-    {
-    }
-
-    // Constructor to average from existing models.
-    template <typename ModelType1, typename ModelType2>
-    ForceModel( const ModelType1& model1, const ModelType2& model2 )
-        : base_type( model1, model2 )
-        , base_fracture_type( model1, model2 )
-    {
-    }
-};
-
-template <typename MemorySpace>
-struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture,
-                  TemperatureIndependent, MemorySpace>
-    : public BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>,
-      public BaseFractureModel,
-      public BaseTemperatureModel<TemperatureIndependent>
-{
-    using base_type = BaseForceModelPMB<ElasticPerfectlyPlastic, MemorySpace>;
-    using base_fracture_type = BaseFractureModel;
-    using base_temperature_type = BaseTemperatureModel<TemperatureIndependent>;
-
-    using base_type::operator();
-    using base_fracture_type::operator();
-    using base_temperature_type::operator();
-    using base_type::updateBonds;
-
-    ForceModel( PMB, ElasticPerfectlyPlastic, MemorySpace space,
-                const double force_horizon, const double K, const double G0,
-                const double sigma_y )
-        : base_type( space, force_horizon, K, sigma_y )
-        , base_fracture_type(
-              G0,
-              // s0
-              ( 5.0 * G0 / sigma_y / force_horizon + sigma_y / K ) / 6.0 )
-        , base_temperature_type()
-    {
-    }
-
-    ForceModel( PMB model, ElasticPerfectlyPlastic mechanics, Fracture,
-                MemorySpace space, const double force_horizon, const double K,
-                const double G0, const double sigma_y )
-        : ForceModel( model, mechanics, space, force_horizon, K, G0, sigma_y )
-    {
-    }
-
-    // Constructor to average from existing models.
-    template <typename ModelType1, typename ModelType2>
-    ForceModel( const ModelType1& model1, const ModelType2& model2 )
-        : base_type( model1, model2 )
-        , base_fracture_type( model1, model2 )
-    {
-    }
-};
-
-template <typename ModelType>
-ForceModel( ModelType, Elastic, NoFracture, const double force_horizon,
-            const double K ) -> ForceModel<ModelType, Elastic, NoFracture>;
-
-template <typename ModelType>
-ForceModel( ModelType, Elastic, Fracture, const double force_horizon,
-            const double K, const double G0 ) -> ForceModel<ModelType, Elastic>;
-
-// Default to fracture.
-template <typename ModelType>
-ForceModel( ModelType, Elastic, const double force_horizon, const double K,
-            const double G0 ) -> ForceModel<ModelType, Elastic>;
-
-template <typename ModelType>
-ForceModel( ModelType, NoFracture, const double force_horizon, const double K )
-    -> ForceModel<ModelType, Elastic, NoFracture>;
-
-// Default to elastic.
-template <typename ModelType>
-ForceModel( ModelType, const double force_horizon, const double K,
-            const double G0 ) -> ForceModel<ModelType>;
-
-template <typename ModelType, typename MemorySpace>
-ForceModel( ModelType, ElasticPerfectlyPlastic, MemorySpace,
-            const double force_horizon, const double K, const double G0,
-            const double sigma_y )
-    -> ForceModel<ModelType, ElasticPerfectlyPlastic, Fracture,
-                  TemperatureIndependent, MemorySpace>;
-
-template <typename TemperatureType>
-struct ForceModel<PMB, Elastic, NoFracture, TemperatureDependent,
-                  TemperatureType>
-    : public BaseForceModelPMB<Elastic>,
-      BaseNoFractureModel,
-      BaseTemperatureModel<TemperatureDependent, TemperatureType>
-{
-    using base_type = BaseForceModelPMB<Elastic>;
-    using base_temperature_type =
-        BaseTemperatureModel<TemperatureDependent, TemperatureType>;
-
-    using base_type::operator();
-    using base_temperature_type::operator();
-    using typename base_temperature_type::needs_update;
-
-    ForceModel( PMB, NoFracture, const double _force_horizon, const double _K,
-                const TemperatureType _temp, const double _alpha,
-                const double _temp0 = 0.0 )
-        : base_type( _force_horizon, _K )
-        , base_temperature_type( _temp, _alpha, _temp0 )
-    {
-    }
-
-    // Constructor to average from existing models.
-    template <typename ModelType1, typename ModelType2>
-    ForceModel( const ModelType1& model1, const ModelType2& model2 )
-        : base_type( model1, model2 )
-        , base_temperature_type( model1, model2 )
-    {
-    }
-};
-
-template <typename TemperatureType>
-struct ForceModel<PMB, Elastic, Fracture, TemperatureDependent, TemperatureType>
-    : public BaseForceModelPMB<Elastic>, ThermalFractureModel<TemperatureType>
-{
-    using base_type = BaseForceModelPMB<Elastic>;
-    using base_temperature_type = ThermalFractureModel<TemperatureType>;
-
-    using base_type::operator();
-    using base_temperature_type::operator();
-    using typename base_temperature_type::needs_update;
-
-    ForceModel( PMB, const double _horizon, const double _K, const double _G0,
-                const TemperatureType _temp, const double _alpha,
-                const double _temp0 = 0.0 )
-        : base_type( _horizon, _K )
-        , base_temperature_type( _horizon, _K, _G0, _temp, _alpha, _temp0 )
-    {
-    }
-
-    // Constructor to average from existing models.
-    template <typename ModelType1, typename ModelType2>
-    ForceModel( const ModelType1& model1, const ModelType2& model2 )
-        : base_type( model1, model2 )
-        , base_temperature_type( model1, model2 )
-    {
-    }
-};
-
-template <typename TemperatureType>
-struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, TemperatureDependent,
-                  TemperatureType>
-    : public BaseForceModelPMB<ElasticPerfectlyPlastic,
-                               typename TemperatureType::memory_space>,
-      public ThermalFractureModel<TemperatureType>
-{
-    using base_type = BaseForceModelPMB<ElasticPerfectlyPlastic,
-                                        typename TemperatureType::memory_space>;
-    using base_temperature_type = ThermalFractureModel<TemperatureType>;
-
-    using base_type::operator();
-    using base_temperature_type::operator();
-    using typename base_temperature_type::needs_update;
-
-    ForceModel( PMB, ElasticPerfectlyPlastic, const double _horizon,
-                const double _K, const double _G0, const double sigma_y,
-                const TemperatureType _temp, const double _alpha,
-                const double _temp0 = 0.0 )
-        : base_type( typename TemperatureType::memory_space{}, _horizon, _K,
-                     sigma_y )
-        , base_temperature_type( _horizon, _K, _G0, _temp, _alpha, _temp0 )
-    {
-    }
-
-    // Constructor to average from existing models.
-    template <typename ModelType1, typename ModelType2>
-    ForceModel( const ModelType1& model1, const ModelType2& model2 )
-        : base_type( model1, model2 )
-        , base_temperature_type( model1, model2 )
-    {
-    }
-};
-
-template <typename ModelType, typename TemperatureType>
-ForceModel( ModelType, NoFracture, const double horizon, const double K,
-            const TemperatureType& temp, const double alpha,
-            const double temp0 = 0.0 )
-    -> ForceModel<ModelType, Elastic, NoFracture, TemperatureDependent,
-                  TemperatureType>;
-
-template <typename ModelType, typename TemperatureType>
-ForceModel( ModelType, const double horizon, const double K, const double _G0,
-            const TemperatureType& temp, const double alpha,
-            const double temp0 = 0.0 )
-    -> ForceModel<ModelType, Elastic, Fracture, TemperatureDependent,
-                  TemperatureType>;
-
-template <typename ModelType, typename TemperatureType>
-ForceModel( ModelType, ElasticPerfectlyPlastic, const double horizon,
-            const double K, const double _G0, const double sigma_y,
-            const TemperatureType& temp, const double alpha,
-            const double temp0 = 0.0 )
-    -> ForceModel<ModelType, ElasticPerfectlyPlastic, Fracture,
-                  TemperatureDependent, TemperatureType>;
-
-template <typename TemperatureType>
-struct ForceModel<PMB, Elastic, NoFracture, DynamicTemperature, TemperatureType>
-    : public BaseForceModelPMB<Elastic>,
-      BaseNoFractureModel,
-      BaseTemperatureModel<TemperatureDependent, TemperatureType>,
-      BaseDynamicTemperatureModel
-{
-    using base_type = BaseForceModelPMB<Elastic>;
-    using base_temperature_type =
-        BaseTemperatureModel<TemperatureDependent, TemperatureType>;
-    using base_heat_transfer_type = BaseDynamicTemperatureModel;
-
-    // Necessary to distinguish between TemperatureDependent
-    using thermal_type = DynamicTemperature;
-
-    using base_type::operator();
-    using base_temperature_type::operator();
-    using typename base_temperature_type::needs_update;
-
-    ForceModel( PMB, NoFracture, const double _horizon, const double _K,
-                const TemperatureType& _temp, const double _kappa,
-                const double _cp, const double _alpha,
-                const double _temp0 = 0.0,
-                const bool _constant_microconductivity = true )
-        : base_type( _horizon, _K )
-        , base_temperature_type( _temp, _alpha, _temp0 )
-        , base_heat_transfer_type( _horizon, _kappa, _cp,
-                                   _constant_microconductivity )
-    {
-    }
-
-    // Constructor to average from existing models.
-    template <typename ModelType1, typename ModelType2>
-    ForceModel( const ModelType1& model1, const ModelType2& model2 )
-        : base_type( model1, model2 )
-        , base_temperature_type( model1, model2 )
-    {
-    }
-};
-
-template <typename ModelType, typename TemperatureType>
-ForceModel( ModelType, NoFracture, const double horizon, const double K,
-            const TemperatureType& temp, const double kappa, const double cp,
-            const double alpha, const double temp0 = 0.0,
-            const bool constant_microconductivity = true )
-    -> ForceModel<ModelType, Elastic, NoFracture, DynamicTemperature,
-                  TemperatureType>;
-
-template <typename ModelType, typename TemperatureType>
-struct ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
-                  TemperatureType> : public BaseForceModelPMB<Elastic>,
-                                     ThermalFractureModel<TemperatureType>,
-                                     BaseDynamicTemperatureModel
-{
-    using base_type = BaseForceModelPMB<Elastic>;
-    using base_temperature_type = ThermalFractureModel<TemperatureType>;
-    using base_heat_transfer_type = BaseDynamicTemperatureModel;
-
-    // Necessary to distinguish between TemperatureDependent
-    using thermal_type = DynamicTemperature;
-
-    using base_type::operator();
-    using base_temperature_type::operator();
-    using typename base_temperature_type::needs_update;
-
-    ForceModel( PMB, const double _horizon, const double _K, const double _G0,
-                const TemperatureType _temp, const double _kappa,
-                const double _cp, const double _alpha,
-                const double _temp0 = 0.0,
-                const bool _constant_microconductivity = true )
-        : base_type( _horizon, _K )
-        , base_temperature_type( _horizon, _K, _G0, _temp, _alpha, _temp0 )
-        , base_heat_transfer_type( _horizon, _kappa, _cp,
-                                   _constant_microconductivity )
-    {
-    }
-
-    // Constructor to average from existing models.
-    template <typename ModelType1, typename ModelType2>
-    ForceModel( const ModelType1& model1, const ModelType2& model2 )
-        : base_type( model1, model2 )
-        , base_temperature_type( model1, model2 )
-        , base_heat_transfer_type( model1, model2 )
-    {
-    }
-};
-
-template <typename ModelType, typename TemperatureType>
-ForceModel( ModelType, const double horizon, const double K, const double G0,
-            const TemperatureType& temp, const double kappa, const double cp,
-            const double alpha, const double temp0 = 0.0,
-            const bool constant_microconductivity = true )
-    -> ForceModel<ModelType, Elastic, Fracture, DynamicTemperature,
-                  TemperatureType>;
-
-template <typename TemperatureType>
-struct ForceModel<PMB, ElasticPerfectlyPlastic, Fracture, DynamicTemperature,
-                  TemperatureType>
-    : public BaseForceModelPMB<ElasticPerfectlyPlastic,
-                               typename TemperatureType::memory_space>,
-      public ThermalFractureModel<TemperatureType>,
-      BaseDynamicTemperatureModel
-{
-    using base_type = BaseForceModelPMB<ElasticPerfectlyPlastic,
-                                        typename TemperatureType::memory_space>;
-    using base_temperature_type = ThermalFractureModel<TemperatureType>;
-    using base_heat_transfer_type = BaseDynamicTemperatureModel;
-
-    // Necessary to distinguish between TemperatureDependent
-    using thermal_type = DynamicTemperature;
-
-    using base_type::operator();
-    using base_temperature_type::operator();
-    using typename base_temperature_type::needs_update;
-
-    ForceModel( PMB, ElasticPerfectlyPlastic, const double _horizon,
-                const double _K, const double _G0, const double sigma_y,
-                const TemperatureType _temp, const double _kappa,
-                const double _cp, const double _alpha,
-                const double _temp0 = 0.0,
-                const bool _constant_microconductivity = true )
-        : base_type( typename TemperatureType::memory_space{}, _horizon, _K,
-                     sigma_y )
-        , base_temperature_type( _horizon, _K, _G0, _temp, _alpha, _temp0 )
-        , base_heat_transfer_type( _horizon, _kappa, _cp,
-                                   _constant_microconductivity )
-    {
-    }
-
-    // Constructor to average from existing models.
-    template <typename ModelType1, typename ModelType2>
-    ForceModel( const ModelType1& model1, const ModelType2& model2 )
-        : base_type( model1, model2 )
-        , base_temperature_type( model1, model2 )
-        , base_heat_transfer_type( model1, model2 )
-    {
-    }
-};
-
-template <typename ModelType, typename TemperatureType>
-ForceModel( ModelType, ElasticPerfectlyPlastic, const double horizon,
-            const double K, const double G0, const double sigma_y,
-            const TemperatureType& temp, const double kappa, const double cp,
-            const double alpha, const double temp0 = 0.0,
-            const bool constant_microconductivity = true )
-    -> ForceModel<ModelType, ElasticPerfectlyPlastic, Fracture,
-                  DynamicTemperature, TemperatureType>;
-
-/******************************************************************************
- Linear PMB.
-******************************************************************************/
-template <typename MechanicsType, typename FractureType, typename ThermalType,
-          typename... FieldTypes>
-struct ForceModel<LinearPMB, MechanicsType, FractureType, ThermalType,
-                  FieldTypes...>
-    : public ForceModel<PMB, MechanicsType, FractureType, ThermalType,
-                        FieldTypes...>
-{
-    using base_type = ForceModel<PMB, MechanicsType, FractureType, ThermalType,
-                                 FieldTypes...>;
-
+    using base_type = MechanicsModel<PMB, Elastic, FunctorType>;
     // Tag to dispatch to force iteration.
     using force_tag = LinearPMB;
 
+    using base_type::base_type;
     using base_type::operator();
 
     template <typename... Args>
-    ForceModel( LinearPMB, Args... args )
+    MechanicsModel( LinearPMB, Args&&... args )
         : base_type( typename base_type::model_tag{},
                      std::forward<Args>( args )... )
     {
     }
 };
+
+template <typename ModelType, typename MemorySpace>
+MechanicsModel( ModelType, ElasticPerfectlyPlastic, MemorySpace,
+                const double force_horizon, const double K,
+                const double sigma_y )
+    -> MechanicsModel<ModelType, ElasticPerfectlyPlastic, ConstantProperty,
+                      ConstantProperty, MemorySpace>;
+
+template <typename ModelType, typename FunctorModulus, typename FunctorYield,
+          typename MemorySpace>
+MechanicsModel( ModelType, ElasticPerfectlyPlastic, MemorySpace,
+                const double force_horizon, const FunctorModulus K,
+                const FunctorYield sigma_y )
+    -> MechanicsModel<ModelType, ElasticPerfectlyPlastic, FunctorModulus,
+                      FunctorYield, MemorySpace>;
 
 } // namespace CabanaPD
 
