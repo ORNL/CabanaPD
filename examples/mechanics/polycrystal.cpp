@@ -61,15 +61,17 @@ void polycrystalExample( const std::string filename )
     // ====================================================
     std::array<double, 3> extent = inputs["system_size"];
     double grainSize = inputs["grain_size"];
+
+    // Initialize host storage for outputs from grain generator
     std::vector<std::array<double, 3>> grainPosStd;
     std::array<int, 3> grainGridShape;
     double grainGridCellSize;
 
+    // Generate grains relative to the origin
     getPolycrystalGrains( extent, grainSize, grainPosStd, grainGridShape,
                           grainGridCellSize );
 
-    // Shift grains relative to low_corner and copy to Kokkos::View
-    // and also copy grid to Kokkos::View
+    // initialize grain positions and lookup grid Kokkos host memory
     int numGrains = grainPosStd.size();
     Kokkos::View<double* [3], Kokkos::HostSpace> grainPosHost(
         Kokkos::ViewAllocateWithoutInitializing( "Host grain position" ),
@@ -77,14 +79,18 @@ void polycrystalExample( const std::string filename )
     Kokkos::View<int***, Kokkos::HostSpace> grainGridHost(
         Kokkos::ViewAllocateWithoutInitializing( "Host grain grid" ),
         grainGridShape[0], grainGridShape[1], grainGridShape[2] );
+
+    // Initialize lookup grid empty (all -1 indices)
     Kokkos::deep_copy( grainGridHost, -1 );
 
+    // Copy and shift grain positions and rebuild lookup grid
     for ( int i = 0; i < numGrains; ++i )
     {
         grainPosHost( i, 0 ) = grainPosStd[i][0] + low_corner[0];
         grainPosHost( i, 1 ) = grainPosStd[i][1] + low_corner[1];
         grainPosHost( i, 2 ) = grainPosStd[i][2] + low_corner[2];
 
+        // Compute grain multi-index and add to the lookup grid
         std::array<int, 3> index = {
             static_cast<int>(
                 std::floor( grainPosStd[i][0] / grainGridCellSize ) ),
@@ -146,6 +152,7 @@ void polycrystalExample( const std::string filename )
     auto nofail = particles.sliceNoFail();
     auto type = particles.sliceType();
 
+    // Initialize functor to find closest grains during particle init
     FindClosestGrainFunctor findClosest( grainGrid, grainPos, low_corner,
                                          grainGridShape, grainGridCellSize );
 
