@@ -42,12 +42,18 @@ TEST( TEST_CATEGORY, test_diagonalIndexing )
     // valid for higher values of N.
 
     // test diagonal indexing for N=1
-    CabanaPD::DiagonalIndexing<1> indexing1;
+    using IndexingType1 = CabanaPD::DiagonalIndexing<1>;
+    IndexingType1 indexing1;
 
     ASSERT_EQ( indexing1( 0, 0 ), 0 );
 
+    // test inverse indexing
+    ASSERT_EQ( IndexingType1::template getInverseIndexPair<0>().first, 0 );
+    ASSERT_EQ( IndexingType1::template getInverseIndexPair<0>().second, 0 );
+
     // test diagonal indexing for N=2
-    CabanaPD::DiagonalIndexing<2> indexing2;
+    using IndexingType2 = CabanaPD::DiagonalIndexing<2>;
+    IndexingType2 indexing2;
 
     // main diagonal
     ASSERT_EQ( indexing2( 0, 0 ), 0 );
@@ -57,8 +63,13 @@ TEST( TEST_CATEGORY, test_diagonalIndexing )
     ASSERT_EQ( indexing2( 0, 1 ), 2 );
     ASSERT_EQ( indexing2( 1, 0 ), 2 );
 
+    // test inverse indexing
+    ASSERT_EQ( IndexingType2::template getInverseIndexPair<2>().first, 0 );
+    ASSERT_EQ( IndexingType2::template getInverseIndexPair<2>().second, 1 );
+
     // test diagonal indexing for N=3
-    CabanaPD::DiagonalIndexing<3> indexing3;
+    using IndexingType3 = CabanaPD::DiagonalIndexing<3>;
+    IndexingType3 indexing3;
 
     // main diagonal
     ASSERT_EQ( indexing3( 0, 0 ), 0 );
@@ -74,6 +85,16 @@ TEST( TEST_CATEGORY, test_diagonalIndexing )
     // second minor diagonal (incl symmetric terms)
     ASSERT_EQ( indexing3( 0, 2 ), 5 );
     ASSERT_EQ( indexing3( 2, 0 ), 5 );
+
+    // test inverse indexing
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<3>().first, 0 );
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<3>().second, 1 );
+
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<4>().first, 1 );
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<4>().second, 2 );
+
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<5>().first, 0 );
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<5>().second, 2 );
 }
 
 TEST( TEST_CATEGORY, test_diagonalIndexing_death )
@@ -101,9 +122,9 @@ TEST( TEST_CATEGORY, test_binaryIndexing )
     CabanaPD::BinaryIndexing indexing;
 
     // test binary indexing for N=3
-    for ( unsigned i = 0; 3 < i; ++i )
+    for ( unsigned i = 0; i < 3; ++i )
     {
-        for ( unsigned j = 0; 3 < j; ++j )
+        for ( unsigned j = 0; j < 3; ++j )
         {
             if ( i == j )
                 ASSERT_EQ( indexing( i, j ), 0 );
@@ -111,5 +132,83 @@ TEST( TEST_CATEGORY, test_binaryIndexing )
                 ASSERT_EQ( indexing( i, j ), 1 );
         }
     }
+}
+
+TEST( TEST_CATEGORY, test_fullIndexing )
+{
+    // test full indexing for N=1
+    using IndexingType1 = CabanaPD::FullIndexing<1>;
+    IndexingType1 indexing1;
+
+    ASSERT_EQ( indexing1( 0, 0 ), 0 );
+
+    // test inverse indexing
+    ASSERT_EQ( IndexingType1::template getInverseIndexPair<0>().first, 0 );
+    ASSERT_EQ( IndexingType1::template getInverseIndexPair<0>().second, 0 );
+
+    // test diagonal indexing for N=2
+    using IndexingType2 = CabanaPD::FullIndexing<2>;
+    IndexingType2 indexing2;
+
+    ASSERT_EQ( indexing2( 0, 0 ), 0 );
+    ASSERT_EQ( indexing2( 0, 1 ), 1 );
+    ASSERT_EQ( indexing2( 1, 0 ), 2 );
+    ASSERT_EQ( indexing2( 1, 1 ), 3 );
+
+    // test inverse indexing
+    ASSERT_EQ( IndexingType2::template getInverseIndexPair<0>().first, 0 );
+    ASSERT_EQ( IndexingType2::template getInverseIndexPair<0>().second, 0 );
+
+    ASSERT_EQ( IndexingType2::template getInverseIndexPair<1>().first, 0 );
+    ASSERT_EQ( IndexingType2::template getInverseIndexPair<1>().second, 1 );
+
+    ASSERT_EQ( IndexingType2::template getInverseIndexPair<2>().first, 1 );
+    ASSERT_EQ( IndexingType2::template getInverseIndexPair<2>().second, 0 );
+
+    ASSERT_EQ( IndexingType2::template getInverseIndexPair<3>().first, 1 );
+    ASSERT_EQ( IndexingType2::template getInverseIndexPair<3>().second, 1 );
+
+    // test diagonal indexing for N=3
+    using IndexingType3 = CabanaPD::FullIndexing<3>;
+    IndexingType3 indexing3;
+
+    ASSERT_EQ( indexing3( 0, 0 ), 0 );
+    ASSERT_EQ( indexing3( 0, 1 ), 1 );
+    ASSERT_EQ( indexing3( 0, 2 ), 2 );
+    ASSERT_EQ( indexing3( 1, 0 ), 3 );
+    ASSERT_EQ( indexing3( 1, 1 ), 4 );
+    ASSERT_EQ( indexing3( 1, 2 ), 5 );
+    ASSERT_EQ( indexing3( 2, 0 ), 6 );
+    ASSERT_EQ( indexing3( 2, 1 ), 7 );
+    ASSERT_EQ( indexing3( 2, 2 ), 8 );
+
+    // test inverse indexing
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<3>().first, 1 );
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<3>().second, 0 );
+
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<4>().first, 1 );
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<4>().second, 1 );
+
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<5>().first, 1 );
+    ASSERT_EQ( IndexingType3::template getInverseIndexPair<5>().second, 2 );
+}
+
+TEST( TEST_CATEGORY, test_fullIndexing_death )
+{
+    // assert death for out of scope indexing
+    ASSERT_DEATH(
+        {
+            CabanaPD::FullIndexing<2> indexing;
+            auto i = indexing( 2, 0 );
+            (void)i;
+        },
+        "Index out of range of FullIndexing" );
+    ASSERT_DEATH(
+        {
+            CabanaPD::FullIndexing<2> indexing;
+            auto i = indexing( 0, 2 );
+            (void)i;
+        },
+        "Index out of range of FullIndexing" );
 }
 } // end namespace Test
