@@ -40,7 +40,6 @@ void dogboneTensileTestExample( const std::string filename )
     double nu = 0.25; // Use bond-based model
     double K = E / ( 3 * ( 1 - 2 * nu ) );
     double G0 = inputs["fracture_energy"];
-    double sigma_y = inputs["yield_stress"];
     double horizon = inputs["horizon"];
     horizon += 1e-10;
 
@@ -58,7 +57,7 @@ void dogboneTensileTestExample( const std::string filename )
     //                  Force model type
     // ====================================================
     using model_type = CabanaPD::PMB;
-    using mechanics_type = CabanaPD::ElasticPerfectlyPlastic;
+    using mechanics_type = CabanaPD::Elastic;
 
     // ====================================================
     //    Custom particle generation and initialization
@@ -154,8 +153,8 @@ void dogboneTensileTestExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    CabanaPD::ForceModel force_model( model_type{}, mechanics_type{},
-                                      memory_space{}, horizon, K, G0, sigma_y );
+    CabanaPD::ForceModel force_model( model_type{}, mechanics_type{}, horizon,
+                                      K, G0 );
 
     // ====================================================
     //                   Create solver
@@ -279,19 +278,17 @@ void dogboneTensileTestExample( const std::string filename )
     double time = 0.0;
     double finalTime = static_cast<double>( inputs["final_time"] );
     double adrFinalTime = 0.8 * finalTime;
-    // As this simulation is elastic-perfectly plastic, we need small time steps
-    // to also have small load increments so that we do not immediately end up
-    // in the plastic regime. We are using the no-fail flag nevertheless, to
-    // demonstrate its use, even though not triggering plasticity also means
-    // that we do not trigger failure.
-    double adrDeltaT = 0.001 * finalTime;
+    double adrDeltaT = 0.1 * finalTime;
     int numADRSteps = adrFinalTime / adrDeltaT;
 
     for ( int adrStep = 1; adrStep < numADRSteps; ++adrStep )
     {
         time = adrDeltaT * adrStep;
+        // integrate using the ADR while disabling bond failure. With bond
+        // failure active, we can not do large load increments (timesteps) as
+        // the particles at the boundary would immediately fail.
         CabanaPD::runUntilConvergedWithExternalIntegrator(
-            exec_space{}, solver, particleADRIntegator, bc, time, false, 5e0,
+            exec_space{}, solver, particleADRIntegator, bc, time, true, 5e0,
             1e-10, 100'000, MPI_COMM_WORLD );
         solver.particles.output( adrStep, time, solver.output_reference );
     }
