@@ -738,12 +738,6 @@ void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
     // Compute internal forces.
     solver.updateForce();
 
-    // TODO comm not public
-    if constexpr ( is_temperature_dependent<
-                       typename SolverType::force_model_type::thermal_type>::
-                       value )
-        solver.comm->gatherTemperature();
-
     // Add force boundary condition.
     if ( boundary_condition.forceUpdate() )
         boundary_condition.apply( exec_space, solver.particles, time );
@@ -780,13 +774,6 @@ bool runUntilConvergedWithExternalIntegrator(
 
         // Update ghost particles.
         solver.comm->gatherDisplacement();
-
-        // Compute internal forces.
-        solver.updateForce();
-        if constexpr ( is_temperature_dependent<
-                           typename SolverType::force_model_type::
-                               thermal_type>::value )
-            solver.comm->gatherTemperature();
 
         // Add force boundary condition.
         if ( boundary_condition.forceUpdate() )
