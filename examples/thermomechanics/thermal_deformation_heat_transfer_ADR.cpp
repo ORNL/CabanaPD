@@ -161,9 +161,19 @@ void thermalDeformationHeatTransferExample( const std::string filename )
         {
             for ( int thermal_step = 0; thermal_step < adrThermalSubSteps;
                   ++thermal_step )
+            {
+                // FIXME:Since we split the integration of thermals and
+                // mechanics for the ADR integration, we need to apply the
+                // thermal boundary condition here. IMPORTANT: This implies that
+                // the boundary condition can not **add** forces or
+                // displacements to the particles! It can however safely set the
+                // force or displacement value
+                bc.apply( exec_space{}, solver.particles, time );
                 computeHeatTransfer( force_model, *( solver.heat_transfer ),
                                      particles, *( solver.neighbor ),
                                      adrDeltaT / adrThermalSubSteps );
+                solver.comm->gatherTemperature();
+            }
         }
 
         CabanaPD::runUntilConvergedWithExternalIntegrator(
