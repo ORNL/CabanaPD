@@ -813,6 +813,7 @@ bool runUntilConvergedWithExternalIntegrator(
             break;
 
         ++step;
+
         if ( step % 1000 == 0 && print_rank() )
         {
             std::cout << "Finished " << step << "/" << maxSteps
