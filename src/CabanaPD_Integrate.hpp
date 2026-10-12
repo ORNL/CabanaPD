@@ -209,7 +209,7 @@ class VelocityVerlet<Contact> : public VelocityVerlet<NoContact>
 //  integrator per entity is suspected to lead to performance penalties
 
 template <typename ExecutionSpace, typename FictitiousMassType,
-          typename InitialVelocityType, int SpatialDimension = 3>
+          typename VelocityAtIntegrationStartType, int SpatialDimension = 3>
 struct ADRIntegrator
 {
     static constexpr int dim = SpatialDimension;
@@ -218,30 +218,31 @@ struct ADRIntegrator
 
     Kokkos::View<force_storage_base_type*,
                  typename ExecutionSpace::memory_space>
-        _forces_last_step;
+        _forces_t_minus_one;
     Kokkos::View<velocity_storage_base_type*,
                  typename ExecutionSpace::memory_space>
-        _velocities_last_step;
+        _velocities_t_minus_half;
     Kokkos::View<double*, typename ExecutionSpace::memory_space>
         _damping_coefficients;
     FictitiousMassType _fictitious_mass;
-    InitialVelocityType _initial_velocity_type;
+    VelocityAtIntegrationStartType _velocity_at_integration_start_type;
     double _delta_t;
-    double _l2_force_residual = Kokkos::Experimental::finite_max_v<double>;
-    double _l2_displacement_residual =
+    double _l2_norm_force_residual = Kokkos::Experimental::finite_max_v<double>;
+    double _l2_norm_displacement_residual =
         Kokkos::Experimental::finite_max_v<double>;
 
   public:
-    ADRIntegrator( ExecutionSpace const& exec_space,
-                   FictitiousMassType const& fictitious_mass,
-                   InitialVelocityType const& initial_velocity,
-                   size_t num_masses, double dt )
-        : _forces_last_step(
+    ADRIntegrator(
+        ExecutionSpace const& exec_space,
+        FictitiousMassType const& fictitious_mass,
+        VelocityAtIntegrationStartType const& velocity_at_integration_start,
+        size_t num_masses, double dt )
+        : _forces_t_minus_one(
               Kokkos::View<force_storage_base_type*, ExecutionSpace>(
                   Kokkos::view_alloc( exec_space, Kokkos::WithoutInitializing,
                                       "Forces_Last_Step" ),
                   num_masses ) )
-        , _velocities_last_step(
+        , _velocities_t_minus_half(
               Kokkos::View<velocity_storage_base_type*, ExecutionSpace>(
                   Kokkos::view_alloc( exec_space, Kokkos::WithoutInitializing,
                                       "Velocities_Last_Step" ),
@@ -251,7 +252,7 @@ struct ADRIntegrator
                                   "damping_current_Step" ),
               num_masses ) )
         , _fictitious_mass( fictitious_mass )
-        , _initial_velocity_type( initial_velocity )
+        , _velocity_at_integration_start_type( velocity_at_integration_start )
         , _delta_t( dt )
     {
     }
@@ -263,13 +264,14 @@ struct ADRIntegrator
         Kokkos::parallel_for(
             "ADRIntegrator::reset",
             Kokkos::RangePolicy<ExecutionSpace>(
-                0, _velocities_last_step.extent( 0 ) ),
+                0, _velocities_t_minus_half.extent( 0 ) ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 for ( int i = 0; i < dim; ++i )
                 {
-                    velocity( index, i ) = _initial_velocity_type( index, i );
+                    velocity( index, i ) =
+                        _velocity_at_integration_start_type( index, i );
                     displacement( index, i ) += _delta_t * velocity( index, i );
-                    _velocities_last_step( index, i ) = velocity( index, i );
+                    _velocities_t_minus_half( index, i ) = velocity( index, i );
                 }
             } );
         Kokkos::fence( "ADRIntegrator::Fence::reset" );
@@ -284,7 +286,7 @@ struct ADRIntegrator
             Kokkos::RangePolicy<ExecutionSpace>( start, end ),
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 for ( int i = 0; i < dim; ++i )
-                    _forces_last_step( index, i ) = forces( index, i );
+                    _forces_t_minus_one( index, i ) = forces( index, i );
             } );
         Kokkos::fence( "ADRIntegrator::Fence::intialStep" );
     }
@@ -294,27 +296,25 @@ struct ADRIntegrator
                         ForceType const& forces,
                         DisplacementType const& displacements )
     {
-        double l2_displacement_denominator;
+        double l2_norm_displacement_denominator;
         Kokkos::parallel_reduce(
             "ADRIntegrator::middleStep",
             Kokkos::RangePolicy<ExecutionSpace>( start, end ),
             KOKKOS_CLASS_LAMBDA( int64_t index, double& local_force_residual,
                                  double& local_displacement_residual,
                                  double& local_displacement_denominator ) {
-                double mass[dim];
                 double damping_numerator = 0.;
                 double damping_denominator = 0.;
                 // compute damping coefficient
                 for ( int i = 0; i < dim; ++i )
                 {
-                    mass[i] = _fictitious_mass( index, i );
                     for ( int j = 0; j < dim; ++j )
                     {
                         damping_numerator +=
                             ( -forces( index, i ) +
-                              _forces_last_step( index, i ) ) /
-                            ( mass[i] * _delta_t *
-                              _velocities_last_step( index, j ) ) *
+                              _forces_t_minus_one( index, i ) ) /
+                            ( _fictitious_mass( index, i ) * _delta_t *
+                              _velocities_t_minus_half( index, j ) ) *
                             displacements( index, i ) *
                             displacements( index, j );
                     }
@@ -325,7 +325,8 @@ struct ADRIntegrator
                                                        damping_denominator );
 
                 // nan check since we divide by the displacement and the
-                // velocity. Thus we can have a lot of 0s which are
+                // velocity. Furthermore, the sqrt will give a Nan for negative
+                // arguments. Thus we can have a lot of 0s which are
                 // singularities in the formula for c_damping
                 if ( Kokkos::isnan( c_damping ) )
                     c_damping = 0.;
@@ -336,28 +337,29 @@ struct ADRIntegrator
                 _damping_coefficients( index ) = c_damping;
 
                 // compute residuals
-                double velocity_denomiator = 2.0 + c_damping * _delta_t;
+                double velocity_denominator = 2.0 + c_damping * _delta_t;
                 for ( int i = 0; i < dim; ++i )
                 {
                     local_force_residual += Kokkos::pow(
-                        -forces( index, i ) + _forces_last_step( index, i ),
+                        _forces_t_minus_one( index, i ) - forces( index, i ),
                         2 );
                     local_displacement_residual += Kokkos::pow(
                         _delta_t *
                             ( ( 2.0 - c_damping * _delta_t ) *
-                                  _velocities_last_step( index, i ) +
-                              2.0 * _delta_t * forces( index, i ) / mass[i] ) /
-                            velocity_denomiator,
+                                  _velocities_t_minus_half( index, i ) +
+                              2.0 * _delta_t * forces( index, i ) /
+                                  _fictitious_mass( index, i ) ) /
+                            velocity_denominator,
                         2 );
 
                     local_displacement_denominator +=
                         Kokkos::pow( displacements( index, i ), 2 );
                 }
             },
-            _l2_force_residual, _l2_displacement_residual,
-            l2_displacement_denominator );
+            _l2_norm_force_residual, _l2_norm_displacement_residual,
+            l2_norm_displacement_denominator );
         Kokkos::fence( "ADRIntegrator::Fence::middleStep" );
-        _l2_displacement_residual /= l2_displacement_denominator;
+        _l2_norm_displacement_residual /= l2_norm_displacement_denominator;
     }
 
     template <typename ForceType, typename VelocityType,
@@ -372,30 +374,34 @@ struct ADRIntegrator
             KOKKOS_CLASS_LAMBDA( int64_t index ) {
                 // update velocity with old velocity and damping coefficient
                 double c_damping = _damping_coefficients( index );
-                double velocity_denomiator = 2.0 + c_damping * _delta_t;
+                double velocity_denominator = 2.0 + c_damping * _delta_t;
                 for ( int i = 0; i < dim; ++i )
                 {
                     // update velocity
                     velocities( index, i ) =
                         ( ( 2.0 - c_damping * _delta_t ) *
-                              _velocities_last_step( index, i ) +
+                              _velocities_t_minus_half( index, i ) +
                           2.0 * _delta_t * forces( index, i ) /
                               _fictitious_mass( index, i ) ) /
-                        velocity_denomiator;
+                        velocity_denominator;
                     // update displacement with velocity
                     displacements( index, i ) +=
                         _delta_t * velocities( index, i );
 
-                    _velocities_last_step( index, i ) = velocities( index, i );
+                    _velocities_t_minus_half( index, i ) =
+                        velocities( index, i );
                 }
             } );
         Kokkos::fence( "ADRIntegrator::Fence::finalStep" );
     }
 
-    double getForceResidual() { return Kokkos::sqrt( _l2_force_residual ); }
+    double getForceResidual()
+    {
+        return Kokkos::sqrt( _l2_norm_force_residual );
+    }
     double getDisplacementResidual()
     {
-        return Kokkos::sqrt( _l2_displacement_residual );
+        return Kokkos::sqrt( _l2_norm_displacement_residual );
     }
 };
 
@@ -535,7 +541,7 @@ struct ADRMassPMBMultiMaterialExact
 };
 
 template <typename ForcesType, typename FictitiousMassType>
-struct ADRInitialVelocity
+struct ADRStartVelocity
 {
     ForcesType _forces;
     FictitiousMassType _fictitious_mass;
@@ -550,8 +556,8 @@ struct ADRInitialVelocity
 };
 
 template <typename ForcesType, typename FictitiousMassType>
-ADRInitialVelocity( ForcesType, FictitiousMassType, double )
-    -> ADRInitialVelocity<ForcesType, FictitiousMassType>;
+ADRStartVelocity( ForcesType, FictitiousMassType, double )
+    -> ADRStartVelocity<ForcesType, FictitiousMassType>;
 
 //  S: copy NoFail field when enabling or disabling NoFail
 //  O: can be extended by inheritance/composition
@@ -673,8 +679,8 @@ auto createADRParticleIntegratorWithSimpleMass(
 {
     CabanaPD::ADRMassPMBSingleMaterial adrMass{ delta_t, horizon, delta_x, c,
                                                 safety_factor };
-    CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass, delta_t };
-    CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrInitialVelocity,
+    CabanaPD::ADRStartVelocity adrStartVelocity{ forces, adrMass, delta_t };
+    CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrStartVelocity,
                                         forces.size(), delta_t );
     CabanaPD::ParticleIntegratorWrapper particleIntegrator( integrator );
     return particleIntegrator;
@@ -694,8 +700,8 @@ auto createADRParticleIntegratorWithSimpleMass(
         adrMass{
             particleType, force_models.indexing, force_models, delta_t, horizon,
             delta_x,      safety_factor };
-    CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass, delta_t };
-    CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrInitialVelocity,
+    CabanaPD::ADRStartVelocity adrStartVelocity{ forces, adrMass, delta_t };
+    CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrStartVelocity,
                                         forces.size(), delta_t );
     CabanaPD::ParticleIntegratorWrapper particleIntegrator( integrator );
     return particleIntegrator;
@@ -714,8 +720,8 @@ auto createADRParticleIntegratorWithExactMass(
         decltype( force_models.indexing ), decltype( force_models )>
         adrMass{ exec_space,   particles, neighbors, force_models.indexing,
                  force_models, delta_t,   delta_x,   safety_factor };
-    CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass, delta_t };
-    CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrInitialVelocity,
+    CabanaPD::ADRStartVelocity adrStartVelocity{ forces, adrMass, delta_t };
+    CabanaPD::ADRIntegrator integrator( exec_space, adrMass, adrStartVelocity,
                                         forces.size(), delta_t );
     CabanaPD::ParticleIntegratorWrapper particleIntegrator( integrator );
     return particleIntegrator;
@@ -774,6 +780,9 @@ bool runUntilConvergedWithExternalIntegrator(
 
         // Update ghost particles.
         solver.comm->gatherDisplacement();
+
+        // Compute internal forces.
+        solver.updateForce();
 
         // Add force boundary condition.
         if ( boundary_condition.forceUpdate() )
