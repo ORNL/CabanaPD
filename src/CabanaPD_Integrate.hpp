@@ -832,7 +832,8 @@ bool runUntilConvergedWithExternalIntegrator(
         ++step;
         if ( step % 1000 == 0 && print_rank() )
         {
-            std::cout << "Finished " << step << " ADR steps, forceResidual "
+            std::cout << "Finished " << step << "/" << maxSteps
+                      << " ADR steps, forceResidual "
                       << integrator.getForceResidual() / grid_size
                       << ", displacementResidual "
                       << integrator.getDisplacementResidual() / grid_size
