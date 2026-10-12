@@ -169,8 +169,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
         CabanaPD::runUntilConvergedWithExternalIntegrator(
             exec_space{}, solver, particleADRIntegator, bc, time, false, 5e-1,
             1e-14, 10'000, MPI_COMM_WORLD );
-        CabanaPD::runStepWithExternalIntegratorAndOutput(
-            exec_space{}, solver, particleADRIntegator, bc, time, adrStep );
+        solver.particles.output( adrStep, time, solver.output_reference );
     }
 
     // Switch to velocity Verlet integration for the remainder of the
