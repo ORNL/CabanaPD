@@ -128,8 +128,7 @@ void testIntegratorADRSingleMass(
     double adrDeltaT = 1.0;
     CabanaPD::ADRMassPMBSingleMaterial adrMass{ adrDeltaT, 1.0, 1.0, stiffness,
                                                 5 };
-    CabanaPD::ADRInitialVelocity adrInitialVelocity{ forces, adrMass,
-                                                     adrDeltaT };
+    CabanaPD::ADRStartVelocity adrInitialVelocity{ forces, adrMass, adrDeltaT };
     CabanaPD::ADRIntegrator integrator(
         exec_space{}, adrMass, adrInitialVelocity, num_masses, adrDeltaT );
 
