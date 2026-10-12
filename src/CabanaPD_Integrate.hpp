@@ -343,17 +343,19 @@ struct ADRIntegrator
                     local_force_residual += Kokkos::pow(
                         _forces_t_minus_one( index, i ) - forces( index, i ),
                         2 );
-                    local_displacement_residual += Kokkos::pow(
+                    double local_displacement_value =
                         _delta_t *
-                            ( ( 2.0 - c_damping * _delta_t ) *
-                                  _velocities_t_minus_half( index, i ) +
-                              2.0 * _delta_t * forces( index, i ) /
-                                  _fictitious_mass( index, i ) ) /
-                            velocity_denominator,
-                        2 );
+                        ( ( 2.0 - c_damping * _delta_t ) *
+                              _velocities_t_minus_half( index, i ) +
+                          2.0 * _delta_t * forces( index, i ) /
+                              _fictitious_mass( index, i ) ) /
+                        velocity_denominator;
+                    local_displacement_residual +=
+                        Kokkos::pow( local_displacement_value, 2 );
 
-                    local_displacement_denominator +=
-                        Kokkos::pow( displacements( index, i ), 2 );
+                    local_displacement_denominator += Kokkos::pow(
+                        displacements( index, i ) + local_displacement_value,
+                        2 );
                 }
             },
             _l2_norm_force_residual, _l2_norm_displacement_residual,
