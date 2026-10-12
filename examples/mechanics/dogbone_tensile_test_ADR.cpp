@@ -293,8 +293,7 @@ void dogboneTensileTestExample( const std::string filename )
         CabanaPD::runUntilConvergedWithExternalIntegrator(
             exec_space{}, solver, particleADRIntegator, bc, time, false, 5e0,
             1e-10, 100'000, MPI_COMM_WORLD );
-        CabanaPD::runStepWithExternalIntegratorAndOutput(
-            exec_space{}, solver, particleADRIntegator, bc, time, adrStep );
+        solver.particles.output( adrStep, time, solver.output_reference );
     }
 
     // Switch to velocity Verlet integration for the remainder of the

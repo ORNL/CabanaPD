@@ -758,19 +758,6 @@ void runStepWithExternalIntegrator( ExecutionSpace const& exec_space,
 
 template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
           typename BoundaryType>
-void runStepWithExternalIntegratorAndOutput( ExecutionSpace const& exec_space,
-                                             SolverType& solver,
-                                             IntegratorType& integrator,
-                                             BoundaryType boundary_condition,
-                                             double time, unsigned step )
-{
-    runStepWithExternalIntegrator( exec_space, solver, integrator,
-                                   boundary_condition, time );
-    solver.particles.output( step, time, solver.output_reference );
-}
-
-template <typename ExecutionSpace, typename SolverType, typename IntegratorType,
-          typename BoundaryType>
 bool runUntilConvergedWithExternalIntegrator(
     ExecutionSpace const& exec_space, SolverType& solver,
     IntegratorType& integrator, BoundaryType boundary_condition, double time,
