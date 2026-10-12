@@ -149,11 +149,11 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     double time = 0.0;
     double finalTime = static_cast<double>( inputs["final_time"] );
     double adrFinalTime = 0.8 * finalTime;
-    double adrDeltaT = 0.1 * finalTime;
+    int numADRSteps = 8;
+    double adrDeltaT = adrFinalTime / numADRSteps;
     double adrThermalSubSteps = 1000;
-    int numADRSteps = adrFinalTime / adrDeltaT;
 
-    for ( int adrStep = 1; adrStep < numADRSteps; ++adrStep )
+    for ( int adrStep = 1; adrStep <= numADRSteps; ++adrStep )
     {
         time = adrDeltaT * adrStep;
         // Advance temperature via heat transfer if enabled
@@ -177,9 +177,12 @@ void thermalDeformationHeatTransferExample( const std::string filename )
         }
 
         CabanaPD::runUntilConvergedWithExternalIntegrator(
-            exec_space{}, solver, particleADRIntegator, bc, time, false, 5e-1,
+            exec_space{}, solver, particleADRIntegator, bc, time, true, 5e-1,
             1e-14, 10'000, MPI_COMM_WORLD );
         solver.particles.output( adrStep, time, solver.output_reference );
+
+        std::cout << adrStep << "/" << numADRSteps << " " << time
+                  << " via ADR integration\n";
     }
 
     // Switch to velocity Verlet integration for the remainder of the

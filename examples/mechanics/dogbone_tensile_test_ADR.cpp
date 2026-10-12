@@ -165,7 +165,7 @@ void dogboneTensileTestExample( const std::string filename )
     //                  Boundary conditions
     // ====================================================
     // Grip velocity
-    double v0 = inputs["grip_velocity"];
+    double v0 = 2.0 * static_cast<double>( inputs["grip_velocity"] );
 
     // Create region for both grips.
     CabanaPD::Region<CabanaPD::RectangularPrism> right_grip(
@@ -260,7 +260,7 @@ void dogboneTensileTestExample( const std::string filename )
     //                   ADR Integrator
     // ====================================================
     double adrSubDeltaT = 1.0;
-    auto particleADRIntegator =
+    auto particleADRIntegrator =
         CabanaPD::createADRParticleIntegratorWithSimpleMass(
             exec_space{}, f, adrSubDeltaT, horizon,
             ( high_corner[0] - low_corner[0] ) / num_cells[0],
@@ -272,25 +272,29 @@ void dogboneTensileTestExample( const std::string filename )
     //                   Simulation run
     // ====================================================
     solver.init( bc );
-    particleADRIntegator.reset( exec_space{}, particles );
+    particleADRIntegrator.reset( exec_space{}, particles );
 
     // Do large part of the simulation with ADR integration.
     double time = 0.0;
     double finalTime = static_cast<double>( inputs["final_time"] );
-    double adrFinalTime = 0.8 * finalTime;
-    double adrDeltaT = 0.1 * finalTime;
-    int numADRSteps = adrFinalTime / adrDeltaT;
+    double adrFinalTime = 0.4 * finalTime;
+    int numADRSteps = 2;
+    double adrDeltaT = adrFinalTime / numADRSteps;
 
-    for ( int adrStep = 1; adrStep < numADRSteps; ++adrStep )
+    for ( int adrStep = 1; adrStep <= numADRSteps; ++adrStep )
     {
         time = adrDeltaT * adrStep;
         // integrate using the ADR while disabling bond failure. With bond
         // failure active, we can not do large load increments (timesteps) as
         // the particles at the boundary would immediately fail.
         CabanaPD::runUntilConvergedWithExternalIntegrator(
-            exec_space{}, solver, particleADRIntegator, bc, time, true, 5e0,
+            exec_space{}, solver, particleADRIntegrator, bc, time, true, 5e2,
             1e-10, 100'000, MPI_COMM_WORLD );
+
         solver.particles.output( adrStep, time, solver.output_reference );
+
+        std::cout << adrStep << "/" << numADRSteps << " " << time
+                  << " via ADR integration\n";
     }
 
     // Switch to velocity Verlet integration for the remainder of the
