@@ -173,9 +173,9 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     }
 
     // Switch to velocity Verlet integration for the remainder of the
-    // simulation, where failure is expected.
+    // simulation to show that this is allowed.
     unsigned numVerletSteps = ( finalTime - time ) / solver.dt;
-    for ( unsigned i = 1; i < numVerletSteps; i++ )
+    for ( unsigned i = 1; i <= numVerletSteps; i++ )
     {
         int step = ( time / solver.dt ) + i;
         solver.runStep( step, bc );
