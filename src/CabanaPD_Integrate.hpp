@@ -337,7 +337,7 @@ struct ADRIntegrator
                 // compute residuals
                 double velocity_denominator = 2.0 + c_damping * _delta_t;
                 double local_displacement_denominator_squared = 0.;
-                double local_displacement_value_squared = 0.;
+                double local_displacement_update_squared = 0.;
                 double local_force_value_squared = 0.;
                 for ( int i = 0; i < dim; ++i )
                 {
@@ -351,7 +351,7 @@ struct ADRIntegrator
                           2.0 * _delta_t * forces( index, i ) /
                               _fictitious_mass( index, i ) ) /
                         velocity_denominator;
-                    local_displacement_value_squared +=
+                    local_displacement_update_squared +=
                         Kokkos::pow( local_displacement_value, 2 );
 
                     local_displacement_denominator_squared += Kokkos::pow(
@@ -362,8 +362,8 @@ struct ADRIntegrator
                 local_force_residual +=
                     Kokkos::sqrt( local_force_value_squared );
                 local_displacement_residual +=
-                    Kokkos::sqrt( local_displacement_value_squared ) /
-                    local_displacement_denominator;
+                    Kokkos::sqrt( local_displacement_update_squared /
+                                  local_displacement_denominator_squared );
             },
             _l2_norm_force_residual, _l2_norm_displacement_residual );
         Kokkos::fence( "ADRIntegrator::Fence::middleStep" );
