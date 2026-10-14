@@ -296,13 +296,11 @@ struct ADRIntegrator
                         ForceType const& forces,
                         DisplacementType const& displacements )
     {
-        double l2_norm_displacement_denominator;
         Kokkos::parallel_reduce(
             "ADRIntegrator::middleStep",
             Kokkos::RangePolicy<ExecutionSpace>( start, end ),
             KOKKOS_CLASS_LAMBDA( int64_t index, double& local_force_residual,
-                                 double& local_displacement_residual,
-                                 double& local_displacement_denominator ) {
+                                 double& local_displacement_residual ) {
                 double damping_numerator = 0.;
                 double damping_denominator = 0.;
                 // compute damping coefficient
@@ -338,9 +336,12 @@ struct ADRIntegrator
 
                 // compute residuals
                 double velocity_denominator = 2.0 + c_damping * _delta_t;
+                double local_displacement_denominator_squared = 0.;
+                double local_displacement_value_squared = 0.;
+                double local_force_value_squared = 0.;
                 for ( int i = 0; i < dim; ++i )
                 {
-                    local_force_residual += Kokkos::pow(
+                    local_force_value_squared += Kokkos::pow(
                         _forces_t_minus_one( index, i ) - forces( index, i ),
                         2 );
                     double local_displacement_value =
@@ -350,18 +351,22 @@ struct ADRIntegrator
                           2.0 * _delta_t * forces( index, i ) /
                               _fictitious_mass( index, i ) ) /
                         velocity_denominator;
-                    local_displacement_residual +=
+                    local_displacement_value_squared +=
                         Kokkos::pow( local_displacement_value, 2 );
 
-                    local_displacement_denominator += Kokkos::pow(
+                    local_displacement_denominator_squared += Kokkos::pow(
                         displacements( index, i ) + local_displacement_value,
                         2 );
                 }
+
+                local_force_residual +=
+                    Kokkos::sqrt( local_force_value_squared );
+                local_displacement_residual +=
+                    Kokkos::sqrt( local_displacement_value_squared ) /
+                    local_displacement_denominator;
             },
-            _l2_norm_force_residual, _l2_norm_displacement_residual,
-            l2_norm_displacement_denominator );
+            _l2_norm_force_residual, _l2_norm_displacement_residual );
         Kokkos::fence( "ADRIntegrator::Fence::middleStep" );
-        _l2_norm_displacement_residual /= l2_norm_displacement_denominator;
     }
 
     template <typename ForceType, typename VelocityType,
@@ -397,14 +402,8 @@ struct ADRIntegrator
         Kokkos::fence( "ADRIntegrator::Fence::finalStep" );
     }
 
-    double getForceResidual()
-    {
-        return Kokkos::sqrt( _l2_norm_force_residual );
-    }
-    double getDisplacementResidual()
-    {
-        return Kokkos::sqrt( _l2_norm_displacement_residual );
-    }
+    double getForceResidual() { return _l2_norm_force_residual; }
+    double getDisplacementResidual() { return _l2_norm_displacement_residual; }
 };
 
 struct ADRMassPMBSingleMaterial
