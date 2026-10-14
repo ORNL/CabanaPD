@@ -809,7 +809,7 @@ bool runUntilConvergedWithExternalIntegrator(
         if ( !boundary_condition.forceUpdate() )
             boundary_condition.apply( exec_space, solver.particles, time );
 
-        MPI_Allreduce( &local_done, &global_done, 1, MPI_INT, MPI_MAX, comm );
+        MPI_Allreduce( &local_done, &global_done, 1, MPI_INT, MPI_MIN, comm );
         if ( global_done )
             break;
 
