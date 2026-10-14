@@ -58,7 +58,7 @@ void testIntegratorReversibility( int steps )
     Cabana::deep_copy( x_init, x );
 
     // Integrate one step
-    for ( int s = 0; s < steps; ++s )
+    for ( int step = 0; step < steps; ++steps )
     {
         integrator.initialHalfStep( exec_space{}, particles );
         integrator.finalHalfStep( exec_space{}, particles );
@@ -74,7 +74,7 @@ void testIntegratorReversibility( int steps )
         } );
 
     // Integrate back
-    for ( int s = 0; s < steps; ++s )
+    for ( int step = 0; step < steps; ++step )
     {
         integrator.initialHalfStep( exec_space{}, particles );
         integrator.finalHalfStep( exec_space{}, particles );
@@ -137,7 +137,7 @@ void testIntegratorADRSingleMass(
     const std::size_t size = forces.extent( 0 );
     if constexpr ( GoBySteps )
     {
-        for ( int s = 0; s < steps; ++s )
+        for ( int step = 0; step < steps; ++step )
         {
             integrator.initialSubStep( exec_space{}, 0, size, forces );
             Kokkos::parallel_for( "testIntegrateADRSingleMass::update_forces",
@@ -229,7 +229,7 @@ void testIntegratorADRparticles(
     if constexpr ( GoBySteps )
     {
         // Integrate one step
-        for ( int s = 0; s < steps; ++s )
+        for ( int step = 0; step < steps; ++step )
         {
             particleIntegrator.initialSubStep( exec_space{}, particles );
             Kokkos::parallel_for( "testIntegrateADRParticles::update_forces",
@@ -330,7 +330,7 @@ void testIntegratorADRparticlesMultiMaterialSimpleMass(
     particleIntegrator.reset( exec_space{}, particles );
     if constexpr ( GoBySteps )
     {
-        for ( int s = 0; s < steps; ++s )
+        for ( int step = 0; step < steps; ++step )
         {
             particleIntegrator.initialSubStep( exec_space{}, particles );
             Kokkos::parallel_for(
@@ -435,7 +435,7 @@ void testIntegratorADRparticlesMultiMaterialExactMass(
     particleIntegrator.reset( exec_space{}, particles );
     if constexpr ( GoBySteps )
     {
-        for ( int s = 0; s < steps; ++s )
+        for ( int step = 0; step < steps; ++step )
         {
             particleIntegrator.initialSubStep( exec_space{}, particles );
             Kokkos::parallel_for(
