@@ -330,8 +330,8 @@ struct ADRIntegrator
                 // singularities in the formula for c_damping
                 if ( Kokkos::isnan( c_damping ) )
                     c_damping = 0.;
-                if ( c_damping >= 2.0 )
-                    c_damping = 1.9;
+                if ( c_damping * _delta_t > 2.0 )
+                    c_damping = 1.9 / _delta_t;
 
                 // store damping coefficient for final sub-step
                 _damping_coefficients( index ) = c_damping;
