@@ -58,7 +58,7 @@ void testIntegratorReversibility( int steps )
     Cabana::deep_copy( x_init, x );
 
     // Integrate one step
-    for ( int step = 0; step < steps; ++steps )
+    for ( int step = 0; step < steps; ++step )
     {
         integrator.initialHalfStep( exec_space{}, particles );
         integrator.finalHalfStep( exec_space{}, particles );
@@ -509,8 +509,8 @@ TEST( TEST_CATEGORY, test_integrate_ADR_particles_multi_material_simple_mass )
 TEST( TEST_CATEGORY, test_integrate_ADR_particles_multi_material_exact_mass )
 {
     // this seems to have a hard time to get to 1e-10
-    testIntegratorADRparticlesMultiMaterialExactMass<true>( 6000, 1e-7, 1e-4 );
-    testIntegratorADRparticlesMultiMaterialExactMass<false>( 6000, 1e-7, 1e-4 );
+    testIntegratorADRparticlesMultiMaterialExactMass<true>( 7000, 1e-7, 1e-4 );
+    testIntegratorADRparticlesMultiMaterialExactMass<false>( 7000, 1e-7, 1e-4 );
 }
 
 //---------------------------------------------------------------------------//
