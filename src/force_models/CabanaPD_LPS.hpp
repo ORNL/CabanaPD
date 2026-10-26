@@ -129,8 +129,8 @@ struct MechanicsModel<LPS, Elastic, FunctorK, FunctorG> : public BaseForceModel
     {
         auto influence = ( *this )( influence_tag, xi );
         double theta_coeff_i = 3.0 * K( i ) - 5.0 * G( i );
-        double theta_coeff_j = 15.0 * G( i );
-        double s_coeff_i = 3.0 * K( j ) - 5.0 * G( j );
+        double theta_coeff_j = 3.0 * K( j ) - 5.0 * G( j );
+        double s_coeff_i = 15.0 * G( i );
         double s_coeff_j = 15.0 * G( j );
 
         return ( theta_coeff_i * theta_i / m_i + theta_coeff_j * theta_j / m_j +
