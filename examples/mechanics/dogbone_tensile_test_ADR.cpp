@@ -288,7 +288,7 @@ void dogboneTensileTestExample( const std::string filename )
         // failure active, we can not do large load increments (timesteps) as
         // the particles at the boundary would immediately fail.
         CabanaPD::runUntilConvergedWithExternalIntegrator(
-            exec_space{}, solver, particleADRIntegrator, bc, time, true, 5e2,
+            exec_space{}, solver, particleADRIntegrator, bc, time, true, 1e-6,
             1e-10, 100'000, MPI_COMM_WORLD );
 
         solver.particles.output( adrStep, time, solver.output_reference );
