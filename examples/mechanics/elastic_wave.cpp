@@ -36,7 +36,7 @@ void elasticWaveExample( const std::string filename )
     //                Material parameters
     // ====================================================
     double rho0 = inputs["density"];
-    auto K = inputs["bulk_modulus"];
+    double K = inputs["bulk_modulus"];
     double G = inputs["shear_modulus"];
     double horizon = inputs["horizon"];
     horizon += 1e-10;
