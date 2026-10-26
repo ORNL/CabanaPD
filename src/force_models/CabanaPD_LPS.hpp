@@ -20,8 +20,8 @@
 
 namespace CabanaPD
 {
-template <>
-struct MechanicsModel<LPS, Elastic> : public BaseForceModel
+template <typename FunctorK, typename FunctorG>
+struct MechanicsModel<LPS, Elastic, FunctorK, FunctorG> : public BaseForceModel
 {
     using base_type = BaseForceModel;
     using thermal_type = TemperatureIndependent;
@@ -34,56 +34,54 @@ struct MechanicsModel<LPS, Elastic> : public BaseForceModel
     int influence_type;
     InfluenceFunctionTag influence_tag;
 
-    using base_type::K;
-    double G;
-    // Store coefficients for multi-material systems.
-    // TODO: this currently only supports bi-material systems.
-    Kokkos::Array<double, 2> theta_coeff;
-    Kokkos::Array<double, 2> s_coeff;
+    PropertyWrapper<FunctorK> K;
+    PropertyWrapper<FunctorG> G;
 
-    MechanicsModel( LPS tag, Elastic, const double _force_horizon,
+    MechanicsModel( LPS tag, Elastic mech, const double _force_horizon,
                     const double _K, const double _G, const int _influence = 0 )
-        : MechanicsModel( tag, _force_horizon, _K, _G, _influence )
+        : MechanicsModel( tag, mech, _force_horizon, ConstantProperty( _K ),
+                          ConstantProperty( _G ), _influence )
     {
     }
 
-    MechanicsModel( LPS, const double _force_horizon, const double _K,
+    MechanicsModel( LPS tag, const double _force_horizon, const double _K,
                     const double _G, const int _influence = 0 )
-        : base_type( _force_horizon, _K )
-        , influence_type( _influence )
-        , G( _G )
+        : MechanicsModel( tag, Elastic{}, _force_horizon,
+                          ConstantProperty( _K ), ConstantProperty( _G ),
+                          _influence )
     {
-        init();
+    }
+
+    MechanicsModel( LPS tag, const double _force_horizon, const FunctorK _K,
+                    const FunctorG _G, const int _influence = 0 )
+        : MechanicsModel( tag, Elastic{}, _force_horizon, _K, _G, _influence )
+    {
+    }
+
+    MechanicsModel( LPS, Elastic, const double _force_horizon,
+                    const FunctorK _K, const FunctorG _G,
+                    const int _influence = 0 )
+        : base_type( _force_horizon )
+        , influence_type( _influence )
+        , K( PropertyWrapper( _K ) )
+        , G( PropertyWrapper( _G ) )
+    {
+        if ( influence_type > 1 || influence_type < 0 )
+            log_err( std::cout, "Influence function type must be 0 or 1." );
     }
 
     // Constructor to average from existing models.
     template <typename ModelType1, typename ModelType2>
     MechanicsModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
+        , influence_type( model1.influenceType() )
+        , K( AveragePropertyWrapper( model1.K, model2.K ) )
+        , G( AveragePropertyWrapper( model1.G, model2.G ) )
     {
-        G = ( model1.G + model2.G ) / 2.0;
-        theta_coeff[0] = 3.0 * model1.K - 5.0 * model1.G;
-        s_coeff[0] = 15.0 * model1.G;
-        theta_coeff[1] = 3.0 * model2.K - 5.0 * model2.G;
-        s_coeff[1] = 15.0 * model2.G;
-
-        influence_type = model1.influenceType();
         if ( model2.influenceType() != model1.influenceType() )
             log_err( std::cout,
                      "Influence function type for each model must match for "
                      "multi-material systems" );
-    }
-
-    void init()
-    {
-        theta_coeff[0] = 3.0 * K - 5.0 * G;
-        s_coeff[0] = 15.0 * G;
-        // Set extra coefficients for multi-material.
-        theta_coeff[1] = theta_coeff[0];
-        s_coeff[1] = s_coeff[0];
-
-        if ( influence_type > 1 || influence_type < 0 )
-            log_err( std::cout, "Influence function type must be 0 or 1." );
     }
 
     KOKKOS_FUNCTION
@@ -122,18 +120,18 @@ struct MechanicsModel<LPS, Elastic> : public BaseForceModel
         return 3.0 * theta_i / m_i;
     }
 
-    KOKKOS_INLINE_FUNCTION auto operator()( ForceCoeffTag, const int, const int,
-                                            const double s, const double xi,
-                                            const double vol, const double m_i,
-                                            const double m_j,
+    KOKKOS_INLINE_FUNCTION auto operator()( ForceCoeffTag, const int i,
+                                            const int j, const double s,
+                                            const double xi, const double vol,
+                                            const double m_i, const double m_j,
                                             const double theta_i,
                                             const double theta_j ) const
     {
         auto influence = ( *this )( influence_tag, xi );
-        double theta_coeff_i = theta_coeff[0];
-        double theta_coeff_j = theta_coeff[1];
-        double s_coeff_i = s_coeff[0];
-        double s_coeff_j = s_coeff[1];
+        double theta_coeff_i = 3.0 * K( i ) - 5.0 * G( i );
+        double theta_coeff_j = 3.0 * K( j ) - 5.0 * G( j );
+        double s_coeff_i = 15.0 * G( i );
+        double s_coeff_j = 15.0 * G( j );
 
         return ( theta_coeff_i * theta_i / m_i + theta_coeff_j * theta_j / m_j +
                  s * ( s_coeff_i / m_i + s_coeff_j / m_j ) ) *
@@ -141,24 +139,25 @@ struct MechanicsModel<LPS, Elastic> : public BaseForceModel
     }
 
     KOKKOS_INLINE_FUNCTION
-    auto operator()( EnergyTag, const int, const int, const double s,
+    auto operator()( EnergyTag, const int i, const int, const double s,
                      const double xi, const double vol, const double m_i,
                      const double theta_i, const double num_bonds ) const
     {
         auto influence = ( *this )( influence_tag, xi );
 
-        double theta_coeff_i = theta_coeff[0];
-        double s_coeff_i = s_coeff[0];
+        double theta_coeff_i = 3.0 * K( i ) - 5.0 * G( i );
+        double s_coeff_i = 15.0 * G( i );
         return 1.0 / num_bonds * 0.5 * theta_coeff_i / 3.0 *
                    ( theta_i * theta_i ) +
                0.5 * ( s_coeff_i / m_i ) * influence * s * s * xi * xi * vol;
     }
 };
 
-template <>
-struct MechanicsModel<LinearLPS, Elastic> : public MechanicsModel<LPS, Elastic>
+template <typename FunctorK, typename FunctorG>
+struct MechanicsModel<LinearLPS, Elastic, FunctorK, FunctorG>
+    : public MechanicsModel<LPS, Elastic, FunctorK, FunctorG>
 {
-    using base_type = MechanicsModel<LPS, Elastic>;
+    using base_type = MechanicsModel<LPS, Elastic, FunctorK, FunctorG>;
     // Tag to dispatch to force iteration.
     using force_tag = LinearLPS;
 
@@ -176,11 +175,20 @@ struct MechanicsModel<LinearLPS, Elastic> : public MechanicsModel<LPS, Elastic>
 template <typename ModelType>
 MechanicsModel( ModelType, const double force_horizon, const double K,
                 const double G, const int _influence = 0 )
-    -> MechanicsModel<ModelType, Elastic>;
+    -> MechanicsModel<ModelType, Elastic, ConstantProperty, ConstantProperty>;
 template <typename ModelType>
 MechanicsModel( ModelType, Elastic, const double force_horizon, const double K,
                 const double G, const int _influence = 0 )
-    -> MechanicsModel<ModelType, Elastic>;
+    -> MechanicsModel<ModelType, Elastic, ConstantProperty, ConstantProperty>;
+
+template <typename ModelType, typename FunctorK, typename FunctorG>
+MechanicsModel( ModelType, const double force_horizon, const FunctorK K,
+                const FunctorG G, const int _influence = 0 )
+    -> MechanicsModel<ModelType, Elastic, FunctorK, FunctorG>;
+template <typename ModelType, typename FunctorK, typename FunctorG>
+MechanicsModel( ModelType, Elastic, const double force_horizon,
+                const FunctorK K, const FunctorG G, const int _influence = 0 )
+    -> MechanicsModel<ModelType, Elastic, FunctorK, FunctorG>;
 
 } // namespace CabanaPD
 
