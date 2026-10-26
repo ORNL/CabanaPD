@@ -23,6 +23,11 @@ struct NoFracture
 struct Fracture
 {
 };
+struct CriticalStretch
+{
+    using base_type = Fracture;
+};
+
 template <class, class SFINAE = void>
 struct is_fracture : public std::false_type
 {
@@ -31,11 +36,14 @@ template <>
 struct is_fracture<Fracture> : public std::true_type
 {
 };
+template <>
+struct is_fracture<CriticalStretch> : public std::true_type
+{
+};
 template <typename ModelType>
-struct is_fracture<
-    ModelType,
-    typename std::enable_if<( std::is_same<typename ModelType::fracture_type,
-                                           Fracture>::value )>::type>
+struct is_fracture<ModelType, typename std::enable_if<(
+                                  std::is_same<typename ModelType::fracture_tag,
+                                               Fracture>::value )>::type>
     : public std::true_type
 {
 };
@@ -161,6 +169,19 @@ struct LinearLPS
 };
 
 template <typename T>
+struct is_model_tag : public std::false_type
+{
+};
+template <>
+struct is_model_tag<PMB> : public std::true_type
+{
+};
+template <>
+struct is_model_tag<LPS> : public std::true_type
+{
+};
+
+template <typename T>
 struct is_symmetric : public std::false_type
 {
 };
@@ -200,7 +221,7 @@ struct NoContact
     using model_tag = std::false_type;
     using force_tag = std::false_type;
     using thermal_type = TemperatureIndependent;
-    using fracture_type = NoFracture;
+    using fracture_tag = NoFracture;
 };
 template <class, class SFINAE = void>
 struct is_contact : public std::false_type

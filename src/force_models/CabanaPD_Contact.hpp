@@ -54,8 +54,8 @@ struct ContactModel
 struct NormalRepulsionModel : public ContactModel
 {
     using base_type = ContactModel;
-    using fracture_type = NoFracture;
-    using thermal_type = TemperatureIndependent;
+    using fracture_tag = NoFracture;
+    using thermal_tag = TemperatureIndependent;
     // Tag to dispatch to force iteration.
     using force_tag = NormalRepulsionModel;
 
