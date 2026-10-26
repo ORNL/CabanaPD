@@ -288,7 +288,7 @@ struct ThermalModel<TemperatureDependent, TemperatureType, NoFracture,
     using needs_update = std::true_type;
     using fracture_tag = NoFracture;
 
-    Property<FunctorType> alpha;
+    PropertyWrapper<FunctorType> alpha;
     double temp0;
 
     // Temperature field
@@ -302,7 +302,7 @@ struct ThermalModel<TemperatureDependent, TemperatureType, NoFracture,
 
     ThermalModel( const TemperatureType _temp, const FunctorType _alpha,
                   const double _temp0 )
-        : alpha( Property( _alpha ) )
+        : alpha( PropertyWrapper( _alpha ) )
         , temp0( _temp0 )
         , temperature( _temp )
     {
@@ -310,7 +310,7 @@ struct ThermalModel<TemperatureDependent, TemperatureType, NoFracture,
 
     template <typename ModelType1, typename ModelType2>
     ThermalModel( const ModelType1& model1, const ModelType2& model2 )
-        : alpha( AverageProperty( model1.alpha, model2.alpha ) )
+        : alpha( AveragePropertyWrapper( model1.alpha, model2.alpha ) )
     {
         static_assert( std::is_same_v<decltype( model1.temperature ),
                                       decltype( model2.temperature )>,
@@ -361,7 +361,7 @@ struct ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
     using base_type::operator();
     using fracture_tag = Fracture;
 
-    Property<FunctorStretch> s0;
+    PropertyWrapper<FunctorStretch> s0;
     using base_type::alpha;
     using base_type::temp0;
     using base_type::temperature;
@@ -376,14 +376,14 @@ struct ThermalModel<TemperatureDependent, TemperatureType, CriticalStretch,
     ThermalModel( const FunctorStretch _s0, const TemperatureType _temp,
                   const FunctorAlpha _alpha, const double _temp0 )
         : base_type( _temp, _alpha, _temp0 )
-        , s0( Property( _s0 ) )
+        , s0( PropertyWrapper( _s0 ) )
     {
     }
 
     template <typename ModelType1, typename ModelType2>
     ThermalModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
-        , s0( AverageProperty( model1.s0, model2.s0 ) )
+        , s0( AveragePropertyWrapper( model1.s0, model2.s0 ) )
     {
     }
 
@@ -420,8 +420,8 @@ struct BaseDynamicTemperatureModel
 
     double thermal_horizon;
     double thermal_coeff;
-    Property<FunctorConductivity> kappa;
-    Property<FunctorHeatCapacity> cp;
+    PropertyWrapper<FunctorConductivity> kappa;
+    PropertyWrapper<FunctorHeatCapacity> cp;
     bool constant_microconductivity;
 
     explicit BaseDynamicTemperatureModel(
@@ -438,8 +438,8 @@ struct BaseDynamicTemperatureModel
                                  FunctorHeatCapacity _cp,
                                  const bool _constant_microconductivity = true )
         : thermal_horizon( _thermal_horizon )
-        , kappa( Property( _kappa ) )
-        , cp( Property( _cp ) )
+        , kappa( PropertyWrapper( _kappa ) )
+        , cp( PropertyWrapper( _cp ) )
     {
         const double d3 =
             _thermal_horizon * _thermal_horizon * _thermal_horizon;
@@ -451,8 +451,8 @@ struct BaseDynamicTemperatureModel
     template <typename ModelType1, typename ModelType2>
     BaseDynamicTemperatureModel( const ModelType1& model1,
                                  const ModelType2& model2 )
-        : kappa( AverageProperty( model1.kappa, model2.kappa ) )
-        , cp( AverageProperty( model1.cp, model2.cp ) )
+        : kappa( AveragePropertyWrapper( model1.kappa, model2.kappa ) )
+        , cp( AveragePropertyWrapper( model1.cp, model2.cp ) )
     {
         constant_microconductivity = model1.constant_microconductivity;
         thermal_horizon = model1.thermal_horizon;

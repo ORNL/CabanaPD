@@ -34,8 +34,8 @@ struct MechanicsModel<LPS, Elastic, FunctorK, FunctorG> : public BaseForceModel
     int influence_type;
     InfluenceFunctionTag influence_tag;
 
-    Property<FunctorK> K;
-    Property<FunctorG> G;
+    PropertyWrapper<FunctorK> K;
+    PropertyWrapper<FunctorG> G;
 
     MechanicsModel( LPS tag, Elastic mech, const double _force_horizon,
                     const double _K, const double _G, const int _influence = 0 )
@@ -63,8 +63,8 @@ struct MechanicsModel<LPS, Elastic, FunctorK, FunctorG> : public BaseForceModel
                     const int _influence = 0 )
         : base_type( _force_horizon )
         , influence_type( _influence )
-        , K( Property( _K ) )
-        , G( Property( _G ) )
+        , K( PropertyWrapper( _K ) )
+        , G( PropertyWrapper( _G ) )
     {
         if ( influence_type > 1 || influence_type < 0 )
             log_err( std::cout, "Influence function type must be 0 or 1." );
@@ -74,8 +74,8 @@ struct MechanicsModel<LPS, Elastic, FunctorK, FunctorG> : public BaseForceModel
     template <typename ModelType1, typename ModelType2>
     MechanicsModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
-        , K( AverageProperty( model1.K, model2.K ) )
-        , G( AverageProperty( model1.G, model2.G ) )
+        , K( AveragePropertyWrapper( model1.K, model2.K ) )
+        , G( AveragePropertyWrapper( model1.G, model2.G ) )
     {
         influence_type = model1.influenceType();
         if ( model2.influenceType() != model1.influenceType() )

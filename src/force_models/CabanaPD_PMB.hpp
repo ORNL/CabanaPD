@@ -32,7 +32,7 @@ struct MechanicsModel<PMB, Elastic, FunctorType> : public BaseForceModel
     using force_tag = PMB;
 
     using base_type::force_horizon;
-    Property<FunctorType> K;
+    PropertyWrapper<FunctorType> K;
     double c_factor;
 
     MechanicsModel( PMB tag, Elastic mech, const double force_horizon,
@@ -54,7 +54,7 @@ struct MechanicsModel<PMB, Elastic, FunctorType> : public BaseForceModel
     MechanicsModel( PMB, Elastic, const double force_horizon,
                     const FunctorType _K )
         : base_type( force_horizon )
-        , K( Property( _K ) )
+        , K( PropertyWrapper( _K ) )
     {
         c_factor = 18.0 / ( pi * force_horizon * force_horizon * force_horizon *
                             force_horizon );
@@ -64,7 +64,7 @@ struct MechanicsModel<PMB, Elastic, FunctorType> : public BaseForceModel
     template <typename ModelType1, typename ModelType2>
     MechanicsModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
-        , K( AverageProperty( model1.K, model2.K ) )
+        , K( AveragePropertyWrapper( model1.K, model2.K ) )
     {
         c_factor = model1.c_factor;
     }
@@ -117,7 +117,7 @@ struct MechanicsModel<PMB, ElasticPerfectlyPlastic, FunctorModulus,
     using mechanics_type = ElasticPerfectlyPlastic;
 
     using base_plasticity_type::_s_p;
-    Property<FunctorYield> s_Y;
+    PropertyWrapper<FunctorYield> s_Y;
 
     using base_plasticity_type::updateBonds;
 
@@ -134,7 +134,7 @@ struct MechanicsModel<PMB, ElasticPerfectlyPlastic, FunctorModulus,
                     const FunctorYield _s_Y )
         : base_type( tag, force_horizon, K )
         , base_plasticity_type()
-        , s_Y( Property( _s_Y ) )
+        , s_Y( PropertyWrapper( _s_Y ) )
     {
     }
 
@@ -143,7 +143,7 @@ struct MechanicsModel<PMB, ElasticPerfectlyPlastic, FunctorModulus,
     MechanicsModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
         , base_plasticity_type()
-        , s_Y( AverageProperty( model1.s_Y, model2.s_Y ) )
+        , s_Y( AveragePropertyWrapper( model1.s_Y, model2.s_Y ) )
     {
     }
 

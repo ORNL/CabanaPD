@@ -17,22 +17,22 @@
 namespace CabanaPD
 {
 template <typename FunctorType>
-struct Property;
+struct PropertyWrapper;
 
 template <typename FunctorType1, typename FunctorType2>
-struct AverageProperty;
+struct AveragePropertyWrapper;
 
 template <typename FunctorType>
-struct Property
+struct PropertyWrapper
 {
-    Property( const FunctorType p )
+    PropertyWrapper( const FunctorType p )
         : prop( p )
     {
     }
 
     template <typename PropertyType1, typename PropertyType2>
-    Property( const PropertyType1 p1, const PropertyType2 p2 )
-        : prop( AverageProperty( p1, p2 ) )
+    PropertyWrapper( const PropertyType1 p1, const PropertyType2 p2 )
+        : prop( AveragePropertyWrapper( p1, p2 ) )
     {
     }
 
@@ -49,12 +49,12 @@ struct Property
 };
 
 template <typename FunctorType1, typename FunctorType2>
-struct AverageProperty : public Property<FunctorType1>
+struct AveragePropertyWrapper : public PropertyWrapper<FunctorType1>
 {
-    using base_type = Property<FunctorType1>;
+    using base_type = PropertyWrapper<FunctorType1>;
 
-    AverageProperty( const Property<FunctorType1> f1,
-                     const Property<FunctorType2> f2 )
+    AveragePropertyWrapper( const PropertyWrapper<FunctorType1> f1,
+                            const PropertyWrapper<FunctorType2> f2 )
         : base_type( f1.prop )
         , prop2( f2.prop )
     {
@@ -105,7 +105,6 @@ struct PropertyDependence
     }
 
     // Update with new temperature field.
-
     ParticleField field;
 };
 
