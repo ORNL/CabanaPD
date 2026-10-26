@@ -291,16 +291,26 @@ struct ADRIntegrator
         Kokkos::fence( "ADRIntegrator::Fence::intialStep" );
     }
 
-    template <typename ForceType, typename DisplacementType>
+    template <typename ForceType, typename DisplacementType,
+              typename VolumeType>
     void middleSubStep( ExecutionSpace, const int start, const int end,
                         ForceType const& forces,
-                        DisplacementType const& displacements )
+                        DisplacementType const& displacements,
+                        VolumeType const& volume )
     {
+        double l2_norm_force_update = 0.0;
+        double l2_norm_force_denominator = 0.0;
+        double l2_norm_displacement_update = 0.0;
+        double l2_norm_displacement_denominator = 0.0;
+
         Kokkos::parallel_reduce(
             "ADRIntegrator::middleStep",
             Kokkos::RangePolicy<ExecutionSpace>( start, end ),
-            KOKKOS_CLASS_LAMBDA( int64_t index, double& local_force_residual,
-                                 double& local_displacement_residual ) {
+            KOKKOS_CLASS_LAMBDA(
+                int64_t index, double& local_l2_norm_force_update,
+                double& local_l2_norm_force_denominator,
+                double& local_l2_norm_displacement_update,
+                double& local_l2_norm_displacement_denominator ) {
                 double damping_numerator = 0.;
                 double damping_denominator = 0.;
                 // compute damping coefficient
@@ -308,13 +318,14 @@ struct ADRIntegrator
                 {
                     for ( int j = 0; j < dim; ++j )
                     {
-                        damping_numerator +=
-                            ( -forces( index, i ) +
-                              _forces_t_minus_one( index, i ) ) /
-                            ( _fictitious_mass( index, i ) * _delta_t *
-                              _velocities_t_minus_half( index, j ) ) *
-                            displacements( index, i ) *
-                            displacements( index, j );
+                        if ( _velocities_t_minus_half( index, j ) != 0.0 )
+                            damping_numerator +=
+                                ( -forces( index, i ) +
+                                  _forces_t_minus_one( index, i ) ) /
+                                ( _fictitious_mass( index, i ) * _delta_t *
+                                  _velocities_t_minus_half( index, j ) ) *
+                                displacements( index, i ) *
+                                displacements( index, j );
                     }
                     damping_denominator +=
                         displacements( index, i ) * displacements( index, i );
@@ -328,22 +339,25 @@ struct ADRIntegrator
                 // singularities in the formula for c_damping
                 if ( Kokkos::isnan( c_damping ) )
                     c_damping = 0.;
-                if ( c_damping * _delta_t > 2.0 )
-                    c_damping = 1.9 / _delta_t;
+                if ( c_damping > 4.0 )
+                    c_damping = 2.0 * 1.9;
 
                 // store damping coefficient for final sub-step
                 _damping_coefficients( index ) = c_damping;
 
                 // compute residuals
                 double velocity_denominator = 2.0 + c_damping * _delta_t;
-                double local_displacement_denominator_squared = 0.;
-                double local_displacement_update_squared = 0.;
-                double local_force_value_squared = 0.;
                 for ( int i = 0; i < dim; ++i )
                 {
-                    local_force_value_squared += Kokkos::pow(
-                        _forces_t_minus_one( index, i ) - forces( index, i ),
-                        2 );
+                    local_l2_norm_force_update +=
+                        Kokkos::pow( _forces_t_minus_one( index, i ) -
+                                         forces( index, i ),
+                                     2 ) *
+                        volume( index );
+                    local_l2_norm_force_denominator +=
+                        Kokkos::pow( _forces_t_minus_one( index, i ), 2 ) *
+                        volume( index );
+
                     double local_displacement_value =
                         _delta_t *
                         ( ( 2.0 - c_damping * _delta_t ) *
@@ -351,22 +365,22 @@ struct ADRIntegrator
                           2.0 * _delta_t * forces( index, i ) /
                               _fictitious_mass( index, i ) ) /
                         velocity_denominator;
-                    local_displacement_update_squared +=
+
+                    local_l2_norm_displacement_update +=
                         Kokkos::pow( local_displacement_value, 2 );
 
-                    local_displacement_denominator_squared += Kokkos::pow(
+                    local_l2_norm_displacement_denominator += Kokkos::pow(
                         displacements( index, i ) + local_displacement_value,
                         2 );
                 }
-
-                local_force_residual +=
-                    Kokkos::sqrt( local_force_value_squared );
-                local_displacement_residual +=
-                    Kokkos::sqrt( local_displacement_update_squared /
-                                  local_displacement_denominator_squared );
             },
-            _l2_norm_force_residual, _l2_norm_displacement_residual );
+            l2_norm_force_update, l2_norm_force_denominator,
+            l2_norm_displacement_update, l2_norm_displacement_denominator );
         Kokkos::fence( "ADRIntegrator::Fence::middleStep" );
+        _l2_norm_force_residual =
+            Kokkos::sqrt( l2_norm_force_update / l2_norm_force_denominator );
+        _l2_norm_displacement_residual = Kokkos::sqrt(
+            l2_norm_displacement_update / l2_norm_displacement_denominator );
     }
 
     template <typename ForceType, typename VelocityType,
@@ -647,10 +661,11 @@ struct ParticleIntegratorWrapper
     {
         auto forces = particles.sliceForce();
         auto displacements = particles.sliceDisplacement();
+        auto volume = particles.sliceVolume();
         auto start = particles.numFrozen();
         auto end = particles.localOffset();
         _integrator.middleSubStep( exec_space, start, end, forces,
-                                   displacements );
+                                   displacements, volume );
     }
 
     template <typename ExecutionSpace, typename ParticleType>
@@ -774,7 +789,6 @@ bool runUntilConvergedWithExternalIntegrator(
     int step = 0;
     int local_done = 0;
     int global_done = 0;
-    const auto grid_size = solver.particles.gridSize();
     while ( step < maxSteps )
     {
         integrator.initialSubStep( exec_space, solver.particles );
@@ -795,9 +809,8 @@ bool runUntilConvergedWithExternalIntegrator(
         // that originates from displacement boundaries only being applied after
         // we did the first step
         if ( step < 2 ||
-             !( integrator.getForceResidual() < forceTolerance * grid_size ||
-                integrator.getDisplacementResidual() <
-                    displacementTolerance * grid_size ) )
+             !( integrator.getForceResidual() < forceTolerance ||
+                integrator.getDisplacementResidual() < displacementTolerance ) )
         {
             integrator.finalSubStep( exec_space, solver.particles );
         }
@@ -819,10 +832,9 @@ bool runUntilConvergedWithExternalIntegrator(
         {
             std::cout << "Finished " << step << "/" << maxSteps
                       << " ADR steps, forceResidual "
-                      << integrator.getForceResidual() / grid_size
+                      << integrator.getForceResidual()
                       << ", displacementResidual "
-                      << integrator.getDisplacementResidual() / grid_size
-                      << "\n";
+                      << integrator.getDisplacementResidual() << "\n";
         }
         if ( step == maxSteps && print_rank() )
         {
@@ -833,9 +845,8 @@ bool runUntilConvergedWithExternalIntegrator(
 
     if ( step < maxSteps && print_rank() )
         std::cout << "Converged after " << step << " steps, forceResidual "
-                  << integrator.getForceResidual() / grid_size
-                  << ", displacementResidual "
-                  << integrator.getDisplacementResidual() / grid_size << "\n";
+                  << integrator.getForceResidual() << ", displacementResidual "
+                  << integrator.getDisplacementResidual() << "\n";
 
     if ( noFail )
     {
