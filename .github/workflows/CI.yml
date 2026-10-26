@@ -104,6 +104,7 @@ jobs:
             -D CMAKE_PREFIX_PATH="$HOME/Cabana" \
             -D MPIEXEC_MAX_NUMPROCS=2 \
             -D MPIEXEC_PREFLAGS="--oversubscribe" \
+            -D CMAKE_CXX_CLANG_TIDY="clang-tidy;-warnings-as-errors=*" \
             ${cmake_opts[@]}
           cmake --build build --parallel 2
           cmake --install build
