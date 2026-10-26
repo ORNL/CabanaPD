@@ -172,8 +172,8 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
 
     void domain( std::array<double, dim> low_corner,
                  std::array<double, dim> high_corner,
-                 const std::array<int, dim> num_cells,
-                 const int max_halo_width )
+                 const std::array<int, dim> num_cells, const int max_halo_width,
+                 std::array<bool, dim> is_periodic = { false, false, false } )
     {
         _init_timer.start();
         halo_width = max_halo_width;
@@ -187,11 +187,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
         for ( int d = 0; d < 3; d++ )
             dx[d] = global_mesh->cellSize( d );
 
-        std::array<bool, dim> is_periodic;
         for ( int d = 0; d < dim; d++ )
         {
             global_mesh_ext[d] = global_mesh->extent( d );
-            is_periodic[d] = false;
         }
         // Create the global grid.
         auto global_grid = Cabana::Grid::createGlobalGrid(
@@ -231,7 +229,16 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, BaseOutput, Dimension>
             horizon / ( ( high_corner[0] - low_corner[0] ) / num_cells[0] ) );
         halo_width = m + 1; // Just to be safe.
 
-        domain( low_corner, high_corner, num_cells, halo_width );
+        if ( inputs.contains( "is_periodic" ) )
+        {
+            std::array<bool, 3> is_periodic = inputs["is_periodic"];
+            domain( low_corner, high_corner, num_cells, halo_width,
+                    is_periodic );
+        }
+        else
+        {
+            domain( low_corner, high_corner, num_cells, halo_width );
+        }
     }
 
     KOKKOS_INLINE_FUNCTION bool operator()( const int, const double[dim] ) const
