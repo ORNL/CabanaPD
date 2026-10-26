@@ -28,6 +28,7 @@
 #include <CabanaPD_OutputProfiles.hpp>
 #include <CabanaPD_Particles.hpp>
 #include <CabanaPD_Prenotch.hpp>
+#include <CabanaPD_Properties.hpp>
 #include <CabanaPD_Solver.hpp>
 #include <CabanaPD_Types.hpp>
 #include <CabanaPD_config.hpp>
