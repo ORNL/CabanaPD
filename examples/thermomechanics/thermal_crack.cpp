@@ -113,7 +113,7 @@ void thermalCrackExample( const std::string filename )
     CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K );
 
     auto temp = particles.sliceTemperature();
-    std::vector<double> coeff = inputs["thermal_expansion_coeff"];
+    std::vector<double> coeff = inputs["coeff_thermal_expansion_coefficients"];
     CustomAlpha alpha( coeff, temp );
     const double s0_coeff = CabanaPD::criticalStretch( horizon, K, G0 );
     CabanaPD::ConstantProperty s0( s0_coeff );
