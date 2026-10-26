@@ -74,10 +74,10 @@ struct MechanicsModel<LPS, Elastic, FunctorK, FunctorG> : public BaseForceModel
     template <typename ModelType1, typename ModelType2>
     MechanicsModel( const ModelType1& model1, const ModelType2& model2 )
         : base_type( model1, model2 )
+        , influence_type( model1.influenceType() )
         , K( AveragePropertyWrapper( model1.K, model2.K ) )
         , G( AveragePropertyWrapper( model1.G, model2.G ) )
     {
-        influence_type = model1.influenceType();
         if ( model2.influenceType() != model1.influenceType() )
             log_err( std::cout,
                      "Influence function type for each model must match for "
