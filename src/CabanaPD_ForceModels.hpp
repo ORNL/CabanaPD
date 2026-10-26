@@ -163,6 +163,7 @@ struct FractureModel<NoFracture>
 {
     using fracture_tag = NoFracture;
     double max = std::numeric_limits<double>::max();
+    PropertyWrapper<ConstantProperty> s0{ max };
 
     FractureModel() = default;
 
@@ -194,35 +195,39 @@ struct FractureModel<CriticalStretch, FunctorType>
 {
     using fracture_tag = Fracture;
 
-    FunctorType s0;
-    int influence_type;
+    PropertyWrapper<FunctorType> s0;
+    int fracture_influence_type;
 
     FractureModel( const double _force_horizon, const double _K,
                    const double G0, const int influence = 1 )
         : s0( ConstantProperty(
               CabanaPD::criticalStretch( _force_horizon, _K, G0, influence ) ) )
-        , influence_type( influence )
+        , fracture_influence_type( influence )
     {
     }
 
     FractureModel( const double _s0 )
         : s0( _s0 )
+        , fracture_influence_type( 1 )
     {
     }
 
     FractureModel( const FunctorType _s0 )
         : s0( _s0 )
+        , fracture_influence_type( 1 )
     {
     }
 
     // Average from existing models.
     template <typename ModelType1, typename ModelType2>
     FractureModel(
-        const ModelType1& model1, const ModelType2&,
+        const ModelType1& model1, const ModelType2& model2,
         typename std::enable_if_t<( is_force_model<ModelType1>::value &&
                                     is_force_model<ModelType2>::value ),
                                   int>* = 0 )
-        : s0( model1.s0 )
+        : s0( WeightedAveragePropertyWrapper( model1.s0, model2.s0, model1.K,
+                                              model2.K ) )
+        , fracture_influence_type( model1.fracture_influence_type )
     {
     }
 
@@ -235,7 +240,7 @@ struct FractureModel<CriticalStretch, FunctorType>
     }
 
     KOKKOS_FUNCTION
-    auto influenceType() const { return influence_type; }
+    auto influenceType() const { return fracture_influence_type; }
 };
 
 template <typename FunctorType>

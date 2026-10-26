@@ -77,6 +77,46 @@ struct AveragePropertyWrapper : public PropertyWrapper<FunctorType1>
     FunctorType2 prop2;
 };
 
+template <typename FunctorType1, typename FunctorType2, typename FunctorK1,
+          typename FunctorK2>
+struct WeightedAveragePropertyWrapper
+    : public AveragePropertyWrapper<FunctorType1, FunctorType2>
+{
+    using base_type = AveragePropertyWrapper<FunctorType1, FunctorType2>;
+
+    WeightedAveragePropertyWrapper( const PropertyWrapper<FunctorType1> s0_1,
+                                    const PropertyWrapper<FunctorType2> s0_2,
+                                    const PropertyWrapper<FunctorK1> K_1,
+                                    const PropertyWrapper<FunctorK2> K_2 )
+        : base_type( s0_1.prop, s0_2.prop )
+        , K1( K_1.prop )
+        , K2( K_2.prop )
+    {
+    }
+
+    KOKKOS_FUNCTION
+    auto operator()( const int p ) const
+    {
+        return Kokkos::sqrt( ( prop( p ) * prop( p ) * K1( p ) +
+                               prop2( p ) * prop2( p ) * K2( p ) ) /
+                             ( K1( p ) + K2( p ) ) );
+    }
+
+    template <typename ParticleType>
+    void update( const ParticleType& particles )
+    {
+        prop.update( particles );
+        prop2.update( particles );
+        K1.update( particles );
+        K2.update( particles );
+    }
+
+    using base_type::prop;
+    using base_type::prop2;
+    FunctorK1 K1;
+    FunctorK2 K2;
+};
+
 struct ConstantProperty
 {
     ConstantProperty( const double v )
