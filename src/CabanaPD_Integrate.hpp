@@ -377,10 +377,11 @@ struct ADRIntegrator
             l2_norm_force_update, l2_norm_force_denominator,
             l2_norm_displacement_update, l2_norm_displacement_denominator );
         Kokkos::fence( "ADRIntegrator::Fence::middleStep" );
-        _l2_norm_force_residual =
-            Kokkos::sqrt( l2_norm_force_update / l2_norm_force_denominator );
-        _l2_norm_displacement_residual = Kokkos::sqrt(
-            l2_norm_displacement_update / l2_norm_displacement_denominator );
+        _l2_norm_force_residual = Kokkos::sqrt(
+            l2_norm_force_update / ( l2_norm_force_denominator + 1e-16 ) );
+        _l2_norm_displacement_residual =
+            Kokkos::sqrt( l2_norm_displacement_update /
+                          ( l2_norm_displacement_denominator + 1e-16 ) );
     }
 
     template <typename ForceType, typename VelocityType,
