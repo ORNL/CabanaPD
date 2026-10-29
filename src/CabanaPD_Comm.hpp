@@ -398,6 +398,32 @@ class Comm<ParticleType, Pair, MaterialType, TemperatureDependent>
     void gatherTemperature() { gather_temp->apply(); }
 };
 
+template <class ParticleType, class MaterialType>
+class Comm<ParticleType, State, MaterialType, TemperatureDependent>
+    : public Comm<ParticleType, State, MaterialType, TemperatureIndependent>
+{
+  public:
+    using base_type =
+        Comm<ParticleType, State, MaterialType, TemperatureIndependent>;
+    using memory_space = typename base_type::memory_space;
+    using halo_type = typename base_type::halo_type;
+    using base_type::halo;
+
+    using gather_temp_type =
+        Cabana::Gather<halo_type, typename ParticleType::aosoa_temp_type>;
+    std::shared_ptr<gather_temp_type> gather_temp;
+
+    Comm( ParticleType& particles, int max_export_guess = 100 )
+        : base_type( particles, max_export_guess )
+    {
+        gather_temp =
+            std::make_shared<gather_temp_type>( *halo, particles._aosoa_temp );
+        particles.resize( halo->numLocal(), halo->numGhost() );
+    }
+
+    void gatherTemperature() { gather_temp->apply(); }
+};
+
 template <class ParticleType, class ModelType>
 class Comm<ParticleType, ModelType, MultiMaterial, TemperatureIndependent>
     : public Comm<ParticleType, ModelType, SingleMaterial,
