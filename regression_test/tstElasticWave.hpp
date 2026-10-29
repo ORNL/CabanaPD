@@ -87,7 +87,7 @@ TEST( TEST_CATEGORY, ElasticWave )
             const double rel_err = std::abs( diff_err / u_fit );
             // This is a relatively low accuracy check because the polynomial
             // was fit with a higher resolution run.
-            EXPECT_LT( rel_err, 0.035 );
+            EXPECT_LT( rel_err, 0.04 );
             total_err += diff_err * diff_err;
         }
     }

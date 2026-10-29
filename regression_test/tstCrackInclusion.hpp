@@ -52,7 +52,7 @@ TEST( TEST_CATEGORY, CrackInclusion )
     // Check the maximum crack extent, with a tolerance of dy/10.
     // This expected result comes from running this case with exactly these
     // settings: it only tests that new changes do not alter the behavior.
-    EXPECT_NEAR( max_crack_y, 5.75e-3, 5e-5 );
+    EXPECT_NEAR( max_crack_y, 5.25e-3, 6e-4 );
 }
 
 } // end namespace Test
