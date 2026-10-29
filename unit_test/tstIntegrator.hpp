@@ -298,10 +298,12 @@ void testIntegratorADRparticlesMultiMaterialSimpleMass(
     double stiffness[numMaterials] = { 1000, 10 };
 
     using model_type = CabanaPD::PMB;
-    CabanaPD::ForceModel force_model_0( model_type{}, CabanaPD::NoFracture{},
-                                        1.0, stiffness[0] );
-    CabanaPD::ForceModel force_model_1( model_type{}, CabanaPD::NoFracture{},
-                                        1.0, stiffness[1] );
+    CabanaPD::MechanicsModel mechanics_model_0( model_type{}, 1.0,
+                                                stiffness[0] );
+    CabanaPD::ForceModel force_model_0( mechanics_model_0 );
+    CabanaPD::MechanicsModel mechanics_model_1( model_type{}, 1.0,
+                                                stiffness[1] );
+    CabanaPD::ForceModel force_model_1( mechanics_model_1 );
 
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, force_model_0, force_model_1 );
@@ -401,10 +403,12 @@ void testIntegratorADRparticlesMultiMaterialExactMass(
     double stiffness[numMaterials] = { 1000, 10 };
 
     using model_type = CabanaPD::PMB;
-    CabanaPD::ForceModel force_model_0( model_type{}, CabanaPD::NoFracture{},
-                                        1.0, stiffness[0] );
-    CabanaPD::ForceModel force_model_1( model_type{}, CabanaPD::NoFracture{},
-                                        1.0, stiffness[1] );
+    CabanaPD::MechanicsModel mechanics_model_0( model_type{}, 1.0,
+                                                stiffness[0] );
+    CabanaPD::ForceModel force_model_0( mechanics_model_0 );
+    CabanaPD::MechanicsModel mechanics_model_1( model_type{}, 1.0,
+                                                stiffness[1] );
+    CabanaPD::ForceModel force_model_1( mechanics_model_1 );
 
     auto models = CabanaPD::createMultiForceModel(
         particles, CabanaPD::AverageTag{}, force_model_0, force_model_1 );
