@@ -377,6 +377,7 @@ struct ADRIntegrator
             l2_norm_force_update, l2_norm_force_denominator,
             l2_norm_displacement_update, l2_norm_displacement_denominator );
         Kokkos::fence( "ADRIntegrator::Fence::middleStep" );
+        // Add a small number to the denominator to avoid division by zero
         _l2_norm_force_residual = Kokkos::sqrt(
             l2_norm_force_update / ( l2_norm_force_denominator + 1e-16 ) );
         _l2_norm_displacement_residual =
