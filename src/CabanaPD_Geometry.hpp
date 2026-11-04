@@ -43,11 +43,21 @@ struct Region
     {
     }
 
-    template <class PositionType>
-    KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
-                                        const int pid ) const
+    KOKKOS_FUNCTION bool inside( const double x[3] ) const
+    {
+        return _user_functor( x );
+    }
+
+    KOKKOS_FUNCTION bool inside( const double pid, const double x[3] ) const
     {
         return _user_functor( x, pid );
+    }
+
+    template <class PositionType>
+    KOKKOS_FUNCTION bool inside( const PositionType& x, const int pid ) const
+    {
+        double xp[3] = { x( pid, 0 ), x( pid, 1 ), x( pid, 2 ) };
+        return inside( xp );
     }
 };
 
@@ -78,19 +88,29 @@ struct Region<RectangularPrism>
         assert( low[2] < high[2] );
     }
 
-    template <class PositionType>
-    KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
-                                        const int pid ) const
+    KOKKOS_FUNCTION bool inside( const double x[3] ) const
     {
-        return ( inside( x, pid, 0 ) && inside( x, pid, 1 ) &&
-                 inside( x, pid, 2 ) );
+        return ( inside( x, 0 ) && inside( x, 1 ) && inside( x, 2 ) );
+    }
+
+    KOKKOS_FUNCTION bool inside( const double x[3], const int d ) const
+    {
+        return ( x[d] >= low[d] && x[d] <= high[d] );
     }
 
     template <class PositionType>
-    KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x, const int pid,
-                                        const int d ) const
+    KOKKOS_FUNCTION bool inside( const PositionType& x, const int pid ) const
     {
-        return ( x( pid, d ) >= low[d] && x( pid, d ) <= high[d] );
+        double xp[3] = { x( pid, 0 ), x( pid, 1 ), x( pid, 2 ) };
+        return inside( xp );
+    }
+
+    template <class PositionType>
+    KOKKOS_FUNCTION bool inside( const PositionType& x, const int pid,
+                                 const int d ) const
+    {
+        double xp[3] = { x( pid, 0 ), x( pid, 1 ), x( pid, 2 ) };
+        return inside( xp, d );
     }
 };
 
@@ -119,15 +139,20 @@ struct Region<Cylinder>
         assert( low_z < high_z );
     }
 
-    template <class PositionType>
-    KOKKOS_INLINE_FUNCTION bool inside( const PositionType& x,
-                                        const int pid ) const
+    KOKKOS_FUNCTION bool inside( const double x[3] ) const
     {
-        double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center ) +
-                     ( x( pid, 1 ) - y_center ) * ( x( pid, 1 ) - y_center );
+        double rsq = ( x[0] - x_center ) * ( x[0] - x_center ) +
+                     ( x[1] - y_center ) * ( x[1] - y_center );
         return ( rsq >= radius_in * radius_in &&
-                 rsq <= radius_out * radius_out && x( pid, 2 ) >= low_z &&
-                 x( pid, 2 ) <= high_z );
+                 rsq <= radius_out * radius_out && x[2] >= low_z &&
+                 x[2] <= high_z );
+    }
+
+    template <class PositionType>
+    KOKKOS_FUNCTION bool inside( const PositionType& x, const int pid ) const
+    {
+        double xp[3] = { x( pid, 0 ), x( pid, 1 ), x( pid, 2 ) };
+        return inside( xp );
     }
 };
 
