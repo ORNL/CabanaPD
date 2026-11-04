@@ -18,6 +18,32 @@
 
 #include <CabanaPD.hpp>
 
+template <typename TemperatureType>
+struct CustomKappa : public CabanaPD::PolynomialDependence<TemperatureType>
+{
+    using base_type = CabanaPD::PolynomialDependence<TemperatureType>;
+    using base_type::base_type;
+    using base_type::coeff;
+    using base_type::field;
+
+    // Return temperature-dependent value.
+    KOKKOS_FUNCTION
+    auto operator()( const int p ) const
+    {
+        return coeff( 0 ) + coeff( 1 ) / field( p );
+    }
+
+    // FIXME
+    template <typename ParticleType>
+    void update( const ParticleType& particles )
+    {
+        field = particles.sliceTemperature();
+    }
+};
+template <typename ArrayType, typename TemperatureType>
+CustomKappa( const ArrayType, const TemperatureType )
+    -> CustomKappa<TemperatureType>;
+
 // Simulate heat transfer in a pre-notched pseudo-1d cube.
 void thermalDeformationHeatTransferPrenotchedExample(
     const std::string filename )
@@ -44,9 +70,7 @@ void thermalDeformationHeatTransferPrenotchedExample(
     double G0 = inputs["fracture_energy"];
     double horizon = inputs["horizon"];
     horizon += 1e-10;
-    double alpha = inputs["thermal_expansion_coeff"];
-    double kappa = inputs["thermal_conductivity"];
-    double cp = inputs["specific_heat_capacity"];
+    double cp_coeff = inputs["specific_heat_capacity"];
 
     // Problem parameters
     double temp0 = inputs["reference_temperature"];
@@ -134,10 +158,26 @@ void thermalDeformationHeatTransferPrenotchedExample(
     //                    Force model
     // ====================================================
     CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K );
-    const double s0 = CabanaPD::criticalStretch( horizon, K, G0 );
-    CabanaPD::ThermalModel thermal_model( horizon, s0, temp, alpha, kappa, cp,
+    const double s0_coeff = CabanaPD::criticalStretch( horizon, K, G0 );
+    CabanaPD::ConstantProperty s0( s0_coeff );
+
+    std::vector<double> alpha_coeff = inputs["thermal_expansion_coeff"];
+    CabanaPD::PolynomialDependence alpha( alpha_coeff, temp );
+    std::vector<double> kappa_coeff = inputs["thermal_conductivity"];
+    CustomKappa kappa( kappa_coeff, temp );
+    CabanaPD::ConstantProperty alpha2( alpha_coeff[0] );
+    CabanaPD::ConstantProperty cp( cp_coeff );
+    CabanaPD::ThermalModel thermal_model( horizon, s0, temp, alpha2, kappa, cp,
                                           temp0 );
     CabanaPD::ThermalForceModel force_model( mechanics_model, thermal_model );
+
+    CabanaPD::ConstantProperty kappa2( kappa_coeff[0] );
+    CabanaPD::ThermalModel thermal_model2( horizon, s0, temp, alpha, kappa2, cp,
+                                           temp0 );
+    CabanaPD::ThermalForceModel force_model2( mechanics_model, thermal_model2 );
+
+    auto models = CabanaPD::createMultiForceModel(
+        particles, CabanaPD::AverageTag{}, force_model, force_model2 );
 
     // ====================================================
     //                   Create solver
