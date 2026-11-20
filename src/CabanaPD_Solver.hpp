@@ -239,8 +239,8 @@ class Solver
         }
         // Compute initial internal forces and energy.
         updateForce();
-        computeEnergy( force_model, *force, particles, *neighbor );
-        computeStress( force_model, *force, particles, *neighbor );
+        computeEnergyScalarField();
+        computeStressTensorField();
 
         if ( initial_output )
             particles.output( 0, 0.0, output_reference );
@@ -479,14 +479,24 @@ class Solver
         computeForce( force_model, *force, particles, *neighbor );
     }
 
+    void computeStressTensorField()
+    {
+        computeStress( force_model, *force, particles, *neighbor );
+    }
+
+    void computeEnergyScalarField()
+    {
+        computeEnergy( force_model, *force, particles, *neighbor );
+    }
+
     void output( const int step )
     {
         // Print output.
         if ( step % output_frequency == 0 )
         {
             _step_timer.start();
-            computeEnergy( force_model, *force, particles, *neighbor );
-            computeStress( force_model, *force, particles, *neighbor );
+            computeEnergyScalarField();
+            computeStressTensorField();
 
             particles.output( step / output_frequency, step * dt,
                               output_reference );
