@@ -44,18 +44,22 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
     // ====================================================
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
+    std::array<int, 3> num_cells = inputs["num_cells"];
 
     // ====================================================
     //            Force model
     // ====================================================
     using model_type = CabanaPD::PMB;
-    CabanaPD::ForceModel force_model( model_type{}, horizon, K, G0 );
+    CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K );
+    CabanaPD::FractureModel fracture_model( horizon, K, G0 );
+    CabanaPD::ForceModel force_model( mechanics_model, fracture_model );
 
     // ====================================================
     //                 Particle generation
     // ====================================================
     // Note that individual inputs can be passed instead (see other examples).
-    CabanaPD::Particles particles( mem_space{}, model_type{} );
+    CabanaPD::Particles particles( mem_space{}, model_type{},
+                                   CabanaPD::EnergyStressOutput{} );
     particles.domain( inputs );
     particles.create( exec_space{} );
 
@@ -97,41 +101,74 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
         low_corner[0], high_corner[0], low_corner[1], high_corner[1],
         low_corner[2], high_corner[2] );
 
-    double edge_length_cube = high_corner[0] - low_corner[0] - 2 * horizon;
-
     // Create BC last to ensure ghost particles are included.
     auto u = solver.particles.sliceDisplacement();
-    double strain_rate = 0.0001;
+    double strain = 0.0001;
     double end_time_factor = 0.5;
     auto disp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
-        double non_dim_time = t / final_time;
-        if ( non_dim_time > end_time_factor )
-            non_dim_time = end_time_factor;
+        double non_dim_time = t / ( final_time * end_time_factor );
+        if ( non_dim_time >= 1.0 )
+            non_dim_time = 1.0;
 
         if ( !center_cube.inside( x, pid ) )
         {
             // uni-axial strain
-            u( pid, 0 ) =
-                x( pid, 0 ) / edge_length_cube * strain_rate * non_dim_time;
+            u( pid, 0 ) = x( pid, 0 ) * strain * non_dim_time;
+            // poission contraction
+            u( pid, 1 ) = x( pid, 1 ) * -nu * strain * non_dim_time;
+            u( pid, 2 ) = x( pid, 2 ) * -nu * strain * non_dim_time;
         }
     };
     auto bc = CabanaPD::createBoundaryCondition(
         disp_func, exec_space{}, solver.particles, false, full_cube );
+    // ====================================================
+    //                   ADR Integrator
+    // ====================================================
+    double adrSubDeltaT = 1.0;
+    auto particleADRIntegrator =
+        CabanaPD::createADRParticleIntegratorWithSimpleMass(
+            exec_space{}, f, adrSubDeltaT, horizon,
+            ( high_corner[0] - low_corner[0] ) / num_cells[0],
+            18.0 * static_cast<double>( K ) /
+                ( Kokkos::numbers::pi * horizon * horizon * horizon * horizon ),
+            2. );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
     solver.init( bc );
-    solver.run( bc );
+    particleADRIntegrator.reset( exec_space{}, particles );
+
+    // Do all of the simulation with ADR integration.
+    double time = 0.0;
+    int numADRSteps = 2;
+    double adrDeltaT = final_time / numADRSteps;
+
+    for ( int adrStep = 1; adrStep <= numADRSteps; ++adrStep )
+    {
+        time = adrDeltaT * adrStep;
+        // integrate using the ADR while disabling bond failure. With bond
+        // failure active, we can not do large load increments (timesteps) as
+        // the particles at the boundary would immediately fail.
+        CabanaPD::runUntilConvergedWithExternalIntegrator(
+            exec_space{}, solver, particleADRIntegrator, bc, time, true, 1e-11,
+            1e-5, 30'000, MPI_COMM_WORLD );
+
+        solver.particles.output( adrStep, time, solver.output_reference );
+
+        std::cout << adrStep << "/" << numADRSteps << " " << time
+                  << " via ADR integration\n";
+    }
 
     // ====================================================
     //            Validation functor
     // ====================================================
-    using HostAoSoA =
+    auto sigma = particles.sliceStress();
+    using HostAoSoA_type =
         Cabana::AoSoA<Cabana::MemberTypes<double[3], double[3], double[3]>,
                       Kokkos::HostSpace>;
-    HostAoSoA aosoa_host( "host_aosoa", particles.size() );
+    HostAoSoA_type aosoa_host( "host_aosoa", particles.size() );
     auto u_host = Cabana::slice<0>( aosoa_host );
     auto f_host = Cabana::slice<1>( aosoa_host );
     auto x_host = Cabana::slice<2>( aosoa_host );
@@ -139,6 +176,17 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
     Cabana::deep_copy( u_host, u );
     Cabana::deep_copy( f_host, f );
     Cabana::deep_copy( x_host, x );
+
+    // Compute stresses
+    solver.computeStressTensorField();
+    using HostAoSoA_stress_type =
+        Cabana::AoSoA<typename decltype( particles )::output_types,
+                      Kokkos::HostSpace, 1>;
+    HostAoSoA_stress_type aosoa_stress_host( "host_stress-aosoa",
+                                             particles.size() );
+    auto sigma_host = Cabana::slice<0>( aosoa_stress_host );
+
+    Cabana::deep_copy( sigma_host, sigma );
 
     // Create region for center of cube. This helps eliminate surface effects
     CabanaPD::Region<CabanaPD::RectangularPrism> center_region(
@@ -148,17 +196,16 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
     // Primary check on the particle displacement that results from the
     // displacement of the clamps check strain in main direction, which is x
     Kokkos::parallel_for(
-        "displacement_center_region_x",
-        Kokkos::RangePolicy<exec_space>( 0, particles.size() ),
+        "on-axis_displacement_center_region",
+        Kokkos::RangePolicy<Kokkos::DefaultHostExecutionSpace>(
+            0, particles.size() ),
         KOKKOS_LAMBDA( const int pid ) {
             if ( center_cube.inside( x_host, pid ) )
             {
                 if ( center_region.inside( x_host, pid ) )
                 {
-                    EXPECT_NEAR( u_host( pid, 0 ),
-                                 x( pid, 0 ) / edge_length_cube * strain_rate *
-                                     end_time_factor,
-                                 Kokkos::abs( u_host( pid, 0 ) ) * 1e-1 );
+                    EXPECT_NEAR( u_host( pid, 0 ), x( pid, 0 ) * strain,
+                                 Kokkos::abs( x( pid, 0 ) * strain ) * 1e-10 );
                 }
             }
         } );
@@ -166,22 +213,53 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
     // Secondary check on the particle displacement that results from the
     // Poisson effect. We only check y check displacement created by nu
     Kokkos::parallel_for(
-        "displacement_center_region_y",
-        Kokkos::RangePolicy<exec_space>( 0, particles.size() ),
+        "off-axis_displacement_center_region",
+        Kokkos::RangePolicy<Kokkos::DefaultHostExecutionSpace>(
+            0, particles.size() ),
         KOKKOS_LAMBDA( const int pid ) {
             if ( center_cube.inside( x_host, pid ) )
             {
                 if ( center_region.inside( x_host, pid ) )
                 {
-                    EXPECT_NEAR( u_host( pid, 1 ),
-                                 ( -nu ) * x( pid, 1 ) / edge_length_cube *
-                                     strain_rate * end_time_factor,
-                                 Kokkos::abs( nu * u_host( pid, 0 ) ) * 1e-1 );
+                    EXPECT_NEAR(
+                        u_host( pid, 1 ), ( -nu ) * x( pid, 1 ) * strain,
+                        Kokkos::abs( -nu * x( pid, 1 ) * strain ) * 1e-10 );
+                    EXPECT_NEAR(
+                        u_host( pid, 2 ), ( -nu ) * x( pid, 2 ) * strain,
+                        Kokkos::abs( -nu * x( pid, 2 ) * strain ) * 1e-10 );
                 }
             }
         } );
 
-    // TODO we probably want to check the stresses.
-    // but either we use ADR or we find a good averaging.
+    // Tertiary check on-axis and off-axis stresses
+    Kokkos::parallel_for(
+        "stress_center_region",
+        Kokkos::RangePolicy<Kokkos::DefaultHostExecutionSpace>(
+            0, particles.size() ),
+        KOKKOS_LAMBDA( const int pid ) {
+            if ( center_cube.inside( x_host, pid ) )
+            {
+                if ( center_region.inside( x_host, pid ) )
+                {
+                    for ( int i = 0; i < 3; ++i )
+                        for ( int j = 0; j < 3; ++j )
+                        {
+                            if ( i == j && i == 0 )
+                            {
+                                // on-axis stress (x-axis)
+                                EXPECT_NEAR( sigma_host( pid, 0, 0 ),
+                                             strain * E,
+                                             Kokkos::abs( strain * E ) * 1e-1 );
+                            }
+                            else
+                            {
+                                // all other stresses should be 0
+                                EXPECT_NEAR( sigma_host( pid, i, j ), 0.0,
+                                             1e-1 );
+                            }
+                        }
+                }
+            }
+        } );
 };
 } // namespace Test
