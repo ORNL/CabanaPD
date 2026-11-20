@@ -155,6 +155,7 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
             exec_space{}, solver, particleADRIntegrator, bc, time, true, 1e-11,
             1e-5, 30'000, MPI_COMM_WORLD );
 
+        solver.computeStressTensorField();
         solver.particles.output( adrStep, time, solver.output_reference );
 
         std::cout << adrStep << "/" << numADRSteps << " " << time
