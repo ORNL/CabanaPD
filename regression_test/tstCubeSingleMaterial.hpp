@@ -37,6 +37,7 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
     double G0 = inputs["fracture_energy"];
     double final_time = inputs["final_time"];
     double horizon = inputs["horizon"];
+    int output_frequency = inputs["output_frequency"];
     horizon += 1e-10;
 
     // ====================================================
@@ -155,11 +156,15 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
             exec_space{}, solver, particleADRIntegrator, bc, time, true, 1e-11,
             1e-5, 30'000, MPI_COMM_WORLD );
 
-        solver.computeStressTensorField();
-        solver.particles.output( adrStep, time, solver.output_reference );
+        // to enable output for debugging
+        if ( adrStep % output_frequency == 0 )
+        {
+            solver.computeStressTensorField();
+            solver.particles.output( adrStep, time, solver.output_reference );
 
-        std::cout << adrStep << "/" << numADRSteps << " " << time
-                  << " via ADR integration\n";
+            std::cout << adrStep << "/" << numADRSteps << " " << time
+                      << " via ADR integration\n";
+        }
     }
 
     // ====================================================
