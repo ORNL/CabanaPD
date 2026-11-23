@@ -18,7 +18,7 @@ namespace Test
 {
 
 template <typename ModelType>
-void test_cube_linear_temperature_single( ModelType )
+void test_thermal_cube_linear_temperature_single( ModelType )
 {
     // ====================================================
     //            Kokkos spaces
@@ -28,7 +28,7 @@ void test_cube_linear_temperature_single( ModelType )
     // ====================================================
     //                   Read inputs
     // ====================================================
-    std::string input = "cube_linear_temperature.json";
+    std::string input = "thermal_cube_linear_temperature.json";
 
     CabanaPD::Inputs inputs( input );
 
@@ -182,9 +182,9 @@ void test_cube_linear_temperature_single( ModelType )
     }
 }
 
-TEST( TEST_CATEGORY, test_cube_linear_temperature_single_PMB )
+TEST( TEST_CATEGORY, test_thermal_cube_linear_temperature_single_PMB )
 {
-    test_cube_linear_temperature_single( CabanaPD::PMB{} );
+    test_thermal_cube_linear_temperature_single( CabanaPD::PMB{} );
 }
 
 // TODO: we currently don't have LPS and thermomechanics
