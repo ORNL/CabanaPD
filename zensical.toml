@@ -50,7 +50,7 @@ nav = [
   { "Contributing" = "CONTRIBUTING.md"},
   { "Citing CabanaPD" = "citing.md"},
   { "Theory Guide" = ["theory/peridynamics.md"] },
-  { "User Guide" = ["user/features.md", "user/examples.md", { "Tests" = [ "user/tests.md", {"Regression" = [ {"mechanical" =  ["user/regression/mechanical/cube_single_material.md"]}, {"thermomechanical" = ["user/regression/thermomechanical/cube_linear_temperature.md"]} ] }]}] },
+  { "User Guide" = ["user/features.md", "user/examples.md", { "Tests" = [ "user/tests.md", {"Regression" = [ {"thermal" = ["user/regression/thermal/cube_linear_temperature.md"]} ] }]}] },
   { "API reference" = [
      "API/input_files.md"
   ] }
