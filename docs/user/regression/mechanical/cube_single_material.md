@@ -1,7 +1,7 @@
 # Cube with single material
 
 This regression test consists of the simplest possible test of macroscopic material behavior, material in uniaxial, constant strain.
-The test's source file is [`tstCubeSingleMaterial.hpp`](https://github.com/ORNL/CabanaPD/blob/main/regression_test/tstCubeSingleMaterial.hpp), the input file [`inputs/cube_single_material_pmb.json`](https://github.com/ORNL/CabanaPD/blob/main/regression_test/inputs/cube_single_material_pmb.json).
+The test's source file is [`tstMechanicalCubeSingleMaterial.hpp`](https://github.com/ORNL/CabanaPD/blob/main/regression_test/tstMechanicalCubeSingleMaterial.hpp), the input file [`inputs/mechanical_cube_single_material.json`](https://github.com/ORNL/CabanaPD/blob/main/regression_test/inputs/mechanical_cube_single_material.json).
 
 ## Purpose
 
@@ -39,7 +39,8 @@ Boundary conditions are applied over the first half of the simulation time, the 
 ### Solver
 
 As the stresses of the solution will be evaluated, this regression test is using the adaptive dynamic relaxation to compute a stationary solutioin. It is observed that the solver was not able to reduce the force residual to values $<10^{-11}$.
-This resulted in the stresses having a residual error of $<10^{-1}$.
+For the `PMB` this resulted in an error in the displacement of $e_{u,PMB} <1.0 * 10^{-10}$ and in the stress of $e_{\sigma,PMB} < 1.0 * 10^{-1}$.
+For the `LPS` this resulted in an error in the displacement of $e_{u,LPS} <3.0 * 10^{-2}$ and in the stress of $e_{\sigma,LPS} <2.0 * 10^{-1}$.
 
 ## Evaluation
 
