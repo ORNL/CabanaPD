@@ -1,6 +1,7 @@
 # Cube with single material
 
 This regression test consists of the simplest possible test of macroscopic material behavior, material in uniaxial, constant strain.
+The test's source file is [`tstCubeSingleMaterial.hpp`](https://github.com/ORNL/CabanaPD/blob/main/regression_test/tstCubeSingleMaterial.hpp), the input file [`inputs/cube_single_material_pmb.json`](https://github.com/ORNL/CabanaPD/blob/main/regression_test/inputs/cube_single_material_pmb.json).
 
 ## Purpose
 
