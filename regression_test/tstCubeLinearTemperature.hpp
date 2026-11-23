@@ -113,9 +113,9 @@ void test_cube_linear_temperature_single( ModelType )
     double end_time_factor = 0.5;
     auto linear_temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
-        double non_dim_time = t / final_time;
-        if ( non_dim_time > end_time_factor )
-            non_dim_time = end_time_factor;
+        double non_dim_time = t / ( final_time * end_time_factor );
+        if ( non_dim_time >= 1.0 )
+            non_dim_time = 1.0;
 
         if ( !center_cube.inside( x, pid ) )
         {
@@ -160,8 +160,7 @@ void test_cube_linear_temperature_single( ModelType )
             if ( center_region.inside( x_host, pid ) )
             {
                 EXPECT_NEAR( temp_host( pid ),
-                             x_host( pid, 0 ) / edge_length_cube * delta_temp *
-                                 end_time_factor,
+                             x_host( pid, 0 ) / edge_length_cube * delta_temp,
                              2.e-16 );
             }
         }
