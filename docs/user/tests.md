@@ -1,6 +1,7 @@
 ---
 icon: lucide/list-checks
 ---
+# Building the tests
 
 Unit tests can be built by updating the CabanaPD CMake configuration in the
 script above with:

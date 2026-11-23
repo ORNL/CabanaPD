@@ -1,0 +1,14 @@
+{
+    "num_cells"              : {"value": [16, 16, 16]},
+    "system_size"            : {"value": [16e-0, 16e-0, 16e-0], "unit": "m"},
+    "density"                : {"value": 1200, "unit": "kg/m^3"},
+    "elastic_modulus"        : {"value": 2e+3, "unit": "Pa"},
+    "fracture_energy"        : {"value": 3000, "unit": "J/m^2"},
+    "horizon"                : {"value": 3.0, "unit": "m"},
+    "yield_stress"           : {"value": 30e6, "unit": "Pa"},
+    "final_time"             : {"value": 5e-5, "unit": "s"},
+    "timestep"               : {"value": 5.0e-9, "unit": "s"},
+    "timestep_safety_factor" : {"value": 0.85},
+    "output_frequency"       : {"value": 200},
+    "output_reference"       : {"value": false}
+}
