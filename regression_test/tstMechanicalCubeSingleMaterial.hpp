@@ -16,7 +16,11 @@
 
 namespace Test
 {
-TEST( TEST_CATEGORY, test_cube_single_material_PMB )
+template <class ModelType, class ForceModelType, class InputsType>
+void test_mechanical_cube_single_material( ForceModelType force_model,
+                                           InputsType inputs,
+                                           double displacement_tolerance,
+                                           double sigma_tolerance )
 {
     // ====================================================
     //            Kokkos spaces
@@ -26,15 +30,10 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
     // ====================================================
     //                   Read inputs
     // ====================================================
-    std::string input = "cube_single_material_pmb.json";
-
-    CabanaPD::Inputs inputs( input );
-
     double rho0 = inputs["density"];
     double E = inputs["elastic_modulus"];
     double nu = 0.25;
     double K = E / ( 3 * ( 1 - 2 * nu ) );
-    double G0 = inputs["fracture_energy"];
     double final_time = inputs["final_time"];
     double horizon = inputs["horizon"];
     int output_frequency = inputs["output_frequency"];
@@ -50,10 +49,7 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
     // ====================================================
     //            Force model
     // ====================================================
-    using model_type = CabanaPD::PMB;
-    CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K );
-    CabanaPD::FractureModel fracture_model( horizon, K, G0 );
-    CabanaPD::ForceModel force_model( mechanics_model, fracture_model );
+    using model_type = ModelType;
 
     // ====================================================
     //                 Particle generation
@@ -211,7 +207,8 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
                 if ( center_region.inside( x_host, pid ) )
                 {
                     EXPECT_NEAR( u_host( pid, 0 ), x( pid, 0 ) * strain,
-                                 Kokkos::abs( x( pid, 0 ) * strain ) * 1e-10 );
+                                 Kokkos::abs( x( pid, 0 ) * strain ) *
+                                     displacement_tolerance );
                 }
             }
         } );
@@ -227,12 +224,14 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
             {
                 if ( center_region.inside( x_host, pid ) )
                 {
-                    EXPECT_NEAR(
-                        u_host( pid, 1 ), ( -nu ) * x( pid, 1 ) * strain,
-                        Kokkos::abs( -nu * x( pid, 1 ) * strain ) * 1e-10 );
-                    EXPECT_NEAR(
-                        u_host( pid, 2 ), ( -nu ) * x( pid, 2 ) * strain,
-                        Kokkos::abs( -nu * x( pid, 2 ) * strain ) * 1e-10 );
+                    EXPECT_NEAR( u_host( pid, 1 ),
+                                 ( -nu ) * x( pid, 1 ) * strain,
+                                 Kokkos::abs( -nu * x( pid, 1 ) * strain ) *
+                                     displacement_tolerance );
+                    EXPECT_NEAR( u_host( pid, 2 ),
+                                 ( -nu ) * x( pid, 2 ) * strain,
+                                 Kokkos::abs( -nu * x( pid, 2 ) * strain ) *
+                                     displacement_tolerance );
                 }
             }
         } );
@@ -255,17 +254,57 @@ TEST( TEST_CATEGORY, test_cube_single_material_PMB )
                                 // on-axis stress (x-axis)
                                 EXPECT_NEAR( sigma_host( pid, 0, 0 ),
                                              strain * E,
-                                             Kokkos::abs( strain * E ) * 1e-1 );
+                                             Kokkos::abs( strain * E ) *
+                                                 sigma_tolerance );
                             }
                             else
                             {
                                 // all other stresses should be 0
                                 EXPECT_NEAR( sigma_host( pid, i, j ), 0.0,
-                                             1e-1 );
+                                             sigma_tolerance );
                             }
                         }
                 }
             }
         } );
+};
+
+TEST( TEST_CATEGORY, test_mechanical_cube_single_material_PMB )
+{
+    std::string input = "mechanical_cube_single_material.json";
+    CabanaPD::Inputs inputs( input );
+
+    double E = inputs["elastic_modulus"];
+    double nu = 0.25;
+    double K = E / ( 3 * ( 1 - 2 * nu ) );
+    double G0 = inputs["fracture_energy"];
+    double horizon = inputs["horizon"];
+
+    using model_type = CabanaPD::PMB;
+    CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K );
+    CabanaPD::FractureModel fracture_model( horizon, K, G0 );
+    CabanaPD::ForceModel force_model( mechanics_model, fracture_model );
+    test_mechanical_cube_single_material<model_type>( force_model, inputs,
+                                                      1e-10, 1e-1 );
+}
+
+TEST( TEST_CATEGORY, test_mechanical_cube_single_material_LPS )
+{
+    std::string input = "mechanical_cube_single_material.json";
+    CabanaPD::Inputs inputs( input );
+
+    double E = inputs["elastic_modulus"];
+    double nu = 0.25;
+    double K = E / ( 3 * ( 1 - 2 * nu ) );
+    double G = E / ( 2 * ( 1 + nu ) );
+    double G0 = inputs["fracture_energy"];
+    double horizon = inputs["horizon"];
+
+    using model_type = CabanaPD::LPS;
+    CabanaPD::MechanicsModel mechanics_model( model_type{}, horizon, K, G );
+    CabanaPD::FractureModel fracture_model( horizon, K, G0 );
+    CabanaPD::ForceModel force_model( mechanics_model, fracture_model );
+    test_mechanical_cube_single_material<model_type>( force_model, inputs, 3e-2,
+                                                      2e-1 );
 };
 } // namespace Test
