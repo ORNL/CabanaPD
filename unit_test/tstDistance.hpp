@@ -78,7 +78,8 @@ TEST( TEST_CATEGORY, test_distance )
                     x, u, 0, 1,
                     // output variables
                     xi, r, s, rx, ry, rz, xi_x, xi_y, xi_z );
-                EXPECT_NEAR( s, eta_norm / xi_norm, eta_norm / xi_norm * 1e-4 );
+                EXPECT_NEAR( s, eta_norm / xi_norm,
+                             eta_norm / xi_norm * 1e-10 );
             }
         }
     }
