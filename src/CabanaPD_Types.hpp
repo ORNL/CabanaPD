@@ -12,6 +12,7 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <Cabana_Core.hpp>
 #include <type_traits>
 
 namespace CabanaPD

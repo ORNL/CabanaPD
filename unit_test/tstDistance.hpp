@@ -23,7 +23,6 @@
 #include <gtest/gtest.h>
 
 #include <CabanaPD_Force.hpp>
-#include <Cabana_Core.hpp>
 
 namespace Test
 {
