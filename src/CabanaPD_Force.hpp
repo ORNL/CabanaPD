@@ -89,7 +89,19 @@ getDistance( const PosType& x, const PosType& u, const int i, const int j,
     rz = xi_z + eta_w;
     r = Kokkos::sqrt( rx * rx + ry * ry + rz * rz );
     xi = Kokkos::sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
-    s = ( r - xi ) / xi;
+
+    // use fma and dot products to compute the stretch to avoid precision loss.
+    // Derived by multiplying (r - xi)/xi by (r + xi)/(r + xi) and simplifying.
+    // This results in the dot product of eta and nu - ||nu|| in the numerator
+    // and xi*(r+xi) in the denominator.
+    const double dot =
+        Kokkos::fma( xi_x, eta_u, Kokkos::fma( xi_y, eta_v, xi_z * eta_w ) );
+
+    const double eta2 =
+        Kokkos::fma( eta_u, eta_u, Kokkos::fma( eta_v, eta_v, eta_w * eta_w ) );
+
+    const double numerator = Kokkos::fma( 2.0, dot, eta2 );
+    s = numerator / ( xi * ( r + xi ) );
 }
 
 template <class PosType>
