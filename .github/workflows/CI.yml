@@ -41,6 +41,10 @@ jobs:
             cmake_build_type: 'Debug'
             kokkos_ver: '4.1.00'
             output: 'BOTH'
+          - distro: 'ubuntu:latest'
+            cxx: 'clang++'
+            cxx_extra_flags: '-fsanitize=address,undefined,leak'
+            extra_linker_flags: '-fsanitize=address,undefined,leak'
     runs-on: ubuntu-latest
     container: ghcr.io/ecp-copa/ci-containers/${{ matrix.distro }}
     steps:
@@ -99,11 +103,13 @@ jobs:
           cmake -B build \
             -D CMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }} \
             -D CMAKE_CXX_COMPILER=${{ matrix.cxx }} \
-            -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Werror" \
+            -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Werror ${{matrix.cxx_extra_flags}}" \
+            -D CMAKE_EXE_LINKER_FLAGS="${{ matrix.extra_linker_flags }}" \
             -D CMAKE_INSTALL_PREFIX=$HOME/CabanaPD \
             -D CMAKE_PREFIX_PATH="$HOME/Cabana" \
             -D MPIEXEC_MAX_NUMPROCS=2 \
             -D MPIEXEC_PREFLAGS="--oversubscribe" \
+            -D CMAKE_CXX_CLANG_TIDY="clang-tidy;-warnings-as-errors=*" \
             ${cmake_opts[@]}
           cmake --build build --parallel 2
           cmake --install build
